@@ -204,6 +204,10 @@ struct ATHLTHHomeView: View {
     @State private var homeWatchTransferMessage: String?
     @State private var homeWatchTransferError: String?
     @State private var showingGettingStartedPopup = false
+    @State private var homeRecoveryTrendSnapshot =
+        RecoveryTrendSnapshot.empty
+    @StateObject private var homeWeather =
+        HomeWeatherStore()
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -213,13 +217,53 @@ struct ATHLTHHomeView: View {
                 accent: ATHLTHTheme.premiumGold.opacity(0.44)
             ) {
                 ZStack(alignment: .topTrailing) {
-                    ATHLTHExclusiveHomeHero(
+                    ATHLTHHomeDashboardHero(
                         imageName: "HomeHero",
-                        title: greetingTitle,
-                        subtitle:
-                            session.profile.presence.state == .training
-                                ? "Training now · \(session.profile.presence.workoutTitle ?? "Workout")"
-                                : "Today, training and recovery at a glance."
+                        workout:
+                            homeTodayPlanWorkout?
+                                .workout,
+                        isStarting:
+                            homeDirectStartInProgress,
+                        weather:
+                            homeWeather.snapshot,
+                        onStart: {
+                            guard let selection =
+                                    homeTodayPlanWorkout
+                            else {
+                                return
+                            }
+
+                            if homeCanStartDirectly(
+                                selection.workout
+                            ) {
+                                startHomeWorkout(
+                                    selection.workout
+                                )
+                            } else {
+                                onOpenTrain(
+                                    .workout(
+                                        planID:
+                                            selection
+                                                .planID,
+                                        workoutID:
+                                            selection
+                                                .workout
+                                                .id
+                                    )
+                                )
+                            }
+                        },
+                        onQuickRun: {
+                            pendingHomeQuickStartKind =
+                                .running
+                        },
+                        onQuickStrength: {
+                            selectedHomeStrengthSession =
+                                homeFreestyleStrengthSession
+                        },
+                        onOpenPlan: {
+                            onOpenTrain(.plan)
+                        }
                     )
 
                     HStack(spacing: 7) {
@@ -358,21 +402,43 @@ struct ATHLTHHomeView: View {
                     .padding(.trailing, 16)
                 }
             } content: {
-                LazyVStack(spacing: 20) {
-                    homeTodayCard
+                LazyVStack(spacing: 12) {
+                    HomeHealthMetricStrip(
+                        snapshot:
+                            homeRecoveryTrendSnapshot,
+                        sleepText:
+                            homeSleepMetricText,
+                        restingHeartRateText:
+                            homeRestingHeartRateMetricText,
+                        hrvText:
+                            homeHRVMetricText,
+                        loadText:
+                            homeLoadMetricText,
+                        readinessText:
+                            homeReadinessMetricText
+                    )
 
-                    HomeActivityCenterV2()
-
-                    if let goal = homeActiveGoal {
-                        homeActiveGoalCard(goal)
-                    }
-
-                    HomeHappeningCard(
-                        challenges: challenges.visibleChallenges,
-                        events: community.upcomingEvents
+                    HomeWeeklyProgressStrip(
+                        plan: session.activePlan,
+                        workouts: health.workouts
                     ) {
-                        onSelectTab(4)
+                        onOpenTrain(.plan)
                     }
+
+                    homeGoalAndCalendarRow
+
+                    HomeRecentActivityStrip()
+
+                    HomeWeeklySummaryCard(
+                        runningDistanceKilometers:
+                            homeWeeklyRunningDistanceKilometers,
+                        durationMinutes:
+                            homeWeeklyDurationMinutes,
+                        strengthSessions:
+                            homeWeeklyStrengthSessions,
+                        sessionCount:
+                            homeWeeklySessionCount
+                    )
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -494,6 +560,13 @@ struct ATHLTHHomeView: View {
                 if !health.shouldDeferAutomaticHealthWork {
                     _ = await health.refreshWorkoutImportInbox()
                     await health.refreshAll()
+                    homeRecoveryTrendSnapshot =
+                        await health.recoveryTrendSnapshot(
+                            days: 14
+                        )
+                    homeWeather.refreshIfNeeded(
+                        force: true
+                    )
 
                     async let streakRefresh: Void = loadHomeStreak()
                     async let goalsRefresh: Void =
@@ -549,6 +622,8 @@ struct ATHLTHHomeView: View {
                 }
             }
             .task {
+                homeWeather.refreshIfNeeded()
+
                 // Let the Home hierarchy paint before starting refresh work.
                 // The compatibility preview is intentionally data-static so
                 // smoke tests measure rendering rather than backend latency.
@@ -571,6 +646,11 @@ struct ATHLTHHomeView: View {
                 if health.lastSuccessfulRefreshAt == nil {
                     await health.refreshAll()
                 }
+
+                homeRecoveryTrendSnapshot =
+                    await health.recoveryTrendSnapshot(
+                        days: 14
+                    )
 
                 async let streakRefresh: Void = loadHomeStreak()
                 async let goalsRefresh: Void =
@@ -921,6 +1001,785 @@ struct ATHLTHHomeView: View {
         }
 
         return "Short night"
+    }
+
+    private var homeSleepMetricText: String {
+        guard health.sleep.totalAsleep > 0 else {
+            return "—"
+        }
+
+        return health.sleep.totalAsleep.shortDuration
+    }
+
+    private var homeRestingHeartRateMetricText: String {
+        guard let value =
+                health.heart.restingHeartRate,
+              value.isFinite,
+              value > 0
+        else {
+            return "—"
+        }
+
+        return
+            "\(Int(value.rounded())) bpm"
+    }
+
+    private var homeHRVMetricText: String {
+        guard let value =
+                health.heart.hrvMilliseconds,
+              value.isFinite,
+              value > 0
+        else {
+            return "—"
+        }
+
+        return
+            "\(Int(value.rounded())) ms"
+    }
+
+    private var homeLoadMetricText: String {
+        let load =
+            homeRecoveryTrendSnapshot
+                .trainingLoad
+
+        if let ratio = load.ratio,
+           ratio.isFinite,
+           ratio > 0 {
+            return String(
+                format: "%.2f×",
+                locale: Locale.current,
+                ratio
+            )
+        }
+
+        guard load.acuteMinutes > 0
+        else {
+            return "—"
+        }
+
+        return
+            "\(Int(load.acuteMinutes.rounded())) min"
+    }
+
+    private var homeReadinessMetricText:
+        String? {
+        switch health.recovery.state {
+        case .ready:
+            return "God form"
+        case .balanced:
+            return "Balansert"
+        case .takeItEasy:
+            return "Rolig"
+        case .recover:
+            return "Restitusjon"
+        case .buildingBaseline:
+            return nil
+        }
+    }
+
+    private var homeWeekInterval:
+        DateInterval {
+        var calendar =
+            Calendar.current
+        calendar.firstWeekday = 2
+
+        return calendar.dateInterval(
+            of: .weekOfYear,
+            for: Date()
+        ) ??
+            DateInterval(
+                start:
+                    calendar.startOfDay(
+                        for: Date()
+                    ),
+                duration: 7 * 86_400
+            )
+    }
+
+    private var homeWorkoutsThisWeek:
+        [WorkoutSummary] {
+        health.workouts.filter {
+            homeWeekInterval.contains(
+                $0.startDate
+            )
+        }
+    }
+
+    private var homeWeeklyRunningDistanceKilometers:
+        Double {
+        homeWorkoutsThisWeek
+            .filter {
+                $0.activity ==
+                    .running
+            }
+            .compactMap(
+                \.distanceMeters
+            )
+            .reduce(0, +) /
+            1_000
+    }
+
+    private var homeWeeklyDurationMinutes:
+        Double {
+        homeWorkoutsThisWeek.reduce(
+            0
+        ) {
+            $0 +
+                max(
+                    $1.duration / 60,
+                    0
+                )
+        }
+    }
+
+    private var homeWeeklyStrengthSessions:
+        Int {
+        homeWorkoutsThisWeek
+            .filter {
+                $0.activity ==
+                    .strength
+            }
+            .count
+    }
+
+    private var homeWeeklySessionCount:
+        Int {
+        homeWorkoutsThisWeek.count
+    }
+
+    @ViewBuilder
+    private var homeGoalAndCalendarRow:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Group {
+                if let goal =
+                        homeActiveGoal {
+                    homeCompactGoalCard(
+                        goal
+                    )
+                } else {
+                    homeCompactCreateGoalCard
+                }
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+
+            homeTodayCalendarCard
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+        }
+    }
+
+    private func homeCompactGoalCard(
+        _ goal: ATHLTHGoal
+    ) -> some View {
+        NavigationLink {
+            GoalDetailView(
+                goalID: goal.id
+            )
+        } label: {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                HStack {
+                    Text("Aktuelt mål")
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer()
+
+                    Text("Se alle")
+                        .font(
+                            .system(
+                                size: 9.5,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+
+                HStack(spacing: 9) {
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                ATHLTHTheme
+                                    .vitality
+                                    .opacity(
+                                        0.16
+                                    ),
+                                lineWidth: 6
+                            )
+
+                        Circle()
+                            .trim(
+                                from: 0,
+                                to:
+                                    max(
+                                        min(
+                                            goal.progress,
+                                            1
+                                        ),
+                                        0
+                                    )
+                            )
+                            .stroke(
+                                ATHLTHTheme
+                                    .vitality,
+                                style:
+                                    StrokeStyle(
+                                        lineWidth:
+                                            6,
+                                        lineCap:
+                                            .round
+                                    )
+                            )
+                            .rotationEffect(
+                                .degrees(
+                                    -90
+                                )
+                            )
+
+                        Text(
+                            "\(Int((goal.progress * 100).rounded()))%"
+                        )
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                    }
+                    .frame(
+                        width: 50,
+                        height: 50
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(goal.title)
+                            .font(
+                                .caption
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+
+                        Text(
+                            homeNextMilestone(
+                                for: goal
+                            )?
+                            .title ??
+                            "Fortsett mot målet"
+                        )
+                        .font(
+                            .system(
+                                size: 9.5
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+
+                        ProgressView(
+                            value:
+                                goal.progress
+                        )
+                        .tint(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                    }
+                }
+                .frame(
+                    minHeight: 74
+                )
+            }
+            .padding(11)
+            .background(
+                Color.white.opacity(
+                    0.90
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 19,
+                        style:
+                            .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.black.opacity(
+                        0.04
+                    ),
+                    lineWidth: 0.7
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var homeCompactCreateGoalCard:
+        some View {
+        NavigationLink {
+            GoalCreationView()
+        } label: {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                HStack {
+                    Text("Aktuelt mål")
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer()
+
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(
+                        .caption.bold()
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+
+                HStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            "target"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .green
+                    )
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
+                    .background(
+                        Color.green
+                            .opacity(0.10),
+                        in: Circle()
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text("Sett et mål")
+                            .font(
+                                .caption
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                        Text(
+                            "Følg fremgangen direkte fra Home."
+                        )
+                        .font(
+                            .system(
+                                size: 9.5
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                    }
+                }
+                .frame(
+                    minHeight: 74
+                )
+            }
+            .padding(11)
+            .background(
+                Color.white.opacity(
+                    0.90
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 19,
+                        style:
+                            .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.black.opacity(
+                        0.04
+                    ),
+                    lineWidth: 0.7
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var homeTodayCalendarCard:
+        some View {
+        let plan =
+            session.activePlan
+        let workouts =
+            plan.map {
+                homeTodaySessions(
+                    in: $0
+                )
+            } ?? []
+
+        return VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            Button {
+                onOpenTrain(.plan)
+            } label: {
+                HStack {
+                    Text("Kalender i dag")
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer()
+
+                    Text("Se alle")
+                        .font(
+                            .system(
+                                size: 9.5,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            if let plan,
+               !workouts.isEmpty {
+                VStack(spacing: 7) {
+                    ForEach(
+                        Array(
+                            workouts
+                                .prefix(2)
+                        )
+                    ) { workout in
+                        Button {
+                            onOpenTrain(
+                                .workout(
+                                    planID:
+                                        plan.id,
+                                    workoutID:
+                                        workout
+                                            .id
+                                )
+                            )
+                        } label: {
+                            HStack(
+                                spacing: 7
+                            ) {
+                                Text(
+                                    workout
+                                        .scheduledStart?
+                                        .formatted(
+                                            date:
+                                                .omitted,
+                                            time:
+                                                .shortened
+                                        ) ??
+                                    "—"
+                                )
+                                .font(
+                                    .system(
+                                        size:
+                                            9.5,
+                                        weight:
+                                            .medium
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                                .frame(
+                                    width: 34,
+                                    alignment:
+                                        .leading
+                                )
+
+                                Image(
+                                    systemName:
+                                        workout
+                                            .kind
+                                            .systemImage
+                                )
+                                .font(
+                                    .system(
+                                        size: 11,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    homeWorkoutTint(
+                                        workout
+                                            .kind
+                                    )
+                                )
+                                .frame(
+                                    width: 27,
+                                    height: 27
+                                )
+                                .background(
+                                    homeWorkoutTint(
+                                        workout
+                                            .kind
+                                    )
+                                    .opacity(
+                                        0.10
+                                    ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                9,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 1
+                                ) {
+                                    Text(
+                                        workout
+                                            .title
+                                    )
+                                    .font(
+                                        .system(
+                                            size:
+                                                10.5,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(
+                                        1
+                                    )
+
+                                    Text(
+                                        homeSessionSummary(
+                                            workout
+                                        )
+                                    )
+                                    .font(
+                                        .system(
+                                            size:
+                                                8.5
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                    .lineLimit(
+                                        1
+                                    )
+                                }
+
+                                Spacer(
+                                    minLength:
+                                        0
+                                )
+                            }
+                        }
+                        .buttonStyle(
+                            .plain
+                        )
+                    }
+                }
+                .frame(
+                    minHeight: 74,
+                    alignment: .top
+                )
+            } else {
+                HStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            "calendar"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accentSoft,
+                        in: Circle()
+                    )
+
+                    Text(
+                        "Ingen flere planlagte økter i dag."
+                    )
+                    .font(
+                        .system(
+                            size: 9.5
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(3)
+                }
+                .frame(
+                    minHeight: 74
+                )
+            }
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style:
+                    .continuous
+            )
+            .stroke(
+                Color.black.opacity(
+                    0.04
+                ),
+                lineWidth: 0.7
+            )
+        }
     }
 
     private var homeActiveGoal: ATHLTHGoal? {
