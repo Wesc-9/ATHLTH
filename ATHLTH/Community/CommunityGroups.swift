@@ -4664,6 +4664,8 @@ struct CommunityGroupDetailView: View {
                 referenceClubChallengeCard(
                     challenge
                 )
+            } else {
+                referenceEmptyChallengeCard
             }
 
             referenceComingUpSection
@@ -5160,6 +5162,150 @@ struct CommunityGroupDetailView: View {
                 updateDraft = body
             }
         }
+    }
+
+    private var referenceEmptyChallengeCard:
+        some View {
+        Button {
+            if groups
+                .canCreateGroupContent(
+                    currentGroup
+                ) {
+                showingCreateChallenge = true
+            } else {
+                selectedTab = .challenges
+            }
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                Image("CommunityHero")
+                    .resizable()
+                    .scaledToFill()
+
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.42),
+                        Color.black.opacity(0.68)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 7
+                ) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "CLUB CHALLENGE",
+                            norwegian:
+                                "UKENS CHALLENGE"
+                        ),
+                        systemImage:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.7)
+                    .foregroundStyle(
+                        .white.opacity(0.94)
+                    )
+
+                    Spacer(minLength: 0)
+
+                    Text(
+                        groups
+                            .canCreateGroupContent(
+                                currentGroup
+                            )
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Choose the Club's next challenge",
+                                    norwegian:
+                                        "Velg neste challenge for Club-en"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "No active Club challenge",
+                                    norwegian:
+                                        "Ingen aktiv Club challenge"
+                                )
+                    )
+                    .font(
+                        .headline.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+
+                    HStack {
+                        Text(
+                            groups
+                                .canCreateGroupContent(
+                                    currentGroup
+                                )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Create challenge",
+                                        norwegian:
+                                            "Opprett challenge"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "View challenges",
+                                        norwegian:
+                                            "Se challenges"
+                                    )
+                        )
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+
+                        Image(
+                            systemName:
+                                "arrow.right"
+                        )
+                        .font(.caption.bold())
+                    }
+                    .foregroundStyle(
+                        .white.opacity(0.92)
+                    )
+                }
+                .padding(14)
+            }
+            .frame(height: 132)
+            .frame(maxWidth: .infinity)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.15),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func referenceClubChallengeCard(
