@@ -2303,7 +2303,7 @@ struct TrainingPlanCreationView: View {
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var creationError: String?
 
-    private let quickDurations = [1, 3, 4, 8, 12, 16, 24]
+    private let quickDurations = [1, 4, 8, 12]
 
     private var resolvedWeeks: Int {
         switch timelineMode {
@@ -3953,7 +3953,6 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
-    @State private var showingContentPicker = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseBeingEdited: PlannedExercise?
@@ -4410,8 +4409,25 @@ struct SessionEditorView: View {
                 if existingWorkout == nil ||
                     kind == .strength {
                     Section {
-                        Button {
-                            showingContentPicker = true
+                        Menu {
+                            Button {
+                                showingSavedWorkoutPicker = true
+                            } label: {
+                                Label(
+                                    "Workout",
+                                    systemImage: "rectangle.stack.fill"
+                                )
+                            }
+
+                            Button {
+                                kind = .strength
+                                showingExerciseLibrary = true
+                            } label: {
+                                Label(
+                                    "Exercise",
+                                    systemImage: "dumbbell.fill"
+                                )
+                            }
                         } label: {
                             HStack(spacing: 11) {
                                 Image(
@@ -4442,7 +4458,7 @@ struct SessionEditorView: View {
                                 Spacer()
 
                                 Image(
-                                    systemName: "chevron.right"
+                                    systemName: "chevron.down"
                                 )
                                 .font(.caption.bold())
                                 .foregroundStyle(.tertiary)
@@ -4495,36 +4511,6 @@ struct SessionEditorView: View {
                     }
                     .disabled(!canAdd)
                 }
-            }
-            .confirmationDialog(
-                "Add to this plan session",
-                isPresented: $showingContentPicker,
-                titleVisibility: .visible
-            ) {
-                Button {
-                    showingSavedWorkoutPicker = true
-                } label: {
-                    Label(
-                        "Workout",
-                        systemImage: "rectangle.stack.fill"
-                    )
-                }
-
-                Button {
-                    kind = .strength
-                    showingExerciseLibrary = true
-                } label: {
-                    Label(
-                        "Exercise",
-                        systemImage: "dumbbell.fill"
-                    )
-                }
-
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text(
-                    "A workout inserts the complete session. An exercise adds one movement to this session."
-                )
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
                 PlanWorkoutPickerView { workout in
