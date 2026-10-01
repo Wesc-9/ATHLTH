@@ -54,111 +54,187 @@ struct WorkoutStartOptionsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 14) {
                     ATHLTHCard {
-                        Text(session.title)
-                            .font(.title2.weight(.bold))
-                        Text("Choose how you want to record this workout.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
+                        HStack(
+                            alignment: .top,
+                            spacing: 12
+                        ) {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 4
+                            ) {
+                                Text(session.title)
+                                    .font(
+                                        .title2
+                                            .weight(.bold)
+                                    )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            trackingMode == .advanced
+                                                ? "Advanced tracking and workout options."
+                                                : "A fast setup with only the essentials.",
+                                        norwegian:
+                                            trackingMode == .advanced
+                                                ? "Avansert registrering og flere treningsvalg."
+                                                : "Raskt oppsett med bare det viktigste."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            trackingModeButton
+                        }
                     }
 
                     ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Workout device")
+                        HStack {
+                            ATHLTHSectionHeader(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Workout device",
+                                        norwegian: "Treningsenhet"
+                                    )
+                            )
 
-                        VStack(spacing: 10) {
-                            optionRow(
+                            Spacer()
+                        }
+
+                        HStack(spacing: 10) {
+                            deviceTile(
                                 title: "iPhone",
-                                subtitle: "Record and finish this workout directly in ATHLTH. Keep your iPhone with you.",
                                 icon: "iphone",
-                                selected: captureDevice == .iPhone
+                                selected:
+                                    captureDevice == .iPhone,
+                                disabled: false
                             ) {
                                 captureDevice = .iPhone
                             }
 
-                            optionRow(
+                            deviceTile(
                                 title: "Apple Watch",
-                                subtitle: watchConnected
-                                    ? "Record the continuous workout on Apple Watch."
-                                    : "Finish Apple Watch setup in Settings to use this option.",
                                 icon: "applewatch",
-                                selected: captureDevice == .appleWatch,
+                                selected:
+                                    captureDevice == .appleWatch,
                                 disabled: !watchConnected
                             ) {
-                                captureDevice = .appleWatch
+                                captureDevice =
+                                    .appleWatch
                             }
                         }
-                        .padding(.top, 12)
+                        .padding(.top, 10)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "This choice applies only to this workout.",
+                                norwegian:
+                                    "Valget gjelder bare denne økten."
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
                     }
 
-                    ATHLTHCard {
-                        ATHLTHSectionHeader(title: "Strength tracking")
-
-                        VStack(spacing: 10) {
-                            optionRow(
-                                title: "Simple",
-                                subtitle: "Only start, duration and finish. No sets, reps, weight or rest required.",
-                                icon: "play.circle.fill",
-                                selected: trackingMode == .simple
-                            ) {
-                                trackingMode = .simple
+                    if trackingMode == .advanced {
+                        VStack(spacing: 12) {
+                            if captureDevice == .appleWatch {
+                                AudioCoachSetupCard(
+                                    draft:
+                                        $audioCoachDraft,
+                                    showRouteOptions: false,
+                                    showStructuredOptions:
+                                        false
+                                )
                             }
 
-                            optionRow(
-                                title: "Advanced",
-                                subtitle: "Track exercises, sets, reps, weight, RPE and optional rest timers.",
-                                icon: "list.bullet.clipboard.fill",
-                                selected: trackingMode == .advanced
-                            ) {
-                                trackingMode = .advanced
+                            ATHLTHCard {
+                                HStack {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Train with someone",
+                                            norwegian:
+                                                "Tren med noen"
+                                        ),
+                                        systemImage:
+                                            "person.2.fill"
+                                    )
+                                    .font(.headline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme.accent
+                                    )
+
+                                    Spacer()
+                                }
+
+                                WorkoutFriendPicker(
+                                    selectedFriendIDs:
+                                        $selectedFriendIDs
+                                )
+                                .padding(.top, 8)
                             }
                         }
-                        .padding(.top, 12)
-                    }
-
-                    if captureDevice == .appleWatch {
-                        AudioCoachSetupCard(
-                            draft: $audioCoachDraft,
-                            showRouteOptions: false,
-                            showStructuredOptions: false
+                        .transition(
+                            .opacity
+                                .combined(
+                                    with: .move(
+                                        edge: .top
+                                    )
+                                )
                         )
-                    }
-
-                    ATHLTHCard {
-                        WorkoutFriendPicker(
-                            selectedFriendIDs: $selectedFriendIDs
-                        )
-                    }
-
-                    ATHLTHCard {
-                        Label("Choose for each workout", systemImage: "checkmark.shield.fill")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.accent)
-
-                        Text("This device choice applies only to the workout you are about to start. You can choose differently next time.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
                     }
 
                     Button {
-                        let selectedFriends = social.trainingPartners.filter {
-                            selectedFriendIDs.contains($0.userID)
-                        }
+                        let selectedFriends =
+                            trackingMode == .advanced
+                                ? social.trainingPartners
+                                    .filter {
+                                        selectedFriendIDs
+                                            .contains(
+                                                $0.userID
+                                            )
+                                    }
+                                : []
+
                         onStart(
                             captureDevice,
                             trackingMode,
                             selectedFriends,
-                            captureDevice == .appleWatch
-                                ? audioCoachDraft.configuration()
+                            trackingMode == .advanced &&
+                                captureDevice ==
+                                .appleWatch
+                                ? audioCoachDraft
+                                    .configuration()
                                 : .disabled
                         )
                         dismiss()
                     } label: {
                         Label(
-                            captureDevice == .appleWatch ? "Start with Apple Watch" : "Start on iPhone",
-                            systemImage: captureDevice == .appleWatch ? "applewatch" : "play.fill"
+                            captureDevice == .appleWatch
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Start with Apple Watch",
+                                    norwegian:
+                                        "Start med Apple Watch"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Start on iPhone",
+                                    norwegian:
+                                        "Start på iPhone"
+                                ),
+                            systemImage:
+                                captureDevice ==
+                                .appleWatch
+                                    ? "applewatch"
+                                    : "play.fill"
                         )
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -168,12 +244,23 @@ struct WorkoutStartOptionsView: View {
                     .tint(ATHLTHTheme.accent)
                 }
                 .padding()
+                .animation(
+                    .easeInOut(duration: 0.18),
+                    value: trackingMode
+                )
             }
-            .navigationTitle("Start Workout")
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Start Workout",
+                    norwegian: "Start økt"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .task {
                 if !audioCoachLoaded {
-                    audioCoachDraft.load(from: settings)
+                    audioCoachDraft.load(
+                        from: settings
+                    )
                     audioCoachLoaded = true
                 }
 
@@ -182,13 +269,154 @@ struct WorkoutStartOptionsView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
             }
         }
+    }
+
+    private var trackingModeButton: some View {
+        Button {
+            trackingMode =
+                trackingMode == .advanced
+                    ? .simple
+                    : .advanced
+        } label: {
+            HStack(spacing: 6) {
+                Image(
+                    systemName:
+                        trackingMode == .advanced
+                            ? "slider.horizontal.3"
+                            : "bolt.fill"
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold
+                    )
+                )
+
+                Text(
+                    trackingMode == .advanced
+                        ? ATHLTHLocalization.choose(
+                            english: "Advanced",
+                            norwegian: "Avansert"
+                        )
+                        : "Basic"
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
+            }
+            .foregroundStyle(
+                trackingMode == .advanced
+                    ? Color.white
+                    : ATHLTHTheme.accentDeep
+            )
+            .padding(.horizontal, 11)
+            .frame(height: 34)
+            .background(
+                trackingMode == .advanced
+                    ? ATHLTHTheme.accent
+                    : ATHLTHTheme.accentSoft,
+                in: Capsule()
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english:
+                    "Switch strength setup mode",
+                norwegian:
+                    "Bytt oppsettsmodus for styrke"
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func deviceTile(
+        title: String,
+        icon: String,
+        selected: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 20,
+                            weight: .semibold
+                        )
+                    )
+
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .lineLimit(1)
+
+                Image(
+                    systemName:
+                        selected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .font(.caption)
+            }
+            .foregroundStyle(
+                disabled
+                    ? Color.secondary
+                    : selected
+                        ? Color.white
+                        : ATHLTHTheme
+                            .primaryText
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 88)
+            .background(
+                disabled
+                    ? Color.primary.opacity(0.03)
+                    : selected
+                        ? ATHLTHTheme.accent
+                        : ATHLTHTheme.accentSoft
+                            .opacity(0.48),
+                in: RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+                .stroke(
+                    selected && !disabled
+                        ? ATHLTHTheme.accent
+                        : Color.primary
+                            .opacity(0.06),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.56 : 1)
     }
 
     @ViewBuilder
