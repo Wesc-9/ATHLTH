@@ -1760,12 +1760,58 @@ struct ATHLTHAccountSecurityView: View {
                 }
             }
 
-            Section("Your data") {
+            Section {
+                NavigationLink {
+                    ATHLTHPrivacyCenterView()
+                } label: {
+                    Label(
+                        accountText(
+                            english: "Privacy & AI",
+                            norwegian: "Personvern og AI"
+                        ),
+                        systemImage: "shield.lefthalf.filled"
+                    )
+                }
+
+                NavigationLink {
+                    TrainingDataSettingsView()
+                } label: {
+                    Label(
+                        accountText(
+                            english: "Training data & Coach",
+                            norwegian: "Treningsdata og Coach"
+                        ),
+                        systemImage: "icloud"
+                    )
+                }
+
                 NavigationLink {
                     ATHLTHDataExportView()
                 } label: {
-                    Label("Export ATHLTH Data", systemImage: "square.and.arrow.up")
+                    Label(
+                        accountText(
+                            english: "Export ATHLTH Data",
+                            norwegian: "Eksporter ATHLTH-data"
+                        ),
+                        systemImage: "square.and.arrow.up"
+                    )
                 }
+            } header: {
+                Text(
+                    accountText(
+                        english: "Privacy & data",
+                        norwegian: "Personvern og data"
+                    )
+                )
+            } footer: {
+                Text(
+                    accountText(
+                        english:
+                            "Manage privacy, AI access, cloud training data, backup and export from one place.",
+                        norwegian:
+                            "Administrer personvern, AI-tilgang, treningsdata i skyen, sikkerhetskopi og eksport på ett sted."
+                    )
+                )
             }
 
             Section {
@@ -1792,7 +1838,12 @@ struct ATHLTHAccountSecurityView: View {
                 Text("Deleting your account is permanent. Signing out keeps your account and clears account-specific cached data from this device.")
             }
         }
-        .navigationTitle("Account & Security")
+        .navigationTitle(
+            accountText(
+                english: "Account & Security",
+                norwegian: "Konto og sikkerhet"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
             "Sign out of ATHLTH?",
@@ -1815,6 +1866,16 @@ struct ATHLTHAccountSecurityView: View {
         } message: {
             Text(statusMessage ?? "")
         }
+    }
+
+    private func accountText(
+        english: String,
+        norwegian: String
+    ) -> String {
+        ATHLTHLocalization.choose(
+            english: english,
+            norwegian: norwegian
+        )
     }
 
     private var accountEmail: String {
