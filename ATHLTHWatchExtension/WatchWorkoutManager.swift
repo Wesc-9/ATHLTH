@@ -138,6 +138,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
+    private var audioCoachReadyAnnouncedForWorkout = false
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var nextDistanceAnnouncementMeters: Double?
@@ -212,22 +213,43 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func configureAudioCoach(
         _ configuration: WatchAudioCoachConfiguration
     ) {
+        let wasEnabled =
+            audioCoachConfiguration.enabled
+
         publish {
             self.audioCoachConfiguration = configuration
         }
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
 
-        if isActive,
-           configuration.enabled,
-           currentStructuredRunningStep != nil {
-            announceCurrentStructuredStep(prefix: "Current")
+        if !configuration.enabled {
+            audioCoachReadyAnnouncedForWorkout = false
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            deactivateAudioCoachAudioSession()
+            return
+        }
+
+        if !wasEnabled {
+            audioCoachReadyAnnouncedForWorkout = false
+        }
+
+        if isActive {
+            announceAudioCoachReadyIfNeeded()
+
+            if currentStructuredRunningStep != nil {
+                announceCurrentStructuredStep(
+                    prefix: "Current"
+                )
+            }
         }
     }
 
     func updateAudioCoachDuringWorkout(
         _ configuration: WatchAudioCoachConfiguration
     ) {
+        let wasEnabled =
+            audioCoachConfiguration.enabled
+
         publish {
             self.audioCoachConfiguration = configuration
         }
@@ -236,8 +258,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         persistWorkoutRecoveryState()
 
         if !configuration.enabled {
+            audioCoachReadyAnnouncedForWorkout = false
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
+        } else {
+            if !wasEnabled {
+                audioCoachReadyAnnouncedForWorkout = false
+            }
+            announceAudioCoachReadyIfNeeded()
         }
     }
 
@@ -454,13 +482,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         persistWorkoutRecoveryState()
 
         if enabled {
-            WKInterfaceDevice.current().play(.click)
+            audioCoachReadyAnnouncedForWorkout = false
+            announceAudioCoachReadyIfNeeded()
+
             if currentStructuredRunningStep != nil {
                 announceCurrentStructuredStep(
                     prefix: "Current"
                 )
             }
         } else {
+            audioCoachReadyAnnouncedForWorkout = false
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
         }
@@ -1230,6 +1261,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         healthKitDistanceLastUpdatedAt = nil
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
+        audioCoachReadyAnnouncedForWorkout = false
+        guidancePriorityGate.reset()
         publish {
             self.state = .idle
             self.elapsedTime = 0
@@ -1339,6 +1372,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
         targetWasOutside = false
+        audioCoachReadyAnnouncedForWorkout = false
+        guidancePriorityGate.reset()
         resetAudioCoachThresholds()
 
         do {
@@ -1426,6 +1461,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 requestStrengthSnapshot()
             }
 
+            announceAudioCoachReadyIfNeeded()
             announceCurrentStructuredStep(prefix: "Starting")
         } catch {
             fail(error)
@@ -1581,6 +1617,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         } else {
             nextTimeAnnouncementSeconds = nil
         }
+    }
+
+    private func announceAudioCoachReadyIfNeeded() {
+        guard state == .running,
+              audioCoachConfiguration.enabled,
+              !audioCoachReadyAnnouncedForWorkout
+        else {
+            return
+        }
+
+        audioCoachReadyAnnouncedForWorkout = true
+        WKInterfaceDevice.current().play(.click)
+
+        speak(
+            coachPhrase(
+                english: "Audio Coach ready.",
+                norwegian: "Audio Coach er klar."
+            ),
+            priority: .routineCoach
+        )
     }
 
     private func evaluateAudioCoach() {
