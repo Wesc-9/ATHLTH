@@ -66,7 +66,8 @@ struct HomeActivityCenterV2: View {
         return Array(
             social.feed.lazy
                 .filter {
-                    $0.actor.userID != currentUserID
+                    $0.actor.userID != currentUserID &&
+                    $0.activity.kind == "workout"
                 }
                 .prefix(2)
         )
