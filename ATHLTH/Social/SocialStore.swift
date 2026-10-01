@@ -1457,6 +1457,72 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func shareChallengeToCommunity(
+        _ challenge: ATHLTHChallenge
+    ) async -> Bool {
+        do {
+            try await service.publishActivity(
+                eventKey: "challenge-\(challenge.id.uuidString)-created",
+                kind: "challenge",
+                title: "Shared a challenge",
+                subtitle: challenge.title,
+                metadata: [
+                    "challenge_id": challenge.id.uuidString,
+                    "sport": challenge.sport.rawValue,
+                    "starts_at": ISO8601DateFormatter()
+                        .string(from: challenge.rules.startsAt)
+                ],
+                visibility: challenge.visibility
+            )
+
+            if let refreshed = try? await service.loadFeed() {
+                feed = scopedFeed(refreshed)
+            }
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func shareCommunityEvent(
+        id: UUID,
+        title: String,
+        activityType: CommunityEventActivity,
+        startsAt: Date,
+        meetingName: String,
+        visibility: ProfileVisibility
+    ) async -> Bool {
+        do {
+            try await service.publishActivity(
+                eventKey: "event-\(id.uuidString)-shared",
+                kind: "event",
+                title: "Shared an event",
+                subtitle: title,
+                metadata: [
+                    "event_id": id.uuidString,
+                    "activity_type": activityType.rawValue,
+                    "starts_at": ISO8601DateFormatter()
+                        .string(from: startsAt),
+                    "meeting_name": meetingName
+                ],
+                visibility: visibility
+            )
+
+            if let refreshed = try? await service.loadFeed() {
+                feed = scopedFeed(refreshed)
+            }
+
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func markBackendInboxRead(_ eventID: UUID) async {
         do {
             try await service.markInboxEventRead(eventID)
