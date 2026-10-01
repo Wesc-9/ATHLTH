@@ -3966,7 +3966,6 @@ final class HealthKitManager: ObservableObject {
             start: start,
             end: end
         )
-        async let moveGoal = fetchTodayMoveGoal()
         async let basalEnergy = summedQuantity(
             identifier: .basalEnergyBurned,
             unit: .kilocalorie(),
@@ -4054,7 +4053,20 @@ final class HealthKitManager: ObservableObject {
 
         let activeEnergyValue =
             try? await activeEnergy
-        let moveGoalValue = try? await moveGoal
+        let moveGoalValue: Double?
+        if ATHLTHWatchWorkoutRuntime
+            .isMirroredWorkoutActive {
+            // HKActivitySummaryQuery has historically been the most fragile
+            // HealthKit read in ATHLTH during an active mirrored Watch workout.
+            // Keep the last known goal while the workout is live instead of
+            // starting that Objective-C predicate/query on app activation.
+            moveGoalValue =
+                training
+                    .moveGoalKilocaloriesToday
+        } else {
+            moveGoalValue =
+                try? await fetchTodayMoveGoal()
+        }
         let basalEnergyValue = try? await basalEnergy
         let exerciseMinutesValue = try? await exerciseMinutes
         let walkingRunningDistanceValue = try? await walkingRunningDistance
@@ -4164,6 +4176,13 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func fetchTodayMoveGoal() async throws -> Double? {
+        guard !ATHLTHWatchWorkoutRuntime
+            .isMirroredWorkoutActive
+        else {
+            return training
+                .moveGoalKilocaloriesToday
+        }
+
         let calendar = Calendar.current
         var components = calendar.dateComponents(
             [.era, .year, .month, .day],
