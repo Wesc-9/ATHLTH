@@ -4124,3 +4124,283 @@ private extension WorkoutActivity {
         }
     }
 }
+
+
+// MARK: - Compact Home activity strip
+
+/// Lightweight Home presentation for recent workouts from people the user follows.
+/// Community owns the richer social surface; Home only keeps the latest training
+/// signal and a simple heart interaction.
+struct HomeRecentActivityStrip: View {
+    @EnvironmentObject private var social: SocialStore
+
+    private var friendActivity: [SocialFeedItem] {
+        let feed = social.feed.lazy.filter {
+            $0.activity.kind == "workout"
+        }
+
+        if let currentUserID = social.currentUserID {
+            return Array(
+                feed
+                    .filter {
+                        $0.actor.userID != currentUserID
+                    }
+                    .prefix(3)
+            )
+        }
+
+        return Array(feed.prefix(3))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Siste aktivitet")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Spacer()
+
+                NavigationLink {
+                    SocialHubView(initialTab: .feed)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Se alle")
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if friendActivity.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ingen nye økter ennå")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text("Nye treningsøkter fra de du følger vises her.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+                }
+                .padding(13)
+                .background(
+                    Color.white.opacity(0.88),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(friendActivity) { item in
+                        HomeRecentActivityTileV4(item: item)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HomeRecentActivityTileV4: View {
+    @EnvironmentObject private var social: SocialStore
+
+    let item: SocialFeedItem
+
+    private var workoutActivity: WorkoutActivity? {
+        guard let raw =
+            item.activity.metadata?["kind"]
+        else {
+            return nil
+        }
+
+        return WorkoutActivity(rawValue: raw)
+    }
+
+    private var preferredReaction: SocialActivityReaction? {
+        SocialActivityReaction.allCases.first {
+            $0.emoji.contains("❤") ||
+            $0.emoji.contains("♥")
+        } ?? SocialActivityReaction.allCases.first
+    }
+
+    private var currentUserReaction: SocialActivityReaction? {
+        guard let currentUserID = social.currentUserID else {
+            return nil
+        }
+
+        return item.reactions.first {
+            $0.userID == currentUserID
+        }?.reaction
+    }
+
+    private var preferredReactionCount: Int {
+        guard let preferredReaction else {
+            return 0
+        }
+
+        return item.reactions.filter {
+            $0.reaction == preferredReaction
+        }
+        .count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                NavigationLink {
+                    FriendProfileView(
+                        userID: item.actor.userID
+                    )
+                } label: {
+                    SocialAvatar(
+                        profile: item.actor,
+                        size: 26
+                    )
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.actor.resolvedName)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    Text(
+                        item.activity.createdAt,
+                        style: .relative
+                    )
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.accentSoft.opacity(0.72),
+                        ATHLTHTheme.recoveryBlue.opacity(0.22),
+                        Color.black.opacity(0.07)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                HomeActivityMotionArtworkV3(
+                    activity: workoutActivity
+                )
+            }
+            .frame(height: 72)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            Text(item.activity.title)
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+
+            if let subtitle = item.activity.subtitle,
+               !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+            }
+
+            HStack {
+                Spacer()
+
+                if let preferredReaction {
+                    Button {
+                        Task {
+                            await social.setReaction(
+                                activityID: item.id,
+                                reaction:
+                                    currentUserReaction == preferredReaction
+                                        ? nil
+                                        : preferredReaction
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(
+                                systemName:
+                                    currentUserReaction == preferredReaction
+                                        ? "heart.fill"
+                                        : "heart"
+                            )
+                            .font(.system(size: 10, weight: .semibold))
+
+                            if preferredReactionCount > 0 {
+                                Text("\(preferredReactionCount)")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                        }
+                        .foregroundStyle(
+                            currentUserReaction == preferredReaction
+                                ? Color.red
+                                : ATHLTHTheme.mutedText
+                        )
+                        .padding(.horizontal, 7)
+                        .frame(height: 24)
+                        .background(
+                            Color.white.opacity(0.80),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        currentUserReaction == preferredReaction
+                            ? "Fjern liker"
+                            : "Lik aktivitet"
+                    )
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.7
+            )
+        }
+    }
+}
