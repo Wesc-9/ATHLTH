@@ -2018,14 +2018,17 @@ private struct CommunityV4ActivityRow: View {
             let meeting =
                 metadata["meeting_name"]
 
-            return [
+            let line = [
                 dateText,
                 meeting
             ]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
-            .nilIfBlank
+
+            return line.isEmpty
+                ? nil
+                : line
         }
 
         if item.activity.kind == "challenge" {
