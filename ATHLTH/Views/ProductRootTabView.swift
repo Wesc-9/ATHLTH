@@ -6163,7 +6163,12 @@ struct ATHLTHRecoveryView: View {
                     )
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Text("min / 7d")
+                Text(
+                                insightText(
+                                    "min / 7d",
+                                    "min / 7 d"
+                                )
+                            )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
