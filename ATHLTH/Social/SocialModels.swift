@@ -1045,6 +1045,47 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
 }
 
 
+struct WorkoutMediaRecord: Identifiable, Codable, Hashable {
+    let id: UUID
+    let userID: UUID
+    let workoutID: UUID
+    let imageURL: String
+    let storagePath: String
+    let caption: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case workoutID = "workout_id"
+        case imageURL = "image_url"
+        case storagePath = "storage_path"
+        case caption
+        case createdAt = "created_at"
+    }
+}
+
+struct WorkoutMediaInsert: Encodable {
+    let id: UUID
+    let userID: UUID
+    let workoutID: UUID
+    let imageURL: String
+    let storagePath: String
+    let caption: String?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "user_id"
+        case workoutID = "workout_id"
+        case imageURL = "image_url"
+        case storagePath = "storage_path"
+        case caption
+        case createdAt = "created_at"
+    }
+}
+
+
 struct SocialFollowRecord: Codable, Hashable {
     let followerID: UUID
     let followingID: UUID
