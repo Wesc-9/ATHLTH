@@ -301,7 +301,12 @@ final class AppSettingsStore: ObservableObject {
     @Published var routeAlertAnnounceBackOnRoute: Bool { didSet { persist() } }
 
     @Published var audioCoachEnabledByDefault: Bool { didSet { persist() } }
-    @Published var audioCoachLanguage: WatchAudioCoachLanguage { didSet { persist() } }
+    @Published var audioCoachLanguage: WatchAudioCoachLanguage {
+        didSet {
+            audioCoachVoiceIdentifier = nil
+            persist()
+        }
+    }
     @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { persist() } }
     @Published var audioCoachTimeTriggerEnabled: Bool { didSet { persist() } }
     @Published var audioCoachDistanceIntervalKilometers: Double { didSet { persist() } }
