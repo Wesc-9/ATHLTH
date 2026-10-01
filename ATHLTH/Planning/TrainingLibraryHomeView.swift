@@ -49,9 +49,48 @@ struct TrainingLibraryHomeView: View {
             }
 
             librarySection(
-                "Your Library",
-                subtitle: "Keep the things you use most close at hand."
+                "Training Plans",
+                subtitle:
+                    "Choose a complete plan from the Library or start with a blank calendar."
             ) {
+                NavigationLink {
+                    TrainingPlanLibraryView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Plan Library",
+                        subtitle: "Curated running, strength & hybrid",
+                        icon: "square.stack.3d.up.fill",
+                        tint: ATHLTHTheme.premiumGold
+                    )
+                }
+
+                Button {
+                    showingCreatePlan = true
+                } label: {
+                    LibraryDestinationTile(
+                        title: "Build from Scratch",
+                        subtitle: "Blank calendar · full control",
+                        icon: "calendar.badge.plus",
+                        tint: ATHLTHTheme.accentDeep
+                    )
+                }
+            }
+
+            librarySection(
+                "Your Library",
+                subtitle: "Keep saved plans and favourites close at hand."
+            ) {
+                NavigationLink {
+                    MyTrainingPlansLibraryView()
+                } label: {
+                    LibraryDestinationTile(
+                        title: "My Plans",
+                        subtitle: "Created, saved & scheduled",
+                        icon: "calendar.badge.clock",
+                        tint: ATHLTHTheme.accent
+                    )
+                }
+
                 NavigationLink {
                     LibraryFavoritesView(
                         onStartRunning: onStartRunning
@@ -65,44 +104,6 @@ struct TrainingLibraryHomeView: View {
                                 : "\(favorites.favorites.count) saved items",
                         icon: "star.fill",
                         tint: ATHLTHTheme.premiumGold
-                    )
-                }
-
-                NavigationLink {
-                    MyTrainingPlansLibraryView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "My Plans",
-                        subtitle: "Created, saved & scheduled",
-                        icon: "calendar.badge.clock",
-                        tint: ATHLTHTheme.accent
-                    )
-                }
-            }
-
-            librarySection(
-                "Training Plans",
-                subtitle: "Start from a proven structure or build your own."
-            ) {
-                NavigationLink {
-                    TrainingPlanLibraryView()
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Plan Library",
-                        subtitle: "Running, strength & hybrid",
-                        icon: "square.stack.3d.up.fill",
-                        tint: Color.orange
-                    )
-                }
-
-                Button {
-                    showingCreatePlan = true
-                } label: {
-                    LibraryDestinationTile(
-                        title: "Create Plan",
-                        subtitle: "Build it your way",
-                        icon: "plus.rectangle.on.rectangle",
-                        tint: ATHLTHTheme.accent
                     )
                 }
             }
@@ -238,7 +239,7 @@ struct TrainingLibraryHomeView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showingCreatePlan) {
-            TrainingPlanCreationView()
+            AdvancedTrainingPlanCreationView()
         }
         .sheet(isPresented: $showingCreateWorkout) {
             WorkoutTemplateBuilderView()
