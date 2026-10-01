@@ -284,11 +284,11 @@ struct ATHLTHHomeDashboardHero: View {
     let isStarting: Bool
     let weather: HomeWeatherSnapshot?
     let onStart: () -> Void
-    let onQuickRun: () -> Void
-    let onQuickStrength: () -> Void
     let onOpenPlan: () -> Void
 
-    private let resolvedHeight: CGFloat = 248
+    private var resolvedHeight: CGFloat {
+        workout == nil ? 218 : 248
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -372,8 +372,6 @@ struct ATHLTHHomeDashboardHero: View {
                         plannedWorkoutContent(
                             workout
                         )
-                    } else {
-                        quickTrainContent
                     }
                 }
                 .padding(.horizontal, 18)
@@ -576,99 +574,6 @@ struct ATHLTHHomeDashboardHero: View {
             radius: 8,
             y: 3
         )
-    }
-
-    private var quickTrainContent:
-        some View {
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            Text("Ingen økt planlagt i dag")
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    .white.opacity(0.94)
-                )
-
-            HStack(spacing: 8) {
-                quickTrainButton(
-                    title: "Run",
-                    icon: "figure.run",
-                    tint:
-                        ATHLTHTheme.vitality,
-                    action: onQuickRun
-                )
-
-                quickTrainButton(
-                    title: "Strength",
-                    icon:
-                        "dumbbell.fill",
-                    tint:
-                        ATHLTHTheme.accentDeep,
-                    action:
-                        onQuickStrength
-                )
-            }
-        }
-        .shadow(
-            color: Color.black.opacity(0.18),
-            radius: 7,
-            y: 3
-        )
-    }
-
-    private func quickTrainButton(
-        title: String,
-        icon: String,
-        tint: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 14,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(tint)
-
-                Text(title)
-                    .font(
-                        .system(
-                            size: 12.5,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-            }
-            .padding(.horizontal, 13)
-            .frame(
-                minWidth: 96,
-                minHeight: 39
-            )
-            .background(
-                Color.white.opacity(0.96),
-                in: Capsule()
-            )
-            .overlay {
-                Capsule()
-                    .stroke(
-                        Color.white.opacity(0.76),
-                        lineWidth: 0.7
-                    )
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
