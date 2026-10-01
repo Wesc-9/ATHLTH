@@ -3589,7 +3589,8 @@ struct SessionEditorView: View {
                     advancedOptions
                 }
 
-                if kind == .strength {
+                if kind == .strength ||
+                    !plannedExercises.isEmpty {
                     strengthBuilder
                 }
 
@@ -3723,19 +3724,15 @@ struct SessionEditorView: View {
                 )
             }
             .task {
-                async let gearRefresh: Void =
-                    gear.refresh()
+                await gear.refresh()
 
-                async let exerciseRefresh: Void = {
-                    if exerciseLibrary.allExercises.isEmpty {
-                        await exerciseLibrary.refresh()
-                    }
-                }()
+                if exerciseLibrary
+                    .allExercises
+                    .isEmpty {
+                    await exerciseLibrary
+                        .refresh()
+                }
 
-                _ = await (
-                    gearRefresh,
-                    exerciseRefresh
-                )
                 applyDefaultRunningShoeIfNeeded()
             }
             .onChange(of: kind) { _, newKind in
@@ -5164,9 +5161,9 @@ struct SessionEditorView: View {
                     )
                     : nil,
             routeID: selectedRouteID,
-            exercises: kind == .strength
-                ? plannedExercises
-                : [],
+            // Preserve exercises for hybrid/custom structured
+            // workouts too (for example HYROX), not only .strength.
+            exercises: plannedExercises,
             notes: cleanNotes.isEmpty ? nil : cleanNotes,
             runningWorkout: kind == .running
                 ? selectedRunningWorkouts.first
