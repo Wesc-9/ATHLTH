@@ -90,10 +90,7 @@ struct ProductRootTabView: View {
             }
                 .tabItem {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "Insights",
-                            norwegian: "Innsikt"
-                        ),
+                        "Insights",
                         systemImage: "sparkles"
                     )
                 }
@@ -5395,6 +5392,16 @@ struct ATHLTHRecoveryView: View {
         let magnitude: Double
     }
 
+    private func insightText(
+        _ english: String,
+        _ norwegian: String
+    ) -> String {
+        ATHLTHLocalization.choose(
+            english: english,
+            norwegian: norwegian
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
@@ -5403,11 +5410,7 @@ struct ATHLTHRecoveryView: View {
             ) {
                 ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Insights",
-                            norwegian: "Innsikt"
-                        ),
+                    title: "Insights",
                     subtitle:
                         ATHLTHLocalization.choose(
                             english:
@@ -5450,14 +5453,14 @@ struct ATHLTHRecoveryView: View {
                             if session.hasPaidAccess {
                                 ATHLTHCard {
                                     Label(
-                                        "ATHLTH Coach health insights are off",
+                                        insightText("ATHLTH Coach health insights are off", "ATHLTH Coach-helseinnsikt er av"),
                                         systemImage: "lock.shield.fill"
                                     )
                                     .font(.headline)
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
 
                                     Text(
-                                        "Enable health-data use in Settings → Privacy & Data only if you want Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way."
+                                        insightText("Enable health-data use in Settings → Privacy & Data only if you want Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way.", "Aktiver bruk av helsedata i Innstillinger → Personvern og data bare hvis du vil at Coach skal bruke søvn, HRV, puls og treningskontekst. Restitusjon beregnes lokalt uansett.")
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -5576,10 +5579,10 @@ struct ATHLTHRecoveryView: View {
                     )
                 } else {
                     ContentUnavailableView(
-                        "Coach health access is off",
+                        insightText("Coach health access is off", "Tilgang til helsedata for Coach er av"),
                         systemImage: "lock.shield.fill",
                         description: Text(
-                            "Enable it in Settings → Privacy & Data before sharing recovery health context with ATHLTH Coach."
+                            insightText("Enable it in Settings → Privacy & Data before sharing recovery health context with ATHLTH Coach.", "Aktiver dette i Innstillinger → Personvern og data før restitusjonsdata deles med ATHLTH Coach.")
                         )
                     )
                 }
@@ -5605,7 +5608,7 @@ struct ATHLTHRecoveryView: View {
                     )
                     .frame(width: 3, height: 19)
 
-                Text("Readiness")
+                Text(insightText("Readiness", "Dagsform"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
@@ -5613,7 +5616,7 @@ struct ATHLTHRecoveryView: View {
 
                 Spacer()
 
-                Text("Today")
+                Text(insightText("Today", "I dag"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
                         ATHLTHTheme.accentDeep.opacity(0.78)
@@ -5642,7 +5645,7 @@ struct ATHLTHRecoveryView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    "How ATHLTH calculates recovery"
+                    insightText("How ATHLTH calculates recovery", "Hvordan ATHLTH beregner restitusjon")
                 )
             }
 
@@ -5676,7 +5679,7 @@ struct ATHLTHRecoveryView: View {
                         }
 
                         Label(
-                            health.recovery.state.title,
+                            localizedRecoveryStateTitle,
                             systemImage:
                                 health.recovery.state.systemImage
                         )
@@ -5709,10 +5712,10 @@ struct ATHLTHRecoveryView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Building your baseline")
+                        Text(insightText("Building your baseline", "Bygger grunnlaget ditt"))
                             .font(.headline)
 
-                        Text(health.recovery.detail)
+                        Text(localizedRecoveryDetail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(
@@ -5734,7 +5737,7 @@ struct ATHLTHRecoveryView: View {
                 .font(.title3.weight(.bold))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(health.recovery.detail)
+            Text(localizedRecoveryDetail)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
@@ -5746,11 +5749,11 @@ struct ATHLTHRecoveryView: View {
 
     private var todaysSignalsCard: some View {
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Recent signals")
+            ATHLTHSectionHeader(title: insightText("Recent signals", "Nylige signaler"))
 
             HStack(alignment: .top, spacing: 0) {
                 recoverySignalMetric(
-                    title: "Sleep",
+                    title: insightText("Sleep", "Søvn"),
                     value: health.sleep.totalAsleep > 0
                         ? health.sleep.totalAsleep.shortDuration
                         : "—",
@@ -5774,7 +5777,7 @@ struct ATHLTHRecoveryView: View {
                 recoverySignalDivider
 
                 recoverySignalMetric(
-                    title: "Resting HR",
+                    title: insightText("Resting HR", "Hvilepuls"),
                     value: health.heart.restingHeartRate.map {
                         "\(Int($0.rounded())) bpm"
                     } ?? "—",
@@ -5786,11 +5789,11 @@ struct ATHLTHRecoveryView: View {
                 recoverySignalDivider
 
                 recoverySignalMetric(
-                    title: "Load",
+                    title: insightText("Load", "Belastning"),
                     value:
                         "\(Int(recoverySnapshot.trainingLoad.acuteMinutes.rounded())) min",
                     comparison:
-                        "7d · strength + walk + run",
+                        insightText("7d · strength + walk + run", "7 d · styrke + gange + løp"),
                     icon: "chart.bar.fill",
                     tint: .green
                 )
@@ -5809,11 +5812,11 @@ struct ATHLTHRecoveryView: View {
         return ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Today vs planned workout")
+                    Text(insightText("Today vs planned workout", "Dagens form mot planlagt økt"))
                         .font(.title3.weight(.bold))
 
                     Text(
-                        "Recovery context applied to what you already planned."
+                        insightText("Recovery context applied to what you already planned.", "Restitusjonen vurdert opp mot det du allerede har planlagt.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -5933,11 +5936,11 @@ struct ATHLTHRecoveryView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("No workout planned today")
+                        Text(insightText("No workout planned today", "Ingen økt planlagt i dag"))
                             .font(.headline)
 
                         Text(
-                            "ATHLTH can still use your recovery and muscle load when you choose a quick-start workout."
+                            insightText("ATHLTH can still use your recovery and muscle load when you choose a quick-start workout.", "ATHLTH kan fortsatt bruke restitusjon og muskelbelastning når du velger en hurtigstartøkt.")
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -5958,8 +5961,8 @@ struct ATHLTHRecoveryView: View {
                 HStack {
                     Label(
                         sessions.isEmpty
-                            ? "Open Train"
-                            : "Review today's training",
+                            ? insightText("Open Train", "Åpne Train")
+                            : insightText("Review today's training", "Se gjennom dagens trening"),
                         systemImage: "dumbbell.fill"
                     )
 
@@ -5981,10 +5984,10 @@ struct ATHLTHRecoveryView: View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("What changed?")
+                    Text(insightText("What changed?", "Hva har endret seg?"))
                         .font(.title3.weight(.bold))
 
-                    Text("Recent 7 days compared with the previous 7.")
+                    Text(insightText("Recent 7 days compared with the previous 7.", "Siste 7 dager sammenlignet med de 7 foregående."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -6005,7 +6008,7 @@ struct ATHLTHRecoveryView: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     Text(
-                        "No clear shift yet, or there are not enough comparable days. ATHLTH will surface only changes large enough to be useful."
+                        insightText("No clear shift yet, or there are not enough comparable days. ATHLTH will surface only changes large enough to be useful.", "Ingen tydelig endring ennå, eller for få sammenlignbare dager. ATHLTH viser bare endringer som er store nok til å være nyttige.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -6076,11 +6079,11 @@ struct ATHLTHRecoveryView: View {
         return ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Load & balance")
+                    Text(insightText("Load & balance", "Belastning og balanse"))
                         .font(.title3.weight(.bold))
 
                     Text(
-                        "Last 7 days · strength, run, walk and other tracked workouts."
+                        insightText("Last 7 days · strength, run, walk and other tracked workouts.", "Siste 7 dager · styrke, løp, gange og andre registrerte økter.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -6128,7 +6131,7 @@ struct ATHLTHRecoveryView: View {
                             .foregroundStyle(
                                 ATHLTHTheme.primaryText
                             )
-                        Text("28d weekly avg")
+                        Text(insightText("28d weekly avg", "28 d ukesnitt"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -6139,21 +6142,21 @@ struct ATHLTHRecoveryView: View {
             if total > 0 {
                 VStack(spacing: 10) {
                     recoveryLoadRow(
-                        title: "Strength",
+                        title: insightText("Strength", "Styrke"),
                         icon: "dumbbell.fill",
                         minutes: load.strengthMinutes,
                         total: total,
                         tint: .purple
                     )
                     recoveryLoadRow(
-                        title: "Run",
+                        title: insightText("Run", "Løp"),
                         icon: "figure.run",
                         minutes: load.runningMinutes,
                         total: total,
                         tint: .green
                     )
                     recoveryLoadRow(
-                        title: "Walk",
+                        title: insightText("Walk", "Gange"),
                         icon: "figure.walk",
                         minutes: load.walkingMinutes,
                         total: total,
@@ -6162,7 +6165,7 @@ struct ATHLTHRecoveryView: View {
 
                     if load.otherMinutes >= 1 {
                         recoveryLoadRow(
-                            title: "Other",
+                            title: insightText("Other", "Annet"),
                             icon: "figure.mixed.cardio",
                             minutes: load.otherMinutes,
                             total: total,
@@ -6173,7 +6176,7 @@ struct ATHLTHRecoveryView: View {
                 .padding(.top, 14)
             } else {
                 Text(
-                    "No tracked workout load was found in the last 7 days."
+                    insightText("No tracked workout load was found in the last 7 days.", "Ingen registrert treningsbelastning ble funnet de siste 7 dagene.")
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -6181,7 +6184,7 @@ struct ATHLTHRecoveryView: View {
             }
 
             Text(
-                "This load view is currently duration-based. It combines tracked activity without pretending that a minute of walking and a minute of hard intervals create identical stress."
+                insightText("This load view is currently duration-based. It combines tracked activity without pretending that a minute of walking and a minute of hard intervals create identical stress.", "Denne belastningsvisningen er foreløpig basert på varighet. Den kombinerer registrert aktivitet uten å anta at ett minutt gange og ett minutt harde intervaller gir samme belastning.")
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -6198,10 +6201,10 @@ struct ATHLTHRecoveryView: View {
         return ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Patterns ATHLTH noticed")
+                    Text(insightText("Patterns ATHLTH noticed", "Mønstre ATHLTH har oppdaget"))
                         .font(.title3.weight(.bold))
 
-                    Text("Observed in your recent data when enough days exist.")
+                    Text(insightText("Observed in your recent data when enough days exist.", "Vises fra dine nyere data når det finnes nok dager."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -6218,7 +6221,7 @@ struct ATHLTHRecoveryView: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     Text(
-                        "ATHLTH is still building enough comparable history to show useful personal patterns."
+                        insightText("ATHLTH is still building enough comparable history to show useful personal patterns.", "ATHLTH bygger fortsatt nok sammenlignbar historikk til å vise nyttige personlige mønstre.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -6268,7 +6271,7 @@ struct ATHLTHRecoveryView: View {
             }
 
             Label(
-                "Observed associations only — not proof that one signal caused another.",
+                insightText("Observed associations only — not proof that one signal caused another.", "Observerte sammenhenger — ikke bevis på at ett signal forårsaket et annet."),
                 systemImage: "info.circle"
             )
             .font(.caption2)
@@ -6413,23 +6416,23 @@ struct ATHLTHRecoveryView: View {
 
     private var recoveryPlanStatusTitle: String {
         guard !recoveryTodaySessions.isEmpty else {
-            return "No plan"
+            return insightText("No plan", "Ingen plan")
         }
 
         guard shouldShowWearableRecoveryContent ||
                 !muscleRecoveryStatuses.isEmpty else {
-            return "Check manually"
+            return insightText("Check manually", "Sjekk manuelt")
         }
 
         if recoveryPlanSeverity >= 2 {
-            return "Adjust"
+            return insightText("Adjust", "Juster")
         }
 
         if recoveryPlanSeverity == 1 {
-            return "Watch"
+            return insightText("Watch", "Følg med")
         }
 
-        return "On track"
+        return insightText("On track", "På rett spor")
     }
 
     private var recoveryPlanStatusTint: Color {
@@ -6486,7 +6489,10 @@ struct ATHLTHRecoveryView: View {
 
         if health.recovery.state == .recover {
             return
-                "Your current recovery signals are below your normal range. Consider reducing the volume or intensity of \(first.title), or moving it if that fits your plan."
+                insightText(
+                            "Your current recovery signals are below your normal range. Consider reducing the volume or intensity of \(first.title), or moving it if that fits your plan.",
+                            "Restitusjonssignalene dine er under normalen. Vurder å redusere volumet eller intensiteten på \(first.title), eller flytte økten hvis det passer planen."
+                        )
         }
 
         if !overlaps.isEmpty {
@@ -6503,16 +6509,25 @@ struct ATHLTHRecoveryView: View {
             recoverySnapshot.trainingLoad.ratio,
            ratio >= 1.50 {
             return
-                "Your 7-day training load is high relative to your recent weekly average. The workout can stay planned, but lower volume or intensity may be worth considering."
+                insightText(
+                            "Your 7-day training load is high relative to your recent weekly average. The workout can stay planned, but lower volume or intensity may be worth considering.",
+                            "Treningsbelastningen de siste 7 dagene er høy sammenlignet med ditt nyere ukesnitt. Økten kan fortsatt stå i planen, men lavere volum eller intensitet kan være verdt å vurdere."
+                        )
         }
 
         if shouldShowWearableRecoveryContent {
             return
-                "Recovery signals and recent muscle load do not show a clear reason to change today's planned workout."
+                insightText(
+                            "Recovery signals and recent muscle load do not show a clear reason to change today's planned workout.",
+                            "Restitusjonssignalene og den siste muskelbelastningen gir ingen tydelig grunn til å endre dagens planlagte økt."
+                        )
         }
 
         return
-            "There is not enough wearable recovery data to assess this workout yet. Use soreness, energy and how the warm-up feels as the final check."
+            insightText(
+                            "There is not enough wearable recovery data to assess this workout yet. Use soreness, energy and how the warm-up feels as the final check.",
+                            "Det finnes ikke nok restitusjonsdata fra klokke til å vurdere økten ennå. Bruk ømhet, energi og hvordan oppvarmingen føles som siste sjekk."
+                        )
     }
 
     private func recoveryPlanOverlapStatuses(
@@ -6972,7 +6987,7 @@ struct ATHLTHRecoveryView: View {
 
     private var todaysGuidanceCard: some View {
         ATHLTHCard {
-            ATHLTHSectionHeader(title: "Today's guidance")
+            ATHLTHSectionHeader(title: insightText("Today's guidance", "Dagens anbefaling"))
 
             HStack(alignment: .top, spacing: 13) {
                 Image(systemName: health.recovery.state.systemImage)
@@ -7023,7 +7038,7 @@ struct ATHLTHRecoveryView: View {
                         recommendedRecoveryTool
                 } label: {
                     Label(
-                        "Recovery session",
+                        insightText("Recovery session", "Restitusjonsøkt"),
                         systemImage: "leaf.fill"
                     )
                     .font(.caption.weight(.semibold))
@@ -7054,7 +7069,7 @@ struct ATHLTHRecoveryView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Recovery data isn’t available yet")
+                    Text(insightText("Recovery data isn’t available yet", "Restitusjonsdata er ikke tilgjengelig ennå"))
                         .font(.headline)
 
                     Text(recoveryUnavailableDetail)
@@ -7101,7 +7116,7 @@ struct ATHLTHRecoveryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
-            Text(comparison ?? "No baseline yet")
+            Text(comparison ?? insightText("No baseline yet", "Ingen grunnlinje ennå"))
                 .font(.system(size: 9.5, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .lineLimit(2)
@@ -7158,7 +7173,7 @@ struct ATHLTHRecoveryView: View {
         let difference = current - baseline
 
         guard abs(difference) >= 60 else {
-            return "At baseline"
+            return insightText("At baseline", "På grunnlinjen")
         }
 
         let totalMinutes = Int((abs(difference) / 60).rounded())
@@ -7185,7 +7200,7 @@ struct ATHLTHRecoveryView: View {
         let difference = Int((current - baseline).rounded())
 
         guard difference != 0 else {
-            return "At baseline"
+            return insightText("At baseline", "På grunnlinjen")
         }
 
         let sign = difference > 0 ? "+" : "−"
@@ -7214,18 +7229,56 @@ struct ATHLTHRecoveryView: View {
             : "Apple Health is configured. ATHLTH will show recovery when compatible readable sleep, HRV or resting heart-rate data becomes available."
     }
 
+    private var localizedRecoveryStateTitle: String {
+        switch health.recovery.state {
+        case .ready:
+            return insightText("Ready", "Klar")
+        case .balanced:
+            return insightText("Balanced", "Balansert")
+        case .takeItEasy:
+            return insightText("Take it easy", "Ta det roligere")
+        case .recover:
+            return insightText("Recover", "Restituer")
+        case .buildingBaseline:
+            return insightText("Building baseline", "Bygger grunnlinje")
+        }
+    }
+
+    private var localizedRecoveryDetail: String {
+        if health.recovery.state == .buildingBaseline {
+            if health.recovery.baselineDays > 0 {
+                return ATHLTHLocalization.choose(
+                    english:
+                        "ATHLTH has \(health.recovery.baselineDays) usable baseline day\(health.recovery.baselineDays == 1 ? "" : "s"). At least 5 days with sleep, HRV and resting heart rate are needed.",
+                    norwegian:
+                        "ATHLTH har \(health.recovery.baselineDays) brukbar\(health.recovery.baselineDays == 1 ? "" : "e") dag\(health.recovery.baselineDays == 1 ? "" : "er") i grunnlinjen. Minst 5 dager med søvn, HRV og hvilepuls er nødvendig."
+                )
+            }
+
+            return insightText(
+                "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
+                "ATHLTH lærer grunnlinjen din for søvn, HRV og hvilepuls."
+            )
+        }
+
+        return insightText(
+            "Based on last night's sleep and your most recent HRV/resting heart rate compared with your recent baseline.",
+            "Basert på nattens søvn og din nyeste HRV/hvilepuls sammenlignet med din nyere grunnlinje."
+        )
+    }
+
     private var recoveryHeadline: String {
         switch health.recovery.state {
         case .ready:
-            return "Well recovered"
+            return insightText("Well recovered", "Godt restituert")
         case .balanced:
-            return "Balanced recovery"
+            return insightText("Balanced recovery", "Balansert restitusjon")
         case .takeItEasy:
-            return "A lighter day may fit"
+            return insightText("A lighter day may fit", "En lettere dag kan passe")
         case .recover:
-            return "Prioritize recovery"
+            return insightText("Prioritize recovery", "Prioriter restitusjon")
         case .buildingBaseline:
-            return "Building your baseline"
+            return insightText("Building your baseline", "Bygger grunnlaget ditt")
         }
     }
 
@@ -7233,53 +7286,53 @@ struct ATHLTHRecoveryView: View {
         if sorenessStore.todayOverallSoreness.map({
             $0 >= 4
         }) ?? false {
-            return "Your body is asking for less today"
+            return insightText("Your body is asking for less today", "Kroppen din ber om mindre i dag")
         }
 
         if sorenessStore.highestTodayLevel == .high {
-            return "Protect sore muscle groups today"
+            return insightText("Protect sore muscle groups today", "Skån ømme muskelgrupper i dag")
         }
 
         if sorenessStore.todayEnergy.map({
             $0 <= 2
         }) ?? false {
-            return "Energy is low today"
+            return insightText("Energy is low today", "Energien er lav i dag")
         }
 
         if sorenessStore.todayStress.map({
             $0 >= 4
         }) ?? false {
-            return "Stress is elevated today"
+            return insightText("Stress is elevated today", "Stressnivået er høyere i dag")
         }
 
         if sorenessStore.todayMotivation.map({
             $0 <= 2
         }) ?? false {
-            return "Motivation is low today"
+            return insightText("Motivation is low today", "Motivasjonen er lav i dag")
         }
 
         if sorenessStore.highestTodayLevel == .moderate {
-            return "Adjust around sore areas"
+            return insightText("Adjust around sore areas", "Tilpass rundt ømme områder")
         }
 
         if let ratio = recoverySnapshot.trainingLoad.ratio,
            ratio >= 1.50 {
-            return "Training load is high"
+            return insightText("Training load is high", "Treningsbelastningen er høy")
         }
 
         switch health.recovery.state {
         case .ready:
-            return "Good day for a hard session"
+            return insightText("Good day for a hard session", "God dag for en hard økt")
         case .balanced:
-            return "Train as planned"
+            return insightText("Train as planned", "Tren som planlagt")
         case .takeItEasy:
-            return "Consider active recovery"
+            return insightText("Consider active recovery", "Vurder aktiv restitusjon")
         case .recover:
-            return "Prioritize recovery today"
+            return insightText("Prioritize recovery today", "Prioriter restitusjon i dag")
         case .buildingBaseline:
             return watchConnection.isReady
-                ? "Keep wearing your Apple Watch"
-                : "More health data is needed"
+                ? insightText("Keep wearing your Apple Watch", "Fortsett å bruke Apple Watch")
+                : insightText("More health data is needed", "Mer helsedata er nødvendig")
         }
     }
 
@@ -7287,53 +7340,92 @@ struct ATHLTHRecoveryView: View {
         if sorenessStore.todayOverallSoreness.map({
             $0 >= 4
         }) ?? false {
-            return "Your Daily Check-in shows high overall soreness. Consider reducing load, changing muscle groups or choosing a gentle recovery session."
+            return insightText(
+                "Your Daily Check-in shows high overall soreness. Consider reducing load, changing muscle groups or choosing a gentle recovery session.",
+                "Dagens innsjekk viser høy generell ømhet. Vurder lavere belastning, andre muskelgrupper eller en rolig restitusjonsøkt."
+            )
         }
 
         if sorenessStore.highestTodayLevel == .high {
-            return "Your body check-in shows high soreness. Keep those muscle groups out of heavy work and choose another area, mobility or easy recovery."
+            return insightText(
+                "Your body check-in shows high soreness. Keep those muscle groups out of heavy work and choose another area, mobility or easy recovery.",
+                "Innsjekken viser høy muskelømhet. Unngå tung belastning på disse muskelgruppene og velg et annet område, mobilitet eller lett restitusjon."
+            )
         }
 
         if sorenessStore.todayEnergy.map({
             $0 <= 2
         }) ?? false {
-            return "Your Daily Check-in shows low energy. Keep the session flexible and reduce volume or intensity if effort feels unusually high."
+            return insightText(
+                "Your Daily Check-in shows low energy. Keep the session flexible and reduce volume or intensity if effort feels unusually high.",
+                "Dagens innsjekk viser lav energi. Hold økten fleksibel og reduser volum eller intensitet hvis belastningen føles uvanlig høy."
+            )
         }
 
         if sorenessStore.todayStress.map({
             $0 >= 4
         }) ?? false {
-            return "Your Daily Check-in shows elevated stress. A shorter session, easier intensity or a recovery tool may fit better today."
+            return insightText(
+                "Your Daily Check-in shows elevated stress. A shorter session, easier intensity or a recovery tool may fit better today.",
+                "Dagens innsjekk viser høyere stress. En kortere økt, lavere intensitet eller et restitusjonsverktøy kan passe bedre i dag."
+            )
         }
 
         if sorenessStore.todayMotivation.map({
             $0 <= 2
         }) ?? false {
-            return "Motivation is low in today's check-in. Keep the plan flexible: start easy, reassess after the warm-up, and reduce the session if it still feels off."
+            return insightText(
+                "Motivation is low in today's check-in. Keep the plan flexible: start easy, reassess after the warm-up, and reduce the session if it still feels off.",
+                "Motivasjonen er lav i dagens innsjekk. Hold planen fleksibel: start rolig, vurder på nytt etter oppvarmingen og reduser økten hvis det fortsatt føles feil."
+            )
         }
 
         if sorenessStore.highestTodayLevel == .moderate {
-            return "Moderate soreness is logged today. You can still train, but reduce load on the affected muscle groups or choose a different focus."
+            return insightText(
+                "Moderate soreness is logged today. You can still train, but reduce load on the affected muscle groups or choose a different focus.",
+                "Moderat ømhet er registrert i dag. Du kan fortsatt trene, men reduser belastningen på berørte muskelgrupper eller velg et annet fokus."
+            )
         }
 
         if let ratio = recoverySnapshot.trainingLoad.ratio,
            ratio >= 1.50 {
-            return "Your last 7 days are substantially above your recent 28-day weekly average. Consider lower volume, easier intensity or a recovery session today."
+            return insightText(
+                "Your last 7 days are substantially above your recent 28-day weekly average. Consider lower volume, easier intensity or a recovery session today.",
+                "De siste 7 dagene ligger tydelig over ditt nyere 28-dagers ukesnitt. Vurder lavere volum, roligere intensitet eller en restitusjonsøkt i dag."
+            )
         }
 
         switch health.recovery.state {
         case .ready:
-            return "Sleep, HRV and resting heart rate support a normal-to-hard training day. Use your planned session and how you feel as the final check."
+            return insightText(
+                "Sleep, HRV and resting heart rate support a normal-to-hard training day. Use your planned session and how you feel as the final check.",
+                "Søvn, HRV og hvilepuls støtter en normal til hard treningsdag. Bruk den planlagte økten og hvordan du føler deg som siste sjekk."
+            )
         case .balanced:
-            return "Your signals are close to baseline. Follow the plan and adjust if effort feels unusually high."
+            return insightText(
+                "Your signals are close to baseline. Follow the plan and adjust if effort feels unusually high.",
+                "Signalene dine ligger nær grunnlinjen. Følg planen og juster hvis belastningen føles uvanlig høy."
+            )
         case .takeItEasy:
-            return "One or more recovery signals are below your recent pattern. Easy cardio, mobility or reduced training volume may fit better today."
+            return insightText(
+                "One or more recovery signals are below your recent pattern. Easy cardio, mobility or reduced training volume may fit better today.",
+                "Ett eller flere restitusjonssignaler ligger under det nyere mønsteret ditt. Lett kondisjon, mobilitet eller redusert treningsvolum kan passe bedre i dag."
+            )
         case .recover:
-            return "Your combined recovery signals are well below baseline. Rest, mobility, breathing or very easy activity may be more appropriate."
+            return insightText(
+                "Your combined recovery signals are well below baseline. Rest, mobility, breathing or very easy activity may be more appropriate.",
+                "De samlede restitusjonssignalene ligger godt under grunnlinjen. Hvile, mobilitet, pust eller svært lett aktivitet kan passe bedre."
+            )
         case .buildingBaseline:
             return watchConnection.isReady
-                ? "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score."
-                : "Recovery scoring needs sleep, HRV and resting heart-rate data. Without compatible data, ATHLTH leaves the score unavailable instead of estimating it."
+                ? insightText(
+                    "ATHLTH needs at least five usable days with sleep, HRV and resting heart-rate data before showing a recovery score.",
+                    "ATHLTH trenger minst fem brukbare dager med søvn, HRV og hvilepuls før en restitusjonsscore kan vises."
+                )
+                : insightText(
+                    "Recovery scoring needs sleep, HRV and resting heart-rate data. Without compatible data, ATHLTH leaves the score unavailable instead of estimating it.",
+                    "Restitusjonsscoren trenger data for søvn, HRV og hvilepuls. Uten kompatible data lar ATHLTH scoren stå utilgjengelig i stedet for å gjette."
+                )
         }
     }
 
@@ -7362,10 +7454,10 @@ struct ATHLTHRecoveryView: View {
             sorenessStore.highestTodayLevel == .high ||
             health.recovery.state == .takeItEasy ||
             health.recovery.state == .recover {
-            return "Adjust workout"
+            return insightText("Adjust workout", "Juster økten")
         }
 
-        return "Open Train"
+        return insightText("Open Train", "Åpne Train")
     }
 
     private var recommendedRecoveryTool: RecoveryTool {
@@ -7402,7 +7494,7 @@ struct ATHLTHRecoveryView: View {
     private var recoveryAIContext: RecoveryAIContext {
         RecoveryAIContext(
             recoveryScore: health.recovery.score,
-            recoveryState: health.recovery.state.title,
+            recoveryState: localizedRecoveryStateTitle,
             recoveryDetail: health.recovery.detail,
             sleepSeconds: health.sleep.totalAsleep > 0
                 ? health.sleep.totalAsleep
@@ -7460,11 +7552,11 @@ struct ATHLTHRecoveryView: View {
     private var fallbackRecoveryAIInsight: RecoveryAIInsight {
         RecoveryAIInsight(
             headline: recoveryHeadline,
-            summary: health.recovery.detail,
+            summary: localizedRecoveryDetail,
             factors: [
                 RecoveryAIFactor(
-                    title: "Sleep",
-                    detail: sleepComparisonText ?? "No personal baseline yet.",
+                    title: insightText("Sleep", "Søvn"),
+                    detail: sleepComparisonText ?? insightText("No personal baseline yet.", "Ingen personlig grunnlinje ennå."),
                     impact: recoveryFactorImpact(
                         current: health.sleep.totalAsleep > 0
                             ? health.sleep.totalAsleep
@@ -7475,7 +7567,7 @@ struct ATHLTHRecoveryView: View {
                 ),
                 RecoveryAIFactor(
                     title: "HRV",
-                    detail: hrvComparisonText ?? "No personal baseline yet.",
+                    detail: hrvComparisonText ?? insightText("No personal baseline yet.", "Ingen personlig grunnlinje ennå."),
                     impact: recoveryFactorImpact(
                         current: health.heart.hrvMilliseconds,
                         baseline:
@@ -7484,10 +7576,10 @@ struct ATHLTHRecoveryView: View {
                     )
                 ),
                 RecoveryAIFactor(
-                    title: "Resting HR",
+                    title: insightText("Resting HR", "Hvilepuls"),
                     detail:
                         restingHRComparisonText ??
-                        "No personal baseline yet.",
+                        insightText("No personal baseline yet.", "Ingen personlig grunnlinje ennå."),
                     impact: recoveryFactorImpact(
                         current: health.heart.restingHeartRate,
                         baseline:
@@ -7502,9 +7594,9 @@ struct ATHLTHRecoveryView: View {
                 reason: guidanceDetail
             ),
             quickQuestions: [
-                "Why is my recovery different today?",
-                "Should I change today's workout?",
-                "Which muscle groups need more recovery?"
+                insightText("Why is my recovery different today?", "Hvorfor er restitusjonen min annerledes i dag?"),
+                insightText("Should I change today's workout?", "Bør jeg endre dagens økt?"),
+                insightText("Which muscle groups need more recovery?", "Hvilke muskelgrupper trenger mer restitusjon?")
             ]
         )
     }
@@ -7512,15 +7604,15 @@ struct ATHLTHRecoveryView: View {
     private var fallbackSuggestionSubtitle: String {
         switch health.recovery.state {
         case .ready:
-            return "Normal to hard · follow your plan"
+            return insightText("Normal to hard · follow your plan", "Normal til hard · følg planen")
         case .balanced:
-            return "Train as planned · stay flexible"
+            return insightText("Train as planned · stay flexible", "Tren som planlagt · vær fleksibel")
         case .takeItEasy:
-            return "Easy effort · reduce load if needed"
+            return insightText("Easy effort · reduce load if needed", "Rolig innsats · reduser belastningen ved behov")
         case .recover:
-            return "Rest, mobility or very easy activity"
+            return insightText("Rest, mobility or very easy activity", "Hvile, mobilitet eller svært lett aktivitet")
         case .buildingBaseline:
-            return "Keep collecting recovery data"
+            return insightText("Keep collecting recovery data", "Fortsett å samle restitusjonsdata")
         }
     }
 
