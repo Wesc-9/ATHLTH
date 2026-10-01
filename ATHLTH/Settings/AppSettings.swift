@@ -14,7 +14,6 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
     static var currentlySupported:
         [AppLanguage] {
         [
-            .system,
             .english,
             .norwegian
         ]
@@ -22,7 +21,7 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .system: return "iPhone"
+        case .system: return "System"
         case .english: return "English"
         case .norwegian: return "Norsk"
         case .spanish: return "Español"
@@ -42,7 +41,7 @@ enum AppLanguage: String, CaseIterable, Identifiable, Codable {
 
     var systemImage: String {
         switch self {
-        case .system: return "iphone"
+        case .system: return "globe"
         default: return "globe"
         }
     }
@@ -367,15 +366,36 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        language =
+        let storedLanguage =
             AppLanguage(
                 rawValue:
                     defaults.string(
                         forKey:
                             "settings.language"
                     ) ?? ""
-            ) ??
-            .english
+            )
+
+        if storedLanguage == .system {
+            let preferredLanguage =
+                Locale.preferredLanguages
+                    .first?
+                    .lowercased() ?? ""
+
+            let migratedLanguage: AppLanguage =
+                preferredLanguage.hasPrefix("nb") ||
+                preferredLanguage.hasPrefix("no") ||
+                preferredLanguage.hasPrefix("nn")
+                    ? .norwegian
+                    : .english
+
+            language = migratedLanguage
+            defaults.set(
+                migratedLanguage.rawValue,
+                forKey: "settings.language"
+            )
+        } else {
+            language = storedLanguage ?? .english
+        }
 
         let resolvedMeasurementPreference =
             MeasurementPreference(
