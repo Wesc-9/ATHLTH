@@ -49,6 +49,7 @@ struct RouteDetailView: View {
 
     private var isPublicTrail: Bool {
         currentRoute.routeSource == "openstreetmap" ||
+        currentRoute.routeSource == "kartverket_turrutebasen" ||
         currentRoute.ownerID ==
             PublicTrailRecord.publicSourceOwnerID ||
         currentRoute.sharedSourceOwnerID ==
@@ -895,7 +896,10 @@ struct RouteDetailView: View {
                     }
 
                     Text(
-                        "Route geometry and trail metadata: OpenStreetMap contributors."
+                        metadata.source ==
+                            "kartverket_turrutebasen"
+                            ? "Route geometry and trail metadata: © Kartverket."
+                            : "Route geometry and trail metadata: OpenStreetMap contributors."
                     )
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
