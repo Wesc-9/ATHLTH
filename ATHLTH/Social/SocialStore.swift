@@ -19,6 +19,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var privacy: SocialPrivacySettings?
+    @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var isHomeFeedRefreshing = false
     @Published var errorMessage: String?
@@ -887,6 +888,74 @@ final class SocialStore: ObservableObject {
 
     func workoutActivity(for workoutID: UUID) async -> SocialActivityRecord? {
         try? await service.workoutActivity(for: workoutID)
+    }
+
+    func refreshWorkoutMedia(
+        for userID: UUID? = nil
+    ) async {
+        guard let resolvedUserID =
+                userID ?? currentUserID
+        else {
+            workoutMedia = []
+            return
+        }
+
+        do {
+            workoutMedia =
+                try await service.loadWorkoutMedia(
+                    for: resolvedUserID
+                )
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
+    func uploadWorkoutMedia(
+        workoutID: UUID,
+        jpegData: Data,
+        caption: String?
+    ) async -> Bool {
+        do {
+            let media =
+                try await service
+                    .uploadWorkoutMedia(
+                        workoutID: workoutID,
+                        jpegData: jpegData,
+                        caption: caption
+                    )
+            workoutMedia.removeAll {
+                $0.id == media.id
+            }
+            workoutMedia.insert(
+                media,
+                at: 0
+            )
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
+    func deleteWorkoutMedia(
+        _ media: WorkoutMediaRecord
+    ) async -> Bool {
+        do {
+            try await service
+                .deleteWorkoutMedia(media)
+            workoutMedia.removeAll {
+                $0.id == media.id
+            }
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
     }
 
     func workoutAssociatedFriendIDs(for workoutID: UUID) -> Set<UUID> {
@@ -1773,6 +1842,7 @@ final class SocialStore: ObservableObject {
         activeWorkoutSession = nil
         activeWorkoutParticipants = []
         privacy = nil
+        workoutMedia = []
         profileCache = [:]
     }
 
