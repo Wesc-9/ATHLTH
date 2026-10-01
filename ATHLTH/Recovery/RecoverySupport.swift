@@ -1692,7 +1692,7 @@ struct RecoveryDailyCheckInCard: View {
 
 struct MuscleRecoveryCard: View {
     let statuses: [MuscleRecoveryStatus]
-    let unmappedExerciseNames: [String]
+    var unmappedExerciseNames: [String] = []
     let onLogSoreness: () -> Void
 
     var body: some View {
