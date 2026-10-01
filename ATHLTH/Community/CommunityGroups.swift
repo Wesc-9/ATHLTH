@@ -12,6 +12,8 @@ struct CommunityGroupRecord: Codable, Identifiable, Hashable {
     let locationName: String
     let visibility: String
     let imageURL: String?
+    let headerImageURL: String?
+    let featuredChallengeID: UUID?
     let joinMode: String
     let membersCanCreateContent: Bool
     let createdAt: Date
@@ -25,6 +27,8 @@ struct CommunityGroupRecord: Codable, Identifiable, Hashable {
         case locationName = "location_name"
         case visibility
         case imageURL = "image_url"
+        case headerImageURL = "header_image_url"
+        case featuredChallengeID = "featured_challenge_id"
         case joinMode = "join_mode"
         case membersCanCreateContent = "members_can_create_content"
         case createdAt = "created_at"
@@ -451,6 +455,26 @@ private struct CommunityGroupImageUpdate: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case imageURL = "image_url"
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct CommunityGroupHeaderImageUpdate: Encodable {
+    let headerImageURL: String?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case headerImageURL = "header_image_url"
+        case updatedAt = "updated_at"
+    }
+}
+
+private struct CommunityGroupFeaturedChallengeUpdate: Encodable {
+    let featuredChallengeID: UUID?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case featuredChallengeID = "featured_challenge_id"
         case updatedAt = "updated_at"
     }
 }
@@ -1893,7 +1917,7 @@ final class CommunityGroupStore: ObservableObject {
                     options: FileOptions(
                         cacheControl: "3600",
                         contentType: "image/jpeg",
-                        upsert: false
+                        upsert: true
                     )
                 )
 
@@ -1968,6 +1992,145 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func uploadGroupHeaderImage(
+        _ group: CommunityGroupRecord,
+        jpegData: Data
+    ) async -> Bool {
+        guard canManage(group) else {
+            return false
+        }
+
+        guard jpegData.count <= 5_242_880 else {
+            errorMessage = "Club header image must be smaller than 5 MB."
+            return false
+        }
+
+        let path =
+            "\(group.id.uuidString.lowercased())/header.jpg"
+
+        do {
+            try await client.storage
+                .from("community-group-images")
+                .upload(
+                    path,
+                    data: jpegData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+
+            let publicURL = try client.storage
+                .from("community-group-images")
+                .getPublicURL(path: path)
+
+            var components = URLComponents(
+                url: publicURL,
+                resolvingAgainstBaseURL: false
+            )
+            components?.queryItems = [
+                URLQueryItem(
+                    name: "v",
+                    value: String(
+                        Int(Date().timeIntervalSince1970)
+                    )
+                )
+            ]
+
+            let finalURL = components?.url ?? publicURL
+
+            try await client
+                .from("community_groups")
+                .update(
+                    CommunityGroupHeaderImageUpdate(
+                        headerImageURL:
+                            finalURL.absoluteString,
+                        updatedAt: Date()
+                    )
+                )
+                .eq("id", value: group.id)
+                .execute()
+
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func removeGroupHeaderImage(
+        _ group: CommunityGroupRecord
+    ) async -> Bool {
+        guard canManage(group) else {
+            return false
+        }
+
+        let path =
+            "\(group.id.uuidString.lowercased())/header.jpg"
+
+        do {
+            _ = try? await client.storage
+                .from("community-group-images")
+                .remove(paths: [path])
+
+            try await client
+                .from("community_groups")
+                .update(
+                    CommunityGroupHeaderImageUpdate(
+                        headerImageURL: nil,
+                        updatedAt: Date()
+                    )
+                )
+                .eq("id", value: group.id)
+                .execute()
+
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func setFeaturedChallenge(
+        _ challengeID: UUID?,
+        in group: CommunityGroupRecord
+    ) async -> Bool {
+        guard canManage(group) else {
+            return false
+        }
+
+        if let challengeID,
+           !challenges(in: group.id).contains(
+                where: { $0.id == challengeID }
+           ) {
+            errorMessage =
+                "That challenge does not belong to this Club."
+            return false
+        }
+
+        do {
+            try await client
+                .from("community_groups")
+                .update(
+                    CommunityGroupFeaturedChallengeUpdate(
+                        featuredChallengeID: challengeID,
+                        updatedAt: Date()
+                    )
+                )
+                .eq("id", value: group.id)
+                .execute()
+
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func deleteGroup(
         _ group: CommunityGroupRecord
     ) async -> Bool {
@@ -1976,16 +2139,17 @@ final class CommunityGroupStore: ObservableObject {
             return false
         }
 
-        let imagePath =
-            "\(group.id.uuidString.lowercased())/cover.jpg"
+        let imagePaths = [
+            "\(group.id.uuidString.lowercased())/cover.jpg",
+            "\(group.id.uuidString.lowercased())/header.jpg"
+        ]
 
         do {
             // Storage objects do not cascade with the database row, so remove
-            // the group photo while the group still exists and permissions can
-            // be evaluated.
+            // both visual assets while manager permissions can still be checked.
             _ = try? await client.storage
                 .from("community-group-images")
-                .remove(paths: [imagePath])
+                .remove(paths: imagePaths)
 
             try await client
                 .from("community_groups")
