@@ -4508,31 +4508,21 @@ struct CommunityGroupDetailView: View {
 
     private var groupHeroFallback: some View {
         ZStack {
+            Image("CommunityHero")
+                .resizable()
+                .interpolation(.medium)
+                .scaledToFill()
+
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.accentDeep,
-                    ATHLTHTheme.accent,
-                    ATHLTHTheme.vitality.opacity(0.88)
+                    ATHLTHTheme.accentDeep.opacity(0.10),
+                    ATHLTHTheme.vitality.opacity(0.12)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-
-            RadialGradient(
-                colors: [
-                    ATHLTHTheme.champagne.opacity(0.28),
-                    Color.clear
-                ],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 280
-            )
-
-            Circle()
-                .fill(Color.white.opacity(0.08))
-                .frame(width: 220, height: 220)
-                .offset(x: 190, y: -80)
         }
+        .clipped()
     }
 
     @ViewBuilder
@@ -4554,16 +4544,16 @@ struct CommunityGroupDetailView: View {
                 detailGroupImageFallback
             }
         }
-        .frame(width: 82, height: 82)
+        .frame(width: 92, height: 92)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 26,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 26,
                 style: .continuous
             )
             .stroke(
@@ -4580,13 +4570,13 @@ struct CommunityGroupDetailView: View {
 
     private var detailGroupImageFallback: some View {
         Image(systemName: "person.3.fill")
-            .font(.system(size: 29, weight: .semibold))
+            .font(.system(size: 31, weight: .semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.accent,
+                        ATHLTHTheme.accentDeep,
                         ATHLTHTheme.vitality
                     ],
                     startPoint: .topLeading,
@@ -4597,9 +4587,18 @@ struct CommunityGroupDetailView: View {
 
     private var memberCountText: String {
         let count = groups.members(in: group.id).count
-        return count == 1
-            ? "1 member"
-            : "\(count) members"
+
+        return ATHLTHLocalization.format(
+            english:
+                count == 1
+                    ? "%d member"
+                    : "%d members",
+            norwegian:
+                count == 1
+                    ? "%d medlem"
+                    : "%d medlemmer",
+            count
+        )
     }
 
     private var overview: some View {
