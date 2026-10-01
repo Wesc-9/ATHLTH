@@ -259,6 +259,12 @@ struct AppRootView: View {
                     .refreshVisibleLiveSessions()
             }
 
+            // Reconcile the app-local marker with HealthKit before deciding
+            // whether Health is connected. This keeps existing permissions
+            // intact across TestFlight/app updates and local defaults migrations
+            // without presenting the Health permission sheet.
+            _ = await health.restoreAuthorizationStateFromSystem()
+
             if health.needsHealthRefreshRecovery {
                 // Give the UI a stable launch first. Clearing the recovery
                 // latch here only affects future launches because this
