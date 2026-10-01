@@ -234,6 +234,8 @@ struct TargetGhostSetupView: View {
         IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace:
         GhostRaceStore
+    @EnvironmentObject private var realtime:
+        ATHLTHRealtimeSocialStore
     @EnvironmentObject private var health:
         HealthKitManager
 
@@ -516,11 +518,6 @@ struct TargetGhostSetupView: View {
         .navigationTitle("Target Ghost")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: route.id) {
-            if watchConnection.isReady &&
-                settings.trainingDeviceProvider ==
-                    .appleWatch {
-                captureDevice = .appleWatch
-            }
             await loadAttemptHistory()
         }
         .alert(
@@ -1278,6 +1275,8 @@ struct TargetGhostSetupView: View {
         }
 
         do {
+            realtime.selectLiveGhost(nil)
+
             try await GhostRaceStartService
                 .startTarget(
                     route: route,
