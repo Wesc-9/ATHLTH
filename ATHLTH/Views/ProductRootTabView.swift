@@ -8514,7 +8514,6 @@ private struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
 }
 
 struct ATHLTHProfileView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
@@ -8555,7 +8554,6 @@ struct ATHLTHProfileView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .background {
             ATHLTHSwipeBackEnabler()
@@ -8568,32 +8566,6 @@ struct ATHLTHProfileView: View {
             await refreshProfile()
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep.opacity(0.74)
-                        )
-                        .frame(width: 32, height: 32)
-                        .background(
-                            Color.white.opacity(0.46),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.58),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-            }
-
             ToolbarItemGroup(placement: .topBarTrailing) {
                 NavigationLink {
                     ATHLTHEditProfileView()
