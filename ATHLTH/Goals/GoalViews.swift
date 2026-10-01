@@ -1069,128 +1069,577 @@ struct GoalCreationView: View {
 
     @ViewBuilder
     private var targetStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Define the target")
-                .font(.title2.bold())
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            goalStepHeading(
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Set the target",
+                        norwegian: "Sett målet"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.format(
+                        english: "Keep it specific. ATHLTH will use this to build milestones and tracking.",
+                        norwegian: "Gjør målet konkret. ATHLTH bruker dette til å lage delmål og sporing."
+                    )
+            )
 
-            TextField("Goal title", text: $title)
-                .textFieldStyle(.roundedBorder)
+            goalInputCard(
+                icon: "text.cursor",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Goal name",
+                        norwegian: "Navn på målet"
+                    )
+            ) {
+                TextField(
+                    ATHLTHLocalization.format(
+                        english: "Optional — ATHLTH can name it for you",
+                        norwegian: "Valgfritt – ATHLTH kan navngi det for deg"
+                    ),
+                    text: $title
+                )
+                .font(.subheadline)
+                .textInputAutocapitalization(
+                    .sentences
+                )
+                .padding(.horizontal, 12)
+                .frame(height: 42)
+                .background(
+                    Color.black.opacity(0.035),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+            }
 
             switch category {
             case .event:
-                numberField(title: "Event distance", suffix: "km", value: $targetValue)
-                Text("The event itself stays manual. Training-distance milestones can be verified automatically from Apple Health.")
-                    .goalHint()
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Event distance",
+                            norwegian: "Distanse"
+                        ),
+                    suffix: "km",
+                    icon: "flag.checkered",
+                    value: $targetValue
+                )
+
+                goalTrackingNote(
+                    icon: "heart.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Apple Health verifies training distance",
+                            norwegian: "Apple Health verifiserer treningsdistanse"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "The event itself remains a manual completion.",
+                            norwegian: "Selve arrangementet fullføres manuelt."
+                        )
+                )
 
             case .endurance:
-                Picker("Activity", selection: $activity) {
-                    Text("Running").tag(GoalActivityFilter.running)
-                    Text("Walking").tag(GoalActivityFilter.walking)
-                    Text("Cycling").tag(GoalActivityFilter.cycling)
-                    Text("Hiking").tag(GoalActivityFilter.hiking)
+                goalInputCard(
+                    icon: "figure.run",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Activity",
+                            norwegian: "Aktivitet"
+                        )
+                ) {
+                    goalActivitySelector
                 }
-                .pickerStyle(.segmented)
 
-                numberField(title: "Target distance", suffix: "km", value: $targetValue)
-                Text("A distance milestone is only completed by a qualifying workout recorded after this goal is created.")
-                    .goalHint()
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Target distance",
+                            norwegian: "Måldistanse"
+                        ),
+                    suffix: "km",
+                    icon: activityGoalIcon,
+                    value: $targetValue
+                )
+
+                goalTrackingNote(
+                    icon: "heart.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Tracked automatically",
+                            norwegian: "Spores automatisk"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "Only qualifying workouts recorded after the goal is created count.",
+                            norwegian: "Kun kvalifiserende økter registrert etter at målet er opprettet teller."
+                        )
+                )
 
             case .strength:
-                TextField("Exercise", text: $exerciseName)
-                    .textFieldStyle(.roundedBorder)
-                numberField(title: "Target weight", suffix: "kg", value: $targetValue)
-                Text("Only sets logged in ATHLTH after goal creation can complete strength milestones.")
-                    .goalHint()
+                goalInputCard(
+                    icon: "dumbbell.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Exercise",
+                            norwegian: "Øvelse"
+                        )
+                ) {
+                    TextField(
+                        ATHLTHLocalization.format(
+                            english: "Exercise name",
+                            norwegian: "Navn på øvelse"
+                        ),
+                        text: $exerciseName
+                    )
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(
+                        Color.black.opacity(0.035),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+                }
+
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Target weight",
+                            norwegian: "Målvekt"
+                        ),
+                    suffix: "kg",
+                    icon: "scalemass.fill",
+                    value: $targetValue
+                )
+
+                goalTrackingNote(
+                    icon: "a.circle.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Tracked from ATHLTH sets",
+                            norwegian: "Spores fra sett i ATHLTH"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "Only sets logged after the goal is created can complete milestones.",
+                            norwegian: "Kun sett logget etter at målet er opprettet kan fullføre delmål."
+                        )
+                )
 
             case .body:
-                numberField(title: "Target weight", suffix: "kg", value: $targetValue)
-                if let current = health.personalDetails.weightKilograms {
-                    Text("Current Apple Health weight: \(current, specifier: "%.1f") kg. This becomes the baseline; old weight samples cannot complete new milestones.")
-                        .goalHint()
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Target weight",
+                            norwegian: "Målvekt"
+                        ),
+                    suffix: "kg",
+                    icon: "scalemass.fill",
+                    value: $targetValue
+                )
+
+                if let current =
+                        health.personalDetails
+                            .weightKilograms {
+                    goalTrackingNote(
+                        icon: "heart.fill",
+                        title:
+                            ATHLTHLocalization.format(
+                                english: "Apple Health baseline",
+                                norwegian: "Utgangspunkt fra Apple Health"
+                            ),
+                        detail:
+                            ATHLTHLocalization.format(
+                                english: "Current weight: %.1f kg. New samples are measured from this baseline.",
+                                norwegian: "Nåværende vekt: %.1f kg. Nye målinger vurderes fra dette utgangspunktet.",
+                                current
+                            )
+                    )
                 } else {
-                    Text("No Apple Health baseline is available yet. The goal can still be created, but weight milestones will stay manual until a baseline exists.")
-                        .goalHint()
+                    goalTrackingNote(
+                        icon: "exclamationmark.circle.fill",
+                        title:
+                            ATHLTHLocalization.format(
+                                english: "No weight baseline yet",
+                                norwegian: "Ingen vektmåling tilgjengelig ennå"
+                            ),
+                        detail:
+                            ATHLTHLocalization.format(
+                                english: "You can create the goal now. Tracking stays manual until Apple Health has a baseline.",
+                                norwegian: "Du kan opprette målet nå. Sporingen er manuell til Apple Health har et utgangspunkt."
+                            )
+                    )
                 }
 
             case .consistency:
-                numberField(title: "Workout target", suffix: "workouts", value: $targetValue)
-                Text("Counts qualifying workouts from the moment this goal is created.")
-                    .goalHint()
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Workout target",
+                            norwegian: "Antall økter"
+                        ),
+                    suffix:
+                        ATHLTHLocalization.format(
+                            english: "workouts",
+                            norwegian: "økter"
+                        ),
+                    icon: "calendar.badge.checkmark",
+                    value: $targetValue
+                )
+
+                goalTrackingNote(
+                    icon: "heart.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Counts new workouts",
+                            norwegian: "Teller nye treningsøkter"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "Only workouts recorded after the goal starts are included.",
+                            norwegian: "Kun økter registrert etter at målet starter blir tatt med."
+                        )
+                )
 
             case .recovery:
-                numberField(title: "Sleep target", suffix: "hours", value: $targetValue)
-                Text("Completes when Apple Health records a qualifying sleep after this goal is created.")
-                    .goalHint()
+                goalNumberField(
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Sleep target",
+                            norwegian: "Søvnmål"
+                        ),
+                    suffix:
+                        ATHLTHLocalization.format(
+                            english: "hours",
+                            norwegian: "timer"
+                        ),
+                    icon: "moon.stars.fill",
+                    value: $targetValue
+                )
+
+                goalTrackingNote(
+                    icon: "heart.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Uses Apple Health sleep",
+                            norwegian: "Bruker søvn fra Apple Health"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "A qualifying night can complete the goal automatically.",
+                            norwegian: "En kvalifiserende natt kan fullføre målet automatisk."
+                        )
+                )
 
             case .custom:
-                Text("Custom goals start with manual tracking. You can add and check milestones yourself.")
-                    .goalHint()
+                goalTrackingNote(
+                    icon: "hand.tap.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Manual tracking",
+                            norwegian: "Manuell sporing"
+                        ),
+                    detail:
+                        ATHLTHLocalization.format(
+                            english: "Add your own milestones and mark them complete when you are ready.",
+                            norwegian: "Legg til egne delmål og marker dem som fullført når du er klar."
+                        )
+                )
             }
         }
     }
 
     private var identityStep: some View {
-        let imageButtonTitle = goalImageButtonTitle
+        let imageButtonTitle =
+            goalImageButtonTitle
 
-        return VStack(alignment: .leading, spacing: 18) {
-            Text("Make it yours")
-                .font(.title2.bold())
+        return VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            goalStepHeading(
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Make it yours",
+                        norwegian: "Gjør målet til ditt"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.format(
+                        english: "Add a deadline, visual identity and context without making the setup heavy.",
+                        norwegian: "Legg til frist, uttrykk og kontekst uten å gjøre oppsettet tungt."
+                    )
+            )
 
-            Toggle("Deadline", isOn: $hasDeadline)
-                .disabled(category == .event)
+            goalInputCard(
+                icon: "calendar",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Deadline",
+                        norwegian: "Frist"
+                    )
+            ) {
+                VStack(spacing: 10) {
+                    Toggle(
+                        ATHLTHLocalization.format(
+                            english: "Use a target date",
+                            norwegian: "Bruk en måldato"
+                        ),
+                        isOn: $hasDeadline
+                    )
+                    .disabled(
+                        category == .event
+                    )
+                    .font(.subheadline.weight(.semibold))
 
-            if hasDeadline || category == .event {
-                DatePicker(
-                    "Target date",
-                    selection: $deadline,
-                    in: Calendar.current.startOfDay(for: Date())...,
-                    displayedComponents: .date
-                )
+                    if hasDeadline ||
+                        category == .event {
+                        Divider()
+                            .opacity(0.45)
+
+                        DatePicker(
+                            ATHLTHLocalization.format(
+                                english: "Target date",
+                                norwegian: "Måldato"
+                            ),
+                            selection: $deadline,
+                            in:
+                                Calendar.current
+                                    .startOfDay(
+                                        for: Date()
+                                    )...,
+                            displayedComponents:
+                                .date
+                        )
+                        .font(.subheadline)
+                    }
+                }
             }
 
-            Text("Goal image")
-                .font(.headline)
+            goalInputCard(
+                icon: "photo.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Goal image",
+                        norwegian: "Målbilde"
+                    )
+            ) {
+                VStack(spacing: 10) {
+                    if let imageData,
+                       let image =
+                            UIImage(
+                                data: imageData
+                            ) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 112)
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style:
+                                        .continuous
+                                )
+                            )
+                    }
 
-            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                HStack {
-                    Image(systemName: "photo.on.rectangle.angled")
-                    Text(imageButtonTitle)
-                    Spacer()
-                    Image(systemName: "chevron.right")
+                    PhotosPicker(
+                        selection:
+                            $selectedPhoto,
+                        matching: .images
+                    ) {
+                        HStack(spacing: 8) {
+                            Image(
+                                systemName:
+                                    "photo.on.rectangle.angled"
+                            )
+
+                            Text(
+                                imageButtonTitle
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                            .font(
+                                .caption.bold()
+                            )
+                        }
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .padding(
+                            .horizontal,
+                            12
+                        )
+                        .frame(height: 42)
+                        .background(
+                            Color.black
+                                .opacity(
+                                    0.035
+                                ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        12,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "Fallback cover",
+                                norwegian: "Standardbakgrunn"
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Spacer()
+
+                        Picker(
+                            "",
+                            selection:
+                                $coverStyle
+                        ) {
+                            ForEach(
+                                GoalCoverStyle
+                                    .allCases
+                            ) { style in
+                                Text(style.title)
+                                    .tag(style)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
                 }
-                .padding()
+            }
+
+            goalInputCard(
+                icon: "heart.text.square.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Why it matters",
+                        norwegian: "Hvorfor dette er viktig"
+                    )
+            ) {
+                TextField(
+                    ATHLTHLocalization.format(
+                        english: "Optional",
+                        norwegian: "Valgfritt"
+                    ),
+                    text: $whyItMatters,
+                    axis: .vertical
+                )
+                .font(.subheadline)
+                .lineLimit(2...4)
+                .padding(12)
                 .background(
-                    Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    Color.black.opacity(0.035),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.primary.opacity(0.05), lineWidth: 1)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Picker("Fallback cover", selection: $coverStyle) {
-                ForEach(GoalCoverStyle.allCases) { style in
-                    Text(style.title).tag(style)
-                }
             }
 
-            TextField("Why this matters (optional)", text: $whyItMatters, axis: .vertical)
-                .lineLimit(3...6)
-                .textFieldStyle(.roundedBorder)
+            goalInputCard(
+                icon: "note.text",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Notes",
+                        norwegian: "Notater"
+                    )
+            ) {
+                TextField(
+                    ATHLTHLocalization.format(
+                        english: "Optional",
+                        norwegian: "Valgfritt"
+                    ),
+                    text: $notes,
+                    axis: .vertical
+                )
+                .font(.subheadline)
+                .lineLimit(2...4)
+                .padding(12)
+                .background(
+                    Color.black.opacity(0.035),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+            }
 
-            TextField("Notes (optional)", text: $notes, axis: .vertical)
-                .lineLimit(2...5)
-                .textFieldStyle(.roundedBorder)
+            if let activePlan =
+                    session.activePlan {
+                goalInputCard(
+                    icon:
+                        "list.bullet.clipboard.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Training plan",
+                            norwegian: "Treningsplan"
+                        )
+                ) {
+                    Toggle(
+                        isOn:
+                            $linkActivePlan
+                    ) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Link this goal",
+                                    norwegian: "Knytt målet til planen"
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
 
-            if let activePlan = session.activePlan {
-                Toggle(isOn: $linkActivePlan) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Link training plan")
-                        Text(activePlan.title)
+                            Text(
+                                activePlan.title
+                            )
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
                     }
                 }
             }
@@ -1198,101 +1647,896 @@ struct GoalCreationView: View {
     }
 
     private var milestoneStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Milestones")
-                .font(.title2.bold())
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            goalStepHeading(
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Milestones",
+                        norwegian: "Delmål"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.format(
+                        english: "ATHLTH proposes a simple path toward your target. You can edit or add manual milestones later.",
+                        norwegian: "ATHLTH foreslår en enkel vei mot målet. Du kan redigere eller legge til manuelle delmål senere."
+                    )
+            )
 
-            Text("ATHLTH proposes milestones from your target. You can always check them manually. Automatic rules never use evidence from before the goal was created.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            ForEach(
+                Array(
+                    previewMilestones
+                        .enumerated()
+                ),
+                id: \.element.id
+            ) { index, milestone in
+                let isFinal =
+                    index ==
+                    previewMilestones
+                        .count - 1
 
-            ForEach(Array(previewMilestones.enumerated()), id: \.element.id) { index, milestone in
-                HStack(alignment: .top, spacing: 12) {
+                HStack(
+                    alignment: .top,
+                    spacing: 11
+                ) {
                     ZStack {
                         Circle()
-                            .fill(index == previewMilestones.count - 1 ? ATHLTHTheme.accent : ATHLTHTheme.accent.opacity(0.10))
-                            .frame(width: 32, height: 32)
-                        Text("\(index + 1)")
-                            .font(.caption.bold())
-                            .foregroundStyle(index == previewMilestones.count - 1 ? .white : ATHLTHTheme.accent)
+                            .fill(
+                                isFinal
+                                    ? ATHLTHTheme
+                                        .accentDeep
+                                    : ATHLTHTheme
+                                        .accentSoft
+                            )
+                            .frame(
+                                width: 34,
+                                height: 34
+                            )
+
+                        if isFinal {
+                            Image(
+                                systemName:
+                                    "flag.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 12,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        } else {
+                            Text(
+                                "\(index + 1)"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(milestone.title)
-                            .font(.subheadline.bold())
-                        Text(milestone.targetDescription)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if let rule = milestone.automationRule {
-                            Label(
-                                ATHLTHLocalization.format(
-                                    english: "Auto · %@ · only new data",
-                                    norwegian: "Auto · %@ · bare nye data",
-                                    rule.dataSource.title
-                                ),
-                                systemImage: rule.dataSource.systemImage
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        HStack(
+                            alignment:
+                                .firstTextBaseline
+                        ) {
+                            Text(
+                                milestone.title
                             )
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.accent)
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .fixedSize(
+                                horizontal:
+                                    false,
+                                vertical: true
+                            )
+
+                            Spacer(
+                                minLength: 8
+                            )
+
+                            if isFinal {
+                                Text(
+                                    ATHLTHLocalization.format(
+                                        english: "FINAL",
+                                        norwegian: "MÅL"
+                                    )
+                                )
+                                .font(
+                                    .system(
+                                        size: 8,
+                                        weight: .bold
+                                    )
+                                )
+                                .tracking(0.7)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+                            }
+                        }
+
+                        Text(
+                            milestone
+                                .targetDescription
+                        )
+                        .font(
+                            .system(
+                                size: 11.5
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+
+                        if let rule =
+                                milestone
+                                    .automationRule {
+                            goalTrackingPill(
+                                icon:
+                                    rule
+                                        .dataSource
+                                        .systemImage,
+                                text:
+                                    ATHLTHLocalization.format(
+                                        english: "Automatic · %@",
+                                        norwegian: "Automatisk · %@",
+                                        rule
+                                            .dataSource
+                                            .title
+                                    ),
+                                emphasized: true
+                            )
                         } else {
-                            Label("Manual", systemImage: "hand.tap.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            goalTrackingPill(
+                                icon:
+                                    "hand.tap.fill",
+                                text:
+                                    ATHLTHLocalization.format(
+                                        english: "Manual",
+                                        norwegian: "Manuell"
+                                    ),
+                                emphasized:
+                                    false
+                            )
                         }
                     }
                 }
-                .padding()
-                .goalCard()
+                .padding(13)
+                .background(
+                    Color.white.opacity(
+                        0.92
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        isFinal
+                            ? ATHLTHTheme
+                                .accentDeep
+                                .opacity(0.20)
+                            : Color.black
+                                .opacity(0.045),
+                        lineWidth: 0.8
+                    )
+                }
             }
 
-            Text("You can add extra manual milestones after creating the goal.")
-                .goalHint()
+            goalTrackingNote(
+                icon: "plus.circle.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "You can add more later",
+                        norwegian: "Du kan legge til flere senere"
+                    ),
+                detail:
+                    ATHLTHLocalization.format(
+                        english: "Manual milestones can be added or checked at any time.",
+                        norwegian: "Manuelle delmål kan legges til eller markeres når som helst."
+                    )
+            )
         }
     }
 
     private var reviewStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Ready to start")
-                .font(.title2.bold())
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            goalStepHeading(
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Ready to start",
+                        norwegian: "Klar til å starte"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.format(
+                        english: "Review the essentials before ATHLTH starts tracking your goal.",
+                        norwegian: "Se over det viktigste før ATHLTH begynner å spore målet."
+                    )
+            )
 
             GoalPreviewCard(
                 title: resolvedTitle,
                 category: category,
-                deadline: (hasDeadline || category == .event) ? deadline : nil,
+                deadline:
+                    (hasDeadline ||
+                     category == .event)
+                        ? deadline
+                        : nil,
                 coverStyle: coverStyle,
                 imageData: imageData
             )
 
-            Toggle("Make this my Primary Goal", isOn: $makePrimary)
+            goalInputCard(
+                icon: "star.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Goal settings",
+                        norwegian: "Målinnstillinger"
+                    )
+            ) {
+                VStack(spacing: 11) {
+                    Toggle(
+                        ATHLTHLocalization.format(
+                            english: "Make this my Primary Goal",
+                            norwegian: "Gjør dette til hovedmålet mitt"
+                        ),
+                        isOn: $makePrimary
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
 
-            Picker("Privacy", selection: $privacy) {
-                ForEach(GoalPrivacy.allCases) { option in
-                    Text(option.title).tag(option)
+                    Divider()
+                        .opacity(0.45)
+
+                    HStack {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Privacy",
+                                    norwegian: "Synlighet"
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Who can see this goal",
+                                    norwegian: "Hvem som kan se dette målet"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        Spacer()
+
+                        Picker(
+                            "",
+                            selection: $privacy
+                        ) {
+                            ForEach(
+                                GoalPrivacy
+                                    .allCases
+                            ) { option in
+                                Text(
+                                    option.title
+                                )
+                                .tag(option)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
                 }
             }
 
-            if linkActivePlan, let activePlan = session.activePlan {
-                Label(ATHLTHLocalization.format(
-                            english: "Linked to %@",
-                            norwegian: "Knyttet til %@",
-                            activePlan.title
-                        ), systemImage: "list.bullet.clipboard.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
+            goalReviewSummaryCard
+
+            goalTrackingNote(
+                icon:
+                    "checkmark.shield.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Safe automation",
+                        norwegian: "Trygg automatikk"
+                    ),
+                detail:
+                    ATHLTHLocalization.format(
+                        english: "Automatic milestones only use qualifying data recorded after this goal is created. You can always override a milestone manually.",
+                        norwegian: "Automatiske delmål bruker bare kvalifiserende data registrert etter at målet er opprettet. Du kan alltid overstyre et delmål manuelt."
+                    )
+            )
+        }
+    }
+
+    private func goalStepHeading(
+        title: String,
+        subtitle: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Text(title)
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+            Text(subtitle)
+                .font(
+                    .system(
+                        size: 12.5
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+        }
+        .padding(.bottom, 2)
+    }
+
+    private func goalInputCard<Content: View>(
+        icon: String,
+        title: String,
+        @ViewBuilder content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Label(
+                title,
+                systemImage: icon
+            )
+            .font(
+                .caption.weight(
+                    .bold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .primaryText
+            )
+
+            content()
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(
+                    0.045
+                ),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func goalNumberField(
+        title: String,
+        suffix: String,
+        icon: String,
+        value: Binding<Double>
+    ) -> some View {
+        goalInputCard(
+            icon: icon,
+            title: title
+        ) {
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 8
+            ) {
+                TextField(
+                    "0",
+                    value: value,
+                    format:
+                        .number.precision(
+                            .fractionLength(
+                                0...3
+                            )
+                        )
+                )
+                .keyboardType(
+                    .decimalPad
+                )
+                .font(
+                    .system(
+                        size: 28,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .minimumScaleFactor(
+                    0.75
+                )
+
+                Text(suffix)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 54)
+            .background(
+                Color.black.opacity(
+                    0.035
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    private var goalActivitySelector:
+        some View {
+        HStack(spacing: 6) {
+            goalActivityButton(
+                .running,
+                icon: "figure.run"
+            )
+            goalActivityButton(
+                .walking,
+                icon: "figure.walk"
+            )
+            goalActivityButton(
+                .cycling,
+                icon: "bicycle"
+            )
+            goalActivityButton(
+                .hiking,
+                icon: "mountain.2.fill"
+            )
+        }
+    }
+
+    private func goalActivityButton(
+        _ option: GoalActivityFilter,
+        icon: String
+    ) -> some View {
+        let isSelected =
+            activity == option
+
+        return Button {
+            withAnimation(
+                .snappy(duration: 0.18)
+            ) {
+                activity = option
+            }
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .semibold
+                        )
+                    )
+
+                Text(
+                    option.title
+                )
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .semibold
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.7
+                )
+            }
+            .foregroundStyle(
+                isSelected
+                    ? .white
+                    : ATHLTHTheme
+                        .primaryText
+            )
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(height: 54)
+            .background(
+                isSelected
+                    ? ATHLTHTheme
+                        .accentDeep
+                    : Color.black
+                        .opacity(0.035),
+                in: RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var activityGoalIcon:
+        String {
+        switch activity {
+        case .running:
+            return "figure.run"
+        case .walking:
+            return "figure.walk"
+        case .cycling:
+            return "bicycle"
+        case .hiking:
+            return "mountain.2.fill"
+        case .any:
+            return "figure.mixed.cardio"
+        }
+    }
+
+    private func goalTrackingNote(
+        icon: String,
+        title: String,
+        detail: String
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 32,
+                height: 32
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(title)
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Text(detail)
+                    .font(
+                        .system(
+                            size: 11.5
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Safe automation", systemImage: "checkmark.shield.fill")
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHTheme.accent)
-                Text("ATHLTH will only auto-complete a milestone when its exact rule is satisfied by the configured source after this goal was created. Manual check and uncheck always remain available.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
-            .goalCard()
+            Spacer(
+                minLength: 0
+            )
         }
+        .padding(11)
+        .background(
+            ATHLTHTheme
+                .accentSoft
+                .opacity(0.48),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+
+    private func goalTrackingPill(
+        icon: String,
+        text: String,
+        emphasized: Bool
+    ) -> some View {
+        Label(
+            text,
+            systemImage: icon
+        )
+        .font(
+            .system(
+                size: 9,
+                weight: .semibold
+            )
+        )
+        .foregroundStyle(
+            emphasized
+                ? ATHLTHTheme
+                    .accentDeep
+                : ATHLTHTheme
+                    .mutedText
+        )
+        .padding(
+            .horizontal,
+            8
+        )
+        .frame(height: 24)
+        .background(
+            emphasized
+                ? ATHLTHTheme
+                    .accentSoft
+                : Color.black
+                    .opacity(0.035),
+            in: Capsule()
+        )
+    }
+
+    private var goalReviewSummaryCard:
+        some View {
+        let source: GoalDataSource
+
+        switch category {
+        case .strength:
+            source = .athlth
+        case .custom:
+            source = .manual
+        default:
+            source = .appleHealth
+        }
+
+        return VStack(
+            spacing: 0
+        ) {
+            goalReviewRow(
+                icon:
+                    source.systemImage,
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Tracking",
+                        norwegian: "Sporing"
+                    ),
+                value: source.title
+            )
+
+            Divider()
+                .padding(.leading, 42)
+                .opacity(0.45)
+
+            goalReviewRow(
+                icon:
+                    "point.3.connected.trianglepath.dotted",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Milestones",
+                        norwegian: "Delmål"
+                    ),
+                value:
+                    "\(previewMilestones.count)"
+            )
+
+            if hasDeadline ||
+                category == .event {
+                Divider()
+                    .padding(
+                        .leading,
+                        42
+                    )
+                    .opacity(0.45)
+
+                goalReviewRow(
+                    icon: "calendar",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Deadline",
+                            norwegian: "Frist"
+                        ),
+                    value:
+                        deadline.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        )
+                )
+            }
+
+            if linkActivePlan,
+               let activePlan =
+                    session.activePlan {
+                Divider()
+                    .padding(
+                        .leading,
+                        42
+                    )
+                    .opacity(0.45)
+
+                goalReviewRow(
+                    icon:
+                        "list.bullet.clipboard.fill",
+                    title:
+                        ATHLTHLocalization.format(
+                            english: "Plan",
+                            norwegian: "Plan"
+                        ),
+                    value:
+                        activePlan.title
+                )
+            }
+        }
+        .padding(.horizontal, 13)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(
+                    0.045
+                ),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func goalReviewRow(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+            )
+            .frame(
+                width: 32,
+                height: 32
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+            )
+
+            Text(title)
+                .font(
+                    .subheadline
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            Spacer()
+
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.75
+                )
+        }
+        .padding(.vertical, 10)
     }
 
     private var footer: some View {
