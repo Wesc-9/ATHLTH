@@ -403,10 +403,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     func startLinkedPlaylist(
         _ playlist: SpotifyPlaylistReference,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        respectGlobalAutoplay: Bool = true
     ) async {
-        guard settings.spotifyAutoplayLinkedPlaylists,
-              isConfigured
+        guard isConfigured,
+              (
+                !respectGlobalAutoplay ||
+                settings.spotifyAutoplayLinkedPlaylists
+              )
         else {
             return
         }
