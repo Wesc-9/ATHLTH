@@ -62,6 +62,11 @@ struct IPhoneWorkoutView: View {
                                     .foregroundStyle(
                                         .secondary
                                     )
+
+                                    if realtime
+                                        .selectedLiveGhostSessionID != nil {
+                                        liveGhostConnectionLabel
+                                    }
                                 }
 
                                 Spacer()
@@ -996,6 +1001,65 @@ struct IPhoneWorkoutView: View {
         return seconds >= 0
             ? "\(value) ahead"
             : "\(value) behind"
+    }
+
+    @ViewBuilder
+    private var liveGhostConnectionLabel:
+        some View {
+        switch realtime
+            .liveGhostConnectionState {
+        case .live:
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Live GPS",
+                    norwegian: "Live GPS"
+                ),
+                systemImage:
+                    "dot.radiowaves.left.and.right"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+
+        case .delayed(let seconds):
+            Label(
+                ATHLTHLocalization.format(
+                    english:
+                        "Delayed · %d s",
+                    norwegian:
+                        "Forsinket · %d s",
+                    seconds
+                ),
+                systemImage:
+                    "clock.badge.exclamationmark"
+            )
+            .foregroundStyle(.orange)
+
+        case .reconnecting(let seconds):
+            Label(
+                ATHLTHLocalization.format(
+                    english:
+                        "Reconnecting · %d s",
+                    norwegian:
+                        "Kobler til på nytt · %d s",
+                    seconds
+                ),
+                systemImage:
+                    "arrow.triangle.2.circlepath"
+            )
+            .foregroundStyle(.orange)
+
+        case .waiting:
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Waiting for GPS",
+                    norwegian: "Venter på GPS"
+                ),
+                systemImage:
+                    "location.slash"
+            )
+            .foregroundStyle(.secondary)
+        }
     }
 
     private func liveGhostText(
