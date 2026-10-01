@@ -1161,6 +1161,8 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 sessionID: session.id
             )
 
+            var refreshCycle = 0
+
             while !Task.isCancelled {
                 try? await Task.sleep(
                     for: self.liveRefreshInterval
@@ -1173,7 +1175,62 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 await self.refreshLocations(
                     sessionID: session.id
                 )
+
+                refreshCycle += 1
+
+                if refreshCycle % 10 == 0 {
+                    let stillActive =
+                        await self
+                            .watchedSessionIsStillActive(
+                                session.id
+                            )
+
+                    if !stillActive {
+                        if self
+                            .selectedLiveGhostSessionID ==
+                            session.id {
+                            self
+                                .selectedLiveGhostSessionID =
+                                nil
+                        }
+
+                        self.stopWatching()
+                        break
+                    }
+                }
             }
+        }
+    }
+
+    private func watchedSessionIsStillActive(
+        _ sessionID: UUID
+    ) async -> Bool {
+        do {
+            let rows: [ATHLTHLiveWorkoutSession] =
+                try await client
+                    .from("live_workout_sessions")
+                    .select()
+                    .eq(
+                        "id",
+                        value: sessionID
+                    )
+                    .limit(1)
+                    .execute()
+                    .value
+
+            guard let session =
+                    rows.first
+            else {
+                return false
+            }
+
+            return session.isActive
+        } catch is CancellationError {
+            return true
+        } catch {
+            // A transient network error must not end a live race. The normal
+            // freshness filter still prevents stale locations being used.
+            return true
         }
     }
 
