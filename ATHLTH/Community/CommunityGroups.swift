@@ -5679,7 +5679,11 @@ struct CommunityGroupDetailView: View {
         _ event:
             CommunityGroupEventRecord
     ) -> some View {
-        HStack(spacing: 10) {
+        let displayStart =
+            event.nextOccurrenceStart() ??
+            event.startsAt
+
+        return HStack(spacing: 10) {
             referenceEventArtwork(event)
                 .frame(
                     width: 118,
@@ -5736,21 +5740,10 @@ struct CommunityGroupDetailView: View {
                     .lineLimit(1)
 
                 Label(
-                    event
-                        .nextOccurrenceStart()
-                        ?.formatted(
-                            date:
-                                .abbreviated,
-                            time:
-                                .shortened
-                        ) ??
-                    event.startsAt
-                        .formatted(
-                            date:
-                                .abbreviated,
-                            time:
-                                .shortened
-                        ),
+                    displayStart.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    ),
                     systemImage:
                         "calendar"
                 )
