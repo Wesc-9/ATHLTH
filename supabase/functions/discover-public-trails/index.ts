@@ -1395,6 +1395,7 @@ async function refreshCell(
   longitude: number,
   radiusKilometers: number,
   bounds: Bounds,
+  refreshKartverket: boolean,
 ) {
   const query = `
 [out:json][timeout:15];
@@ -1424,6 +1425,7 @@ out body geom qt 160;
   // Start the Norway-only secondary source in parallel with Overpass.
   // Its 7 s timeout cannot block or replace the primary OSM result.
   const kartverketPromise =
+    refreshKartverket &&
     shouldUseKartverket(
       bounds,
     )
@@ -2096,12 +2098,15 @@ Deno.serve(
         : EMPTY_CACHE_RETRY_SECONDS *
           1000;
 
-    const cacheFresh =
-      !forceRefresh &&
+    const sourceCacheFresh =
       cacheAgeMilliseconds != null &&
       cacheAgeMilliseconds >= 0 &&
       cacheAgeMilliseconds <
         allowedCacheAge;
+
+    const cacheFresh =
+      !forceRefresh &&
+      sourceCacheFresh;
 
     const refreshAgeMilliseconds =
       cell?.refresh_started_at
@@ -2184,6 +2189,7 @@ Deno.serve(
             longitude,
             radiusKilometers,
             bounds,
+            !sourceCacheFresh,
           );
 
           isRefreshing =
@@ -2200,6 +2206,7 @@ Deno.serve(
                 longitude,
                 radiusKilometers,
                 bounds,
+                !sourceCacheFresh,
               ),
             );
         }
