@@ -899,56 +899,29 @@ struct TargetGhostSetupView: View {
     }
 
     private var workoutDeviceCard: some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 10
-            ) {
-                Text("Workout device")
-                    .font(.headline)
-
-                Picker(
-                    "Workout device",
-                    selection:
-                        $captureDevice
-                ) {
-                    Label(
-                        "iPhone",
-                        systemImage: "iphone"
+        QuickStartWorkoutDeviceCard(
+            selection: $captureDevice,
+            watchConnected:
+                watchConnection.isReady &&
+                !watchConnection
+                    .workoutLaunchInProgress,
+            iPhoneEnabled:
+                phoneWorkout.active == nil,
+            iPhoneSubtitle:
+                phoneWorkout.active == nil
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Record the Target Ghost with iPhone GPS, Route Guardian and live Ghost comparison.",
+                        norwegian:
+                            "Registrer Target Ghost med GPS på iPhone, Route Guardian og live Ghost-sammenligning."
                     )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .iPhone
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Finish the active iPhone workout before starting Target Ghost.",
+                        norwegian:
+                            "Fullfør den aktive iPhone-økten før du starter Target Ghost."
                     )
-
-                    Label(
-                        "Apple Watch",
-                        systemImage: "applewatch"
-                    )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .appleWatch
-                    )
-                }
-                .pickerStyle(.segmented)
-                .onChange(
-                    of: captureDevice
-                ) { _, device in
-                    if device == .appleWatch &&
-                        !watchConnection.isReady {
-                        captureDevice = .iPhone
-                    }
-                }
-
-                Text(
-                    captureDevice == .iPhone
-                        ? "iPhone records GPS, Route Guardian and Ghost comparison."
-                        : "Apple Watch records the workout and Ghost comparison."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
+        )
     }
 
     private var startButton: some View {
