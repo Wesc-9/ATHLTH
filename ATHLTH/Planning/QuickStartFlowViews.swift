@@ -305,7 +305,7 @@ struct WalkQuickStartConfiguration {
     let gearIDs: Set<UUID>
 }
 
-private struct QuickStartWorkoutDeviceCard: View {
+struct QuickStartWorkoutDeviceCard: View {
     @Binding var selection: WorkoutCaptureDevice
     let watchConnected: Bool
     let iPhoneEnabled: Bool
