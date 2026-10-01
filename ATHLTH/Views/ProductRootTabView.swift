@@ -2809,44 +2809,16 @@ struct ATHLTHTrainView: View {
     }
 
     var body: some View {
-        let useImmersiveTrainHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
-            ATHLTHPinnedHeroLayout(
-                accent: Color.green.opacity(0.55),
-                softTransition: true,
-                immersiveTransition: useImmersiveTrainHero,
-                scrollFadeTransition: true
+        NavigationStack {
+            ATHLTHExclusiveHomeHeroLayout(
+                accent: Color.green.opacity(0.42),
+                showsTopSheen: false
             ) {
                 ZStack(alignment: .topTrailing) {
-                    ATHLTHTabHero(
+                    ATHLTHExclusiveHomeHero(
                         imageName: "TrainHero",
                         title: "Train",
-                        subtitle: "Build a stronger, healthier you.",
-                        height:
-                            useImmersiveTrainHero
-                                ? 232
-                                : 190,
-                        alignment: .leading,
-                        focalOffsetX:
-                            useImmersiveTrainHero
-                                ? -10
-                                : -18,
-                        focalOffsetY:
-                            useImmersiveTrainHero
-                                ? 10
-                                : 18,
-                        titleFontSize:
-                            useImmersiveTrainHero
-                                ? 31
-                                : 30,
-                        copyWidthFraction:
-                            useImmersiveTrainHero
-                                ? 0.70
-                                : 0.80,
-                        immersiveCopy: useImmersiveTrainHero
+                        subtitle: "Build a stronger, healthier you."
                     )
 
                     Button {
@@ -2855,15 +2827,15 @@ struct ATHLTHTrainView: View {
                         Image(systemName: "square.grid.2x2.fill")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 36, height: 36)
                             .background(
-                                Color.black.opacity(0.22),
+                                Color.black.opacity(0.20),
                                 in: Circle()
                             )
                             .overlay {
                                 Circle()
                                     .stroke(
-                                        Color.white.opacity(0.32),
+                                        Color.white.opacity(0.30),
                                         lineWidth: 0.8
                                     )
                             }
@@ -2887,7 +2859,9 @@ struct ATHLTHTrainView: View {
                         todayContent
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 30)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
@@ -4445,7 +4419,7 @@ struct ATHLTHRecoveryView: View {
             ) {
                 ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
-                    title: "Recovery",
+                    title: "Insights",
                     subtitle:
                         "Understand your body. Make better decisions. Stay in the game."
                 )
