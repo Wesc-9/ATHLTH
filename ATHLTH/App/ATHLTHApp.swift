@@ -140,6 +140,7 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
@@ -274,6 +275,15 @@ struct AppRootView: View {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
+
+            // Opening ATHLTH while the Watch owns an active workout should
+            // prioritize the mirroring session. A full Health refresh can
+            // wait until the workout finishes; the completion path refreshes
+            // Health immediately afterwards.
+            guard !workoutMirroring.hasActiveMirroredWorkout else {
+                return
+            }
+
             await health.refreshIfStale(maxAge: 90)
             await officialWeeklyChallenges.syncCompletionState(
                 workouts: health.workouts
@@ -366,6 +376,10 @@ struct AppRootView: View {
             // This is connection state, not a global workout-device choice.
             watchConnection.connect()
 
+            if workoutMirroring.hasActiveMirroredWorkout {
+                return
+            }
+
             let now = Date()
             if let lastFullLifecycleRefreshAt,
                now.timeIntervalSince(lastFullLifecycleRefreshAt) <
@@ -391,7 +405,8 @@ struct AppRootView: View {
                 }
 
                 guard health.hasRequestedAuthorization,
-                      !health.shouldDeferAutomaticHealthWork
+                      !health.shouldDeferAutomaticHealthWork,
+                      !workoutMirroring.hasActiveMirroredWorkout
                 else {
                     return
                 }
