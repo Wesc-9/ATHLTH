@@ -25,39 +25,41 @@ struct GhostFriendRaceHubView: View {
 
     var body: some View {
         List {
-            Section("Workout device") {
-                Picker(
-                    "Record with",
-                    selection:
-                        $captureDevice
-                ) {
-                    Label(
-                        "iPhone",
-                        systemImage: "iphone"
+            Section {
+                QuickStartWorkoutDeviceCard(
+                    selection: $captureDevice,
+                    watchConnected:
+                        watchConnection.isReady &&
+                        !watchConnection
+                            .workoutLaunchInProgress,
+                    iPhoneEnabled:
+                        phoneWorkout.active == nil,
+                    iPhoneSubtitle:
+                        phoneWorkout.active == nil
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Record the friend Ghost Race with iPhone GPS while the other device can remain a companion.",
+                                norwegian:
+                                    "Registrer Friend Ghost Race med GPS på iPhone, mens den andre enheten kan brukes som companion."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Finish the active iPhone workout before starting a friend Ghost Race.",
+                                norwegian:
+                                    "Fullfør den aktive iPhone-økten før du starter Friend Ghost Race."
+                            )
+                )
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 6,
+                        leading: 0,
+                        bottom: 6,
+                        trailing: 0
                     )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .iPhone
-                    )
-
-                    Label(
-                        "Apple Watch",
-                        systemImage: "applewatch"
-                    )
-                    .tag(
-                        WorkoutCaptureDevice
-                            .appleWatch
-                    )
-                }
-                .pickerStyle(.segmented)
-                .onChange(
-                    of: captureDevice
-                ) { _, device in
-                    if device == .appleWatch &&
-                        !watchConnection.isReady {
-                        captureDevice = .iPhone
-                    }
-                }
+                )
+                .listRowBackground(
+                    Color.clear
+                )
             }
             Section {
                 privacyCard
