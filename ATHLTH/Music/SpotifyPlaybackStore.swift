@@ -669,21 +669,38 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return
         }
 
-        guard let callbackURL,
-              callbackMatchesConfiguredRedirect(
-                callbackURL
-              ),
-              let components = URLComponents(
-                url: callbackURL,
-                resolvingAgainstBaseURL: false
-              )
-        else {
+        guard let callbackURL else {
             connectionState =
                 .error(
-                    "Spotify returned an invalid callback."
+                    "Spotify did not return to ATHLTH."
                 )
             lastErrorMessage =
-                "Spotify returned an invalid callback. Expected \(redirectURI)."
+                "Spotify did not return a callback URL to ATHLTH."
+            return
+        }
+
+        guard callbackMatchesConfiguredRedirect(
+            callbackURL
+        ) else {
+            connectionState =
+                .error(
+                    "Spotify returned an unexpected callback."
+                )
+            lastErrorMessage =
+                "Spotify returned an unexpected callback location. Expected \(redirectURI), received \(callbackLocationForDiagnostics(callbackURL))."
+            return
+        }
+
+        guard let components = URLComponents(
+            url: callbackURL,
+            resolvingAgainstBaseURL: false
+        ) else {
+            connectionState =
+                .error(
+                    "Spotify callback could not be read."
+                )
+            lastErrorMessage =
+                "Spotify returned a callback URL that ATHLTH could not parse."
             return
         }
 
@@ -755,12 +772,65 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             return false
         }
 
-        return expected.scheme ==
-                received.scheme &&
-            expected.host ==
-                received.host &&
-            expected.path ==
+        let expectedScheme =
+            expected.scheme?
+                .lowercased()
+        let receivedScheme =
+            received.scheme?
+                .lowercased()
+        let expectedHost =
+            expected.host?
+                .lowercased()
+        let receivedHost =
+            received.host?
+                .lowercased()
+
+        return expectedScheme == receivedScheme &&
+            expectedHost == receivedHost &&
+            Self.normalizedCallbackPath(
+                expected.path
+            ) ==
+            Self.normalizedCallbackPath(
                 received.path
+            )
+    }
+
+    private static func normalizedCallbackPath(
+        _ path: String
+    ) -> String {
+        guard !path.isEmpty,
+              path != "/"
+        else {
+            return ""
+        }
+
+        if path.count > 1,
+           path.hasSuffix("/") {
+            return String(path.dropLast())
+        }
+
+        return path
+    }
+
+    private func callbackLocationForDiagnostics(
+        _ callbackURL: URL
+    ) -> String {
+        guard let components =
+                URLComponents(
+                    url: callbackURL,
+                    resolvingAgainstBaseURL:
+                        false
+                )
+        else {
+            return "<unreadable>"
+        }
+
+        let scheme =
+            components.scheme ?? "<no-scheme>"
+        let host =
+            components.host ?? "<no-host>"
+
+        return "\(scheme)://\(host)\(components.path)"
     }
 
     private func exchangeAuthorizationCode(
