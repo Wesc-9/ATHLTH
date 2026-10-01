@@ -2376,6 +2376,7 @@ struct PersonalizeTrainingPlanView: View {
     @State private var selectedDays: Set<Int> = []
     @State private var configured = false
     @State private var scheduleError: String?
+    @State private var existingPlanToOpen: TrainingPlan?
 
     private let dayLabels = [
         "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
@@ -2399,8 +2400,19 @@ struct PersonalizeTrainingPlanView: View {
         ) ?? resolvedStartDate
     }
 
+    private var existingScheduledPlan: TrainingPlan? {
+        session.existingScheduledCatalogPlan(
+            entry,
+            startDate: resolvedStartDate
+        )
+    }
+
     private var conflictingPlan: TrainingPlan? {
-        session.trainingPlanConflict(
+        guard existingScheduledPlan == nil else {
+            return nil
+        }
+
+        return session.trainingPlanConflict(
             startDate: resolvedStartDate,
             weekCount: entry.durationWeeks
         )
@@ -2614,7 +2626,56 @@ struct PersonalizeTrainingPlanView: View {
                         }
                     }
 
-                    if let conflict = conflictingPlan {
+                    if let existing =
+                        existingScheduledPlan {
+                        HStack(
+                            alignment: .top,
+                            spacing: 11
+                        ) {
+                            Image(
+                                systemName:
+                                    "checkmark.circle.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    "Plan already scheduled"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+
+                                Text(
+                                    "\(existing.title) starts \((existing.startDate ?? resolvedStartDate).formatted(date: .abbreviated, time: .omitted)). Open it instead of creating a duplicate."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft
+                                .opacity(0.58),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style: .continuous
+                                )
+                        )
+                    } else if let conflict =
+                                conflictingPlan {
                         HStack(alignment: .top, spacing: 11) {
                             Image(
                                 systemName:
@@ -2644,12 +2705,23 @@ struct PersonalizeTrainingPlanView: View {
                     }
 
                     Button {
-                        createScheduledPlan()
+                        if let existing =
+                            existingScheduledPlan {
+                            existingPlanToOpen =
+                                existing
+                        } else {
+                            createScheduledPlan()
+                        }
                     } label: {
                         HStack {
                             Label(
-                                "Create My Plan",
-                                systemImage: "calendar.badge.plus"
+                                existingScheduledPlan == nil
+                                    ? "Create My Plan"
+                                    : "Open Existing Plan",
+                                systemImage:
+                                    existingScheduledPlan == nil
+                                        ? "calendar.badge.plus"
+                                        : "calendar"
                             )
                             .font(.headline)
 
@@ -2662,7 +2734,9 @@ struct PersonalizeTrainingPlanView: View {
                         .padding(.horizontal, 17)
                         .frame(height: 54)
                         .background(
-                            ATHLTHTheme.accentDeep,
+                            existingScheduledPlan == nil
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.vitality,
                             in: RoundedRectangle(
                                 cornerRadius: 16,
                                 style: .continuous
@@ -2672,11 +2746,17 @@ struct PersonalizeTrainingPlanView: View {
                     .buttonStyle(.plain)
                     .disabled(
                         !hasValidDays ||
-                        conflictingPlan != nil
+                        (
+                            conflictingPlan != nil &&
+                            existingScheduledPlan == nil
+                        )
                     )
                     .opacity(
                         !hasValidDays ||
-                        conflictingPlan != nil
+                        (
+                            conflictingPlan != nil &&
+                            existingScheduledPlan == nil
+                        )
                             ? 0.45
                             : 1
                     )
@@ -2730,6 +2810,30 @@ struct PersonalizeTrainingPlanView: View {
                     )
                 )
             }
+            .sheet(
+                item: $existingPlanToOpen
+            ) { plan in
+                NavigationStack {
+                    ScrollView {
+                        AdvancedPlannerView(
+                            planID: plan.id
+                        )
+                        .padding()
+                    }
+                    .background(
+                        ATHLTHPremiumCanvas(
+                            accent:
+                                ATHLTHTheme
+                                    .accent
+                                    .opacity(0.35)
+                        )
+                    )
+                    .navigationTitle(plan.title)
+                    .navigationBarTitleDisplayMode(
+                        .inline
+                    )
+                }
+            }
             .alert(
                 "Could not create plan",
                 isPresented: Binding(
@@ -2779,18 +2883,23 @@ struct PersonalizeTrainingPlanView: View {
     private func createScheduledPlan() {
         guard hasValidDays else { return }
 
-        guard session.scheduleCatalogPlan(
-            entry,
-            startDate: resolvedStartDate,
-            preferredDayIndexes:
-                selectedDays.sorted()
-        ) != nil else {
+        guard let plan =
+            session.scheduleCatalogPlan(
+                entry,
+                startDate: resolvedStartDate,
+                preferredDayIndexes:
+                    selectedDays.sorted()
+            )
+        else {
             scheduleError =
                 "The plan could not be scheduled. Check that its dates do not overlap another active or upcoming plan."
             return
         }
 
-        dismiss()
+        // Keep a concrete route back to the created plan. Upcoming
+        // plans are valid plans even though they are not the active
+        // plan until their start date.
+        existingPlanToOpen = plan
         onPlanCreated?()
     }
 }
