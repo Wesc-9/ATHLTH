@@ -5797,7 +5797,9 @@ struct ATHLTHRecoveryView: View {
                         }
 
                         MuscleRecoveryCard(
-                            statuses: muscleRecoveryStatuses
+                            statuses: muscleRecoveryStatuses,
+                            unmappedExerciseNames:
+                                unmappedMuscleExercises
                         ) {
                             showingSorenessLog = true
                         }
@@ -5846,7 +5848,9 @@ struct ATHLTHRecoveryView: View {
                         recoveryUnavailableCard
 
                         MuscleRecoveryCard(
-                            statuses: muscleRecoveryStatuses
+                            statuses: muscleRecoveryStatuses,
+                            unmappedExerciseNames:
+                                unmappedMuscleExercises
                         ) {
                             showingSorenessLog = true
                         }
@@ -7950,6 +7954,14 @@ struct ATHLTHRecoveryView: View {
             soreness: sorenessStore,
             activityLoad: recoverySnapshot.trainingLoad
         )
+    }
+
+    private var unmappedMuscleExercises: [String] {
+        MuscleRecoveryEngine
+            .unmappedExerciseNames(
+                history:
+                    strengthWorkout.workoutHistory
+            )
     }
 
     private var recoveryAIContext: RecoveryAIContext {
