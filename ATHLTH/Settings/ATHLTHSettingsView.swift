@@ -991,7 +991,7 @@ struct ATHLTHSettingsView: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
+            Text(localizedSettingsSectionTitle(title).uppercased())
                 .font(.caption.weight(.semibold))
                 .tracking(2.8)
                 .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
@@ -1000,6 +1000,45 @@ struct ATHLTHSettingsView: View {
             content()
         }
         .padding(.bottom, 24)
+    }
+
+    private func localizedSettingsSectionTitle(
+        _ title: String
+    ) -> String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return title
+        }
+
+        switch title {
+        case "App":
+            return "App"
+        case "Profile":
+            return "Profil"
+        case "Privacy & Data":
+            return "Personvern og data"
+        case "Health & Sync":
+            return "Helse og synkronisering"
+        case "Connections":
+            return "Tilkoblinger"
+        case "Preferences":
+            return "Preferanser"
+        case "Membership":
+            return "Medlemskap"
+        case "Account":
+            return "Konto"
+        case "About":
+            return "Om ATHLTH"
+        case "Support":
+            return "Brukerstøtte"
+        case "Developer":
+            return "Utvikler"
+        case "Admin":
+            return "Admin"
+        case "Developer Tools":
+            return "Utviklerverktøy"
+        default:
+            return title
+        }
     }
 
     private var privacySummary: String {
