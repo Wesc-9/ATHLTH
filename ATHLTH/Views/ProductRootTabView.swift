@@ -230,6 +230,8 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @State private var homeStreakDays: [Date]?
     @State private var showingGlobalSearch = false
@@ -526,26 +528,75 @@ struct ATHLTHHomeView: View {
                 }
             }
             .sheet(item: $pendingHomeQuickStartKind) { kind in
-                QuickWorkoutStartSheet(
-                    kind: kind,
-                    trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady
-                ) { selectedFriends, gearIDs, audioCoach in
-                    Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
-                            title: kind.title,
-                            kind: kind,
-                            friends: selectedFriends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
-                        )
+                if kind == .running {
+                    RunQuickStartSheet(
+                        trainingDeviceProvider:
+                            watchConnection.isReady ? .appleWatch : .none,
+                        watchConnected:
+                            watchConnection.isReady
+                    ) { configuration in
+                        Task { @MainActor in
+                            await social.beginWorkoutWithFriends(
+                                title:
+                                    configuration.title,
+                                kind: .running,
+                                friends:
+                                    configuration.friends,
+                                creatorName:
+                                    session.profile.displayName,
+                                creatorUsername:
+                                    session.profile.username
+                            )
 
-                        startHomeQuickWorkoutOnWatch(
-                            kind,
-                            gearIDs: gearIDs,
-                            audioCoach: audioCoach
-                        )
+                            do {
+                                try await WorkoutLaunchCoordinator
+                                    .startRunQuick(
+                                        configuration:
+                                            configuration,
+                                        session:
+                                            session,
+                                        settings:
+                                            settings,
+                                        gear:
+                                            gear,
+                                        phoneWorkout:
+                                            phoneWorkout,
+                                        watchConnection:
+                                            watchConnection,
+                                        ghostRace:
+                                            ghostRace
+                                    )
+                            } catch {
+                                await social
+                                    .cancelActiveWorkout()
+                                homeWatchTransferError =
+                                    error.localizedDescription
+                            }
+                        }
+                    }
+                } else {
+                    QuickWorkoutStartSheet(
+                        kind: kind,
+                        trainingDeviceProvider:
+                            watchConnection.isReady ? .appleWatch : .none,
+                        watchConnected:
+                            watchConnection.isReady
+                    ) { selectedFriends, gearIDs, audioCoach in
+                        Task { @MainActor in
+                            await social.beginWorkoutWithFriends(
+                                title: kind.title,
+                                kind: kind,
+                                friends: selectedFriends,
+                                creatorName: session.profile.displayName,
+                                creatorUsername: session.profile.username
+                            )
+
+                            startHomeQuickWorkoutOnWatch(
+                                kind,
+                                gearIDs: gearIDs,
+                                audioCoach: audioCoach
+                            )
+                        }
                     }
                 }
             }
