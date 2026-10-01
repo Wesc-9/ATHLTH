@@ -968,7 +968,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                 Text(challenge.title)
                     .font(
                         .system(
-                            size: 25,
+                            size: 21,
                             weight: .bold
                         )
                     )
@@ -1110,8 +1110,8 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         ATHLTHTheme.primaryText
                     )
                     .frame(
-                        width: 44,
-                        height: 44
+                        width: 38,
+                        height: 38
                     )
                     .background(
                         .white,
@@ -1121,7 +1121,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
             }
             .padding(15)
         }
-        .frame(height: 202)
+        .frame(height: 142)
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
@@ -1891,8 +1891,8 @@ private struct CommunityReferenceActivityRow: View {
 
             mediaPreview
                 .frame(
-                    width: 150,
-                    height: 76
+                    width: 148,
+                    height: 62
                 )
                 .clipShape(
                     RoundedRectangle(
@@ -1901,7 +1901,7 @@ private struct CommunityReferenceActivityRow: View {
                     )
                 )
         }
-        .padding(10)
+        .padding(8)
         .background(
             Color.white.opacity(0.91),
             in:
