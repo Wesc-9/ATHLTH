@@ -11,7 +11,11 @@ enum ATHLTHWatchWorkoutRuntime {
 @MainActor
 final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var snapshot: WatchWorkoutLiveSnapshot?
-    @Published private(set) var connectionText = "Waiting for Apple Watch"
+    @Published private(set) var connectionText =
+        ATHLTHLocalization.choose(
+            english: "Waiting for Apple Watch",
+            norwegian: "Venter på Apple Watch"
+        )
     @Published private(set) var errorMessage: String?
     @Published var isPresentationRequested = false
 
@@ -39,7 +43,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     func sendCommand(_ command: WatchWorkoutCommand) {
         guard let mirroredSession else {
             publish {
-                self.errorMessage = "The mirrored Apple Watch workout is not connected."
+                self.errorMessage =
+                    ATHLTHLocalization.choose(
+                        english: "The mirrored Apple Watch workout is not connected.",
+                        norwegian: "Den speilede Apple Watch-økten er ikke tilkoblet."
+                    )
             }
             return
         }
@@ -70,7 +78,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             self.isPresentationRequested = false
             self.snapshot = nil
             self.errorMessage = nil
-            self.connectionText = "Waiting for Apple Watch"
+            self.connectionText =
+                ATHLTHLocalization.choose(
+                    english: "Waiting for Apple Watch",
+                    norwegian: "Venter på Apple Watch"
+                )
         }
     }
 
@@ -96,7 +108,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         publish {
             self.snapshot = initialSnapshot
-            self.connectionText = "Live from Apple Watch"
+            self.connectionText =
+                ATHLTHLocalization.choose(
+                    english: "Live from Apple Watch",
+                    norwegian: "Direkte fra Apple Watch"
+                )
             self.errorMessage = nil
             self.isPresentationRequested = true
         }
@@ -118,9 +134,16 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         publish {
             self.snapshot = latestSnapshot
-            self.connectionText = latestSnapshot.state == .completed
-                ? "Workout completed"
-                : "Live from Apple Watch"
+            self.connectionText =
+                latestSnapshot.state == .completed
+                    ? ATHLTHLocalization.choose(
+                        english: "Workout completed",
+                        norwegian: "Økt fullført"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Live from Apple Watch",
+                        norwegian: "Direkte fra Apple Watch"
+                    )
             self.isPresentationRequested = true
         }
     }
@@ -213,9 +236,16 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             }
 
             self.snapshot = snapshot
-            self.connectionText = newState == .completed
-                ? "Workout completed"
-                : "Live from Apple Watch"
+            self.connectionText =
+                newState == .completed
+                    ? ATHLTHLocalization.choose(
+                        english: "Workout completed",
+                        norwegian: "Økt fullført"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Live from Apple Watch",
+                        norwegian: "Direkte fra Apple Watch"
+                    )
             self.isPresentationRequested = true
 
             if newState == .completed {
@@ -241,7 +271,11 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                 self.snapshot = snapshot
             }
 
-            self.connectionText = "Mirroring error"
+            self.connectionText =
+                ATHLTHLocalization.choose(
+                    english: "Mirroring error",
+                    norwegian: "Feil ved speiling"
+                )
             self.isPresentationRequested = true
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
         }
@@ -266,7 +300,11 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             guard let self else { return }
 
             self.mirroredSession = nil
-            self.connectionText = "Reconnecting to Apple Watch"
+            self.connectionText =
+                ATHLTHLocalization.choose(
+                    english: "Reconnecting to Apple Watch",
+                    norwegian: "Kobler til Apple Watch på nytt"
+                )
 
             if let message {
                 self.errorMessage = message
