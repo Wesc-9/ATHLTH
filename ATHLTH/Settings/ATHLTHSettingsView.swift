@@ -419,15 +419,12 @@ struct ATHLTHSettingsView: View {
                                     subtitle: appleHealthConnectionSubtitle
                                 ) {
                                     connectionTrailing(
-                                        health.isRefreshing
-                                            ? "Syncing"
-                                            : !health.hasRequestedAuthorization
-                                                ? "Connect"
-                                                : health.hasReadableHealthData
-                                                    ? "Connected"
-                                                    : "Configured",
-                                        showChevron: true,
-                                        loading: healthRequestInProgress
+                                        !health.hasRequestedAuthorization
+                                            ? "Connect"
+                                            : health.hasReadableHealthData
+                                                ? "Connected"
+                                                : "Configured",
+                                        showChevron: true
                                     )
                                 }
                             }
@@ -1230,10 +1227,6 @@ struct ATHLTHSettingsView: View {
     private var appleHealthConnectionSubtitle: String {
         guard health.hasRequestedAuthorization else {
             return "Connect your Apple Health data"
-        }
-
-        if health.isRefreshing {
-            return "Reading Apple Health data now"
         }
 
         if health.hasTrainingHealthData {
