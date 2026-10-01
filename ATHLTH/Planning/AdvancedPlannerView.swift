@@ -2301,7 +2301,9 @@ struct TrainingPlanCreationView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    TrainingPlanLibraryView()
+                    TrainingPlanLibraryView {
+                        dismiss()
+                    }
                 } label: {
                     creationPathCard(
                         eyebrow: "TRAINING LIBRARY",
