@@ -153,8 +153,13 @@ final class GhostRacePrivacyTests: XCTestCase {
         XCTAssertTrue(
             result.completedRoute
         )
+        let signedTime =
+            try XCTUnwrap(
+                result.signedTimeSeconds
+            )
+
         XCTAssertEqual(
-            result.signedTimeSeconds,
+            signedTime,
             30,
             accuracy: 0.01
         )
