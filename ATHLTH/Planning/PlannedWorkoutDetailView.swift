@@ -4,6 +4,8 @@ import SwiftUI
 struct PlannedWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let planID: UUID
     let workout: PlannedSession
@@ -217,6 +219,25 @@ struct PlannedWorkoutDetailView: View {
                     )
                 }
 
+                if let playlist =
+                    WorkoutLaunchCoordinator
+                        .resolvedSpotifyPlaylist(
+                            workout: currentWorkout,
+                            session: session
+                        ) {
+                    detailRow(
+                        icon: "music.note.list",
+                        title: "Spotify",
+                        value: playlist.name
+                    )
+                } else if currentWorkout.spotifyAutoplayOnStart == false {
+                    detailRow(
+                        icon: "speaker.slash",
+                        title: "Spotify",
+                        value: "Off"
+                    )
+                }
+
                 if currentWorkout.scheduledStart == nil &&
                     currentWorkout.durationMinutes == nil &&
                     currentWorkout.targetDistanceKilometers == nil &&
@@ -408,6 +429,13 @@ struct PlannedWorkoutDetailView: View {
     private var structuredWorkoutStartButton:
         some View {
         Button {
+            WorkoutLaunchCoordinator
+                .startLinkedSpotifyIfNeeded(
+                    workout: currentWorkout,
+                    session: session,
+                    settings: settings,
+                    spotify: spotify
+                )
             showingStructuredWorkout = true
         } label: {
             Label(
