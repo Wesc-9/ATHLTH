@@ -314,9 +314,15 @@ enum WorkoutLaunchCoordinator {
         settings: AppSettingsStore,
         spotify: SpotifyPlaybackStore
     ) {
-        guard settings
-                .spotifyAutoplayLinkedPlaylists,
-              let playlist =
+        let hasWorkoutOverride =
+            workout.spotifyAutoplayOnStart != nil
+
+        guard
+            (
+                hasWorkoutOverride ||
+                settings.spotifyAutoplayLinkedPlaylists
+            ),
+            let playlist =
                 resolvedSpotifyPlaylist(
                     workout: workout,
                     session: session
@@ -328,7 +334,9 @@ enum WorkoutLaunchCoordinator {
         Task { @MainActor in
             await spotify.startLinkedPlaylist(
                 playlist,
-                settings: settings
+                settings: settings,
+                respectGlobalAutoplay:
+                    !hasWorkoutOverride
             )
         }
     }
