@@ -233,6 +233,13 @@ struct ATHLTHHomeView: View {
                                 )
                             }
                         },
+                        onQuickRun: {
+                            pendingHomeQuickStartKind = .running
+                        },
+                        onQuickStrength: {
+                            selectedHomeStrengthSession =
+                                homeFreestyleStrengthSession
+                        },
                         onOpenPlan: {
                             onOpenTrain(.plan)
                         }
