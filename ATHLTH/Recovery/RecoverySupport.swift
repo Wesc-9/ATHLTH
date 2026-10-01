@@ -3,6 +3,37 @@ import Combine
 import Foundation
 import SwiftUI
 
+private func recoveryText(
+    _ english: String,
+    _ norwegian: String
+) -> String {
+    ATHLTHLocalization.choose(
+        english: english,
+        norwegian: norwegian
+    )
+}
+
+private func recoveryMuscleName(
+    _ value: String
+) -> String {
+    guard ATHLTHLocalization.isNorwegian else {
+        return value
+    }
+
+    switch value {
+    case "Chest": return "Bryst"
+    case "Back": return "Rygg"
+    case "Shoulders": return "Skuldre"
+    case "Arms": return "Armer"
+    case "Core": return "Kjerne"
+    case "Glutes": return "Sete"
+    case "Quads": return "Forside lår"
+    case "Hamstrings": return "Bakside lår"
+    case "Calves": return "Legger"
+    default: return value
+    }
+}
+
 struct RecoveryTrendDay: Identifiable, Equatable {
     var id: Date { date }
 
@@ -65,18 +96,18 @@ struct RecoveryTrainingLoadSummary: Equatable {
 
     var title: String {
         guard let ratio else {
-            return "Building load baseline"
+            return recoveryText("Building load baseline", "Bygger belastningsgrunnlag")
         }
 
         switch ratio {
         case ..<0.75:
-            return "Below recent load"
+            return recoveryText("Below recent load", "Under nyere belastning")
         case 0.75...1.25:
-            return "Near recent load"
+            return recoveryText("Near recent load", "Nær nyere belastning")
         case 1.25...1.50:
-            return "Elevated load"
+            return recoveryText("Elevated load", "Forhøyet belastning")
         default:
-            return "High load"
+            return recoveryText("High load", "Høy belastning")
         }
     }
 }
@@ -104,19 +135,19 @@ enum RecoverySorenessLevel: Int, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .none: return "None"
-        case .mild: return "Mild"
-        case .moderate: return "Moderate"
-        case .high: return "High"
+        case .none: return recoveryText("None", "Ingen")
+        case .mild: return recoveryText("Mild", "Lett")
+        case .moderate: return recoveryText("Moderate", "Moderat")
+        case .high: return recoveryText("High", "Høy")
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .none: return "Ready"
-        case .mild: return "Mild"
-        case .moderate: return "Sore"
-        case .high: return "Very sore"
+        case .none: return recoveryText("Ready", "Klar")
+        case .mild: return recoveryText("Mild", "Lett")
+        case .moderate: return recoveryText("Sore", "Øm")
+        case .high: return recoveryText("Very sore", "Svært øm")
         }
     }
 }
@@ -352,11 +383,11 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
     var loadTitle: String {
         switch loadScore {
         case 0.67...:
-            return "High load"
+            return recoveryText("High load", "Høy belastning")
         case 0.34..<0.67:
-            return "Moderate"
+            return recoveryText("Moderate", "Moderat")
         default:
-            return "Light"
+            return recoveryText("Light", "Lett")
         }
     }
 
@@ -364,36 +395,36 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         var sources: [String] = []
 
         if completedSets > 0 {
-            sources.append("Strength")
+            sources.append(recoveryText("Strength", "Styrke"))
         }
         if runningMinutes >= 1 {
-            sources.append("Run")
+            sources.append(recoveryText("Run", "Løp"))
         }
         if walkingMinutes >= 1 {
-            sources.append("Walk")
+            sources.append(recoveryText("Walk", "Gange"))
         }
 
-        return sources.isEmpty ? "Check-in" : sources.joined(separator: " + ")
+        return sources.isEmpty ? recoveryText("Check-in", "Innsjekk") : sources.joined(separator: " + ")
     }
 
     var statusTitle: String {
         if soreness == .high {
-            return "Very sore"
+            return recoveryText("Very sore", "Svært øm")
         }
 
         if soreness == .moderate {
-            return "Sore"
+            return recoveryText("Sore", "Øm")
         }
 
         if progress >= 0.95 {
-            return soreness == .mild ? "Mild soreness" : "Ready"
+            return soreness == .mild ? recoveryText("Mild soreness", "Lett ømhet") : recoveryText("Ready", "Klar")
         }
 
         if progress >= 0.55 {
-            return "Recovering"
+            return recoveryText("Recovering", "Restituerer")
         }
 
-        return "Recently trained"
+        return recoveryText("Recently trained", "Nylig trent")
     }
 }
 
@@ -656,17 +687,17 @@ enum RecoveryTool: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .stretch: return "Full-body reset"
-        case .mobility: return "Mobility flow"
-        case .breathing: return "Downshift breathing"
+        case .stretch: return recoveryText("Full-body reset", "Nullstill hele kroppen")
+        case .mobility: return recoveryText("Mobility flow", "Mobilitetsflyt")
+        case .breathing: return recoveryText("Downshift breathing", "Rolig pust")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .stretch: return "8 min · gentle stretch"
-        case .mobility: return "10 min · hips, spine & shoulders"
-        case .breathing: return "5 min · calm breathing"
+        case .stretch: return recoveryText("8 min · gentle stretch", "8 min · rolig tøying")
+        case .mobility: return recoveryText("10 min · hips, spine & shoulders", "10 min · hofter, rygg og skuldre")
+        case .breathing: return recoveryText("5 min · calm breathing", "5 min · rolig pust")
         }
     }
 
@@ -682,24 +713,24 @@ enum RecoveryTool: String, CaseIterable, Identifiable {
         switch self {
         case .stretch:
             return [
-                .init(title: "Cat-cow", seconds: 60),
-                .init(title: "Hip flexor · left", seconds: 60),
-                .init(title: "Hip flexor · right", seconds: 60),
-                .init(title: "Hamstring fold", seconds: 90),
-                .init(title: "Chest opener", seconds: 60),
-                .init(title: "Child’s pose", seconds: 90),
-                .init(title: "Easy reset", seconds: 60)
+                .init(title: recoveryText("Cat-cow", "Katt-ku"), seconds: 60),
+                .init(title: recoveryText("Hip flexor · left", "Hoftebøyer · venstre"), seconds: 60),
+                .init(title: recoveryText("Hip flexor · right", "Hoftebøyer · høyre"), seconds: 60),
+                .init(title: recoveryText("Hamstring fold", "Bakside lår"), seconds: 90),
+                .init(title: recoveryText("Chest opener", "Bryståpner"), seconds: 60),
+                .init(title: recoveryText("Child’s pose", "Barnets posisjon"), seconds: 90),
+                .init(title: recoveryText("Easy reset", "Rolig avslutning"), seconds: 60)
             ]
 
         case .mobility:
             return [
-                .init(title: "Ankle rocks", seconds: 75),
-                .init(title: "90/90 hips", seconds: 90),
-                .init(title: "World’s greatest stretch", seconds: 120),
-                .init(title: "Thoracic rotations", seconds: 90),
-                .init(title: "Shoulder circles", seconds: 75),
-                .init(title: "Deep squat hold", seconds: 90),
-                .init(title: "Easy reset", seconds: 60)
+                .init(title: recoveryText("Ankle rocks", "Ankelmobilitet"), seconds: 75),
+                .init(title: recoveryText("90/90 hips", "90/90 hofter"), seconds: 90),
+                .init(title: recoveryText("World’s greatest stretch", "Dynamisk helkroppsstrekk"), seconds: 120),
+                .init(title: recoveryText("Thoracic rotations", "Rotasjon i brystrygg"), seconds: 90),
+                .init(title: recoveryText("Shoulder circles", "Skuldersirkler"), seconds: 75),
+                .init(title: recoveryText("Deep squat hold", "Dyp knebøy-hold"), seconds: 90),
+                .init(title: recoveryText("Easy reset", "Rolig avslutning"), seconds: 60)
             ]
 
         case .breathing:
@@ -727,13 +758,13 @@ struct RecoveryReadinessBreakdownCard: View {
     var body: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
-                title: "Why this score",
-                actionTitle: "Today"
+                title: recoveryText("Why this score", "Hvorfor denne scoren"),
+                actionTitle: recoveryText("Today", "I dag")
             )
 
             VStack(spacing: 12) {
                 factorRow(
-                    title: "Sleep",
+                    title: recoveryText("Sleep", "Søvn"),
                     icon: "moon.fill",
                     weight: "45%",
                     value: sleepValue,
@@ -749,7 +780,7 @@ struct RecoveryReadinessBreakdownCard: View {
                 )
 
                 factorRow(
-                    title: "Resting HR",
+                    title: recoveryText("Resting HR", "Hvilepuls"),
                     icon: "heart.fill",
                     weight: "20%",
                     value: restingHRValue,
@@ -759,7 +790,7 @@ struct RecoveryReadinessBreakdownCard: View {
             .padding(.top, 12)
 
             Text(
-                "Each factor is compared with your own recent baseline. The weights above are the same ones used for the readiness score shown on Home."
+                recoveryText("Each factor is compared with your own recent baseline. The weights above are the same ones used for the readiness score shown on Home.", "Hver faktor sammenlignes med din egen nyere grunnlinje. Vektingen er den samme som brukes for dagsformscoren på Home.")
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -845,7 +876,7 @@ struct RecoveryReadinessBreakdownCard: View {
     }
 
     private var sleepValue: String {
-        guard sleep.totalAsleep > 0 else { return "No data" }
+        guard sleep.totalAsleep > 0 else { return recoveryText("No data", "Ingen data") }
 
         if let baseline = recovery.averageSleepDuration {
             return "\(sleep.totalAsleep.shortDuration) · \(comparison(current: sleep.totalAsleep, baseline: baseline, higherIsBetter: true))"
@@ -856,7 +887,7 @@ struct RecoveryReadinessBreakdownCard: View {
 
     private var hrvValue: String {
         guard let current = heart.hrvMilliseconds else {
-            return "No data"
+            return recoveryText("No data", "Ingen data")
         }
 
         if let baseline = recovery.baselineHRVMilliseconds {
@@ -868,7 +899,7 @@ struct RecoveryReadinessBreakdownCard: View {
 
     private var restingHRValue: String {
         guard let current = heart.restingHeartRate else {
-            return "No data"
+            return recoveryText("No data", "Ingen data")
         }
 
         if let baseline = recovery.baselineRestingHeartRate {
@@ -883,13 +914,13 @@ struct RecoveryReadinessBreakdownCard: View {
         baseline: Double,
         higherIsBetter: Bool
     ) -> String {
-        guard baseline > 0 else { return "No baseline" }
+        guard baseline > 0 else { return recoveryText("No baseline", "Ingen grunnlinje") }
 
         let percent = ((current - baseline) / baseline) * 100
         let rounded = Int(abs(percent).rounded())
 
         guard rounded >= 2 else {
-            return "near baseline"
+            return recoveryText("near baseline", "nær grunnlinjen")
         }
 
         let favorable =
@@ -903,13 +934,13 @@ struct RecoveryReadinessBreakdownCard: View {
     private func factorLabel(
         _ score: Double?
     ) -> String {
-        guard let score else { return "Learning" }
+        guard let score else { return recoveryText("Learning", "Lærer") }
 
         switch score {
-        case 0.90...: return "Strong"
-        case 0.75..<0.90: return "Good"
-        case 0.60..<0.75: return "Low"
-        default: return "Limited"
+        case 0.90...: return recoveryText("Strong", "Sterk")
+        case 0.75..<0.90: return recoveryText("Good", "God")
+        case 0.60..<0.75: return recoveryText("Low", "Lav")
+        default: return recoveryText("Limited", "Begrenset")
         }
     }
 
@@ -936,8 +967,8 @@ struct RecoveryTrendsCard: View {
     var body: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
-                title: "Recent signals",
-                actionTitle: "14 days"
+                title: recoveryText("Recent signals", "Nylige signaler"),
+                actionTitle: recoveryText("14 days", "14 dager")
             )
 
             LazyVGrid(
@@ -948,7 +979,7 @@ struct RecoveryTrendsCard: View {
                 spacing: 10
             ) {
                 trendTile(
-                    title: "Sleep",
+                    title: recoveryText("Sleep", "Søvn"),
                     value: sleepTrendValue,
                     subtitle: sleepQualityText,
                     icon: "moon.fill",
@@ -958,21 +989,21 @@ struct RecoveryTrendsCard: View {
                 trendTile(
                     title: "HRV",
                     value: latestHRVText,
-                    subtitle: "Nightly / daily signal",
+                    subtitle: recoveryText("Nightly / daily signal", "Nattlig / daglig signal"),
                     icon: "waveform.path.ecg",
                     metric: .hrv
                 )
 
                 trendTile(
-                    title: "Resting HR",
+                    title: recoveryText("Resting HR", "Hvilepuls"),
                     value: latestRestingHRText,
-                    subtitle: "Lower vs baseline can be favorable",
+                    subtitle: recoveryText("Lower vs baseline can be favorable", "Lavere enn grunnlinjen kan være positivt"),
                     icon: "heart.fill",
                     metric: .restingHR
                 )
 
                 trendTile(
-                    title: "Training load",
+                    title: recoveryText("Training load", "Treningsbelastning"),
                     value: acuteLoadText,
                     subtitle: loadSubtitle,
                     icon: "chart.line.uptrend.xyaxis",
@@ -1022,15 +1053,15 @@ struct RecoveryTrendsCard: View {
                     metric: metric
                 ) {
                     LineMark(
-                        x: .value("Day", day.date),
-                        y: .value("Value", value)
+                        x: .value(recoveryText("Day", "Dag"), day.date),
+                        y: .value(recoveryText("Value", "Verdi"), value)
                     )
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(ATHLTHTheme.accent)
 
                     PointMark(
-                        x: .value("Day", day.date),
-                        y: .value("Value", value)
+                        x: .value(recoveryText("Day", "Dag"), day.date),
+                        y: .value(recoveryText("Value", "Verdi"), value)
                     )
                     .symbolSize(10)
                     .foregroundStyle(ATHLTHTheme.accent)
@@ -1076,7 +1107,7 @@ struct RecoveryTrendsCard: View {
 
     private var sleepQualityText: String {
         guard sleep.totalAsleep > 0 else {
-            return "Sleep quality unavailable"
+            return recoveryText("Sleep quality unavailable", "Søvnkvalitet ikke tilgjengelig")
         }
 
         let durationHours = sleep.totalAsleep / 3_600
@@ -1095,12 +1126,12 @@ struct RecoveryTrendsCard: View {
            durationHours <= 9.5,
            restorativeRatio.map({ $0 >= 0.25 }) ?? true,
            awakeRatio < 0.18 {
-            quality = "Good quality"
+            quality = recoveryText("Good quality", "God kvalitet")
         } else if durationHours >= 6,
                   awakeRatio < 0.25 {
-            quality = "Fair quality"
+            quality = recoveryText("Fair quality", "Middels kvalitet")
         } else {
-            quality = "Low quality"
+            quality = recoveryText("Low quality", "Lav kvalitet")
         }
 
         return "\(quality) · duration + available stages"
@@ -1132,7 +1163,7 @@ struct RecoveryTrendsCard: View {
         let minutes = Int(
             snapshot.trainingLoad.acuteMinutes.rounded()
         )
-        return "\(minutes) min / 7d"
+        return ATHLTHLocalization.choose(english: "\(minutes) min / 7d", norwegian: "\(minutes) min / 7 d")
     }
 
     private var loadSubtitle: String {
@@ -1142,7 +1173,7 @@ struct RecoveryTrendsCard: View {
             return load.title
         }
 
-        return "\(load.title) · 28d avg \(Int(chronic.rounded())) min/week"
+        return ATHLTHLocalization.choose(english: "\(load.title) · 28d avg \(Int(chronic.rounded())) min/week", norwegian: "\(load.title) · 28 d snitt \(Int(chronic.rounded())) min/uke")
     }
 }
 
@@ -1152,7 +1183,7 @@ struct RecoveryLastNightCard: View {
     var body: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
-                title: "Last night",
+                title: recoveryText("Last night", "I natt"),
                 actionTitle: nightLabel
             )
 
@@ -1182,7 +1213,7 @@ struct RecoveryLastNightCard: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text("Bed → wake")
+                        Text(recoveryText("Bed → wake", "Seng → våken"))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -1192,7 +1223,7 @@ struct RecoveryLastNightCard: View {
 
             HStack(spacing: 8) {
                 stageTile(
-                    "Deep",
+                    recoveryText("Deep", "Dyp"),
                     value: sleep.deep,
                     icon: "moon.zzz.fill"
                 )
@@ -1207,7 +1238,7 @@ struct RecoveryLastNightCard: View {
                     icon: "moon.fill"
                 )
                 stageTile(
-                    "Awake",
+                    recoveryText("Awake", "Våken"),
                     value: sleep.awake,
                     icon: "eye.fill"
                 )
@@ -1258,7 +1289,7 @@ struct RecoveryLastNightCard: View {
         }
 
         if Calendar.current.isDateInToday(end) {
-            return "Today"
+            return recoveryText("Today", "I dag")
         }
 
         return end.formatted(
@@ -1282,15 +1313,15 @@ struct RecoveryLastNightCard: View {
            durationHours <= 9.5,
            restorativeRatio.map({ $0 >= 0.25 }) ?? true,
            awakeRatio < 0.18 {
-            return "Good sleep quality from duration and available sleep stages."
+            return recoveryText("Good sleep quality from duration and available sleep stages.", "God søvnkvalitet basert på varighet og tilgjengelige søvnstadier.")
         }
 
         if durationHours >= 6,
            awakeRatio < 0.25 {
-            return "Fair sleep quality. Recovery also considers HRV and resting heart rate."
+            return recoveryText("Fair sleep quality. Recovery also considers HRV and resting heart rate.", "Middels søvnkvalitet. Restitusjon vurderer også HRV og hvilepuls.")
         }
 
-        return "Sleep was below your usual recovery-friendly range."
+        return recoveryText("Sleep was below your usual recovery-friendly range.", "Søvnen var under ditt vanlige restitusjonsvennlige nivå.")
     }
 }
 
@@ -1302,11 +1333,11 @@ struct RecoveryDailyCheckInCard: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Daily check-in")
+                    Text(recoveryText("Daily check-in", "Daglig innsjekk"))
                         .font(.title3.weight(.bold))
 
                     Text(
-                        "How you feel can refine today's guidance without changing your wearable score."
+                        recoveryText("How you feel can refine today's guidance without changing your wearable score.", "Hvordan du føler deg kan forbedre dagens anbefaling uten å endre scoren fra klokken.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1316,8 +1347,8 @@ struct RecoveryDailyCheckInCard: View {
 
                 Button(
                     store.hasTodayCheckIn
-                        ? "Update"
-                        : "Check in"
+                        ? recoveryText("Update", "Oppdater")
+                        : recoveryText("Check in", "Sjekk inn")
                 ) {
                     onCheckIn()
                 }
@@ -1327,25 +1358,25 @@ struct RecoveryDailyCheckInCard: View {
             if store.hasTodayCheckIn {
                 HStack(spacing: 8) {
                     checkInMetric(
-                        title: "Energy",
+                        title: recoveryText("Energy", "Energi"),
                         value: store.todayEnergy,
                         icon: "bolt.fill",
                         inverted: false
                     )
                     checkInMetric(
-                        title: "Stress",
+                        title: recoveryText("Stress", "Stress"),
                         value: store.todayStress,
                         icon: "waveform.path.ecg",
                         inverted: true
                     )
                     checkInMetric(
-                        title: "Soreness",
+                        title: recoveryText("Soreness", "Ømhet"),
                         value: store.todayOverallSoreness,
                         icon: "figure.walk.motion",
                         inverted: true
                     )
                     checkInMetric(
-                        title: "Motivation",
+                        title: recoveryText("Motivation", "Motivasjon"),
                         value: store.todayMotivation,
                         icon: "flame.fill",
                         inverted: false
@@ -1369,13 +1400,13 @@ struct RecoveryDailyCheckInCard: View {
                             )
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Add today's context")
+                            Text(recoveryText("Add today's context", "Legg til dagens status"))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(
                                     ATHLTHTheme.primaryText
                                 )
                             Text(
-                                "Energy, stress, soreness and motivation."
+                                recoveryText("Energy, stress, soreness and motivation.", "Energi, stress, ømhet og motivasjon.")
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -1438,11 +1469,11 @@ struct MuscleRecoveryCard: View {
         ATHLTHCard {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Recently trained areas")
+                    Text(recoveryText("Recently trained areas", "Nylig belastede områder"))
                         .font(.title3.weight(.bold))
 
                     Text(
-                        "Last 7 days · strength, running and walking all contribute."
+                        recoveryText("Last 7 days · strength, running and walking all contribute.", "Siste 7 dager · styrke, løping og gange teller med.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1451,7 +1482,7 @@ struct MuscleRecoveryCard: View {
 
                 Spacer(minLength: 8)
 
-                Button("Check in") {
+                Button(recoveryText("Check in", "Sjekk inn")) {
                     onLogSoreness()
                 }
                 .font(.caption.weight(.semibold))
@@ -1487,7 +1518,7 @@ struct MuscleRecoveryCard: View {
                         )
 
                     Text(
-                        "Complete a tracked strength workout, run or walk and ATHLTH will show which areas have carried the most recent training."
+                        recoveryText("Complete a tracked strength workout, run or walk and ATHLTH will show which areas have carried the most recent training.", "Fullfør en registrert styrkeøkt, løpetur eller gåtur, så viser ATHLTH hvilke områder som har hatt mest nylig belastning.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1523,7 +1554,7 @@ struct MuscleRecoveryCard: View {
             }
 
             Text(
-                "Area load is an ATHLTH training estimate based on completed strength sets and recent run/walk duration. Recovery percentages also use time since training and your soreness check-in; they are not medical measurements."
+                recoveryText("Area load is an ATHLTH training estimate based on completed strength sets and recent run/walk duration. Recovery percentages also use time since training and your soreness check-in; they are not medical measurements.", "Områdebelastning er et ATHLTH-estimat basert på fullførte styrkesett og nylig løpe-/gangvarighet. Restitusjonsprosenten bruker også tid siden trening og innsjekket ømhet; dette er ikke medisinske målinger.")
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -1552,7 +1583,7 @@ struct MuscleRecoveryCard: View {
         VStack(spacing: 7) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(status.muscleGroup)
+                    Text(recoveryMuscleName(status.muscleGroup))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
@@ -1579,7 +1610,7 @@ struct MuscleRecoveryCard: View {
 
             HStack(spacing: 5) {
                 Text(
-                    "\(Int((status.progress * 100).rounded()))% recovered"
+                    ATHLTHLocalization.choose(english: "\(Int((status.progress * 100).rounded()))% recovered", norwegian: "\(Int((status.progress * 100).rounded()))% restituert")
                 )
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(statusTint(status))
@@ -1668,11 +1699,17 @@ struct MuscleRecoveryCard: View {
     private func relativeDescription(
         _ date: Date
     ) -> String {
-        RelativeDateTimeFormatter()
-            .localizedString(
-                for: date,
-                relativeTo: Date()
-            )
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(
+            identifier:
+                ATHLTHLocalization.isNorwegian
+                    ? "nb_NO"
+                    : "en_US"
+        )
+        return formatter.localizedString(
+            for: date,
+            relativeTo: Date()
+        )
     }
 
     private func loadTint(
@@ -1711,8 +1748,8 @@ struct RecoveryToolsCard: View {
     var body: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
-                title: "Recovery tools",
-                actionTitle: "Do something now"
+                title: recoveryText("Recovery tools", "Restitusjonsverktøy"),
+                actionTitle: recoveryText("Do something now", "Gjør noe nå")
             )
 
             VStack(spacing: 9) {
@@ -1769,47 +1806,47 @@ struct RecoverySorenessLogView: View {
             List {
                 Section {
                     Text(
-                        "Your check-in can influence Today's Guidance and muscle-recovery suggestions. It never changes the wearable Readiness score."
+                        recoveryText("Your check-in can influence Today's Guidance and muscle-recovery suggestions. It never changes the wearable Readiness score.", "Innsjekken kan påvirke dagens anbefaling og forslag til muskelrestitusjon. Den endrer aldri dagsformscoren fra klokken.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
 
-                Section("How you feel") {
+                Section(recoveryText("How you feel", "Hvordan du føler deg")) {
                     checkInScale(
-                        title: "Energy",
-                        subtitle: "Low → high",
+                        title: recoveryText("Energy", "Energi"),
+                        subtitle: recoveryText("Low → high", "Lav → høy"),
                         icon: "bolt.fill",
                         value: store.todayEnergy,
                         onSelect: store.setEnergy
                     )
 
                     checkInScale(
-                        title: "Stress",
-                        subtitle: "Low → high",
+                        title: recoveryText("Stress", "Stress"),
+                        subtitle: recoveryText("Low → high", "Lav → høy"),
                         icon: "waveform.path.ecg",
                         value: store.todayStress,
                         onSelect: store.setStress
                     )
 
                     checkInScale(
-                        title: "Overall soreness",
-                        subtitle: "None → very sore",
+                        title: recoveryText("Overall soreness", "Generell ømhet"),
+                        subtitle: recoveryText("None → very sore", "Ingen → svært øm"),
                         icon: "figure.walk.motion",
                         value: store.todayOverallSoreness,
                         onSelect: store.setOverallSoreness
                     )
 
                     checkInScale(
-                        title: "Motivation",
-                        subtitle: "Low → high",
+                        title: recoveryText("Motivation", "Motivasjon"),
+                        subtitle: recoveryText("Low → high", "Lav → høy"),
                         icon: "flame.fill",
                         value: store.todayMotivation,
                         onSelect: store.setMotivation
                     )
                 }
 
-                Section("Muscle soreness") {
+                Section(recoveryText("Muscle soreness", "Muskelømhet")) {
                     ForEach(
                         RecoverySorenessStore.muscleGroups,
                         id: \.self
@@ -1864,11 +1901,11 @@ struct RecoverySorenessLogView: View {
                     }
                 }
             }
-            .navigationTitle("Daily Check-in")
+            .navigationTitle(recoveryText("Daily Check-in", "Daglig innsjekk"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(recoveryText("Done", "Ferdig")) {
                         dismiss()
                     }
                 }
@@ -1938,12 +1975,12 @@ struct RecoveryMethodInfoView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     ATHLTHCard {
                         ATHLTHSectionHeader(
-                            title: "Readiness score",
+                            title: recoveryText("Readiness score", "Dagsformscore"),
                             actionTitle: "0–100"
                         )
 
                         Text(
-                            "ATHLTH compares your latest sleep, HRV and resting heart rate with your own recent baseline."
+                            recoveryText("ATHLTH compares your latest sleep, HRV and resting heart rate with your own recent baseline.", "ATHLTH sammenligner nyeste søvn, HRV og hvilepuls med din egen nyere grunnlinje.")
                         )
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -1951,7 +1988,7 @@ struct RecoveryMethodInfoView: View {
 
                         VStack(spacing: 10) {
                             methodRow(
-                                "Sleep",
+                                recoveryText("Sleep", "Søvn"),
                                 weight: "45%",
                                 icon: "moon.fill"
                             )
@@ -1961,7 +1998,7 @@ struct RecoveryMethodInfoView: View {
                                 icon: "waveform.path.ecg"
                             )
                             methodRow(
-                                "Resting HR",
+                                recoveryText("Resting HR", "Hvilepuls"),
                                 weight: "20%",
                                 icon: "heart.fill"
                             )
@@ -1970,11 +2007,11 @@ struct RecoveryMethodInfoView: View {
                     }
 
                     ATHLTHCard {
-                        Text("Your baseline")
+                        Text(recoveryText("Your baseline", "Din grunnlinje"))
                             .font(.headline)
 
                         Text(
-                            "The baseline uses usable days from the recent 14-day window where Sleep, HRV and Resting HR are all available. At least five usable days are required before ATHLTH shows a readiness score."
+                            recoveryText("The baseline uses usable days from the recent 14-day window where Sleep, HRV and Resting HR are all available. At least five usable days are required before ATHLTH shows a readiness score.", "Grunnlinjen bruker gyldige dager fra de siste 14 dagene der søvn, HRV og hvilepuls finnes. Minst fem gyldige dager kreves før ATHLTH viser en dagsformscore.")
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1983,14 +2020,14 @@ struct RecoveryMethodInfoView: View {
 
                     ATHLTHCard {
                         Label(
-                            "Training guidance, not a medical assessment",
+                            recoveryText("Training guidance, not a medical assessment", "Treningsveiledning, ikke en medisinsk vurdering"),
                             systemImage: "info.circle.fill"
                         )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accent)
 
                         Text(
-                            "Daily Check-in responses may refine Today's Guidance, but they do not alter the wearable readiness score."
+                            recoveryText("Daily Check-in responses may refine Today's Guidance, but they do not alter the wearable readiness score.", "Svar fra daglig innsjekk kan forbedre dagens anbefaling, men endrer ikke dagsformscoren fra klokken.")
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1999,11 +2036,11 @@ struct RecoveryMethodInfoView: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("How Recovery Works")
+            .navigationTitle(recoveryText("How Recovery Works", "Slik fungerer restitusjon"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(recoveryText("Done", "Ferdig")) {
                         dismiss()
                     }
                 }
@@ -2116,7 +2153,7 @@ struct RecoveryGuidedToolView: View {
                         running.toggle()
                     } label: {
                         Label(
-                            running ? "Pause" : "Start",
+                            running ? recoveryText("Pause", "Pause") : recoveryText("Start", "Start"),
                             systemImage:
                                 running
                                     ? "pause.fill"
@@ -2140,11 +2177,11 @@ struct RecoveryGuidedToolView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("Recovery")
+            .navigationTitle(recoveryText("Recovery", "Restitusjon"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    Button(recoveryText("Close", "Lukk")) {
                         dismiss()
                     }
                 }
