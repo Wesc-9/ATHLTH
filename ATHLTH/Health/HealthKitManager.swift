@@ -72,6 +72,7 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var backgroundSyncError: String?
     @Published private(set) var automaticRefreshSuspended = false
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
+    @Published private(set) var authorizationReviewNeeded = false
 
     var hasTrainingHealthData: Bool {
         !workouts.isEmpty ||
@@ -110,10 +111,9 @@ final class HealthKitManager: ObservableObject {
     private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v1"
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
-    // Keep the existing authorization version stable so users upgrading
-    // from earlier TestFlight builds retain their current Health connection.
-    // The expanded write set is requested the next time Health permissions
-    // are explicitly reviewed.
+    // Tracks the newest permission set ATHLTH has explicitly requested.
+    // Never use this value alone as the connection state: an app update or
+    // a newly added Health type must not disconnect an existing Health setup.
     private let currentAuthorizationVersion = 2
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
@@ -189,8 +189,8 @@ final class HealthKitManager: ObservableObject {
 
         let interruptedRefresh = defaults.bool(forKey: refreshInProgressKey)
         let hasExistingHealthAuthorization =
-            defaults.integer(forKey: authorizationVersionKey) >=
-            currentAuthorizationVersion
+            defaults.bool(forKey: legacyAuthorizationFlagKey) ||
+            defaults.integer(forKey: authorizationVersionKey) > 0
         let needsSafeLaunchMigration =
             hasExistingHealthAuthorization &&
             defaults.integer(forKey: safeRefreshVersionKey) <
@@ -213,7 +213,9 @@ final class HealthKitManager: ObservableObject {
     }
 
     var hasRequestedAuthorization: Bool {
-        UserDefaults.standard.integer(forKey: authorizationVersionKey) >= currentAuthorizationVersion
+        let defaults = UserDefaults.standard
+        return defaults.bool(forKey: legacyAuthorizationFlagKey) ||
+            defaults.integer(forKey: authorizationVersionKey) > 0
     }
 
     var pendingWorkoutImportCount: Int {
@@ -516,6 +518,69 @@ final class HealthKitManager: ObservableObject {
         return types
     }
 
+    @discardableResult
+    func restoreAuthorizationStateFromSystem() async -> Bool {
+        guard healthDataAvailable else {
+            authorizationReviewNeeded = false
+            return false
+        }
+
+        let hadLocalSetup = hasRequestedAuthorization
+
+        do {
+            let requestStatus =
+                try await healthStore.statusForAuthorizationRequest(
+                    toShare: shareTypes,
+                    read: readTypes
+                )
+
+            switch requestStatus {
+            case .unnecessary:
+                authorizationReviewNeeded = false
+
+                // HealthKit already has a decision for this permission set.
+                // Recover the local marker when a TestFlight/app update has
+                // lost or migrated app-local defaults, without showing the
+                // permission sheet again.
+                if !hadLocalSetup {
+                    let defaults = UserDefaults.standard
+                    defaults.set(true, forKey: legacyAuthorizationFlagKey)
+                    defaults.set(
+                        currentAuthorizationVersion,
+                        forKey: authorizationVersionKey
+                    )
+                    defaults.set(
+                        currentSafeRefreshVersion,
+                        forKey: safeRefreshVersionKey
+                    )
+                    objectWillChange.send()
+                }
+
+                return true
+
+            case .shouldRequest:
+                // Existing access remains usable. New Health types can be
+                // reviewed explicitly from the Apple Health connection row,
+                // but they must never make an existing setup look disconnected.
+                authorizationReviewNeeded = hadLocalSetup
+                return hadLocalSetup
+
+            case .unknown:
+                authorizationReviewNeeded = false
+                return hadLocalSetup
+
+            @unknown default:
+                authorizationReviewNeeded = false
+                return hadLocalSetup
+            }
+        } catch {
+            // A request-status lookup is advisory. Never invalidate an
+            // existing local connection because this lightweight check failed.
+            authorizationReviewNeeded = false
+            return hadLocalSetup
+        }
+    }
+
     func requestAuthorization() async {
         authorizationError = nil
 
@@ -535,6 +600,7 @@ final class HealthKitManager: ObservableObject {
                 currentSafeRefreshVersion,
                 forKey: safeRefreshVersionKey
             )
+            authorizationReviewNeeded = false
             automaticRefreshSuspended = false
             deferFullRefreshUntilNextLaunch = true
             objectWillChange.send()
