@@ -4602,68 +4602,1600 @@ struct CommunityGroupDetailView: View {
     }
 
     private var overview: some View {
-        VStack(spacing: 18) {
-            if groups.canPublishUpdates(currentGroup) {
-                groupUpdateComposer
+        VStack(spacing: 12) {
+            if groups.canPublishUpdates(
+                currentGroup
+            ) {
+                referenceClubComposer
             }
 
-            if let challenge = featuredClubChallenge {
-                clubChallengeCard(challenge)
+            if let challenge =
+                featuredClubChallenge ??
+                nextGroupChallenge {
+                referenceClubChallengeCard(
+                    challenge
+                )
             }
 
-            comingUpCard
+            referenceComingUpSection
+            referenceClubPostsSection
+            clubLeaderboardCard
+        }
+    }
 
-            let pinned = groups.pinnedAnnouncement(
-                in: group.id
-            )
-
-            if let pinned {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label(
-                        "Pinned Post",
-                        systemImage: "pin.fill"
+    private var referenceClubComposer: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                if let profile =
+                    groups.profileCard(
+                        for:
+                            session.profile.userID
+                    ) {
+                    CommunityGroupProfileAvatar(
+                        profile: profile,
+                        size: 42
                     )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .padding(.horizontal, 4)
+                } else {
+                    Circle()
+                        .fill(
+                            ATHLTHTheme
+                                .accentSoft
+                        )
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+                        .overlay {
+                            Image(
+                                systemName:
+                                    "person.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
+                }
 
-                    groupUpdateCard(
-                        pinned,
-                        isPinned: true
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Write a post in \(currentGroup.name)…",
+                        norwegian:
+                            "Skriv et innlegg i \(currentGroup.name)…"
+                    ),
+                    text: $updateDraft,
+                    axis: .vertical
+                )
+                .focused(
+                    $updateComposerFocused
+                )
+                .lineLimit(1...4)
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    Color.white.opacity(0.94),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.black.opacity(0.04),
+                        lineWidth: 0.7
                     )
                 }
-            }
 
-            let updates = groups.announcements(
-                in: group.id
-            ).filter {
-                $0.id != pinned?.id
-            }
-
-            if !updates.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Club Posts")
-                                .font(.title3.weight(.bold))
-                            Text(
-                                "Latest from \(currentGroup.name)"
+                Button {
+                    postReferenceClubUpdate()
+                } label: {
+                    Group {
+                        if postingUpdate {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(
+                                systemName:
+                                    "arrow.up"
                             )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(
+                                .system(
+                                    size: 17,
+                                    weight: .bold
+                                )
+                            )
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme
+                                    .accentDeep,
+                                ATHLTHTheme
+                                    .vitality
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .shadow(
+                        color:
+                            ATHLTHTheme
+                                .accentDeep
+                                .opacity(0.18),
+                        radius: 8,
+                        y: 4
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    updateDraft
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty ||
+                    updateDraft.count > 1200 ||
+                    postingUpdate
+                )
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    updateComposerFocused = true
+                } label: {
+                    referenceActionTile(
+                        title:
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "New post",
+                                    norwegian:
+                                        "Nytt innlegg"
+                                ),
+                        detail:
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Share",
+                                    norwegian:
+                                        "Del med gruppen"
+                                ),
+                        icon: "pencil",
+                        tint:
+                            ATHLTHTheme
+                                .accentDeep
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    CommunityGroupMembersView(
+                        group: currentGroup
+                    )
+                } label: {
+                    referenceActionTile(
+                        title:
+                            groups.canManage(
+                                currentGroup
+                            )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Invite",
+                                        norwegian:
+                                            "Inviter"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Members",
+                                        norwegian:
+                                            "Medlemmer"
+                                    ),
+                        detail:
+                            groups.canManage(
+                                currentGroup
+                            )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Add people",
+                                        norwegian:
+                                            "Få med flere"
+                                    )
+                                : memberCountText,
+                        icon:
+                            groups.canManage(
+                                currentGroup
+                            )
+                                ? "person.badge.plus"
+                                : "person.2.fill",
+                        tint:
+                            ATHLTHTheme
+                                .recoveryBlue
+                    )
+                }
+                .buttonStyle(.plain)
+
+                referenceChallengeAction
+
+                Button {
+                    if groups
+                        .canCreateGroupContent(
+                            currentGroup
+                        ) {
+                        showingCreateEvent = true
+                    } else {
+                        selectedTab = .events
+                    }
+                } label: {
+                    referenceActionTile(
+                        title:
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "New event",
+                                    norwegian:
+                                        "Nytt event"
+                                ),
+                        detail:
+                            groups
+                                .canCreateGroupContent(
+                                    currentGroup
+                                )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Create",
+                                        norwegian:
+                                            "Opprett"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "View",
+                                        norwegian:
+                                            "Se events"
+                                    ),
+                        icon: "calendar",
+                        tint:
+                            ATHLTHTheme
+                                .vitality
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.05),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    @ViewBuilder
+    private var referenceChallengeAction:
+        some View {
+        if let challenge =
+            featuredClubChallenge ??
+            nextGroupChallenge {
+            NavigationLink {
+                CommunityGroupChallengeDetailView(
+                    group: currentGroup,
+                    challenge: challenge
+                )
+            } label: {
+                referenceActionTile(
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Club challenge",
+                                norwegian:
+                                    "Ukens challenge"
+                            ),
+                    detail:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Join in",
+                                norwegian:
+                                    "Bli med"
+                            ),
+                    icon: "trophy.fill",
+                    tint: .orange
+                )
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button {
+                if groups
+                    .canCreateGroupContent(
+                        currentGroup
+                    ) {
+                    showingCreateChallenge =
+                        true
+                } else {
+                    selectedTab =
+                        .challenges
+                }
+            } label: {
+                referenceActionTile(
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Club challenge",
+                                norwegian:
+                                    "Ukens challenge"
+                            ),
+                    detail:
+                        groups
+                            .canCreateGroupContent(
+                                currentGroup
+                            )
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Create",
+                                    norwegian:
+                                        "Opprett"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "View",
+                                    norwegian:
+                                        "Se challenges"
+                                ),
+                    icon: "trophy.fill",
+                    tint: .orange
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func referenceActionTile(
+        title: String,
+        detail: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            HStack {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        tint,
+                        in: Circle()
+                    )
+
+                Spacer(minLength: 2)
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption2.bold())
+                .foregroundStyle(
+                    tint.opacity(0.85)
+                )
+            }
+
+            Text(title)
+                .font(
+                    .caption.weight(
+                        .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+
+            Text(detail)
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+        }
+        .padding(9)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 92,
+            alignment: .leading
+        )
+        .background(
+            tint.opacity(0.08),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func postReferenceClubUpdate() {
+        let body =
+            updateDraft
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard !body.isEmpty,
+              body.count <= 1200,
+              !postingUpdate
+        else {
+            return
+        }
+
+        updateDraft = ""
+        updateComposerFocused = false
+
+        Task {
+            postingUpdate = true
+
+            let posted =
+                await groups
+                    .postAnnouncement(
+                        groupID: group.id,
+                        body: body
+                    )
+
+            postingUpdate = false
+
+            if !posted {
+                updateDraft = body
+            }
+        }
+    }
+
+    private func referenceClubChallengeCard(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        NavigationLink {
+            CommunityGroupChallengeDetailView(
+                group: currentGroup,
+                challenge: challenge
+            )
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                referenceChallengeArtwork(
+                    challenge
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.04),
+                        Color.black.opacity(0.20),
+                        Color.black.opacity(0.72)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.58),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    HStack {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "CLUB CHALLENGE",
+                                norwegian:
+                                    "UKENS CHALLENGE"
+                            ),
+                            systemImage:
+                                "trophy.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                        .tracking(0.7)
+                        .foregroundStyle(
+                            .white.opacity(0.94)
+                        )
+                        .padding(
+                            .horizontal,
+                            10
+                        )
+                        .frame(height: 26)
+                        .background(
+                            Color.black
+                                .opacity(0.22),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white
+                                        .opacity(
+                                            0.22
+                                        ),
+                                    lineWidth:
+                                        0.7
+                                )
                         }
 
                         Spacer()
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Join",
+                                norwegian: "Bli med"
+                            )
+                        )
+                        .font(
+                            .caption.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .padding(
+                            .horizontal,
+                            13
+                        )
+                        .frame(height: 34)
+                        .background(
+                            .white,
+                            in: Capsule()
+                        )
                     }
 
-                    ForEach(updates) { update in
-                        groupUpdateCard(update)
+                    Spacer(minLength: 0)
+
+                    Text(challenge.title)
+                        .font(
+                            .system(
+                                size: 21,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    if !challenge.summary
+                        .isEmpty {
+                        Text(
+                            challenge.summary
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .white.opacity(0.88)
+                        )
+                        .lineLimit(2)
+                    }
+
+                    HStack(spacing: 7) {
+                        Label(
+                            comingUpChallengeDetail(
+                                challenge
+                            ),
+                            systemImage:
+                                "clock"
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .white.opacity(0.86)
+                        )
+                        .lineLimit(1)
+
+                        Spacer()
+
+                        let contributors =
+                            Set(
+                                groups
+                                    .challengeWorkouts
+                                    .filter {
+                                        $0.challengeID ==
+                                            challenge.id
+                                    }
+                                    .map(\.userID)
+                            )
+                            .count
+
+                        if contributors > 0 {
+                            Label(
+                                "\(contributors)",
+                                systemImage:
+                                    "person.2.fill"
+                            )
+                            .font(
+                                .caption2
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        }
+                    }
+                }
+                .padding(14)
+            }
+            .frame(height: 156)
+            .frame(maxWidth: .infinity)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white
+                        .opacity(0.16),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.12),
+                radius: 13,
+                y: 6
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func referenceChallengeArtwork(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        if let value =
+            challenge.imageURL,
+           let url = URL(string: value) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Image("CommunityHero")
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+        } else {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+        }
+    }
+
+    private var referenceComingUpSection:
+        some View {
+        VStack(spacing: 10) {
+            referenceClubSectionHeader(
+                icon: "calendar",
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Coming up",
+                            norwegian:
+                                "Kommende"
+                        ),
+                subtitle:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "The next event or challenge in the Club",
+                            norwegian:
+                                "Neste event eller challenge i gruppen"
+                        ),
+                actionTitle:
+                    ATHLTHLocalization
+                        .choose(
+                            english: "See all",
+                            norwegian: "Se alle"
+                        ),
+                action: {
+                    selectedTab = .events
+                }
+            )
+
+            if let event =
+                nextGroupEvent {
+                NavigationLink {
+                    CommunityGroupEventDetailView(
+                        group: currentGroup,
+                        event: event
+                    )
+                } label: {
+                    referenceComingEventCard(
+                        event
+                    )
+                }
+                .buttonStyle(.plain)
+            } else if let challenge =
+                        referenceSecondaryChallenge {
+                NavigationLink {
+                    CommunityGroupChallengeDetailView(
+                        group: currentGroup,
+                        challenge: challenge
+                    )
+                } label: {
+                    referenceUpcomingChallengeRow(
+                        challenge
+                    )
+                }
+                .buttonStyle(.plain)
+            } else {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "calendar.badge.plus"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No upcoming events or challenges yet.",
+                            norwegian:
+                                "Ingen kommende events eller challenges ennå."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private var referenceSecondaryChallenge:
+        CommunityGroupChallengeRecord? {
+        guard let challenge =
+            nextGroupChallenge
+        else {
+            return nil
+        }
+
+        if challenge.id ==
+            featuredClubChallenge?.id {
+            return nil
+        }
+
+        return challenge
+    }
+
+    private func referenceComingEventCard(
+        _ event:
+            CommunityGroupEventRecord
+    ) -> some View {
+        HStack(spacing: 10) {
+            referenceEventArtwork(event)
+                .frame(
+                    width: 118,
+                    height: 72
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "EVENT",
+                        norwegian: "EVENT"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    8
+                )
+                .padding(.vertical, 3)
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in: Capsule()
+                )
+
+                Text(event.title)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .bold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Label(
+                    event
+                        .nextOccurrenceStart()
+                        ?.formatted(
+                            date:
+                                .abbreviated,
+                            time:
+                                .shortened
+                        ) ??
+                    event.startsAt
+                        .formatted(
+                            date:
+                                .abbreviated,
+                            time:
+                                .shortened
+                        ),
+                    systemImage:
+                        "calendar"
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+                if !event.meetingName
+                    .isEmpty {
+                    Label(
+                        event.meetingName,
+                        systemImage:
+                            "location.fill"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft,
+                in: Circle()
+            )
+        }
+        .padding(8)
+        .background(
+            Color.white.opacity(0.86),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+    }
+
+    @ViewBuilder
+    private func referenceEventArtwork(
+        _ event:
+            CommunityGroupEventRecord
+    ) -> some View {
+        if let value =
+            event.imageURL,
+           let url = URL(string: value) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Image("CommunityHero")
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+        } else {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+        }
+    }
+
+    private func referenceUpcomingChallengeRow(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(
+                systemName:
+                    "trophy.fill"
+            )
+            .font(.title3)
+            .foregroundStyle(.orange)
+            .frame(
+                width: 46,
+                height: 46
+            )
+            .background(
+                Color.orange
+                    .opacity(0.10),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(challenge.title)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .lineLimit(1)
+
+                Text(
+                    comingUpChallengeDetail(
+                        challenge
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                .tertiary
+            )
+        }
+        .padding(.vertical, 6)
+    }
+
+    private var referenceClubPostsSection:
+        some View {
+        let pinned =
+            groups.pinnedAnnouncement(
+                in: group.id
+            )
+
+        let remaining =
+            groups.announcements(
+                in: group.id
+            )
+            .filter {
+                $0.id != pinned?.id
+            }
+
+        let ordered =
+            ([pinned].compactMap { $0 }) +
+            remaining
+
+        let visiblePosts =
+            showAllClubPosts
+                ? ordered
+                : Array(ordered.prefix(2))
+
+        return VStack(spacing: 9) {
+            referenceClubSectionHeader(
+                icon:
+                    "rectangle.and.pencil.and.ellipsis",
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Recent posts",
+                            norwegian:
+                                "Nylige innlegg"
+                        ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "See what is happening in \(currentGroup.name)",
+                        norwegian:
+                            "Se hva som skjer i \(currentGroup.name)"
+                    ),
+                actionTitle:
+                    ordered.count > 2
+                        ? (
+                            showAllClubPosts
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Show less",
+                                    norwegian:
+                                        "Vis færre"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "See all",
+                                    norwegian:
+                                        "Se alle"
+                                )
+                        )
+                        : nil,
+                action: {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        showAllClubPosts.toggle()
+                    }
+                }
+            )
+
+            if visiblePosts.isEmpty {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "text.bubble"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No Club posts yet.",
+                            norwegian:
+                                "Ingen Club-innlegg ennå."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Spacer()
+                }
+                .padding(.vertical, 8)
+            } else {
+                ForEach(visiblePosts) {
+                    update in
+                    referenceGroupPostCard(
+                        update,
+                        isPinned:
+                            update.id ==
+                            pinned?.id
+                    )
+                }
+            }
+        }
+        .padding(13)
+        .background(
+            Color.white.opacity(0.88),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 21,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 21,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func referenceClubSectionHeader(
+        icon: String,
+        title: String,
+        subtitle: String,
+        actionTitle: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(
+            alignment: .center,
+            spacing: 10
+        ) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 36,
+                    height: 36
+                )
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(title)
+                    .font(
+                        .headline.weight(
+                            .bold
+                        )
+                    )
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            if let actionTitle {
+                Button(action: action) {
+                    HStack(spacing: 4) {
+                        Text(actionTitle)
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func referenceGroupPostCard(
+        _ update:
+            CommunityGroupAnnouncementRecord,
+        isPinned: Bool
+    ) -> some View {
+        let likeCount =
+            groups.announcementLikeCount(
+                update.id,
+                in: group.id
+            )
+        let liked =
+            groups.hasLikedAnnouncement(
+                update.id,
+                in: group.id
+            )
+        let author =
+            groups.profileCard(
+                for: update.authorID
+            )
+
+        return VStack(
+            alignment: .leading,
+            spacing: 9
+        ) {
+            HStack(spacing: 9) {
+                if let author {
+                    CommunityGroupProfileAvatar(
+                        profile: author,
+                        size: 39
+                    )
+                } else {
+                    Circle()
+                        .fill(
+                            ATHLTHTheme
+                                .accentSoft
+                        )
+                        .frame(
+                            width: 39,
+                            height: 39
+                        )
+                        .overlay {
+                            Image(
+                                systemName:
+                                    "person.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    HStack(spacing: 5) {
+                        Text(
+                            author?
+                                .resolvedName ??
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Club member",
+                                    norwegian:
+                                        "Club-medlem"
+                                )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .lineLimit(1)
+
+                        if isPinned {
+                            Image(
+                                systemName:
+                                    "pin.fill"
+                            )
+                            .font(
+                                .caption2
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
+                    }
+
+                    Text(
+                        update.createdAt,
+                        style: .relative
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+
+                if groups.canPublishUpdates(
+                    currentGroup
+                ) {
+                    Menu {
+                        Button {
+                            Task {
+                                _ =
+                                    await groups
+                                        .pinAnnouncement(
+                                            groupID:
+                                                group.id,
+                                            announcementID:
+                                                isPinned
+                                                    ? nil
+                                                    : update.id
+                                        )
+                            }
+                        } label: {
+                            Label(
+                                isPinned
+                                    ? ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Unpin",
+                                            norwegian:
+                                                "Fjern festing"
+                                        )
+                                    : ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Pin post",
+                                            norwegian:
+                                                "Fest innlegg"
+                                        ),
+                                systemImage:
+                                    isPinned
+                                        ? "pin.slash"
+                                        : "pin"
+                            )
+                        }
+
+                        if groups.canManage(
+                            currentGroup
+                        ) {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Delete post",
+                                    norwegian:
+                                        "Slett innlegg"
+                                ),
+                                role: .destructive
+                            ) {
+                                Task {
+                                    _ =
+                                        await groups
+                                            .deleteAnnouncement(
+                                                groupID:
+                                                    group.id,
+                                                announcementID:
+                                                    update.id
+                                            )
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "ellipsis"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .frame(
+                            width: 30,
+                            height: 30
+                        )
                     }
                 }
             }
 
-            clubLeaderboardCard
-            recentGroupActivityCard
+            Text(update.body)
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+            HStack {
+                Spacer()
+
+                Button {
+                    Task {
+                        _ =
+                            await groups
+                                .toggleAnnouncementLike(
+                                    groupID:
+                                        group.id,
+                                    announcementID:
+                                        update.id
+                                )
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                liked
+                                    ? "heart.fill"
+                                    : "heart"
+                        )
+                        if likeCount > 0 {
+                            Text(
+                                "\(likeCount)"
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        liked
+                            ? Color.red
+                            : ATHLTHTheme
+                                .mutedText
+                    )
+                    .padding(
+                        .horizontal,
+                        11
+                    )
+                    .frame(height: 32)
+                    .background(
+                        Color.white,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black
+                                    .opacity(
+                                        0.04
+                                    ),
+                                lineWidth:
+                                    0.7
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.92),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.04),
+                lineWidth: 0.7
+            )
         }
     }
 
