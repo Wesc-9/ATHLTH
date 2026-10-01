@@ -1136,7 +1136,12 @@ struct RecoveryTrendsCard: View {
 
         return ATHLTHLocalization.choose(
                         english:
-                            "\(quality) · duration + available stages",
+                            ATHLTHLocalization.choose(
+                            english:
+                                "\(quality) · duration + available stages",
+                            norwegian:
+                                "\(quality) · varighet + tilgjengelige søvnstadier"
+                        ),
                         norwegian:
                             "\(quality) · varighet + tilgjengelige søvnstadier"
                     )
