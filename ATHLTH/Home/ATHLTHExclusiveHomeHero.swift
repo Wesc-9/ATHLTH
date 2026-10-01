@@ -280,6 +280,8 @@ struct ATHLTHHomeNextWorkoutHero: View {
     let workout: PlannedSession?
     let isStarting: Bool
     let onStart: () -> Void
+    let onQuickRun: () -> Void
+    let onQuickStrength: () -> Void
     let onOpenPlan: () -> Void
 
     private let resolvedHeight: CGFloat = 330
@@ -299,12 +301,26 @@ struct ATHLTHHomeNextWorkoutHero: View {
                     .clipped()
                     .accessibilityHidden(true)
 
+                // Keep Home brighter than the other immersive surfaces.
+                // A small white veil lifts the artwork while the localized
+                // lower gradient preserves contrast around workout actions.
                 LinearGradient(
                     stops: [
-                        .init(color: Color.black.opacity(0.20), location: 0),
-                        .init(color: Color.black.opacity(0.05), location: 0.34),
-                        .init(color: Color.black.opacity(0.26), location: 0.63),
-                        .init(color: Color.black.opacity(0.72), location: 1)
+                        .init(color: Color.white.opacity(0.20), location: 0),
+                        .init(color: Color.white.opacity(0.08), location: 0.30),
+                        .init(color: Color.clear, location: 0.58)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .allowsHitTesting(false)
+
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.black.opacity(0.08), location: 0),
+                        .init(color: Color.black.opacity(0.02), location: 0.38),
+                        .init(color: Color.black.opacity(0.16), location: 0.66),
+                        .init(color: Color.black.opacity(0.54), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -313,7 +329,7 @@ struct ATHLTHHomeNextWorkoutHero: View {
 
                 LinearGradient(
                     colors: [
-                        Color.black.opacity(0.28),
+                        Color.black.opacity(0.18),
                         Color.clear
                     ],
                     startPoint: .leading,
@@ -344,12 +360,16 @@ struct ATHLTHHomeNextWorkoutHero: View {
                     Spacer(minLength: 20)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(workout == nil ? "I DAG" : "NESTE ØKT")
-                            .font(.system(size: 12, weight: .semibold))
-                            .tracking(0.5)
-                            .foregroundStyle(.white.opacity(0.86))
+                        Text(
+                            workout == nil
+                                ? "INGEN ØKT PLANLAGT I DAG"
+                                : "NESTE ØKT"
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundStyle(.white.opacity(0.90))
 
-                        Text(workout?.title ?? "Restitusjonsdag")
+                        Text(workout?.title ?? "Hva vil du trene?")
                             .font(
                                 .system(
                                     size: UIDevice.current.userInterfaceIdiom == .pad
@@ -397,13 +417,13 @@ struct ATHLTHHomeNextWorkoutHero: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         } else {
-                            Text("Ingen planlagt økt i dag.")
+                            Text("Velg en rask økt, eller se planen din.")
                                 .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.82))
+                                .foregroundStyle(.white.opacity(0.88))
                         }
 
-                        HStack(spacing: 10) {
-                            if workout != nil {
+                        if workout != nil {
+                            HStack(spacing: 10) {
                                 Button(action: onStart) {
                                     HStack(spacing: 9) {
                                         if isStarting {
@@ -428,35 +448,14 @@ struct ATHLTHHomeNextWorkoutHero: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(isStarting)
-                            }
 
-                            Button(action: onOpenPlan) {
-                                HStack(spacing: 7) {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text("Se dagens plan")
-                                        .font(.caption.weight(.semibold))
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 10, weight: .bold))
-                                }
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 15)
-                                .frame(height: 42)
-                                .background(
-                                    Color.black.opacity(0.34),
-                                    in: Capsule()
-                                )
-                                .overlay {
-                                    Capsule()
-                                        .stroke(
-                                            Color.white.opacity(0.34),
-                                            lineWidth: 0.8
-                                        )
-                                }
+                                planButton
                             }
-                            .buttonStyle(.plain)
+                            .padding(.top, 3)
+                        } else {
+                            emptyStateActions
+                                .padding(.top, 3)
                         }
-                        .padding(.top, 3)
                     }
                     .shadow(
                         color: Color.black.opacity(0.25),
@@ -475,6 +474,137 @@ struct ATHLTHHomeNextWorkoutHero: View {
         }
         .frame(height: resolvedHeight)
         .clipped()
+    }
+
+    @ViewBuilder
+    private var emptyStateActions: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                quickTrainButton(
+                    title: "Run",
+                    subtitle: "Start en løpetur",
+                    icon: "figure.run",
+                    tint: ATHLTHTheme.vitality,
+                    action: onQuickRun
+                )
+
+                quickTrainButton(
+                    title: "Strength",
+                    subtitle: "Start en styrkeøkt",
+                    icon: "dumbbell.fill",
+                    tint: ATHLTHTheme.accentDeep,
+                    action: onQuickStrength
+                )
+
+                planButton
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    quickTrainButton(
+                        title: "Run",
+                        subtitle: "Start en løpetur",
+                        icon: "figure.run",
+                        tint: ATHLTHTheme.vitality,
+                        action: onQuickRun
+                    )
+
+                    quickTrainButton(
+                        title: "Strength",
+                        subtitle: "Start en styrkeøkt",
+                        icon: "dumbbell.fill",
+                        tint: ATHLTHTheme.accentDeep,
+                        action: onQuickStrength
+                    )
+                }
+
+                planButton
+            }
+        }
+    }
+
+    private func quickTrainButton(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(tint)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+
+                    Text(subtitle)
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 13)
+            .frame(minWidth: 103, minHeight: 48)
+            .background(
+                Color.white.opacity(0.96),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.76),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color: Color.black.opacity(0.10),
+                radius: 7,
+                y: 3
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var planButton: some View {
+        Button(action: onOpenPlan) {
+            HStack(spacing: 7) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+
+                Text("Se dagens plan")
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .background(
+                Color.black.opacity(0.28),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(0.42),
+                        lineWidth: 0.8
+                    )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func heroMetric(
