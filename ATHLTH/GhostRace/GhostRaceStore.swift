@@ -556,7 +556,8 @@ final class GhostRaceStore: ObservableObject {
 
     func temporaryRoute(
         ownerID: UUID,
-        title: String? = nil
+        title: String? = nil,
+        comparisonRouteID: UUID? = nil
     ) -> TrainingRoute? {
         guard let reference,
               reference.points.count >= 2
@@ -600,7 +601,8 @@ final class GhostRaceStore: ObservableObject {
                 reference.durationSeconds,
             routeSource: "ghost_race",
             sharedSourceOwnerID: nil,
-            sharedSourceRouteID: nil
+            sharedSourceRouteID:
+                comparisonRouteID
         )
     }
 
