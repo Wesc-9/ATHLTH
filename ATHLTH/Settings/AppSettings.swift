@@ -317,6 +317,12 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachAnnounceRemainingStepTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceRemainingStepDistance: Bool { didSet { persist() } }
     @Published var audioCoachDuckOtherAudio: Bool { didSet { persist() } }
+    @Published var audioCoachVoiceIdentifier: String? { didSet { persist() } }
+    @Published var audioCoachSpeechRate: Double { didSet { persist() } }
+    @Published var audioCoachSpeechVolume: Double { didSet { persist() } }
+    @Published var audioCoachAnnounceWorkoutStart: Bool { didSet { persist() } }
+    @Published var audioCoachAnnouncePauseResume: Bool { didSet { persist() } }
+    @Published var audioCoachAnnounceWorkoutComplete: Bool { didSet { persist() } }
     @Published var guidanceQuietPeriodSeconds: Int { didSet { persist() } }
 
     @Published var ghostRaceAudioEnabled: Bool { didSet { persist() } }
@@ -587,6 +593,30 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.audioCoach.duckOtherAudio"
             ) as? Bool ?? true
+        audioCoachVoiceIdentifier =
+            defaults.string(
+                forKey: "settings.audioCoach.voiceIdentifier"
+            )
+        audioCoachSpeechRate =
+            defaults.object(
+                forKey: "settings.audioCoach.speechRate"
+            ) as? Double ?? 0.48
+        audioCoachSpeechVolume =
+            defaults.object(
+                forKey: "settings.audioCoach.speechVolume"
+            ) as? Double ?? 1.0
+        audioCoachAnnounceWorkoutStart =
+            defaults.object(
+                forKey: "settings.audioCoach.announceWorkoutStart"
+            ) as? Bool ?? true
+        audioCoachAnnouncePauseResume =
+            defaults.object(
+                forKey: "settings.audioCoach.announcePauseResume"
+            ) as? Bool ?? true
+        audioCoachAnnounceWorkoutComplete =
+            defaults.object(
+                forKey: "settings.audioCoach.announceWorkoutComplete"
+            ) as? Bool ?? true
         guidanceQuietPeriodSeconds =
             defaults.object(
                 forKey: "settings.guidance.quietPeriodSeconds"
@@ -795,6 +825,36 @@ final class AppSettingsStore: ObservableObject {
             audioCoachDuckOtherAudio,
             forKey: "settings.audioCoach.duckOtherAudio"
         )
+        if let audioCoachVoiceIdentifier {
+            defaults.set(
+                audioCoachVoiceIdentifier,
+                forKey: "settings.audioCoach.voiceIdentifier"
+            )
+        } else {
+            defaults.removeObject(
+                forKey: "settings.audioCoach.voiceIdentifier"
+            )
+        }
+        defaults.set(
+            audioCoachSpeechRate,
+            forKey: "settings.audioCoach.speechRate"
+        )
+        defaults.set(
+            audioCoachSpeechVolume,
+            forKey: "settings.audioCoach.speechVolume"
+        )
+        defaults.set(
+            audioCoachAnnounceWorkoutStart,
+            forKey: "settings.audioCoach.announceWorkoutStart"
+        )
+        defaults.set(
+            audioCoachAnnouncePauseResume,
+            forKey: "settings.audioCoach.announcePauseResume"
+        )
+        defaults.set(
+            audioCoachAnnounceWorkoutComplete,
+            forKey: "settings.audioCoach.announceWorkoutComplete"
+        )
         defaults.set(
             guidanceQuietPeriodSeconds,
             forKey: "settings.guidance.quietPeriodSeconds"
@@ -930,7 +990,35 @@ final class AppSettingsStore: ObservableObject {
                         ),
                         30
                     )
-                )
+                ),
+            voiceIdentifier:
+                audioCoachVoiceIdentifier,
+            speechRate:
+                Float(
+                    min(
+                        max(
+                            audioCoachSpeechRate,
+                            0.35
+                        ),
+                        0.65
+                    )
+                ),
+            speechVolume:
+                Float(
+                    min(
+                        max(
+                            audioCoachSpeechVolume,
+                            0.2
+                        ),
+                        1.0
+                    )
+                ),
+            announceWorkoutStart:
+                audioCoachAnnounceWorkoutStart,
+            announcePauseResume:
+                audioCoachAnnouncePauseResume,
+            announceWorkoutComplete:
+                audioCoachAnnounceWorkoutComplete
         )
     }
 
