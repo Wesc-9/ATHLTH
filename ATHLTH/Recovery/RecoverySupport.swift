@@ -762,6 +762,55 @@ enum MuscleRecoveryEngine {
             }
     }
 
+    static func unmappedExerciseNames(
+        history: [StrengthWorkoutLog],
+        days: Int = 7
+    ) -> [String] {
+        let cutoff =
+            Date().addingTimeInterval(
+                -Double(max(days, 1)) *
+                    86_400
+            )
+
+        var names = Set<String>()
+
+        for workout in history
+        where workout.isFinished &&
+            workout.startedAt >= cutoff {
+            for exercise in workout.exercises {
+                let completedSets =
+                    exercise.sets
+                        .filter(\.isCompleted)
+                        .count
+
+                guard completedSets > 0 else {
+                    continue
+                }
+
+                let mapped =
+                    exercise.exercise
+                        .primaryMuscles
+                        .contains { muscle in
+                            normalizedMuscleGroup(
+                                muscle
+                            ) != nil
+                        }
+
+                if !mapped {
+                    names.insert(
+                        exercise.exercise.name
+                    )
+                }
+            }
+        }
+
+        return names.sorted {
+            $0.localizedCaseInsensitiveCompare(
+                $1
+            ) == .orderedAscending
+        }
+    }
+
     private static func maxDate(
         _ lhs: Date?,
         _ rhs: Date?
@@ -1643,6 +1692,7 @@ struct RecoveryDailyCheckInCard: View {
 
 struct MuscleRecoveryCard: View {
     let statuses: [MuscleRecoveryStatus]
+    let unmappedExerciseNames: [String]
     let onLogSoreness: () -> Void
 
     var body: some View {
@@ -1695,6 +1745,39 @@ struct MuscleRecoveryCard: View {
                 )
             }
             .padding(.top, 10)
+
+            if !unmappedExerciseNames.isEmpty {
+                HStack(
+                    alignment: .top,
+                    spacing: 8
+                ) {
+                    Image(
+                        systemName:
+                            "exclamationmark.triangle.fill"
+                    )
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                    .padding(.top, 1)
+
+                    Text(
+                        missingMuscleGroupWarning
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(.secondary)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 8)
+            }
 
             if statuses.isEmpty {
                 HStack(spacing: 11) {
@@ -1756,6 +1839,35 @@ struct MuscleRecoveryCard: View {
             .foregroundStyle(.secondary)
             .padding(.top, 7)
         }
+    }
+
+    private var missingMuscleGroupWarning:
+        String {
+        let visibleNames =
+            unmappedExerciseNames
+                .prefix(3)
+                .joined(separator: ", ")
+        let remaining =
+            max(
+                unmappedExerciseNames.count - 3,
+                0
+            )
+        let suffix =
+            remaining > 0
+                ? " +\(remaining)"
+                : ""
+
+        if unmappedExerciseNames.count == 1 {
+            return recoveryText(
+                "1 trained exercise is missing a muscle group and is not included in the muscle map: \(visibleNames).",
+                "1 trent øvelse mangler muskelgruppe og er ikke med i muskelkartet: \(visibleNames)."
+            )
+        }
+
+        return recoveryText(
+            "\(unmappedExerciseNames.count) trained exercises are missing a muscle group and are not included in the muscle map: \(visibleNames)\(suffix).",
+            "\(unmappedExerciseNames.count) trente øvelser mangler muskelgruppe og er ikke med i muskelkartet: \(visibleNames)\(suffix)."
+        )
     }
 
     private func sourceBadge(
