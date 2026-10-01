@@ -1245,89 +1245,151 @@ struct IPhoneWorkoutView: View {
                         )
                     }
                 }
-                if let completion =
-                    recorder.lastRouteCompletion {
-                    Section("Route complete") {
-                        HStack {
-                            completionMetric(
-                                title: "MATCH",
-                                value:
-                                    "\(Int(completion.routeMatchPercent.rounded()))%"
+                if recorder.active == nil {
+                    premiumHistoryHeader
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 10,
+                                leading: 14,
+                                bottom: 4,
+                                trailing: 14
                             )
-                            completionMetric(
-                                title: "AVG DEV.",
-                                value:
-                                    "\(Int(completion.averageDeviationMeters.rounded())) m"
-                            )
-                            completionMetric(
-                                title: "MAX DEV.",
-                                value:
-                                    "\(Int(completion.maxDeviationMeters.rounded())) m"
-                            )
-                        }
+                        )
+                        .listRowBackground(
+                            Color.clear
+                        )
+                        .listRowSeparator(
+                            .hidden
+                        )
 
-                        if completion.personalBest {
-                            Label(
-                                "New personal best",
-                                systemImage:
-                                    "trophy.fill"
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .premiumGold
-                            )
-                        }
+                    if let completion =
+                        recorder.lastRouteCompletion {
+                        Section("Route complete") {
+                            HStack {
+                                completionMetric(
+                                    title: "MATCH",
+                                    value:
+                                        "\(Int(completion.routeMatchPercent.rounded()))%"
+                                )
+                                completionMetric(
+                                    title: "AVG DEV.",
+                                    value:
+                                        "\(Int(completion.averageDeviationMeters.rounded())) m"
+                                )
+                                completionMetric(
+                                    title: "MAX DEV.",
+                                    value:
+                                        "\(Int(completion.maxDeviationMeters.rounded())) m"
+                                )
+                            }
 
-                        if let rank =
-                                completion
-                                    .leaderboardRank,
-                           let fieldSize =
-                                completion
-                                    .leaderboardFieldSize {
-                            Label(
-                                "Leaderboard #\(rank) of \(fieldSize)",
-                                systemImage:
-                                    "list.number"
-                            )
-                            .font(
-                                .caption
-                                    .weight(.semibold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.vitality
-                            )
-                        } else {
-                            Label(
-                                completion.leaderboardEligible
-                                    ? "Eligible for route leaderboard"
-                                    : "Route match was below leaderboard requirements",
-                                systemImage:
+                            if completion.personalBest {
+                                Label(
+                                    "New personal best",
+                                    systemImage:
+                                        "trophy.fill"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                            }
+
+                            if let rank =
+                                    completion
+                                        .leaderboardRank,
+                               let fieldSize =
+                                    completion
+                                        .leaderboardFieldSize {
+                                Label(
+                                    "Leaderboard #\(rank) of \(fieldSize)",
+                                    systemImage:
+                                        "list.number"
+                                )
+                                .font(
+                                    .caption
+                                        .weight(.semibold)
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.vitality
+                                )
+                            } else {
+                                Label(
                                     completion.leaderboardEligible
-                                        ? "checkmark.seal.fill"
-                                        : "info.circle"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(
-                                completion.leaderboardEligible
-                                    ? ATHLTHTheme.vitality
-                                    : .secondary
-                            )
+                                        ? "Eligible for route leaderboard"
+                                        : "Route match was below leaderboard requirements",
+                                    systemImage:
+                                        completion.leaderboardEligible
+                                            ? "checkmark.seal.fill"
+                                            : "info.circle"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    completion.leaderboardEligible
+                                        ? ATHLTHTheme.vitality
+                                        : .secondary
+                                )
+                            }
                         }
                     }
-                }
 
-                if let message = recorder.message { Section { Text(message).font(.footnote) } }
-                Section("Saved iPhone workouts") {
-                    ForEach(recorder.history.prefix(20)) { workout in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(workout.title).font(.headline)
-                            Text(workout.start.formatted(date: .abbreviated, time: .shortened))
-                            Text(String(format: "%.2f km · %.0f min", workout.distanceMeters / 1000, workout.accumulatedSeconds / 60))
-                            if workout.healthID == nil {
-                                Button("Copy to Apple Health") {
-                                    Task { await health.requestAuthorization(); await recorder.retryHealthSave(workout) }
-                                }.disabled(recorder.saving)
-                            } else { Label("Saved to Apple Health", systemImage: "checkmark.circle").font(.caption) }
+                    if let message = recorder.message {
+                        Section {
+                            Text(message)
+                                .font(.footnote)
+                        }
+                    }
+
+                    Section("Saved iPhone workouts") {
+                        ForEach(
+                            recorder.history.prefix(20)
+                        ) { workout in
+                            VStack(
+                                alignment: .leading,
+                                spacing: 6
+                            ) {
+                                Text(workout.title)
+                                    .font(.headline)
+                                Text(
+                                    workout.start.formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    )
+                                )
+                                Text(
+                                    String(
+                                        format:
+                                            "%.2f km · %.0f min",
+                                        workout.distanceMeters / 1000,
+                                        workout.accumulatedSeconds / 60
+                                    )
+                                )
+
+                                if workout.healthID == nil {
+                                    Button(
+                                        "Copy to Apple Health"
+                                    ) {
+                                        Task {
+                                            await health
+                                                .requestAuthorization()
+                                            await recorder
+                                                .retryHealthSave(
+                                                    workout
+                                                )
+                                        }
+                                    }
+                                    .disabled(
+                                        recorder.saving
+                                    )
+                                } else {
+                                    Label(
+                                        "Saved to Apple Health",
+                                        systemImage:
+                                            "checkmark.circle"
+                                    )
+                                    .font(.caption)
+                                }
+                            }
                         }
                     }
                 }
@@ -1378,6 +1440,73 @@ struct IPhoneWorkoutView: View {
                     await publishLivePointIfNeeded()
                 }
             }
+        }
+    }
+
+    private var premiumHistoryHeader:
+        some View {
+        HStack {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "iPhone workouts",
+                        norwegian:
+                            "iPhone-økter"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 31,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Workouts recorded on this iPhone",
+                        norwegian:
+                            "Økter registrert på denne iPhonen"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.90),
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
         }
     }
 
