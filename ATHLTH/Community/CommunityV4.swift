@@ -108,6 +108,20 @@ struct ATHLTHCommunityV4View: View {
                                 .canAccessControlCenter
                     )
 
+                    if let refreshError {
+                        communityRefreshNotice(
+                            message: refreshError
+                        )
+                        .transition(
+                            .opacity.combined(
+                                with:
+                                    .move(
+                                        edge: .top
+                                    )
+                            )
+                        )
+                    }
+
                     referenceWeeklyChallengeSection
                     referenceFriendsVsFriendsSection
 
@@ -149,24 +163,120 @@ struct ATHLTHCommunityV4View: View {
             .task {
                 await refreshCommunity()
             }
-            .alert(
-                "Community",
-                isPresented:
-                    Binding(
-                        get: { refreshError != nil },
-                        set: { shown in
-                            if !shown {
-                                refreshError = nil
-                            }
-                        }
-                    )
-            ) {
-                Button("OK", role: .cancel) {
-                    refreshError = nil
-                }
-            } message: {
-                Text(refreshError ?? "")
             }
+        }
+    }
+
+    private func communityRefreshNotice(
+        message: String
+    ) -> some View {
+        HStack(
+            alignment: .center,
+            spacing: 10
+        ) {
+            Image(
+                systemName:
+                    "arrow.clockwise.circle.fill"
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft
+                    .opacity(0.82),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+            )
+
+            Text(message)
+                .font(
+                    .system(
+                        size: 11.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+            Spacer(
+                minLength: 6
+            )
+
+            Button {
+                Task {
+                    await refreshCommunity(
+                        force: true
+                    )
+                }
+            } label: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Retry",
+                        norwegian: "Prøv igjen"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 11.5,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .frame(height: 32)
+                .background(
+                    Color.white.opacity(0.82),
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(11)
+        .background(
+            ATHLTHTheme
+                .accentSoft
+                .opacity(0.42),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.08),
+                lineWidth: 0.7
+            )
         }
     }
 
@@ -642,6 +752,53 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
+    private var hasUsableCommunityContent:
+        Bool {
+        officialChallenges.activeChallenge != nil ||
+        !officialChallenges
+            .upcomingChallenges
+            .isEmpty ||
+        !social.feed.isEmpty ||
+        !social.following.isEmpty ||
+        !social.followers.isEmpty ||
+        !groups.joinedGroups.isEmpty ||
+        !community.upcomingEvents.isEmpty
+    }
+
+    private func friendlyCommunityRefreshMessage(
+        for rawError: String
+    ) -> String {
+        let normalized =
+            rawError.lowercased()
+
+        if normalized.contains(
+            "timed out"
+        ) ||
+        normalized.contains(
+            "timeout"
+        ) ||
+        normalized.contains(
+            "tidsavbrudd"
+        ) ||
+        normalized.contains(
+            "request timed"
+        ) {
+            return ATHLTHLocalization.choose(
+                english:
+                    "The connection took too long. Showing the latest available content.",
+                norwegian:
+                    "Tilkoblingen tok for lang tid. Viser sist tilgjengelige innhold."
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Some community data couldn't be updated. Showing the latest available content.",
+            norwegian:
+                "Noe innhold kunne ikke oppdateres. Viser sist tilgjengelige innhold."
+        )
+    }
+
     @MainActor
     private func refreshCommunity(
         force: Bool = false
@@ -707,13 +864,38 @@ struct ATHLTHCommunityV4View: View {
 
         challenges.refreshStatuses()
 
-        refreshError =
+        let rawRefreshError =
             social.errorMessage ??
             messaging.errorMessage ??
             community.errorMessage ??
             groups.errorMessage ??
             officialChallenges.errorMessage ??
             realtime.errorMessage
+
+        if let rawRefreshError {
+            // Background refreshes must never interrupt a Community page that
+            // already has useful cached content. Pull-to-refresh can surface a
+            // compact inline notice, but raw networking/system errors never
+            // reach the user.
+            if force ||
+                !hasUsableCommunityContent {
+                withAnimation(
+                    .easeInOut(
+                        duration: 0.18
+                    )
+                ) {
+                    refreshError =
+                        friendlyCommunityRefreshMessage(
+                            for:
+                                rawRefreshError
+                        )
+                }
+            } else {
+                refreshError = nil
+            }
+        } else {
+            refreshError = nil
+        }
     }
 }
 
