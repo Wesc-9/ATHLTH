@@ -898,7 +898,9 @@ final class HealthKitManager: ObservableObject {
     }
 
     var shouldDeferAutomaticHealthWork: Bool {
-        automaticRefreshSuspended || deferFullRefreshUntilNextLaunch
+        automaticRefreshSuspended ||
+            deferFullRefreshUntilNextLaunch ||
+            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
     }
 
     func saveManualStrengthWorkout(
