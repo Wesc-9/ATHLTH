@@ -6578,10 +6578,21 @@ struct CommunityGroupDetailView: View {
         return ATHLTHCard {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Club Leaderboard")
-                        .font(.title3.weight(.bold))
                     Text(
-                        "Last 7 days · training, participation and Club activity."
+                        ATHLTHLocalization.choose(
+                            english: "Club Leaderboard",
+                            norwegian: "Club Leaderboard"
+                        )
+                    )
+                    .font(.title3.weight(.bold))
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Last 7 days · training, participation and Club activity.",
+                            norwegian:
+                                "Siste 7 dager · trening, deltakelse og aktivitet i Club-en."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -6592,7 +6603,12 @@ struct CommunityGroupDetailView: View {
 
             if entries.isEmpty {
                 Text(
-                    "Leaderboard activity will appear as members train and take part in the Club."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Leaderboard activity will appear as members train and take part in the Club.",
+                        norwegian:
+                            "Leaderboard fylles når medlemmer trener og deltar i Club-en."
+                    )
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -6695,7 +6711,12 @@ struct CommunityGroupDetailView: View {
             }
 
             Text(
-                "Scoring: workouts, events and challenges +5. Chat and likes +1, capped at 5 per day each."
+                ATHLTHLocalization.choose(
+                    english:
+                        "Scoring: workouts, events and challenges +5. Chat and likes +1, capped at 5 per day each.",
+                    norwegian:
+                        "Poeng: økter, events og challenges +5. Chat og likes +1, maks 5 per dag hver."
+                )
             )
             .font(.caption2)
             .foregroundStyle(.tertiary)
