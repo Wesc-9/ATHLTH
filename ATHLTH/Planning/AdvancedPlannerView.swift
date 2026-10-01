@@ -2100,14 +2100,17 @@ struct TrainingPlanCreationView: View {
     @EnvironmentObject private var goalStore: GoalStore
 
     @State private var creationMode: TrainingPlanCreationMode?
+    private let showsSourceChooser: Bool
 
     init() {
+        showsSourceChooser = true
         _creationMode = State(initialValue: nil)
     }
 
     fileprivate init(
         initialMode: TrainingPlanCreationMode
     ) {
+        showsSourceChooser = false
         _creationMode = State(initialValue: initialMode)
     }
 
@@ -2211,8 +2214,12 @@ struct TrainingPlanCreationView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(creationMode == nil ? "Cancel" : "Back") {
-                        if creationMode == nil {
+                    Button(
+                        creationMode == nil || !showsSourceChooser
+                            ? "Cancel"
+                            : "Back"
+                    ) {
+                        if creationMode == nil || !showsSourceChooser {
                             dismiss()
                         } else {
                             creationMode = nil
@@ -2457,27 +2464,20 @@ struct TrainingPlanCreationView: View {
         }
         .padding(20)
         .background(
-            Group {
-                if prominent {
-                    LinearGradient(
-                        colors: [
+            LinearGradient(
+                colors:
+                    prominent
+                        ? [
                             ATHLTHTheme.accentDeep,
                             ATHLTHTheme.accentDeep.opacity(0.88)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                } else {
-                    LinearGradient(
-                        colors: [
+                        ]
+                        : [
                             Color.white.opacity(0.98),
                             accent.opacity(0.055)
                         ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            },
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 28,
                 style: .continuous
@@ -2832,7 +2832,7 @@ struct TrainingPlanCreationView: View {
                         VStack(spacing: 0) {
                             ForEach(
                                 Array(goalStore.goals.enumerated()),
-                                id: \.element.id
+                                id: \.offset
                             ) { index, goal in
                                 Toggle(
                                     isOn: Binding(
@@ -3147,27 +3147,20 @@ struct TrainingPlanCreationView: View {
                             : ATHLTHTheme.primaryText
                     )
                     .background(
-                        Group {
-                            if isSelected {
-                                LinearGradient(
-                                    colors: [
+                        LinearGradient(
+                            colors:
+                                isSelected
+                                    ? [
                                         ATHLTHTheme.accent,
                                         ATHLTHTheme.accentDeep
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            } else {
-                                LinearGradient(
-                                    colors: [
+                                    ]
+                                    : [
                                         Color.white.opacity(0.88),
                                         Color.black.opacity(0.018)
                                     ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            }
-                        },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
                         in: RoundedRectangle(
                             cornerRadius: 13,
                             style: .continuous
