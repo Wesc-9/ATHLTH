@@ -1437,6 +1437,8 @@ struct TrainingPlanLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
 
+    var onPlanCreated: (() -> Void)? = nil
+
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var query = ""
     @State private var selectedCategory = "All"
@@ -1554,7 +1556,8 @@ struct TrainingPlanLibraryView: View {
                         ZStack(alignment: .topTrailing) {
                             NavigationLink {
                                 TrainingPlanCatalogDetailView(
-                                    entry: entry
+                                    entry: entry,
+                                    onPlanCreated: onPlanCreated
                                 )
                             } label: {
                                 catalogCard(entry)
@@ -1800,6 +1803,7 @@ struct TrainingPlanCatalogDetailView: View {
     @EnvironmentObject private var recents: LibraryRecentsStore
 
     let entry: TrainingPlanCatalogEntry
+    var onPlanCreated: (() -> Void)? = nil
 
     @State private var addedToLibrary = false
     @State private var showingPersonalizePlan = false
@@ -2067,7 +2071,10 @@ struct TrainingPlanCatalogDetailView: View {
             }
         }
         .sheet(isPresented: $showingPersonalizePlan) {
-            PersonalizeTrainingPlanView(entry: entry)
+            PersonalizeTrainingPlanView(
+                entry: entry,
+                onPlanCreated: onPlanCreated
+            )
         }
         .alert(
             "Added to My Plans",
@@ -2363,6 +2370,7 @@ struct PersonalizeTrainingPlanView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let entry: TrainingPlanCatalogEntry
+    var onPlanCreated: (() -> Void)? = nil
 
     @State private var startDate = Date()
     @State private var selectedDays: Set<Int> = []
@@ -2783,6 +2791,7 @@ struct PersonalizeTrainingPlanView: View {
         }
 
         dismiss()
+        onPlanCreated?()
     }
 }
 
