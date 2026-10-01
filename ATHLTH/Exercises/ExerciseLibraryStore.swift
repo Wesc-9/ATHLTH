@@ -588,8 +588,8 @@ final class ExerciseLibraryStore: ObservableObject {
                     UUID(uuidString: "C2000000-0000-0000-0000-000000000004")!,
                     "Burpee Broad Jump",
                     "Chest-to-floor burpee followed by a two-foot broad jump.",
-                    ["Full Body"],
                     ["Quads", "Glutes", "Chest", "Core"],
+                    ["Shoulders", "Calves"],
                     ["Bodyweight"]
                 ),
                 (
