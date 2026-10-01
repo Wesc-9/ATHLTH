@@ -958,12 +958,26 @@ private struct StrengthBodyFigureCanvas:
                     : 0.09
             )
 
+        let recoverySilhouette: Bool
+        switch style {
+        case .activation:
+            recoverySilhouette = false
+        case .recoveryLoad:
+            recoverySilhouette = true
+        }
+
         let head =
             CGRect(
-                x: size.width * 0.39,
+                x:
+                    size.width *
+                    (recoverySilhouette ? 0.41 : 0.39),
                 y: size.height * 0.02,
-                width: size.width * 0.22,
-                height: size.width * 0.22
+                width:
+                    size.width *
+                    (recoverySilhouette ? 0.18 : 0.22),
+                height:
+                    size.width *
+                    (recoverySilhouette ? 0.18 : 0.22)
             )
         context.fill(
             Path(
@@ -983,7 +997,9 @@ private struct StrengthBodyFigureCanvas:
         )
         torso.addCurve(
             to: CGPoint(
-                x: size.width * 0.75,
+                x:
+                    size.width *
+                    (recoverySilhouette ? 0.72 : 0.75),
                 y: size.height * 0.28
             ),
             control1:
@@ -993,45 +1009,61 @@ private struct StrengthBodyFigureCanvas:
                 ),
             control2:
                 CGPoint(
-                    x: size.width * 0.73,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.70 : 0.73),
                     y: size.height * 0.20
                 )
         )
         torso.addCurve(
             to: CGPoint(
-                x: size.width * 0.64,
+                x:
+                    size.width *
+                    (recoverySilhouette ? 0.61 : 0.64),
                 y: size.height * 0.58
             ),
             control1:
                 CGPoint(
-                    x: size.width * 0.73,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.68 : 0.73),
                     y: size.height * 0.40
                 ),
             control2:
                 CGPoint(
-                    x: size.width * 0.68,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.63 : 0.68),
                     y: size.height * 0.52
                 )
         )
         torso.addLine(
             to: CGPoint(
-                x: size.width * 0.36,
+                x:
+                    size.width *
+                    (recoverySilhouette ? 0.39 : 0.36),
                 y: size.height * 0.58
             )
         )
         torso.addCurve(
             to: CGPoint(
-                x: size.width * 0.25,
+                x:
+                    size.width *
+                    (recoverySilhouette ? 0.28 : 0.25),
                 y: size.height * 0.28
             ),
             control1:
                 CGPoint(
-                    x: size.width * 0.32,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.37 : 0.32),
                     y: size.height * 0.52
                 ),
             control2:
                 CGPoint(
-                    x: size.width * 0.27,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.32 : 0.27),
                     y: size.height * 0.40
                 )
         )
@@ -1042,7 +1074,9 @@ private struct StrengthBodyFigureCanvas:
             ),
             control1:
                 CGPoint(
-                    x: size.width * 0.27,
+                    x:
+                        size.width *
+                        (recoverySilhouette ? 0.30 : 0.27),
                     y: size.height * 0.20
                 ),
             control2:
@@ -1064,20 +1098,20 @@ private struct StrengthBodyFigureCanvas:
         )
 
         drawCapsule(
-            x: 0.16,
+            x: recoverySilhouette ? 0.18 : 0.16,
             y: 0.23,
-            width: 0.14,
-            height: 0.38,
+            width: recoverySilhouette ? 0.11 : 0.14,
+            height: recoverySilhouette ? 0.36 : 0.38,
             rotation: -0.08,
             fill: base,
             context: &context,
             size: size
         )
         drawCapsule(
-            x: 0.70,
+            x: recoverySilhouette ? 0.71 : 0.70,
             y: 0.23,
-            width: 0.14,
-            height: 0.38,
+            width: recoverySilhouette ? 0.11 : 0.14,
+            height: recoverySilhouette ? 0.36 : 0.38,
             rotation: 0.08,
             fill: base,
             context: &context,
@@ -1085,9 +1119,9 @@ private struct StrengthBodyFigureCanvas:
         )
 
         drawCapsule(
-            x: 0.33,
+            x: recoverySilhouette ? 0.35 : 0.33,
             y: 0.55,
-            width: 0.16,
+            width: recoverySilhouette ? 0.13 : 0.16,
             height: 0.41,
             rotation: -0.015,
             fill: base,
@@ -1095,9 +1129,9 @@ private struct StrengthBodyFigureCanvas:
             size: size
         )
         drawCapsule(
-            x: 0.51,
+            x: recoverySilhouette ? 0.52 : 0.51,
             y: 0.55,
-            width: 0.16,
+            width: recoverySilhouette ? 0.13 : 0.16,
             height: 0.41,
             rotation: 0.015,
             fill: base,
