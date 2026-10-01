@@ -110,20 +110,25 @@ struct ATHLTHCommunityV4View: View {
                                 .canAccessControlCenter
                     )
 
-                    CommunityV4SocialSnapshot(
-                        followers:
-                            social.followerCount,
-                        following:
-                            social.followingCount,
-                        mutuals:
-                            mutuals.count,
-                        online:
-                            onlineFollowing.count,
-                        live:
-                            visibleCircleLiveSessions.count
-                    )
+                    weeklyChallengeSection
+                    friendsVsFriendsSection
 
-                    peopleNowSection
+                    CommunityV4QuickActions(
+                        clubCount:
+                            groups.joinedGroups.count,
+                        challengeCount:
+                            activeChallenges.count +
+                            (
+                                officialChallenges
+                                    .activeChallenge == nil
+                                    ? 0
+                                    : 1
+                            ),
+                        eventCount:
+                            socialEventCount,
+                        unreadMessages:
+                            messaging.unreadCount
+                    )
 
                     if attentionCount > 0 {
                         CommunityV4AttentionCard(
@@ -142,8 +147,6 @@ struct ATHLTHCommunityV4View: View {
                         )
                     }
 
-                    weeklyChallengeSection
-                    friendsVsFriendsSection
                     recentCircleSection
 
                     CommunityV4SocialWorld(
@@ -415,7 +418,7 @@ struct ATHLTHCommunityV4View: View {
                 eyebrow: "FROM YOUR CIRCLE",
                 title: "Recent activity",
                 subtitle:
-                    "The latest shared training from athletes you follow.",
+                    "Workouts, events, challenges and milestones from people you follow.",
                 destinationTitle: "See all",
                 destination: {
                     AnyView(
@@ -429,18 +432,16 @@ struct ATHLTHCommunityV4View: View {
             if circleFeed.isEmpty {
                 CommunityV4EmptyActivityCard()
             } else {
-                VStack(spacing: 0) {
+                VStack(spacing: 10) {
                     ForEach(
                         Array(
                             circleFeed
-                                .prefix(4)
+                                .prefix(5)
                         )
                     ) { item in
                         NavigationLink {
-                            FriendProfileView(
-                                userID:
-                                    item.actor
-                                        .userID
+                            socialDestination(
+                                for: item
                             )
                         } label: {
                             CommunityV4ActivityRow(
@@ -454,41 +455,45 @@ struct ATHLTHCommunityV4View: View {
                             )
                         }
                         .buttonStyle(.plain)
-
-                        if item.id !=
-                            circleFeed
-                                .prefix(4)
-                                .last?
-                                .id {
-                            Divider()
-                                .padding(
-                                    .leading,
-                                    64
-                                )
-                        }
                     }
-                }
-                .padding(.horizontal, 14)
-                .background(
-                    Color.white.opacity(0.86),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 24,
-                            style: .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.white.opacity(0.94),
-                        lineWidth: 0.8
-                    )
                 }
             }
         }
+    }
+
+    private func socialDestination(
+        for item: SocialFeedItem
+    ) -> AnyView {
+        let metadata =
+            item.activity.metadata ?? [:]
+
+        if item.activity.kind == "event",
+           let rawID = metadata["event_id"],
+           let eventID = UUID(uuidString: rawID) {
+            return AnyView(
+                CommunityEventDetailView(
+                    eventID: eventID
+                )
+            )
+        }
+
+        if item.activity.kind == "challenge",
+           let rawID = metadata["challenge_id"],
+           let challengeID = UUID(uuidString: rawID) {
+            return AnyView(
+                ChallengeDetailView(
+                    challengeID:
+                        challengeID
+                )
+            )
+        }
+
+        return AnyView(
+            FriendProfileView(
+                userID:
+                    item.actor.userID
+            )
+        )
     }
 
     private func profile(
@@ -596,23 +601,10 @@ private struct CommunityV4Header: View {
                 alignment: .leading,
                 spacing: 5
             ) {
-                Text("COMMUNITY")
-                    .font(
-                        .caption2.weight(
-                            .bold
-                        )
-                    )
-                    .tracking(1.9)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                            .opacity(0.54)
-                    )
-
-                Text("Your social world.")
+                Text("Community")
                     .font(
                         .system(
-                            size: 32,
+                            size: 34,
                             weight: .bold,
                             design: .rounded
                         )
@@ -623,36 +615,17 @@ private struct CommunityV4Header: View {
                     )
 
                 Text(
-                    "People, training, messages, clubs, events and competition — without turning Community into an endless feed."
+                    "Friends, clubs and challenges"
                 )
                 .font(.subheadline)
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
                 )
             }
 
             Spacer(minLength: 8)
 
             HStack(spacing: 8) {
-                NavigationLink {
-                    SocialHubView(
-                        initialTab: .discover
-                    )
-                } label: {
-                    headerButton(
-                        icon:
-                            "person.badge.plus"
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    "Find people"
-                )
-
                 NavigationLink {
                     MessageInboxDestinationView()
                 } label: {
@@ -662,8 +635,8 @@ private struct CommunityV4Header: View {
                         headerButton(
                             icon:
                                 unreadMessages > 0
-                                ? "bubble.left.and.bubble.right.fill"
-                                : "bubble.left.and.bubble.right"
+                                ? "envelope.fill"
+                                : "envelope"
                         )
 
                         if unreadMessages > 0 {
@@ -682,6 +655,37 @@ private struct CommunityV4Header: View {
                     unreadMessages > 0
                         ? "Messages, \(unreadMessages) unread"
                         : "Messages"
+                )
+
+                NavigationLink {
+                    ATHLTHNotificationCenterView()
+                } label: {
+                    ZStack(
+                        alignment: .topTrailing
+                    ) {
+                        headerButton(
+                            icon:
+                                attentionCount > 0
+                                ? "bell.fill"
+                                : "bell"
+                        )
+
+                        if attentionCount > 0 {
+                            badge(
+                                attentionCount
+                            )
+                            .offset(
+                                x: 4,
+                                y: -4
+                            )
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    attentionCount > 0
+                        ? "Notifications, \(attentionCount)"
+                        : "Notifications"
                 )
 
                 if canManageWeekly {
@@ -1629,6 +1633,143 @@ private struct CommunityV4AttentionCard: View {
     }
 }
 
+// MARK: - Quick actions
+
+private struct CommunityV4QuickActions: View {
+    let clubCount: Int
+    let challengeCount: Int
+    let eventCount: Int
+    let unreadMessages: Int
+
+    var body: some View {
+        HStack(spacing: 9) {
+            NavigationLink {
+                CommunityGroupsView()
+            } label: {
+                tile(
+                    title: "Clubs",
+                    value: clubCount,
+                    icon: "person.3.fill",
+                    tint: .green
+                )
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                ChallengeHubView()
+            } label: {
+                tile(
+                    title: "Challenges",
+                    value: challengeCount,
+                    icon: "trophy.fill",
+                    tint: .orange
+                )
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                CommunityEventsView()
+            } label: {
+                tile(
+                    title: "Events",
+                    value: eventCount,
+                    icon: "calendar",
+                    tint: .blue
+                )
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                MessageInboxDestinationView()
+            } label: {
+                tile(
+                    title: "Chat",
+                    value: unreadMessages,
+                    icon: "bubble.left.and.bubble.right.fill",
+                    tint: ATHLTHTheme.accentDeep
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func tile(
+        title: String,
+        value: Int,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    tint.opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                )
+
+            Text(title)
+                .font(
+                    .caption.weight(
+                        .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(
+                value > 0
+                    ? value.formatted()
+                    : "Open"
+            )
+            .font(.caption2)
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 96
+        )
+        .background(
+            Color.white.opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+}
+
 // MARK: - Recent activity
 
 private struct CommunityV4ActivityRow: View {
@@ -1637,7 +1778,7 @@ private struct CommunityV4ActivityRow: View {
 
     var body: some View {
         HStack(
-            alignment: .center,
+            alignment: .top,
             spacing: 12
         ) {
             CommunityV4Avatar(
@@ -1648,74 +1789,267 @@ private struct CommunityV4ActivityRow: View {
 
             VStack(
                 alignment: .leading,
-                spacing: 3
+                spacing: 7
             ) {
-                Text(
-                    item.actor.resolvedName
-                )
-                .font(
-                    .subheadline.weight(
-                        .semibold
+                HStack(spacing: 7) {
+                    Text(
+                        item.actor.resolvedName
                     )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .primaryText
-                )
-                .lineLimit(1)
-
-                Text(item.activity.title)
-                    .font(.caption)
+                    .font(
+                        .subheadline.weight(
+                            .bold
+                        )
+                    )
                     .foregroundStyle(
                         ATHLTHTheme
-                            .mutedText
+                            .primaryText
                     )
                     .lineLimit(1)
+
+                    Spacer(minLength: 6)
+
+                    Text(
+                        item.activity
+                            .createdAt,
+                        style: .relative
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+
+                HStack(spacing: 6) {
+                    Image(
+                        systemName:
+                            activityIcon
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold
+                        )
+                    )
+
+                    Text(activityLabel)
+                        .font(
+                            .caption.weight(
+                                .bold
+                            )
+                        )
+                }
+                .foregroundStyle(activityTint)
+
+                Text(item.activity.title)
+                    .font(
+                        .subheadline.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(2)
 
                 if let subtitle =
                     item.activity.subtitle,
                    !subtitle.isEmpty {
                     Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                }
+
+                if let metadataLine {
+                    Text(metadataLine)
                         .font(.caption2)
                         .foregroundStyle(
                             ATHLTHTheme
                                 .mutedText
-                                .opacity(0.82)
+                                .opacity(0.88)
                         )
                         .lineLimit(1)
                 }
-            }
 
-            Spacer()
+                if !item.reactions.isEmpty ||
+                    !item.comments.isEmpty {
+                    HStack(spacing: 12) {
+                        if !item.reactions.isEmpty {
+                            Label(
+                                "\(item.reactions.count)",
+                                systemImage:
+                                    "hand.thumbsup.fill"
+                            )
+                        }
 
-            VStack(
-                alignment: .trailing,
-                spacing: 4
-            ) {
-                Text(
-                    item.activity
-                        .createdAt,
-                    style: .relative
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    .tertiary
-                )
-
-                if !item.reactions.isEmpty {
-                    Label(
-                        "\(item.reactions.count)",
-                        systemImage:
-                            "hand.thumbsup.fill"
-                    )
+                        if !item.comments.isEmpty {
+                            Label(
+                                "\(item.comments.count)",
+                                systemImage:
+                                    "bubble.left.fill"
+                            )
+                        }
+                    }
                     .font(.caption2)
                     .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                        ATHLTHTheme
+                            .accentDeep
                     )
                 }
             }
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(.tertiary)
+            .padding(.top, 16)
         }
-        .padding(.vertical, 12)
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    activityTint.opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                activityTint.opacity(0.09),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var activityIcon: String {
+        switch item.activity.kind {
+        case "event":
+            return "calendar.badge.plus"
+        case "challenge":
+            return "trophy.fill"
+        case "personal_record":
+            return "medal.fill"
+        case "trophy":
+            return "rosette"
+        case "goal":
+            return "target"
+        case "status":
+            return "text.bubble.fill"
+        default:
+            let workoutKind =
+                item.activity
+                    .metadata?["kind"]
+            return workoutKind == "strength"
+                ? "dumbbell.fill"
+                : "figure.run"
+        }
+    }
+
+    private var activityLabel: String {
+        switch item.activity.kind {
+        case "event":
+            return "EVENT"
+        case "challenge":
+            return "CHALLENGE"
+        case "personal_record":
+            return "PERSONAL BEST"
+        case "trophy":
+            return "ACHIEVEMENT"
+        case "goal":
+            return "GOAL"
+        case "status":
+            return "STATUS"
+        default:
+            return "WORKOUT"
+        }
+    }
+
+    private var activityTint: Color {
+        switch item.activity.kind {
+        case "event":
+            return .blue
+        case "challenge":
+            return .orange
+        case "personal_record",
+             "trophy":
+            return .yellow
+        case "goal":
+            return .green
+        case "status":
+            return .indigo
+        default:
+            return ATHLTHTheme.vitality
+        }
+    }
+
+    private var metadataLine: String? {
+        let metadata =
+            item.activity.metadata ?? [:]
+
+        if item.activity.kind == "event" {
+            let startsAt =
+                metadata["starts_at"]
+                    .flatMap {
+                        ISO8601DateFormatter()
+                            .date(from: $0)
+                    }
+            let dateText =
+                startsAt?.formatted(
+                    date: .abbreviated,
+                    time: .shortened
+                )
+            let meeting =
+                metadata["meeting_name"]
+
+            return [
+                dateText,
+                meeting
+            ]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+            .nilIfBlank
+        }
+
+        if item.activity.kind == "challenge" {
+            return metadata["sport"]?
+                .replacingOccurrences(
+                    of: "_",
+                    with: " "
+                )
+                .capitalized
+        }
+
+        if item.activity.kind == "workout",
+           let rawDistance =
+                metadata["distance_meters"],
+           let meters = Double(rawDistance),
+           meters > 0 {
+            return String(
+                format:
+                    "%.1f km",
+                meters / 1_000
+            )
+        }
+
+        return nil
     }
 }
 
@@ -1751,7 +2085,7 @@ private struct CommunityV4EmptyActivityCard: View {
                     .font(.headline)
 
                 Text(
-                    "Shared workouts from people you follow will appear here."
+                    "Workouts, events, challenges and milestones from people you follow will appear here."
                 )
                 .font(.caption)
                 .foregroundStyle(
@@ -1790,56 +2124,13 @@ private struct CommunityV4SocialWorld: View {
             spacing: 12
         ) {
             CommunityV4SectionHeader(
-                eyebrow: "YOUR SOCIAL WORLD",
-                title: "Everything connected",
+                eyebrow: "MORE FROM COMMUNITY",
+                title: "Clubs & upcoming",
                 subtitle:
-                    "Clubs, events and challenges stay available without crowding the main overview.",
+                    "\(clubCount) clubs · \(eventCount) events · \(challengeCount) challenges",
                 destinationTitle: nil,
                 destination: nil
             )
-
-            HStack(spacing: 9) {
-                NavigationLink {
-                    CommunityGroupsView()
-                } label: {
-                    tile(
-                        title: "Clubs",
-                        value: clubCount,
-                        icon:
-                            "person.3.fill",
-                        tint: .indigo
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    CommunityEventsView()
-                } label: {
-                    tile(
-                        title: "Events",
-                        value: eventCount,
-                        icon:
-                            "calendar.badge.clock",
-                        tint: .purple
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    ChallengeHubView()
-                } label: {
-                    tile(
-                        title:
-                            "Challenges",
-                        value:
-                            challengeCount,
-                        icon:
-                            "trophy.fill",
-                        tint: .orange
-                    )
-                }
-                .buttonStyle(.plain)
-            }
 
             if let nextEvent {
                 NavigationLink {
