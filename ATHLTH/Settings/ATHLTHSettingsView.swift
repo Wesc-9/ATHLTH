@@ -1025,15 +1025,30 @@ struct ATHLTHSettingsView: View {
     private var trainingDeviceSubtitle: String {
         switch watchConnection.state {
         case .ready:
-            return "Apple Watch connected"
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch connected",
+                norwegian: "Apple Watch tilkoblet"
+            )
         case .appNotInstalled:
-            return "Apple Watch paired · install ATHLTH on Watch"
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch paired · install ATHLTH on Watch",
+                norwegian: "Apple Watch sammenkoblet · installer ATHLTH på klokken"
+            )
         case .notPaired:
-            return "No Apple Watch connected"
+            return ATHLTHLocalization.choose(
+                english: "No Apple Watch connected",
+                norwegian: "Ingen Apple Watch tilkoblet"
+            )
         case .checking:
-            return "Checking Apple Watch"
+            return ATHLTHLocalization.choose(
+                english: "Checking Apple Watch",
+                norwegian: "Sjekker Apple Watch"
+            )
         case .unsupported:
-            return "Apple Watch unavailable on this device"
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch unavailable on this device",
+                norwegian: "Apple Watch er ikke tilgjengelig på denne enheten"
+            )
         }
     }
 
@@ -1042,9 +1057,15 @@ struct ATHLTHSettingsView: View {
         case .ready:
             return "Apple Watch"
         case .checking:
-            return "Checking"
+            return ATHLTHLocalization.choose(
+                english: "Checking",
+                norwegian: "Sjekker"
+            )
         case .appNotInstalled, .notPaired, .unsupported:
-            return "Setup"
+            return ATHLTHLocalization.choose(
+                english: "Setup",
+                norwegian: "Oppsett"
+            )
         }
     }
 
@@ -1096,13 +1117,25 @@ struct ATHLTHSettingsView: View {
     private var notificationSummary: String {
         switch notifications.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
-            return "System notifications allowed · choose what ATHLTH sends"
+            return ATHLTHLocalization.choose(
+                english: "System notifications allowed · choose what ATHLTH sends",
+                norwegian: "Systemvarsler tillatt · velg hva ATHLTH skal sende"
+            )
         case .denied:
-            return "System notifications are disabled in iOS Settings"
+            return ATHLTHLocalization.choose(
+                english: "System notifications are disabled in iOS Settings",
+                norwegian: "Systemvarsler er deaktivert i iOS-innstillinger"
+            )
         case .notDetermined:
-            return "System notification permission has not been requested"
+            return ATHLTHLocalization.choose(
+                english: "System notification permission has not been requested",
+                norwegian: "Tillatelse til systemvarsler er ikke forespurt"
+            )
         @unknown default:
-            return "Review notification preferences"
+            return ATHLTHLocalization.choose(
+                english: "Review notification preferences",
+                norwegian: "Se gjennom varslingsinnstillingene"
+            )
         }
     }
 
@@ -1114,43 +1147,86 @@ struct ATHLTHSettingsView: View {
 
     private var healthSyncStateTitle: String {
         guard settings.backgroundHealthSyncEnabled else {
-            return "Off"
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
         }
         if health.isRefreshing {
-            return "Syncing"
+            return ATHLTHLocalization.choose(
+                english: "Syncing",
+                norwegian: "Synkroniserer"
+            )
         }
         if !health.hasRequestedAuthorization {
-            return "Not connected"
+            return ATHLTHLocalization.choose(
+                english: "Not connected",
+                norwegian: "Ikke tilkoblet"
+            )
         }
         if healthSyncHasIssue {
-            return "Issue"
+            return ATHLTHLocalization.choose(
+                english: "Issue",
+                norwegian: "Problem"
+            )
         }
         if health.lastSuccessfulRefreshAt != nil && !health.hasTrainingHealthData {
-            return health.personalDetails.hasAnyValue ? "Profile only" : "No data"
+            return health.personalDetails.hasAnyValue
+                ? ATHLTHLocalization.choose(
+                    english: "Profile only",
+                    norwegian: "Kun profil"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "No data",
+                    norwegian: "Ingen data"
+                )
         }
         if health.lastSuccessfulRefreshAt != nil &&
             health.hasTrainingHealthData &&
             !health.canWriteWorkouts {
-            return "Read only"
+            return ATHLTHLocalization.choose(
+                english: "Read only",
+                norwegian: "Kun lesing"
+            )
         }
-        return health.lastSuccessfulRefreshAt != nil ? "Synced" : "Ready"
+        return health.lastSuccessfulRefreshAt != nil
+            ? ATHLTHLocalization.choose(
+                english: "Synced",
+                norwegian: "Synkronisert"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Ready",
+                norwegian: "Klar"
+            )
     }
 
     private var healthSyncStatusText: String {
         if healthRequestInProgress {
-            return "Reading workouts, activity, sleep, heart data and profile values from Apple Health."
+            return ATHLTHLocalization.choose(
+                english: "Reading workouts, activity, sleep, heart data and profile values from Apple Health.",
+                norwegian: "Leser økter, aktivitet, søvn, hjertedata og profilverdier fra Apple Health."
+            )
         }
 
         if let error = health.backgroundSyncError, !error.isEmpty {
-            return "Background sync needs attention: \(error)"
+            return ATHLTHLocalization.choose(
+                english: "Background sync needs attention: \(error)",
+                norwegian: "Bakgrunnssynkronisering krever oppmerksomhet: \(error)"
+            )
         }
 
         if let error = health.authorizationError, !error.isEmpty {
-            return "Apple Health read needs attention: \(error)"
+            return ATHLTHLocalization.choose(
+                english: "Apple Health read needs attention: \(error)",
+                norwegian: "Lesetilgang til Apple Health krever oppmerksomhet: \(error)"
+            )
         }
 
         guard health.hasRequestedAuthorization else {
-            return "Apple Health is not connected yet. Tap here to connect."
+            return ATHLTHLocalization.choose(
+                english: "Apple Health is not connected yet. Tap here to connect.",
+                norwegian: "Apple Health er ikke tilkoblet ennå. Trykk her for å koble til."
+            )
         }
 
         if let lastRefresh = health.lastSuccessfulRefreshAt {
@@ -1158,22 +1234,40 @@ struct ATHLTHSettingsView: View {
 
             if health.hasTrainingHealthData {
                 if health.canWriteWorkouts {
-                    return "Apple Health training data imported successfully. Last synced \(synced)."
+                    return ATHLTHLocalization.choose(
+                        english: "Apple Health training data imported successfully. Last synced \(synced).",
+                        norwegian: "Treningsdata fra Apple Health er importert. Sist synkronisert \(synced)."
+                    )
                 }
 
-                return "Apple Health data was imported \(synced), but workout write access is off. Tap Sync now to review Health permissions."
+                return ATHLTHLocalization.choose(
+                    english: "Apple Health data was imported \(synced), but workout write access is off. Tap Sync now to review Health permissions.",
+                    norwegian: "Apple Health-data ble importert \(synced), men skrivetilgang for økter er av. Trykk Synkroniser nå for å kontrollere Health-tillatelser."
+                )
             }
 
             if health.personalDetails.hasAnyValue {
-                return "Apple Health profile values were imported, but ATHLTH found no readable workouts, activity, sleep or heart data. Review Health read access, then tap Sync now."
+                return ATHLTHLocalization.choose(
+                    english: "Apple Health profile values were imported, but ATHLTH found no readable workouts, activity, sleep or heart data. Review Health read access, then tap Sync now.",
+                    norwegian: "Profilverdier fra Apple Health ble importert, men ATHLTH fant ingen lesbare økter, aktivitets-, søvn- eller hjertedata. Kontroller lesetilgangen i Health og trykk deretter Synkroniser nå."
+                )
             }
 
-            return "Apple Health responded, but ATHLTH found no readable compatible data. Review Health read access, then tap Sync now."
+            return ATHLTHLocalization.choose(
+                english: "Apple Health responded, but ATHLTH found no readable compatible data. Review Health read access, then tap Sync now.",
+                norwegian: "Apple Health svarte, men ATHLTH fant ingen kompatible data som kunne leses. Kontroller lesetilgangen i Health og trykk deretter Synkroniser nå."
+            )
         }
 
         return settings.backgroundHealthSyncEnabled
-            ? "Apple Health is configured. Tap Sync now to perform the first full import."
-            : "Apple Health is configured. Background sync is off, but you can still tap Sync now."
+            ? ATHLTHLocalization.choose(
+                english: "Apple Health is configured. Tap Sync now to perform the first full import.",
+                norwegian: "Apple Health er konfigurert. Trykk Synkroniser nå for å utføre første fullstendige import."
+            )
+            : ATHLTHLocalization.choose(
+                english: "Apple Health is configured. Background sync is off, but you can still tap Sync now.",
+                norwegian: "Apple Health er konfigurert. Bakgrunnssynkronisering er av, men du kan fortsatt trykke Synkroniser nå."
+            )
     }
 
     private func healthSyncTimestamp(
@@ -1182,14 +1276,20 @@ struct ATHLTHSettingsView: View {
         let calendar = Calendar.current
 
         if calendar.isDateInToday(date) {
-            return "today at " + date.formatted(
+            return ATHLTHLocalization.choose(
+                english: "today at ",
+                norwegian: "i dag kl. "
+            ) + date.formatted(
                 date: .omitted,
                 time: .shortened
             )
         }
 
         if calendar.isDateInYesterday(date) {
-            return "yesterday at " + date.formatted(
+            return ATHLTHLocalization.choose(
+                english: "yesterday at ",
+                norwegian: "i går kl. "
+            ) + date.formatted(
                 date: .omitted,
                 time: .shortened
             )
@@ -1213,29 +1313,50 @@ struct ATHLTHSettingsView: View {
     }
 
     private var backgroundHealthSubtitle: String {
-        "Sync with Apple Health automatically in the background."
+        ATHLTHLocalization.choose(
+            english: "Sync with Apple Health automatically in the background.",
+            norwegian: "Synkroniser automatisk med Apple Health i bakgrunnen."
+        )
     }
 
     private var appleHealthConnectionSubtitle: String {
         guard health.hasRequestedAuthorization else {
-            return "Connect your Apple Health data"
+            return ATHLTHLocalization.choose(
+                english: "Connect your Apple Health data",
+                norwegian: "Koble til Apple Health-data"
+            )
         }
 
         if health.hasTrainingHealthData {
             return health.canWriteWorkouts
-                ? "Connected · training and health data is available"
-                : "Connected for reading · workout write access is off"
+                ? ATHLTHLocalization.choose(
+                    english: "Connected · training and health data is available",
+                    norwegian: "Tilkoblet · trenings- og helsedata er tilgjengelig"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Connected for reading · workout write access is off",
+                    norwegian: "Tilkoblet for lesing · skrivetilgang for økter er av"
+                )
         }
 
         if health.personalDetails.hasAnyValue {
-            return "Configured · profile values available, no training data yet"
+            return ATHLTHLocalization.choose(
+                english: "Configured · profile values available, no training data yet",
+                norwegian: "Konfigurert · profilverdier tilgjengelig, ingen treningsdata ennå"
+            )
         }
 
         if health.lastSuccessfulRefreshAt != nil {
-            return "Permission configured · no readable data found yet"
+            return ATHLTHLocalization.choose(
+                english: "Permission configured · no readable data found yet",
+                norwegian: "Tillatelse konfigurert · ingen lesbare data funnet ennå"
+            )
         }
 
-        return "Permission configured · run the first sync"
+        return ATHLTHLocalization.choose(
+            english: "Permission configured · run the first sync",
+            norwegian: "Tillatelse konfigurert · kjør første synkronisering"
+        )
     }
 
     private var appleCalendarConnectionSubtitle: String {
@@ -1839,7 +1960,10 @@ private struct AppleCalendarSettingsView: View {
 
     private var lastSyncText: String {
         guard let date = calendarSync.lastSyncedAt else {
-            return "Never"
+            return ATHLTHLocalization.choose(
+                english: "Never",
+                norwegian: "Aldri"
+            )
         }
 
         return date.formatted(
@@ -2243,41 +2367,80 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
     private var watchConnectionTitle: String {
         switch watchConnection.state {
         case .ready, .appNotInstalled:
-            return "Paired"
+            return ATHLTHLocalization.choose(
+                english: "Paired",
+                norwegian: "Sammenkoblet"
+            )
         case .notPaired:
-            return "Not paired"
+            return ATHLTHLocalization.choose(
+                english: "Not paired",
+                norwegian: "Ikke sammenkoblet"
+            )
         case .checking:
-            return "Checking…"
+            return ATHLTHLocalization.choose(
+                english: "Checking…",
+                norwegian: "Sjekker…"
+            )
         case .unsupported:
-            return "Unavailable"
+            return ATHLTHLocalization.choose(
+                english: "Unavailable",
+                norwegian: "Ikke tilgjengelig"
+            )
         }
     }
 
     private var watchAppTitle: String {
         switch watchConnection.state {
         case .ready:
-            return "Installed"
+            return ATHLTHLocalization.choose(
+                english: "Installed",
+                norwegian: "Installert"
+            )
         case .appNotInstalled:
-            return "Not installed"
+            return ATHLTHLocalization.choose(
+                english: "Not installed",
+                norwegian: "Ikke installert"
+            )
         case .notPaired, .unsupported:
-            return "Unavailable"
+            return ATHLTHLocalization.choose(
+                english: "Unavailable",
+                norwegian: "Ikke tilgjengelig"
+            )
         case .checking:
-            return "Checking…"
+            return ATHLTHLocalization.choose(
+                english: "Checking…",
+                norwegian: "Sjekker…"
+            )
         }
     }
 
     private var watchSetupDetail: String {
         switch watchConnection.state {
         case .ready:
-            return "ATHLTH Watch is ready for live workouts, routes and HealthKit sync."
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH Watch is ready for live workouts, routes and HealthKit sync.",
+                norwegian: "ATHLTH på Apple Watch er klar for liveøkter, ruter og HealthKit-synkronisering."
+            )
         case .appNotInstalled:
-            return "Install the ATHLTH Watch app to start workouts, sync routes and use live tracking."
+            return ATHLTHLocalization.choose(
+                english: "Install the ATHLTH Watch app to start workouts, sync routes and use live tracking.",
+                norwegian: "Installer ATHLTH på Apple Watch for å starte økter, synkronisere ruter og bruke live-sporing."
+            )
         case .notPaired:
-            return "Pair an Apple Watch with this iPhone first, then return here to finish ATHLTH setup."
+            return ATHLTHLocalization.choose(
+                english: "Pair an Apple Watch with this iPhone first, then return here to finish ATHLTH setup.",
+                norwegian: "Koble først en Apple Watch til denne iPhonen, og gå deretter tilbake hit for å fullføre ATHLTH-oppsettet."
+            )
         case .checking:
-            return "ATHLTH is checking the paired Apple Watch and app installation."
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH is checking the paired Apple Watch and app installation.",
+                norwegian: "ATHLTH sjekker den sammenkoblede Apple Watch-en og appinstallasjonen."
+            )
         case .unsupported:
-            return "Apple Watch connectivity is unavailable on this device."
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch connectivity is unavailable on this device.",
+                norwegian: "Apple Watch-tilkobling er ikke tilgjengelig på denne enheten."
+            )
         }
     }
 }
@@ -2419,9 +2582,15 @@ private struct ATHLTHTrainingSettingsView: View {
     private var strengthTrackingDescription: String {
         switch settings.defaultStrengthTracking {
         case .simple:
-            return "Simple keeps strength logging fast with a lighter set and rep workflow."
+            return ATHLTHLocalization.choose(
+                english: "Simple keeps strength logging fast with a lighter set and rep workflow.",
+                norwegian: "Enkel gjør styrkelogging rask med en lettere flyt for sett og repetisjoner."
+            )
         case .advanced:
-            return "Advanced enables the full strength workflow with more detailed workout tracking."
+            return ATHLTHLocalization.choose(
+                english: "Advanced enables the full strength workflow with more detailed workout tracking.",
+                norwegian: "Avansert gir full styrkeflyt med mer detaljert treningsregistrering."
+            )
         }
     }
 }
@@ -2481,12 +2650,36 @@ private struct ATHLTHNotificationSettingsView: View {
 
     private var authorizationTitle: String {
         switch notifications.authorizationStatus {
-        case .notDetermined: return "Not requested"
-        case .denied: return "Disabled"
-        case .authorized: return "Allowed"
-        case .provisional: return "Provisional"
-        case .ephemeral: return "Temporary"
-        @unknown default: return "Unknown"
+        case .notDetermined:
+            return ATHLTHLocalization.choose(
+                english: "Not requested",
+                norwegian: "Ikke forespurt"
+            )
+        case .denied:
+            return ATHLTHLocalization.choose(
+                english: "Disabled",
+                norwegian: "Deaktivert"
+            )
+        case .authorized:
+            return ATHLTHLocalization.choose(
+                english: "Allowed",
+                norwegian: "Tillatt"
+            )
+        case .provisional:
+            return ATHLTHLocalization.choose(
+                english: "Provisional",
+                norwegian: "Midlertidig tillatt"
+            )
+        case .ephemeral:
+            return ATHLTHLocalization.choose(
+                english: "Temporary",
+                norwegian: "Midlertidig"
+            )
+        @unknown default:
+            return ATHLTHLocalization.choose(
+                english: "Unknown",
+                norwegian: "Ukjent"
+            )
         }
     }
 }
