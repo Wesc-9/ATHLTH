@@ -1078,7 +1078,22 @@ struct IPhoneWorkoutView: View {
             routeProgressPercent:
                 workout.routeProgressPercent,
             routeDeviationMeters:
-                workout.routeDeviationMeters
+                workout.routeDeviationMeters,
+            routeKey:
+                workout
+                    .plannedComparisonRouteID,
+            routeDistanceMeters:
+                workout
+                    .plannedRouteDistanceKilometers
+                    .map {
+                        max(
+                            $0 * 1_000,
+                            0
+                        )
+                    },
+            routeTitle:
+                workout
+                    .plannedRouteTitle
         )
     }
 }
