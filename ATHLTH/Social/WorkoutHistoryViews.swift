@@ -1,5 +1,7 @@
 import MapKit
+import PhotosUI
 import SwiftUI
+import UIKit
 
 private enum WorkoutHistoryFilter: String, CaseIterable, Identifiable {
     case all
@@ -971,6 +973,9 @@ struct PostWorkoutReviewView: View {
     @State private var saving = false
     @State private var alreadyPublished = false
     @State private var replayContext: WorkoutAIInsightContext?
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var selectedPhotoPreviews: [Data] = []
+    @State private var mediaErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -987,6 +992,8 @@ struct PostWorkoutReviewView: View {
                     }
 
                     reflectionCard
+
+                    workoutPhotoCard
 
                     sectionLabel(
                         "ATHLTH REPLAY",
@@ -1048,11 +1055,23 @@ struct PostWorkoutReviewView: View {
                     loadExistingReview()
                 async let replayLoad: Void =
                     loadReplayContext()
+                async let mediaLoad: Void =
+                    social.refreshWorkoutMedia()
 
                 _ = await (
                     reviewLoad,
-                    replayLoad
+                    replayLoad,
+                    mediaLoad
                 )
+            }
+            .onChange(
+                of: selectedPhotoItems
+            ) { _, items in
+                Task {
+                    await loadSelectedPhotos(
+                        items
+                    )
+                }
             }
         }
     }
@@ -1639,6 +1658,269 @@ struct PostWorkoutReviewView: View {
         }
     }
 
+    private var workoutPhotoCard: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            HStack(
+                alignment: .top,
+                spacing: 12
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "PHOTOS FROM THIS WORKOUT",
+                            norwegian:
+                                "BILDER FRA ØKTEN"
+                        )
+                    )
+                    .font(
+                        .caption2.weight(.bold)
+                    )
+                    .tracking(1.65)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Add moments you want to keep on your profile.",
+                            norwegian:
+                                "Legg til øyeblikk du vil beholde på profilen."
+                        )
+                    )
+                    .font(
+                        .subheadline.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                }
+
+                Spacer()
+
+                PhotosPicker(
+                    selection:
+                        $selectedPhotoItems,
+                    maxSelectionCount: 6,
+                    matching: .images
+                ) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Add",
+                            norwegian: "Legg til"
+                        ),
+                        systemImage:
+                            "photo.badge.plus"
+                    )
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        completionAccent
+                    )
+                    .padding(
+                        .horizontal,
+                        11
+                    )
+                    .frame(height: 34)
+                    .background(
+                        completionAccent
+                            .opacity(0.09),
+                        in: Capsule()
+                    )
+                }
+            }
+
+            if !selectedPhotoPreviews.isEmpty ||
+                !existingWorkoutMedia.isEmpty {
+                ScrollView(
+                    .horizontal,
+                    showsIndicators: false
+                ) {
+                    HStack(spacing: 9) {
+                        ForEach(
+                            Array(
+                                selectedPhotoPreviews
+                                    .enumerated()
+                            ),
+                            id: \.offset
+                        ) { _, data in
+                            if let image =
+                                UIImage(data: data) {
+                                Image(
+                                    uiImage: image
+                                )
+                                .resizable()
+                                .scaledToFill()
+                                .frame(
+                                    width: 92,
+                                    height: 92
+                                )
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: 16,
+                                        style:
+                                            .continuous
+                                    )
+                                )
+                            }
+                        }
+
+                        ForEach(
+                            existingWorkoutMedia
+                        ) { media in
+                            AsyncImage(
+                                url:
+                                    URL(
+                                        string:
+                                            media.imageURL
+                                    )
+                            ) { phase in
+                                switch phase {
+                                case .success(
+                                    let image
+                                ):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                default:
+                                    ZStack {
+                                        Color.black
+                                            .opacity(
+                                                0.04
+                                            )
+                                        Image(
+                                            systemName:
+                                                "photo"
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                    }
+                                }
+                            }
+                            .frame(
+                                width: 92,
+                                height: 92
+                            )
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style:
+                                        .continuous
+                                )
+                            )
+                        }
+                    }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "photo.on.rectangle.angled"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        completionAccent
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Up to 6 photos. They will appear in Photos & highlights on your profile.",
+                            norwegian:
+                                "Opptil 6 bilder. De vises under Bilder og høydepunkter på profilen."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+                .padding(12)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .background(
+                    Color.black.opacity(
+                        0.025
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+            }
+
+            if let mediaErrorMessage {
+                Label(
+                    mediaErrorMessage,
+                    systemImage:
+                        "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    completionAccent
+                        .opacity(0.055),
+                    Color.white.opacity(0.95)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                completionAccent.opacity(
+                    0.10
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var existingWorkoutMedia:
+        [WorkoutMediaRecord] {
+        social.workoutMedia.filter {
+            $0.workoutID == workout.id
+        }
+    }
+
     private var visibilityCard: some View {
         ATHLTHCard {
             VStack(
@@ -2012,9 +2294,97 @@ struct PostWorkoutReviewView: View {
             creatorUsername: session.profile.username
         )
 
-        if gearSaved && reviewSaved {
+        let mediaSaved =
+            await uploadSelectedPhotos()
+
+        if gearSaved &&
+            reviewSaved &&
+            mediaSaved {
             dismiss()
         }
+    }
+
+    private func loadSelectedPhotos(
+        _ items: [PhotosPickerItem]
+    ) async {
+        var loaded: [Data] = []
+
+        for item in items.prefix(6) {
+            guard let data =
+                    try? await item
+                        .loadTransferable(
+                            type: Data.self
+                        )
+            else {
+                continue
+            }
+
+            loaded.append(data)
+        }
+
+        await MainActor.run {
+            selectedPhotoPreviews =
+                loaded
+            mediaErrorMessage = nil
+        }
+    }
+
+    @MainActor
+    private func uploadSelectedPhotos()
+        async -> Bool
+    {
+        guard !selectedPhotoPreviews
+            .isEmpty
+        else {
+            return true
+        }
+
+        mediaErrorMessage = nil
+
+        for rawData in
+            selectedPhotoPreviews {
+            guard let image =
+                    UIImage(data: rawData),
+                  let jpeg =
+                    image.jpegData(
+                        compressionQuality: 0.84
+                    )
+            else {
+                mediaErrorMessage =
+                    ATHLTHLocalization.choose(
+                        english:
+                            "One of the selected photos could not be prepared.",
+                        norwegian:
+                            "Ett av de valgte bildene kunne ikke klargjøres."
+                    )
+                return false
+            }
+
+            let uploaded =
+                await social
+                    .uploadWorkoutMedia(
+                        workoutID:
+                            workout.id,
+                        jpegData: jpeg,
+                        caption:
+                            descriptionText
+                    )
+
+            if !uploaded {
+                mediaErrorMessage =
+                    ATHLTHLocalization.choose(
+                        english:
+                            "A photo could not be uploaded. Try again.",
+                        norwegian:
+                            "Et bilde kunne ikke lastes opp. Prøv igjen."
+                    )
+                return false
+            }
+        }
+
+        selectedPhotoItems = []
+        selectedPhotoPreviews = []
+        return true
     }
 
     static func effortLabel(_ effort: Int) -> String {
