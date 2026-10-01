@@ -40,9 +40,10 @@ struct WorkoutStartOptionsView: View {
         self.onStart = onStart
 
         // Workout capture is chosen for this workout only.
-        // Legacy Settings preferences must not silently decide the device.
+        // A workout started from iPhone stays on iPhone unless the user
+        // explicitly chooses Apple Watch in this sheet.
         let initialDevice: WorkoutCaptureDevice =
-            watchConnected ? .appleWatch : .iPhone
+            .iPhone
 
         _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
