@@ -195,6 +195,19 @@ struct WatchLiveWorkoutFocusCard: View {
                 .ghostTimeDeltaSeconds ??
             liveGhost?
                 .estimatedTimeDeltaSeconds
+        let liveGhostAge =
+            liveGhost.map {
+                max(
+                    Date().timeIntervalSince(
+                        $0.updatedAt
+                    ),
+                    0
+                )
+            }
+        let liveGhostIsStale =
+            liveGhostAge.map {
+                $0 > 10
+            } ?? false
 
         return VStack(
             alignment: .leading,
@@ -205,12 +218,23 @@ struct WatchLiveWorkoutFocusCard: View {
                     liveGhost != nil &&
                     workoutManager
                         .ghostRaceTitle == nil
-                        ? "LIVE GHOST"
+                        ? (
+                            liveGhostIsStale
+                                ? "GHOST STALE"
+                                : "LIVE GHOST"
+                        )
                         : "GHOST GAP",
-                    systemImage: "figure.run"
+                    systemImage:
+                        liveGhostIsStale
+                            ? "arrow.triangle.2.circlepath"
+                            : "figure.run"
                 )
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(WatchTheme.green)
+                .foregroundStyle(
+                    liveGhostIsStale
+                        ? .orange
+                        : WatchTheme.green
+                )
 
                 Spacer()
 
@@ -230,10 +254,36 @@ struct WatchLiveWorkoutFocusCard: View {
                     ))
                     .minimumScaleFactor(0.72)
 
-                Text(title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
-                    .lineLimit(1)
+                Text(
+                    liveGhostIsStale,
+                    format: .number
+                )
+                .hidden()
+                .frame(width: 0, height: 0)
+
+                Text(
+                    liveGhostIsStale,
+                    format: .number
+                )
+                .hidden()
+                .frame(width: 0, height: 0)
+
+                Text(
+                    liveGhostIsStale,
+                    format: .number
+                )
+                .hidden()
+                .frame(width: 0, height: 0)
+
+                Text(
+                    liveGhostIsStale &&
+                    liveGhostAge != nil
+                        ? "\(title) · \(Int((liveGhostAge ?? 0).rounded()))s ago"
+                        : title
+                )
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(WatchTheme.muted)
+                .lineLimit(1)
             } else {
                 Text(title)
                     .font(.system(size: 14, weight: .bold))
