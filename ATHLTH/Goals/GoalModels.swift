@@ -13,25 +13,81 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var title: String {
         switch self {
-        case .event: return ATHLTHLocalization.string( "Event")
-        case .endurance: return ATHLTHLocalization.string( "Running & Endurance")
-        case .strength: return ATHLTHLocalization.string( "Strength")
-        case .body: return ATHLTHLocalization.string( "Body")
-        case .consistency: return ATHLTHLocalization.string( "Consistency")
-        case .recovery: return ATHLTHLocalization.string( "Recovery & Health")
-        case .custom: return ATHLTHLocalization.string( "Custom Goal")
+        case .event:
+            return ATHLTHLocalization.format(
+                english: "Event",
+                norwegian: "Arrangement"
+            )
+        case .endurance:
+            return ATHLTHLocalization.format(
+                english: "Running & Endurance",
+                norwegian: "Løping og utholdenhet"
+            )
+        case .strength:
+            return ATHLTHLocalization.format(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .body:
+            return ATHLTHLocalization.format(
+                english: "Body",
+                norwegian: "Kropp"
+            )
+        case .consistency:
+            return ATHLTHLocalization.format(
+                english: "Consistency",
+                norwegian: "Kontinuitet"
+            )
+        case .recovery:
+            return ATHLTHLocalization.format(
+                english: "Recovery & Health",
+                norwegian: "Restitusjon og helse"
+            )
+        case .custom:
+            return ATHLTHLocalization.format(
+                english: "Custom Goal",
+                norwegian: "Egendefinert mål"
+            )
         }
     }
 
     var subtitle: String {
         switch self {
-        case .event: return ATHLTHLocalization.string( "Prepare for a race or event.")
-        case .endurance: return ATHLTHLocalization.string( "Distance, pace and endurance targets.")
-        case .strength: return ATHLTHLocalization.string( "Exercise-specific strength targets.")
-        case .body: return ATHLTHLocalization.string( "Body-weight goals.")
-        case .consistency: return ATHLTHLocalization.string( "Workout frequency and consistency.")
-        case .recovery: return ATHLTHLocalization.string( "Sleep-duration goals.")
-        case .custom: return ATHLTHLocalization.string( "Define a goal that does not fit a template.")
+        case .event:
+            return ATHLTHLocalization.format(
+                english: "Prepare for a race or event.",
+                norwegian: "Forbered deg til et løp eller arrangement."
+            )
+        case .endurance:
+            return ATHLTHLocalization.format(
+                english: "Distance, pace and endurance targets.",
+                norwegian: "Mål for distanse, tempo og utholdenhet."
+            )
+        case .strength:
+            return ATHLTHLocalization.format(
+                english: "Exercise-specific strength targets.",
+                norwegian: "Øvelsesspesifikke mål for styrke."
+            )
+        case .body:
+            return ATHLTHLocalization.format(
+                english: "Body-weight goals.",
+                norwegian: "Mål for kroppsvekt."
+            )
+        case .consistency:
+            return ATHLTHLocalization.format(
+                english: "Workout frequency and consistency.",
+                norwegian: "Mål for treningsfrekvens og kontinuitet."
+            )
+        case .recovery:
+            return ATHLTHLocalization.format(
+                english: "Sleep-duration goals.",
+                norwegian: "Mål for søvnlengde."
+            )
+        case .custom:
+            return ATHLTHLocalization.format(
+                english: "Define a goal that does not fit a template.",
+                norwegian: "Lag et mål som ikke passer i en mal."
+            )
         }
     }
 
