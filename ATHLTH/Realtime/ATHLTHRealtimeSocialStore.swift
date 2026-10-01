@@ -585,7 +585,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         elapsedSeconds: TimeInterval,
         heartRateBPM: Double? = nil,
         routeProgressPercent: Double? = nil,
-        routeDeviationMeters: Double? = nil
+        routeDeviationMeters: Double? = nil,
+        routeKey: UUID? = nil,
+        routeDistanceMeters: Double? = nil,
+        routeTitle: String? = nil
     ) async {
         guard let session = currentSession,
               session.isActive,
@@ -602,6 +605,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         else {
             return
         }
+
+        await bindRouteContextIfNeeded(
+            routeKey: routeKey,
+            routeDistanceMeters:
+                routeDistanceMeters,
+            routeTitle: routeTitle
+        )
 
         let now = Date()
         if let lastPublishedLocationAt,
@@ -749,8 +759,22 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private func bindRouteContextIfNeeded(
         _ snapshot: WatchWorkoutLiveSnapshot
     ) async {
-        guard let routeKey =
+        await bindRouteContextIfNeeded(
+            routeKey:
                 snapshot.routeComparisonID,
+            routeDistanceMeters:
+                snapshot.routeDistanceMeters,
+            routeTitle:
+                snapshot.routeTitle
+        )
+    }
+
+    private func bindRouteContextIfNeeded(
+        routeKey: UUID?,
+        routeDistanceMeters: Double?,
+        routeTitle: String?
+    ) async {
+        guard let routeKey,
               let currentUserID,
               let activeSession =
                 currentSession,
@@ -763,10 +787,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         let distance =
             sanitizedNonNegative(
-                snapshot.routeDistanceMeters
+                routeDistanceMeters
             )
         let cleanTitle =
-            snapshot.routeTitle?
+            routeTitle?
                 .trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
