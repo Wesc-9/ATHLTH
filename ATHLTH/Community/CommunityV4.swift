@@ -1008,11 +1008,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                             CommunityReferenceAvatar(
                                 url:
                                     profile.avatarURL
-                                        .flatMap(
-                                            URL.init(
-                                                string:
-                                                    )
-                                        ),
+                                        .flatMap(URL.init(string:)),
                                 fallback:
                                     profile
                                         .resolvedName,
@@ -1195,7 +1191,7 @@ private struct CommunityReferenceFriendsCard: View {
 
     private var totalKilometers: Double {
         currentKilometers +
-        topFriend.map(friendKilometers) ?? 0
+            (topFriend.map(friendKilometers) ?? 0)
     }
 
     private var currentShare: Double {
@@ -1325,11 +1321,7 @@ private struct CommunityReferenceFriendsCard: View {
                         avatarURL:
                             topFriend
                                 .avatarURL
-                                .flatMap(
-                                    URL.init(
-                                        string:
-                                            )
-                                ),
+                                .flatMap(URL.init(string:)),
                         fallback:
                             topFriend
                                 .resolvedName,
