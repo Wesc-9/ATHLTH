@@ -1861,3 +1861,259 @@ struct SavedWorkoutPickerView: View {
     }
 }
 
+
+
+struct PlanWorkoutPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+
+    @StateObject private var catalog =
+        WorkoutTemplateCatalogStore()
+    @State private var query = ""
+
+    let onSelect: (PlannedSession) -> Void
+
+    private var savedWorkouts: [PlannedSession] {
+        let clean =
+            query.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !clean.isEmpty else {
+            return session.savedWorkoutTemplates
+        }
+
+        return session.savedWorkoutTemplates.filter {
+            $0.title.localizedCaseInsensitiveContains(
+                clean
+            ) ||
+            ($0.notes ?? "")
+                .localizedCaseInsensitiveContains(
+                    clean
+                )
+        }
+    }
+
+    private var catalogWorkouts:
+        [WorkoutTemplateCatalogEntry] {
+        let clean =
+            query.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !clean.isEmpty else {
+            return catalog.entries
+        }
+
+        return catalog.entries.filter {
+            $0.title.localizedCaseInsensitiveContains(
+                clean
+            ) ||
+            $0.summary
+                .localizedCaseInsensitiveContains(
+                    clean
+                ) ||
+            $0.tags
+                .joined(separator: " ")
+                .localizedCaseInsensitiveContains(
+                    clean
+                )
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !savedWorkouts.isEmpty {
+                    Section("My Workouts") {
+                        ForEach(savedWorkouts) {
+                            workout in
+                            Button {
+                                onSelect(workout)
+                                dismiss()
+                            } label: {
+                                workoutRow(
+                                    title: workout.title,
+                                    subtitle:
+                                        savedWorkoutSubtitle(
+                                            workout
+                                        ),
+                                    icon:
+                                        workout.kind
+                                            .systemImage
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !catalogWorkouts.isEmpty {
+                    Section("Workout Library") {
+                        ForEach(catalogWorkouts) {
+                            entry in
+                            Button {
+                                onSelect(
+                                    entry
+                                        .plannedSession()
+                                )
+                                dismiss()
+                            } label: {
+                                workoutRow(
+                                    title: entry.title,
+                                    subtitle:
+                                        catalogWorkoutSubtitle(
+                                            entry
+                                        ),
+                                    icon:
+                                        entry.systemImage
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if savedWorkouts.isEmpty &&
+                    catalogWorkouts.isEmpty {
+                    ContentUnavailableView(
+                        "No workouts found",
+                        systemImage:
+                            "rectangle.stack",
+                        description: Text(
+                            "Try another search."
+                        )
+                    )
+                    .listRowBackground(
+                        Color.clear
+                    )
+                }
+            }
+            .navigationTitle("Choose Workout")
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .searchable(
+                text: $query,
+                prompt: "Search workouts"
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                await catalog.refresh()
+            }
+        }
+    }
+
+    private func workoutRow(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(
+                    ATHLTHTheme.accent
+                )
+                .frame(
+                    width: 36,
+                    height: 36
+                )
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+            }
+
+            Spacer()
+
+            Image(
+                systemName: "plus.circle.fill"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accent
+            )
+        }
+    }
+
+    private func savedWorkoutSubtitle(
+        _ workout: PlannedSession
+    ) -> String {
+        if !workout.exercises.isEmpty {
+            let count =
+                workout.exercises.count
+            return count == 1
+                ? "1 exercise · \(workout.kind.title)"
+                : "\(count) exercises · \(workout.kind.title)"
+        }
+
+        let blocks =
+            workout
+                .resolvedWorkoutBlocks
+
+        if !blocks.isEmpty {
+            let exerciseCount =
+                blocks.filter {
+                    $0.kind == .exercise
+                }.count
+
+            if exerciseCount > 0 {
+                return exerciseCount == 1
+                    ? "1 exercise · Structured workout"
+                    : "\(exerciseCount) exercises · Structured workout"
+            }
+
+            return "\(blocks.count) blocks · Structured workout"
+        }
+
+        return workout.kind.title
+    }
+
+    private func catalogWorkoutSubtitle(
+        _ entry:
+            WorkoutTemplateCatalogEntry
+    ) -> String {
+        let exerciseCount =
+            entry.blocks.filter {
+                $0.kind == .exercise
+            }.count
+
+        if exerciseCount > 0 {
+            return exerciseCount == 1
+                ? "1 exercise · \(entry.categoryTitle)"
+                : "\(exerciseCount) exercises · \(entry.categoryTitle)"
+        }
+
+        return "\(entry.blocks.count) blocks · \(entry.categoryTitle)"
+    }
+}
