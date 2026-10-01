@@ -253,14 +253,6 @@ struct ATHLTHHomeView: View {
                                 )
                             }
                         },
-                        onQuickRun: {
-                            pendingHomeQuickStartKind =
-                                .running
-                        },
-                        onQuickStrength: {
-                            selectedHomeStrengthSession =
-                                homeFreestyleStrengthSession
-                        },
                         onOpenPlan: {
                             onOpenTrain(.plan)
                         }
@@ -1712,48 +1704,28 @@ struct ATHLTHHomeView: View {
                     alignment: .top
                 )
             } else {
-                HStack(spacing: 9) {
-                    Image(
-                        systemName:
-                            "calendar"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight:
-                                .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
-                    .frame(
-                        width: 38,
-                        height: 38
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .accentSoft,
-                        in: Circle()
-                    )
+                HStack(spacing: 7) {
+                    homeCalendarQuickStartButton(
+                        title: "Run",
+                        icon: "figure.run",
+                        tint: ATHLTHTheme.vitality
+                    ) {
+                        pendingHomeQuickStartKind =
+                            .running
+                    }
 
-                    Text(
-                        "Ingen flere planlagte økter i dag."
-                    )
-                    .font(
-                        .system(
-                            size: 9.5
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .lineLimit(3)
+                    homeCalendarQuickStartButton(
+                        title: "Strength",
+                        icon: "dumbbell.fill",
+                        tint: ATHLTHTheme.accentDeep
+                    ) {
+                        selectedHomeStrengthSession =
+                            homeFreestyleStrengthSession
+                    }
                 }
                 .frame(
-                    minHeight: 74
+                    minHeight: 74,
+                    alignment: .center
                 )
             }
         }
@@ -1780,6 +1752,64 @@ struct ATHLTHHomeView: View {
                 lineWidth: 0.7
             )
         }
+    }
+
+    private func homeCalendarQuickStartButton(
+        title: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(
+                        .system(
+                            size: 10.5,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(height: 58)
+            .background(
+                tint.opacity(0.08),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .stroke(
+                    tint.opacity(0.14),
+                    lineWidth: 0.7
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "Start quick \(title)"
+        )
     }
 
     private var homeActiveGoal: ATHLTHGoal? {
