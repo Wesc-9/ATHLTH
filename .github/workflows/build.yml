@@ -22,6 +22,7 @@ on:
       - release/v1.5.1
       - release/v1.5.2
       - release/v1.5.3
+      - release/v1.5.4
       - fix/v1.4.2-swift6-release
     paths:
       - .github/build-trigger
