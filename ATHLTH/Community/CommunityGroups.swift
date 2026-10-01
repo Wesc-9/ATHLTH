@@ -3389,6 +3389,22 @@ enum CommunityGroupsTab: String, CaseIterable, Identifiable {
     case challenges = "Challenges"
 
     var id: String { rawValue }
+
+    var displayTitle: String {
+        switch self {
+        case .overview:
+            return ATHLTHLocalization.choose(
+                english: "Overview",
+                norwegian: "Oversikt"
+            )
+        case .chat:
+            return "Chat"
+        case .events:
+            return "Events"
+        case .challenges:
+            return "Challenges"
+        }
+    }
 }
 
 struct CommunityGroupsView: View {
@@ -3790,6 +3806,8 @@ struct CommunityGroupDetailView: View {
     @State private var showingNotificationSettings = false
     @State private var updateDraft = ""
     @State private var postingUpdate = false
+    @State private var showAllClubPosts = false
+    @FocusState private var updateComposerFocused: Bool
 
     private var currentGroup: CommunityGroupRecord {
         groups.groups.first {
@@ -3934,7 +3952,7 @@ struct CommunityGroupDetailView: View {
                         selectedTab = tab
                     }
                 } label: {
-                    Text(tab.rawValue)
+                    Text(tab.displayTitle)
                         .font(
                             .subheadline
                                 .weight(
