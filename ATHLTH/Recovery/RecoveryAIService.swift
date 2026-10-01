@@ -59,6 +59,7 @@ private struct RecoveryAIRequest: Encodable {
     let mode: String
     let context: RecoveryAIContext
     let question: String?
+    let language: String
 }
 
 private struct RecoveryAIInsightCacheEntry: Codable {
@@ -89,8 +90,12 @@ final class RecoveryAIService {
         let userScope =
             client.auth.currentUser?.id.uuidString
             ?? "signed-out"
+        let language =
+            ATHLTHLocalization.isNorwegian
+                ? "nb"
+                : "en"
         let cacheKey =
-            "athlth.recoveryAIInsight.\(userScope)"
+            "athlth.recoveryAIInsight.\(userScope).\(language)"
 
         if !bypassCache,
            let data = UserDefaults.standard.data(
@@ -113,7 +118,11 @@ final class RecoveryAIService {
                     body: RecoveryAIRequest(
                         mode: "insight",
                         context: context,
-                        question: nil
+                        question: nil,
+                        language:
+                            ATHLTHLocalization.isNorwegian
+                                ? "nb"
+                                : "en"
                     )
                 )
             )
@@ -156,7 +165,11 @@ final class RecoveryAIService {
                     body: RecoveryAIRequest(
                         mode: "ask",
                         context: context,
-                        question: question
+                        question: question,
+                        language:
+                            ATHLTHLocalization.isNorwegian
+                                ? "nb"
+                                : "en"
                     )
                 )
             )
