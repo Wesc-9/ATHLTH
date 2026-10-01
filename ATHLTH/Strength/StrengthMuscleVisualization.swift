@@ -99,6 +99,23 @@ struct StrengthMuscleProfile {
         )
     }
 
+    func absoluteScore(
+        for region: StrengthMuscleRegion
+    ) -> Double {
+        let score =
+            activations.first(
+                where: {
+                    $0.region == region
+                }
+            )?
+            .score ?? 0
+
+        return min(
+            max(score, 0),
+            1
+        )
+    }
+
     var topActivations:
         [StrengthMuscleActivation] {
         activations
@@ -786,9 +803,15 @@ enum StrengthMuscleResolver {
     }
 }
 
+enum StrengthMuscleMapStyle {
+    case activation
+    case recoveryLoad
+}
+
 struct StrengthMuscleMapView: View {
     let profile: StrengthMuscleProfile
     var compact = false
+    var style: StrengthMuscleMapStyle = .activation
 
     var body: some View {
         HStack(spacing: compact ? 5 : 12) {
@@ -817,7 +840,8 @@ struct StrengthMuscleMapView: View {
         VStack(spacing: compact ? 2 : 6) {
             StrengthBodyFigureCanvas(
                 profile: profile,
-                side: side
+                side: side,
+                style: style
             )
 
             if !compact {
@@ -860,6 +884,7 @@ private struct StrengthBodyFigureCanvas:
     View {
     let profile: StrengthMuscleProfile
     let side: StrengthBodySide
+    let style: StrengthMuscleMapStyle
 
     var body: some View {
         Canvas {
@@ -874,15 +899,24 @@ private struct StrengthBodyFigureCanvas:
             for region in
                 StrengthMuscleRegion
                     .allCases {
-                let intensity =
-                    profile.intensity(
-                        for: region
-                    )
+                let intensity: Double
 
-                guard intensity >
-                    0.01
-                else {
-                    continue
+                switch style {
+                case .activation:
+                    intensity =
+                        profile.intensity(
+                            for: region
+                        )
+
+                    guard intensity > 0.01 else {
+                        continue
+                    }
+
+                case .recoveryLoad:
+                    intensity =
+                        profile.absoluteScore(
+                            for: region
+                        )
                 }
 
                 draw(
@@ -906,14 +940,22 @@ private struct StrengthBodyFigureCanvas:
         size: CGSize
     ) {
         let base =
-            Color(
-                red: 0.83,
-                green: 0.84,
-                blue: 0.85
-            )
+            style == .recoveryLoad
+                ? Color(
+                    red: 0.89,
+                    green: 0.87,
+                    blue: 0.83
+                )
+                : Color(
+                    red: 0.83,
+                    green: 0.84,
+                    blue: 0.85
+                )
         let outline =
             Color.black.opacity(
-                0.09
+                style == .recoveryLoad
+                    ? 0.055
+                    : 0.09
             )
 
         let head =
@@ -1070,16 +1112,27 @@ private struct StrengthBodyFigureCanvas:
         context: inout GraphicsContext,
         size: CGSize
     ) {
-        let fill =
-            Color(
-                red: 0.14,
-                green: 0.60,
-                blue: 0.45
-            )
-            .opacity(
-                0.26 +
-                intensity * 0.74
-            )
+        let fill: Color
+
+        switch style {
+        case .activation:
+            fill =
+                Color(
+                    red: 0.14,
+                    green: 0.60,
+                    blue: 0.45
+                )
+                .opacity(
+                    0.26 +
+                    intensity * 0.74
+                )
+
+        case .recoveryLoad:
+            fill =
+                recoveryLoadColor(
+                    score: intensity
+                )
+        }
 
         switch (side, region) {
         case (.front, .chest):
@@ -1322,6 +1375,109 @@ private struct StrengthBodyFigureCanvas:
         default:
             break
         }
+    }
+
+    private func recoveryLoadColor(
+        score: Double
+    ) -> Color {
+        let value = min(max(score, 0), 1)
+
+        let green = (
+            red: 0.20,
+            green: 0.68,
+            blue: 0.42
+        )
+        let yellow = (
+            red: 0.96,
+            green: 0.78,
+            blue: 0.16
+        )
+        let orange = (
+            red: 0.96,
+            green: 0.47,
+            blue: 0.14
+        )
+        let red = (
+            red: 0.88,
+            green: 0.18,
+            blue: 0.20
+        )
+
+        let color: (
+            red: Double,
+            green: Double,
+            blue: Double
+        )
+
+        switch value {
+        case ..<0.34:
+            color = interpolate(
+                from: green,
+                to: yellow,
+                progress: value / 0.34
+            )
+
+        case 0.34..<0.60:
+            color = interpolate(
+                from: yellow,
+                to: orange,
+                progress:
+                    (value - 0.34) /
+                    0.26
+            )
+
+        default:
+            color = interpolate(
+                from: orange,
+                to: red,
+                progress:
+                    (value - 0.60) /
+                    0.40
+            )
+        }
+
+        return Color(
+            red: color.red,
+            green: color.green,
+            blue: color.blue
+        )
+        .opacity(0.92)
+    }
+
+    private func interpolate(
+        from start: (
+            red: Double,
+            green: Double,
+            blue: Double
+        ),
+        to end: (
+            red: Double,
+            green: Double,
+            blue: Double
+        ),
+        progress: Double
+    ) -> (
+        red: Double,
+        green: Double,
+        blue: Double
+    ) {
+        let value =
+            min(max(progress, 0), 1)
+
+        return (
+            red:
+                start.red +
+                (end.red - start.red) *
+                value,
+            green:
+                start.green +
+                (end.green - start.green) *
+                value,
+            blue:
+                start.blue +
+                (end.blue - start.blue) *
+                value
+        )
     }
 
     private func ellipsePair(
