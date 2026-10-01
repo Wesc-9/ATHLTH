@@ -2986,6 +2986,10 @@ final class AppSessionStore: ObservableObject {
             gearIDs: source.gearIDs,
             audioCoachConfiguration:
                 source.audioCoachConfiguration,
+            spotifyPlaylist:
+                source.spotifyPlaylist,
+            spotifyAutoplayOnStart:
+                source.spotifyAutoplayOnStart,
             targetAlertConfiguration:
                 source.targetAlertConfiguration,
             workoutTemplateID:
