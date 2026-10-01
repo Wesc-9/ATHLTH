@@ -168,6 +168,22 @@ enum ATHLTHLiveGhostComparisonMode: Equatable {
     case distanceFallback
 }
 
+enum ATHLTHLiveGhostConnectionState: Equatable {
+    case waiting
+    case live
+    case delayed(seconds: Int)
+    case reconnecting(seconds: Int)
+
+    var isStale: Bool {
+        switch self {
+        case .delayed, .reconnecting:
+            return true
+        case .waiting, .live:
+            return false
+        }
+    }
+}
+
 struct ATHLTHLiveGhostComparison: Equatable {
     let sessionID: UUID
     let opponentUserID: UUID
@@ -303,6 +319,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var liveTrails:
         [UUID: [CLLocationCoordinate2D]] = [:]
     @Published var selectedLiveGhostSessionID: UUID?
+    @Published private(set)
+    var liveGhostConnectionState:
+        ATHLTHLiveGhostConnectionState = .waiting
     @Published private(set) var isSharingLiveLocation = false
     @Published var errorMessage: String?
 
@@ -313,10 +332,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private var appIsActive = false
     private var onlineEnabled = false
     private var lastPublishedLocationAt: Date?
+    private var lastPublishedDistanceMeters: Double?
+    private var lastPublishedElapsedSeconds: TimeInterval?
 
     private let onlineHeartbeatInterval: Duration = .seconds(45)
     private let liveRefreshInterval: Duration = .seconds(3)
-    private let minimumLocationPublishInterval: TimeInterval = 3
+    private let liveGhostFreshAge: TimeInterval = 8
+    private let liveGhostDelayedAge: TimeInterval = 25
+    private let liveGhostMaximumUsableAge: TimeInterval = 90
+    private let routeAwareMaximumDeviationMeters = 120.0
+    private let selectedLiveGhostDefaultsPrefix =
+        "athlth.liveGhost.selectedSession."
 
     init(
         client: SupabaseClient = SupabaseEnvironment.client
@@ -435,16 +461,47 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             visibleLiveSessions =
                 rows.filter(\.isActive)
 
-            if let selectedLiveGhostSessionID,
-               !visibleLiveSessions.contains(
-                    where: {
-                        $0.id ==
-                            selectedLiveGhostSessionID
-                    }
-               ) {
-                self.selectedLiveGhostSessionID =
-                    nil
-                stopWatching()
+            if selectedLiveGhostSessionID == nil,
+               let restoredID =
+                    restoredLiveGhostSessionID(),
+               let restoredSession =
+                    visibleLiveSessions.first(
+                        where: {
+                            $0.id == restoredID &&
+                            $0.activity == "running" &&
+                            $0.ownerID !=
+                                currentUserID
+                        }
+                    ) {
+                selectedLiveGhostSessionID =
+                    restoredID
+                startWatching(
+                    restoredSession
+                )
+            }
+
+            if let selectedLiveGhostSessionID {
+                guard let selectedSession =
+                        visibleLiveSessions.first(
+                            where: {
+                                $0.id ==
+                                    selectedLiveGhostSessionID
+                            }
+                        )
+                else {
+                    clearSelectedLiveGhost()
+                    stopWatching()
+                    return
+                }
+
+                // App relaunch, process suspension and transient connectivity
+                // can tear down the polling task while the remote session is
+                // still active. Resume watching automatically.
+                if watcherTask == nil {
+                    startWatching(
+                        selectedSession
+                    )
+                }
             }
         } catch is CancellationError {
             return
@@ -614,19 +671,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         )
 
         let now = Date()
-        if let lastPublishedLocationAt,
-           now.timeIntervalSince(lastPublishedLocationAt) <
-                minimumLocationPublishInterval {
-            return
-        }
-
-        lastPublishedLocationAt = now
 
         let speed =
             location.speed.isFinite &&
             location.speed >= 0
                 ? location.speed
                 : nil
+
+        guard shouldPublishLiveLocation(
+            now: now,
+            distanceMeters:
+                distanceMeters,
+            elapsedSeconds:
+                elapsedSeconds,
+            speedHint: speed
+        ) else {
+            return
+        }
         let course =
             location.course.isFinite &&
             location.course >= 0 &&
@@ -673,6 +734,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 .from("live_workout_locations")
                 .upsert(payload)
                 .execute()
+
+            markLiveLocationPublished(
+                at: now,
+                distanceMeters:
+                    distanceMeters,
+                elapsedSeconds:
+                    elapsedSeconds
+            )
         } catch is CancellationError {
             return
         } catch {
@@ -703,13 +772,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         )
 
         let now = Date()
-        if let lastPublishedLocationAt,
-           now.timeIntervalSince(lastPublishedLocationAt) <
-                minimumLocationPublishInterval {
+
+        guard shouldPublishLiveLocation(
+            now: now,
+            distanceMeters:
+                snapshot.distanceMeters,
+            elapsedSeconds:
+                snapshot.elapsedTime,
+            speedHint: nil
+        ) else {
             return
         }
-
-        lastPublishedLocationAt = now
 
         let payload = ATHLTHLiveWorkoutLocationWrite(
             sessionID: session.id,
@@ -749,6 +822,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 .from("live_workout_locations")
                 .upsert(payload)
                 .execute()
+
+            markLiveLocationPublished(
+                at: now,
+                distanceMeters:
+                    snapshot.distanceMeters,
+                elapsedSeconds:
+                    snapshot.elapsedTime
+            )
         } catch is CancellationError {
             return
         } catch {
@@ -897,7 +978,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         _ session: ATHLTHLiveWorkoutSession?
     ) {
         guard let session else {
-            selectedLiveGhostSessionID = nil
+            clearSelectedLiveGhost()
             stopWatching()
             return
         }
@@ -910,6 +991,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         selectedLiveGhostSessionID =
             session.id
+        persistSelectedLiveGhost(
+            session.id
+        )
         startWatching(session)
     }
 
@@ -966,9 +1050,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 selectedSession.routeKey
         let routeAccuracyOK =
             (ownRouteDeviationMeters ?? 0) <=
-                250 &&
+                routeAwareMaximumDeviationMeters &&
             (livePoint.routeDeviationMeters ?? 0) <=
-                250
+                routeAwareMaximumDeviationMeters &&
+            (
+                livePoint.horizontalAccuracy == nil ||
+                (livePoint.horizontalAccuracy ?? 0) <= 50
+            )
 
         if sameRoute,
            routeAccuracyOK,
@@ -1164,8 +1252,21 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             var refreshCycle = 0
 
             while !Task.isCancelled {
+                let interval:
+                    Duration
+
+                switch self.liveGhostConnectionState {
+                case .reconnecting:
+                    interval = .seconds(6)
+                case .delayed:
+                    interval = .seconds(4)
+                case .waiting, .live:
+                    interval =
+                        self.liveRefreshInterval
+                }
+
                 try? await Task.sleep(
-                    for: self.liveRefreshInterval
+                    for: interval
                 )
 
                 guard !Task.isCancelled else {
@@ -1175,10 +1276,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 await self.refreshLocations(
                     sessionID: session.id
                 )
+                self.updateLiveGhostConnectionState(
+                    session: session
+                )
 
                 refreshCycle += 1
 
-                if refreshCycle % 10 == 0 {
+                if refreshCycle % 8 == 0 {
                     let stillActive =
                         await self
                             .watchedSessionIsStillActive(
@@ -1190,8 +1294,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                             .selectedLiveGhostSessionID ==
                             session.id {
                             self
-                                .selectedLiveGhostSessionID =
-                                nil
+                                .clearSelectedLiveGhost()
                         }
 
                         self.stopWatching()
@@ -1242,6 +1345,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         liveLocations = []
         liveTrails = [:]
 
+        if selectedLiveGhostSessionID == nil {
+            liveGhostConnectionState =
+                .waiting
+        }
+
         if !keepCurrentSession {
             currentSession = nil
         }
@@ -1262,12 +1370,12 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         if enabled {
             isSharingLiveLocation = true
-            lastPublishedLocationAt = nil
+            resetLocationPublishThrottle()
             return
         }
 
         isSharingLiveLocation = false
-        lastPublishedLocationAt = nil
+        resetLocationPublishThrottle()
 
         do {
             try await client
@@ -1339,12 +1447,11 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
 
         isSharingLiveLocation = false
-        lastPublishedLocationAt = nil
+        resetLocationPublishThrottle()
 
         if selectedLiveGhostSessionID ==
             session.id {
-            selectedLiveGhostSessionID =
-                nil
+            clearSelectedLiveGhost()
         }
 
         stopWatching(
@@ -1400,17 +1507,242 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .execute()
                     .value
 
-            let fresh =
-                rows.filter(\.isFresh)
-            liveLocations = fresh
+            let now = Date()
+            let usable =
+                rows.filter {
+                    $0.expiresAt > now &&
+                    now.timeIntervalSince(
+                        $0.updatedAt
+                    ) <=
+                        liveGhostMaximumUsableAge
+                }
+
+            liveLocations = usable
             appendFreshTrailSamples(
-                fresh
+                usable.filter(\.isFresh)
             )
+            updateLiveGhostConnectionState()
         } catch is CancellationError {
             return
         } catch {
+            // Preserve the last known point while reconnecting. The UI marks
+            // it as delayed/stale instead of pretending the opponent is still
+            // sending fresh GPS.
+            updateLiveGhostConnectionState()
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func updateLiveGhostConnectionState(
+        session:
+            ATHLTHLiveWorkoutSession? = nil
+    ) {
+        let selected =
+            session ??
+            selectedLiveGhostSession
+
+        guard let selected,
+              let point =
+                liveLocations.first(
+                    where: {
+                        $0.sessionID ==
+                            selected.id &&
+                        $0.userID ==
+                            selected.ownerID
+                    }
+                )
+        else {
+            liveGhostConnectionState =
+                .waiting
+            return
+        }
+
+        let age =
+            max(
+                Date().timeIntervalSince(
+                    point.updatedAt
+                ),
+                0
+            )
+        let roundedAge =
+            max(
+                Int(age.rounded()),
+                0
+            )
+
+        if age <= liveGhostFreshAge {
+            liveGhostConnectionState =
+                .live
+        } else if age <=
+                    liveGhostDelayedAge {
+            liveGhostConnectionState =
+                .delayed(
+                    seconds: roundedAge
+                )
+        } else if age <=
+                    liveGhostMaximumUsableAge {
+            liveGhostConnectionState =
+                .reconnecting(
+                    seconds: roundedAge
+                )
+        } else {
+            liveGhostConnectionState =
+                .waiting
+        }
+    }
+
+    private func selectedLiveGhostDefaultsKey(
+        userID: UUID
+    ) -> String {
+        selectedLiveGhostDefaultsPrefix +
+            userID.uuidString
+    }
+
+    private func persistSelectedLiveGhost(
+        _ sessionID: UUID?
+    ) {
+        guard let currentUserID else {
+            return
+        }
+
+        let key =
+            selectedLiveGhostDefaultsKey(
+                userID: currentUserID
+            )
+
+        if let sessionID {
+            UserDefaults.standard.set(
+                sessionID.uuidString,
+                forKey: key
+            )
+        } else {
+            UserDefaults.standard
+                .removeObject(
+                    forKey: key
+                )
+        }
+    }
+
+    private func restoredLiveGhostSessionID()
+        -> UUID? {
+        guard let currentUserID,
+              let raw =
+                UserDefaults.standard
+                    .string(
+                        forKey:
+                            selectedLiveGhostDefaultsKey(
+                                userID:
+                                    currentUserID
+                            )
+                    )
+        else {
+            return nil
+        }
+
+        return UUID(uuidString: raw)
+    }
+
+    private func clearSelectedLiveGhost() {
+        selectedLiveGhostSessionID = nil
+        persistSelectedLiveGhost(nil)
+        liveGhostConnectionState =
+            .waiting
+    }
+
+    private func resetLocationPublishThrottle() {
+        lastPublishedLocationAt = nil
+        lastPublishedDistanceMeters = nil
+        lastPublishedElapsedSeconds = nil
+    }
+
+    private func liveLocationPublishInterval(
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        speedHint: Double?
+    ) -> TimeInterval {
+        let inferredSpeed:
+            Double? = {
+                if let speedHint,
+                   speedHint.isFinite,
+                   speedHint >= 0 {
+                    return speedHint
+                }
+
+                guard let previousDistance =
+                        lastPublishedDistanceMeters,
+                      let previousElapsed =
+                        lastPublishedElapsedSeconds
+                else {
+                    return nil
+                }
+
+                let elapsedDelta =
+                    elapsedSeconds -
+                    previousElapsed
+
+                guard elapsedDelta > 0.5
+                else {
+                    return nil
+                }
+
+                return max(
+                    distanceMeters -
+                        previousDistance,
+                    0
+                ) /
+                elapsedDelta
+            }()
+
+        guard let inferredSpeed else {
+            return 3
+        }
+
+        if inferredSpeed >= 1.0 {
+            return 3
+        }
+
+        if inferredSpeed >= 0.35 {
+            return 5
+        }
+
+        return 8
+    }
+
+    private func shouldPublishLiveLocation(
+        now: Date,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        speedHint: Double?
+    ) -> Bool {
+        guard let lastPublishedLocationAt else {
+            return true
+        }
+
+        let interval =
+            liveLocationPublishInterval(
+                distanceMeters:
+                    distanceMeters,
+                elapsedSeconds:
+                    elapsedSeconds,
+                speedHint:
+                    speedHint
+            )
+
+        return now.timeIntervalSince(
+            lastPublishedLocationAt
+        ) >= interval
+    }
+
+    private func markLiveLocationPublished(
+        at date: Date,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval
+    ) {
+        lastPublishedLocationAt = date
+        lastPublishedDistanceMeters =
+            max(distanceMeters, 0)
+        lastPublishedElapsedSeconds =
+            max(elapsedSeconds, 0)
     }
 
     private func appendFreshTrailSamples(
