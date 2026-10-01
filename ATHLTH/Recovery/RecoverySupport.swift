@@ -1134,7 +1134,12 @@ struct RecoveryTrendsCard: View {
             quality = recoveryText("Low quality", "Lav kvalitet")
         }
 
-        return "\(quality) · duration + available stages"
+        return ATHLTHLocalization.choose(
+                        english:
+                            "\(quality) · duration + available stages",
+                        norwegian:
+                            "\(quality) · varighet + tilgjengelige søvnstadier"
+                    )
     }
 
     private var latestHRVText: String {
@@ -1198,7 +1203,12 @@ struct RecoveryLastNightCard: View {
                     )
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Text("asleep")
+                Text(
+                    recoveryText(
+                        "asleep",
+                        "sovet"
+                    )
+                )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -1233,7 +1243,10 @@ struct RecoveryLastNightCard: View {
                     icon: "brain.head.profile"
                 )
                 stageTile(
-                    "Core",
+                    recoveryText(
+                        "Core",
+                        "Kjerne"
+                    ),
                     value: sleep.core,
                     icon: "moon.fill"
                 )
@@ -1456,7 +1469,12 @@ struct RecoveryDailyCheckInCard: View {
             )
         )
         .accessibilityLabel(
-            "\(title), \(value.map(String.init) ?? "not logged") out of 5"
+            ATHLTHLocalization.choose(
+                english:
+                    "\(title), \(value.map(String.init) ?? "not logged") out of 5",
+                norwegian:
+                    "\(title), \(value.map(String.init) ?? "ikke registrert") av 5"
+            )
         )
     }
 }
@@ -1490,15 +1508,27 @@ struct MuscleRecoveryCard: View {
 
             HStack(spacing: 8) {
                 sourceBadge(
-                    title: "Strength",
+                    title:
+                        recoveryText(
+                            "Strength",
+                            "Styrke"
+                        ),
                     icon: "figure.strengthtraining.traditional"
                 )
                 sourceBadge(
-                    title: "Run",
+                    title:
+                        recoveryText(
+                            "Run",
+                            "Løp"
+                        ),
                     icon: "figure.run"
                 )
                 sourceBadge(
-                    title: "Walk",
+                    title:
+                        recoveryText(
+                            "Walk",
+                            "Gange"
+                        ),
                     icon: "figure.walk"
                 )
             }
@@ -2110,7 +2140,12 @@ struct RecoveryGuidedToolView: View {
                         .font(.title2.weight(.bold))
 
                     Text(
-                        "Step \(stepIndex + 1) of \(tool.steps.count)"
+                        ATHLTHLocalization.choose(
+                        english:
+                            "Step \(stepIndex + 1) of \(tool.steps.count)",
+                        norwegian:
+                            "Steg \(stepIndex + 1) av \(tool.steps.count)"
+                    )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
