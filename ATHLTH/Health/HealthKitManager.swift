@@ -115,6 +115,14 @@ final class HealthKitManager: ObservableObject {
     // Never use this value alone as the connection state: an app update or
     // a newly added Health type must not disconnect an existing Health setup.
     private let currentAuthorizationVersion = 2
+
+    static func hasPersistedAuthorizationMarker(
+        legacyRequested: Bool,
+        authorizationVersion: Int
+    ) -> Bool {
+        legacyRequested || authorizationVersion > 0
+    }
+
     private let refreshInProgressKey = "athlth.healthRefreshInProgress"
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 2
@@ -189,8 +197,12 @@ final class HealthKitManager: ObservableObject {
 
         let interruptedRefresh = defaults.bool(forKey: refreshInProgressKey)
         let hasExistingHealthAuthorization =
-            defaults.bool(forKey: legacyAuthorizationFlagKey) ||
-            defaults.integer(forKey: authorizationVersionKey) > 0
+            Self.hasPersistedAuthorizationMarker(
+                legacyRequested:
+                    defaults.bool(forKey: legacyAuthorizationFlagKey),
+                authorizationVersion:
+                    defaults.integer(forKey: authorizationVersionKey)
+            )
         let needsSafeLaunchMigration =
             hasExistingHealthAuthorization &&
             defaults.integer(forKey: safeRefreshVersionKey) <
@@ -214,8 +226,12 @@ final class HealthKitManager: ObservableObject {
 
     var hasRequestedAuthorization: Bool {
         let defaults = UserDefaults.standard
-        return defaults.bool(forKey: legacyAuthorizationFlagKey) ||
-            defaults.integer(forKey: authorizationVersionKey) > 0
+        return Self.hasPersistedAuthorizationMarker(
+            legacyRequested:
+                defaults.bool(forKey: legacyAuthorizationFlagKey),
+            authorizationVersion:
+                defaults.integer(forKey: authorizationVersionKey)
+        )
     }
 
     var pendingWorkoutImportCount: Int {
