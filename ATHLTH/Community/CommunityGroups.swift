@@ -4969,7 +4969,7 @@ struct CommunityGroupDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Club Post")
                         .font(.subheadline.weight(.semibold))
-                    Text("Visible to every group member")
+                    Text("Visible to every Club member")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -5091,7 +5091,7 @@ struct CommunityGroupDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Coming Up")
                         .font(.title3.weight(.bold))
-                    Text("The next things happening in this group.")
+                    Text("The next things happening in this Club.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -5237,7 +5237,7 @@ struct CommunityGroupDetailView: View {
                     Text("Recent Activity")
                         .font(.title3.weight(.bold))
                     Text(
-                        "What has changed in the group lately."
+                        "What has changed in the Club lately."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -5800,7 +5800,7 @@ struct CommunityGroupDetailView: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Group Events")
+                    Text("Club Events")
                         .font(.title3.weight(.bold))
                     Text(
                         groups.canCreateGroupContent(
@@ -6070,7 +6070,7 @@ struct CommunityGroupDetailView: View {
         ATHLTHCard {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Group Challenges")
+                    Text("Club Challenges")
                         .font(.title3.weight(.bold))
                     Text(
                         groups.canCreateGroupContent(
@@ -6542,7 +6542,7 @@ struct CommunityGroupCreateView: View {
                 }
 
                 Section("Club") {
-                    TextField("Group name", text: $name)
+                    TextField("Club name", text: $name)
                     TextField(
                         "Description",
                         text: $summary,
@@ -6553,7 +6553,7 @@ struct CommunityGroupCreateView: View {
 
                 Section("Visibility") {
                     Picker(
-                        "Group visibility",
+                        "Club visibility",
                         selection: $visibility
                     ) {
                         Label("Public", systemImage: "globe")
@@ -7038,8 +7038,8 @@ struct CommunityGroupSettingsView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Section("Group") {
-                    TextField("Group name", text: $name)
+                Section("Club") {
+                    TextField("Club name", text: $name)
                     TextField(
                         "Description",
                         text: $summary,
@@ -7050,7 +7050,7 @@ struct CommunityGroupSettingsView: View {
 
                 Section("Visibility") {
                     Picker(
-                        "Group visibility",
+                        "Club visibility",
                         selection: $visibility
                     ) {
                         Label("Public", systemImage: "globe")
@@ -7108,7 +7108,7 @@ struct CommunityGroupSettingsView: View {
                 if groups.isOwner(of: currentGroup) {
                     Section {
                         Button(
-                            "Delete Group",
+                            "Delete Club",
                             role: .destructive
                         ) {
                             showingDeleteConfirmation = true
@@ -7213,7 +7213,7 @@ struct CommunityGroupSettingsView: View {
                 titleVisibility: .visible
             ) {
                 Button(
-                    "Delete Group",
+                    "Delete Club",
                     role: .destructive
                 ) {
                     Task {
