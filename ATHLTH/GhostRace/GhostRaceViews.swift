@@ -108,18 +108,20 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            if watchConnection.isReady &&
-                settings.trainingDeviceProvider ==
-                    .appleWatch {
-                captureDevice = .appleWatch
-            }
-
             async let runs: Void =
                 loadRuns()
             async let live: Void =
                 realtime
                     .refreshVisibleLiveSessions()
             _ = await (runs, live)
+        }
+        .onChange(
+            of: selectedMode
+        ) { _, mode in
+            if mode != .live {
+                realtime
+                    .selectLiveGhost(nil)
+            }
         }
         .refreshable {
             async let runs: Void =
@@ -1246,6 +1248,8 @@ struct GhostRaceHubView: View {
             )
 
         do {
+            realtime.selectLiveGhost(nil)
+
             try await GhostRaceStartService.start(
                 workout: workout,
                 detail: detail,
