@@ -763,8 +763,7 @@ struct MirroredWorkoutLiveView: View {
         }
 
         if realtime.currentSession == nil {
-            guard ghostRace.reference == nil,
-                  social.privacy?
+            guard social.privacy?
                     .shareLiveWorkoutLocation ==
                     true
             else {
