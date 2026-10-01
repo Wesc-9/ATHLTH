@@ -2314,12 +2314,16 @@ struct PostWorkoutReviewView: View {
                     try? await item
                         .loadTransferable(
                             type: Data.self
-                        )
+                        ),
+                  let prepared =
+                    preparedWorkoutPhotoData(
+                        from: data
+                    )
             else {
                 continue
             }
 
-            loaded.append(data)
+            loaded.append(prepared)
         }
 
         await MainActor.run {
@@ -2341,25 +2345,8 @@ struct PostWorkoutReviewView: View {
 
         mediaErrorMessage = nil
 
-        for rawData in
+        for jpeg in
             selectedPhotoPreviews {
-            guard let image =
-                    UIImage(data: rawData),
-                  let jpeg =
-                    image.jpegData(
-                        compressionQuality: 0.84
-                    )
-            else {
-                mediaErrorMessage =
-                    ATHLTHLocalization.choose(
-                        english:
-                            "One of the selected photos could not be prepared.",
-                        norwegian:
-                            "Ett av de valgte bildene kunne ikke klargjøres."
-                    )
-                return false
-            }
-
             let uploaded =
                 await social
                     .uploadWorkoutMedia(
@@ -2385,6 +2372,73 @@ struct PostWorkoutReviewView: View {
         selectedPhotoItems = []
         selectedPhotoPreviews = []
         return true
+    }
+
+    private func preparedWorkoutPhotoData(
+        from data: Data
+    ) -> Data? {
+        guard let image =
+                UIImage(data: data)
+        else {
+            return nil
+        }
+
+        let maximumDimension:
+            CGFloat = 2_048
+        let sourceSize = image.size
+        let sourceMaximum =
+            max(
+                sourceSize.width,
+                sourceSize.height
+            )
+
+        guard sourceMaximum > 0 else {
+            return nil
+        }
+
+        if sourceMaximum <=
+            maximumDimension {
+            return image.jpegData(
+                compressionQuality: 0.82
+            )
+        }
+
+        let scale =
+            maximumDimension /
+            sourceMaximum
+        let targetSize =
+            CGSize(
+                width:
+                    max(
+                        1,
+                        sourceSize.width *
+                        scale
+                    ),
+                height:
+                    max(
+                        1,
+                        sourceSize.height *
+                        scale
+                    )
+            )
+
+        let renderer =
+            UIGraphicsImageRenderer(
+                size: targetSize
+            )
+        let resized =
+            renderer.image { _ in
+                image.draw(
+                    in: CGRect(
+                        origin: .zero,
+                        size: targetSize
+                    )
+                )
+            }
+
+        return resized.jpegData(
+            compressionQuality: 0.82
+        )
     }
 
     static func effortLabel(_ effort: Int) -> String {
