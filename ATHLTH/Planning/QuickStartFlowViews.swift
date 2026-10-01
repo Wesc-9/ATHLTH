@@ -437,6 +437,7 @@ struct RunQuickStartSheet: View {
         GhostQuickStartDraft()
     @State private var didLoadAudioCoachDefaults = false
     @State private var didLoadGuidanceDefaults = false
+    @State private var isAdvancedSetup = false
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
@@ -476,88 +477,107 @@ struct RunQuickStartSheet: View {
                         activity: .running
                     )
 
-                    NavigationLink {
-                        RunGuidanceSetupView(
-                            audioCoach:
-                                $audioCoachDraft,
-                            routeGuardian:
-                                $routeGuardianDraft,
-                            ghost:
-                                $ghostDraft,
-                            route:
-                                guidanceRoute,
-                            structuredWorkout:
-                                mode == .structured
-                                    ? selectedWorkout
-                                    : nil
-                        )
-                    } label: {
-                        ATHLTHCard {
-                            HStack(spacing: 12) {
-                                Image(
-                                    systemName:
-                                        "waveform.and.mic"
+                    if isAdvancedSetup {
+                        VStack(spacing: 12) {
+                            NavigationLink {
+                                RunGuidanceSetupView(
+                                    audioCoach:
+                                        $audioCoachDraft,
+                                    routeGuardian:
+                                        $routeGuardianDraft,
+                                    ghost:
+                                        $ghostDraft,
+                                    route:
+                                        guidanceRoute,
+                                    structuredWorkout:
+                                        mode == .structured
+                                            ? selectedWorkout
+                                            : nil
                                 )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .premiumGold
-                                )
-                                .frame(
-                                    width: 40,
-                                    height: 40
-                                )
-                                .background(
-                                    ATHLTHTheme
-                                        .premiumGoldSoft,
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                12
+                            } label: {
+                                ATHLTHCard {
+                                    HStack(spacing: 12) {
+                                        Image(
+                                            systemName:
+                                                "waveform.and.mic"
                                         )
-                                )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .premiumGold
+                                        )
+                                        .frame(
+                                            width: 40,
+                                            height: 40
+                                        )
+                                        .background(
+                                            ATHLTHTheme
+                                                .premiumGoldSoft,
+                                            in:
+                                                RoundedRectangle(
+                                                    cornerRadius:
+                                                        12
+                                                )
+                                        )
 
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 3
-                                ) {
-                                    Text(
-                                        "Guidance & Alerts"
-                                    )
-                                    .font(
-                                        .subheadline
-                                            .weight(
-                                                .semibold
+                                        VStack(
+                                            alignment: .leading,
+                                            spacing: 3
+                                        ) {
+                                            Text(
+                                                ATHLTHLocalization.choose(
+                                                    english:
+                                                        "Guidance & Alerts",
+                                                    norwegian:
+                                                        "Veiledning og varsler"
+                                                )
                                             )
-                                    )
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
 
-                                    Text(
-                                        guidanceSummary
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                    .multilineTextAlignment(
-                                        .leading
-                                    )
+                                            Text(
+                                                guidanceSummary
+                                            )
+                                            .font(.caption)
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                            .multilineTextAlignment(
+                                                .leading
+                                            )
+                                        }
+
+                                        Spacer()
+
+                                        Image(
+                                            systemName:
+                                                "chevron.right"
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
                                 }
+                            }
+                            .buttonStyle(.plain)
 
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .foregroundStyle(
-                                    .secondary
+                            ATHLTHCard {
+                                WorkoutFriendPicker(
+                                    selectedFriendIDs:
+                                        $selectedFriendIDs
                                 )
                             }
                         }
-                    }
-                    .buttonStyle(.plain)
-                    ATHLTHCard {
-                        WorkoutFriendPicker(
-                            selectedFriendIDs: $selectedFriendIDs
+                        .transition(
+                            .opacity
+                                .combined(
+                                    with: .move(
+                                        edge: .top
+                                    )
+                                )
                         )
                     }
 
@@ -576,11 +596,21 @@ struct RunQuickStartSheet: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle("Start Run")
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Start Run",
+                    norwegian: "Start løpeøkt"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
@@ -661,30 +691,123 @@ struct RunQuickStartSheet: View {
 
     private var introCard: some View {
         ATHLTHCard {
-            HStack(spacing: 14) {
+            HStack(
+                alignment: .top,
+                spacing: 12
+            ) {
                 Image(systemName: "figure.run")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 54, height: 54)
+                    .font(
+                        .system(
+                            size: 25,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                    .frame(
+                        width: 50,
+                        height: 50
+                    )
                     .background(
                         ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(cornerRadius: 16)
+                        in: RoundedRectangle(
+                            cornerRadius: 15
+                        )
                     )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("How do you want to run?")
-                        .font(.title3.weight(.bold))
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Start Run",
+                            norwegian: "Start løpeøkt"
+                        )
+                    )
+                    .font(
+                        .title3
+                            .weight(.bold)
+                    )
 
                     Text(
-                        "Choose the run type and then decide whether this workout should be recorded with iPhone or Apple Watch."
+                        ATHLTHLocalization.choose(
+                            english:
+                                isAdvancedSetup
+                                    ? "Advanced guidance and social options."
+                                    : "A fast setup with the essentials.",
+                            norwegian:
+                                isAdvancedSetup
+                                    ? "Avansert veiledning og sosiale valg."
+                                    : "Raskt oppsett med det viktigste."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
 
-                Spacer()
+                Spacer(minLength: 6)
+
+                runSetupModeButton
             }
         }
+    }
+
+    private var runSetupModeButton: some View {
+        Button {
+            isAdvancedSetup.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(
+                    systemName:
+                        isAdvancedSetup
+                            ? "slider.horizontal.3"
+                            : "bolt.fill"
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold
+                    )
+                )
+
+                Text(
+                    isAdvancedSetup
+                        ? ATHLTHLocalization.choose(
+                            english: "Advanced",
+                            norwegian: "Avansert"
+                        )
+                        : "Basic"
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
+            }
+            .foregroundStyle(
+                isAdvancedSetup
+                    ? Color.white
+                    : ATHLTHTheme.accentDeep
+            )
+            .padding(.horizontal, 11)
+            .frame(height: 34)
+            .background(
+                isAdvancedSetup
+                    ? ATHLTHTheme.accent
+                    : ATHLTHTheme.accentSoft,
+                in: Capsule()
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english:
+                    "Switch run setup mode",
+                norwegian:
+                    "Bytt oppsettsmodus for løpeøkt"
+            )
+        )
     }
 
     private var modeCard: some View {
@@ -957,8 +1080,22 @@ struct RunQuickStartSheet: View {
 
     private var startButton: some View {
         Button {
-            let friends = social.trainingPartners.filter {
-                selectedFriendIDs.contains($0.userID)
+            let friends =
+                isAdvancedSetup
+                    ? social.trainingPartners
+                        .filter {
+                            selectedFriendIDs
+                                .contains(
+                                    $0.userID
+                                )
+                        }
+                    : []
+
+            var routeAlerts =
+                routeGuardianDraft
+                    .configuration
+            if !isAdvancedSetup {
+                routeAlerts.enabled = false
             }
 
             onStart(
@@ -973,16 +1110,20 @@ struct RunQuickStartSheet: View {
                             ? selectedWorkout
                             : nil,
                     captureDevice: captureDevice,
-                    audioCoach: audioCoachConfiguration,
+                    audioCoach:
+                        isAdvancedSetup
+                            ? audioCoachConfiguration
+                            : .disabled,
                     routeAlerts:
-                        routeGuardianDraft
-                            .configuration,
+                        routeAlerts,
                     ghostTargetDurationSeconds:
+                        isAdvancedSetup &&
                         guidanceRoute != nil
                             ? ghostDraft
                                 .targetDuration
                             : nil,
                     ghostUpdates:
+                        isAdvancedSetup &&
                         guidanceRoute != nil &&
                         ghostDraft.enabled &&
                         ghostDraft.updatesEnabled
