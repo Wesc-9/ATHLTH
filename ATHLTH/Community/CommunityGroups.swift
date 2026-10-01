@@ -3359,7 +3359,7 @@ struct CommunityGroupsView: View {
     var body: some View {
         ZStack {
             ATHLTHPremiumCanvas(
-                accent: Color.indigo.opacity(0.34)
+                accent: ATHLTHTheme.accentDeep.opacity(0.34)
             )
 
             ScrollView {
@@ -3514,10 +3514,10 @@ struct CommunityGroupsView: View {
             HStack(spacing: 14) {
                 Image(systemName: "person.3.fill")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.indigo)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 48, height: 48)
                     .background(
-                        Color.indigo.opacity(0.09),
+                        ATHLTHTheme.accentDeep.opacity(0.09),
                         in: RoundedRectangle(cornerRadius: 15)
                     )
 
@@ -3628,10 +3628,10 @@ struct CommunityGroupsView: View {
     private var groupImageFallback: some View {
         Image(systemName: "person.3.fill")
             .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(.indigo)
+            .foregroundStyle(ATHLTHTheme.accentDeep)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
-                Color.indigo.opacity(0.09),
+                ATHLTHTheme.accentDeep.opacity(0.09),
                 in: RoundedRectangle(
                     cornerRadius: 14,
                     style: .continuous
@@ -5301,11 +5301,11 @@ struct CommunityGroupDetailView: View {
     ) -> Color {
         switch kind {
         case "member_joined":
-            return .indigo
+            return ATHLTHTheme.accent
         case "announcement":
             return .orange
         case "event_created":
-            return .purple
+            return ATHLTHTheme.recoveryBlue
         case "challenge_created":
             return .green
         default:
@@ -5381,7 +5381,7 @@ struct CommunityGroupDetailView: View {
                 .foregroundStyle(
                     isPinned
                         ? ATHLTHTheme.accentDeep
-                        : .indigo
+                        : ATHLTHTheme.accentDeep
                 )
 
                 Spacer()
@@ -5809,13 +5809,13 @@ struct CommunityGroupDetailView: View {
                                                     .activityType
                                             )
                                     )
-                                    .foregroundStyle(.purple)
+                                    .foregroundStyle(ATHLTHTheme.recoveryBlue)
                                     .frame(
                                         width: 38,
                                         height: 38
                                     )
                                     .background(
-                                        Color.purple
+                                        ATHLTHTheme.recoveryBlue
                                             .opacity(0.08),
                                         in:
                                             RoundedRectangle(
@@ -6294,7 +6294,7 @@ struct CommunityGroupDetailView: View {
                 default:
                     LinearGradient(
                         colors: [
-                            Color.indigo.opacity(0.12),
+                            ATHLTHTheme.accentDeep.opacity(0.12),
                             ATHLTHTheme.cardWarm,
                             ATHLTHTheme.canvasTop
                         ],
@@ -6347,7 +6347,7 @@ struct CommunityGroupDetailView: View {
         case .live:
             return .green
         case .completed:
-            return .indigo
+            return ATHLTHTheme.accent
         case .cancelled:
             return .red
         }
@@ -6646,7 +6646,7 @@ struct CommunityGroupCreateView: View {
                 } else {
                     LinearGradient(
                         colors: [
-                            Color.indigo.opacity(0.22),
+                            ATHLTHTheme.accentDeep.opacity(0.22),
                             ATHLTHTheme.cardWarm,
                             ATHLTHTheme.canvasTop
                         ],
@@ -7637,11 +7637,11 @@ private struct CommunityGroupActivityRow: View {
     private var tint: Color {
         switch item.kind {
         case "member_joined":
-            return .indigo
+            return ATHLTHTheme.accent
         case "announcement":
             return .orange
         case "event_created":
-            return .purple
+            return ATHLTHTheme.recoveryBlue
         case "challenge_created":
             return .green
         default:
@@ -8226,7 +8226,7 @@ struct CommunityGroupMembersView: View {
         case "owner":
             return ATHLTHTheme.premiumGold
         case "admin":
-            return .indigo
+            return ATHLTHTheme.accent
         case "contributor":
             return .orange
         default:
@@ -8259,7 +8259,7 @@ private struct CommunityContentCoverPicker: View {
                 } else {
                     LinearGradient(
                         colors: [
-                            Color.indigo.opacity(0.18),
+                            ATHLTHTheme.accentDeep.opacity(0.18),
                             ATHLTHTheme.cardWarm,
                             ATHLTHTheme.canvasTop
                         ],
