@@ -93,7 +93,7 @@ struct PublicTrailRecord: Codable, Identifiable, Hashable {
             startName: reference,
             endName: nil,
             expectedTravelTimeSeconds: estimatedRunSeconds,
-            routeSource: "openstreetmap"
+            routeSource: source
         )
     }
 
