@@ -31,6 +31,7 @@ type RecoveryRequest = {
   mode?: "insight" | "ask";
   context?: RecoveryContext;
   question?: string | null;
+  language?: "en" | "nb";
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -376,6 +377,10 @@ Deno.serve(async (req: Request) => {
   }
 
   const context = sanitizeContext(body.context);
+  const responseLanguage =
+    body.language === "nb" ? "Norwegian Bokmål" : "English";
+  const languageInstruction =
+    `\nWrite every user-visible response in ${responseLanguage}. Keep metric abbreviations such as HRV and bpm unchanged.`;
 
   if (body.mode === "ask") {
     const question = String(body.question ?? "").trim().slice(0, 1200);
@@ -394,6 +399,7 @@ Deno.serve(async (req: Request) => {
         reasoning: { effort: "medium" },
         instructions:
           sharedInstructions +
+          languageInstruction +
           "\nAnswer the user's question directly in 2-5 short sentences. Make the relationship to their supplied recovery data clear.",
         input: JSON.stringify({ context, question }),
       }),
@@ -431,6 +437,7 @@ Deno.serve(async (req: Request) => {
       reasoning: { effort: "medium" },
       instructions:
         sharedInstructions +
+        languageInstruction +
         `
 Create today's Recovery insight.
 - headline: short and specific.
