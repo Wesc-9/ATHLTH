@@ -163,7 +163,6 @@ struct ATHLTHCommunityV4View: View {
             .task {
                 await refreshCommunity()
             }
-            }
         }
     }
 
