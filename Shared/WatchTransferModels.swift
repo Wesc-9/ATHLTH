@@ -368,9 +368,15 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announceRemainingStepDistance: Bool
 
     // Optional for backwards compatibility with configurations already
-    // persisted or queued before music ducking was introduced.
+    // persisted or queued before these Audio Coach controls were introduced.
     var duckOtherAudio: Bool? = nil
     var guidanceQuietPeriodSeconds: TimeInterval? = nil
+    var voiceIdentifier: String? = nil
+    var speechRate: Float? = nil
+    var speechVolume: Float? = nil
+    var announceWorkoutStart: Bool? = nil
+    var announcePauseResume: Bool? = nil
+    var announceWorkoutComplete: Bool? = nil
 
     var shouldDuckOtherAudio: Bool {
         duckOtherAudio ?? true
@@ -385,6 +391,38 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
             ),
             30
         )
+    }
+
+    var resolvedSpeechRate: Float {
+        min(
+            max(
+                speechRate ?? 0.48,
+                0.35
+            ),
+            0.65
+        )
+    }
+
+    var resolvedSpeechVolume: Float {
+        min(
+            max(
+                speechVolume ?? 1.0,
+                0.2
+            ),
+            1.0
+        )
+    }
+
+    var shouldAnnounceWorkoutStart: Bool {
+        announceWorkoutStart ?? true
+    }
+
+    var shouldAnnouncePauseResume: Bool {
+        announcePauseResume ?? true
+    }
+
+    var shouldAnnounceWorkoutComplete: Bool {
+        announceWorkoutComplete ?? true
     }
 
     static let disabled = WatchAudioCoachConfiguration(
