@@ -701,27 +701,7 @@ struct GoalCreationView: View {
                 if step == 0 {
                     goalTypeScreen
                 } else {
-                    VStack(spacing: 0) {
-                        goalFlowHeader
-                        progressHeader
-
-                        ScrollView {
-                            Group {
-                                switch step {
-                                case 1: targetStep
-                                case 2: identityStep
-                                case 3: milestoneStep
-                                default: reviewStep
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 18)
-                            .padding(.bottom, 28)
-                        }
-                        .scrollIndicators(.hidden)
-
-                        footer
-                    }
+                    goalStepScreen
                 }
             }
             .background(
@@ -769,6 +749,444 @@ struct GoalCreationView: View {
             .background(Color(.systemGroupedBackground))
 
             footer
+        }
+    }
+
+    private var goalStepScreen: some View {
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    goalStepHero
+
+                    VStack(spacing: 14) {
+                        goalSelectedCategoryCard
+
+                        Group {
+                            switch step {
+                            case 1:
+                                targetStep
+                            case 2:
+                                identityStep
+                            case 3:
+                                milestoneStep
+                            default:
+                                reviewStep
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 16)
+                    .padding(.bottom, 112)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Color(.systemGroupedBackground),
+                        in: RoundedRectangle(
+                            cornerRadius: 28,
+                            style: .continuous
+                        )
+                    )
+                    .padding(.horizontal, 8)
+                    .offset(y: -18)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .background(
+                Color(.systemGroupedBackground)
+            )
+
+            footer
+        }
+    }
+
+    private var goalStepHero: some View {
+        ZStack {
+            Image("HomeHero")
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 258)
+                .clipped()
+                .accessibilityHidden(true)
+
+            LinearGradient(
+                stops: [
+                    .init(
+                        color: Color.black.opacity(0.30),
+                        location: 0
+                    ),
+                    .init(
+                        color: Color.black.opacity(0.18),
+                        location: 0.34
+                    ),
+                    .init(
+                        color: Color.black.opacity(0.76),
+                        location: 1
+                    )
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 0
+            ) {
+                HStack(spacing: 11) {
+                    Button {
+                        withAnimation(
+                            .snappy(duration: 0.22)
+                        ) {
+                            step = max(
+                                0,
+                                step - 1
+                            )
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "chevron.left"
+                        )
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .frame(
+                            width: 40,
+                            height: 40
+                        )
+                        .background(
+                            .ultraThinMaterial,
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.24),
+                                    lineWidth: 0.8
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.format(
+                            english: "Back",
+                            norwegian: "Tilbake"
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text("ATHLTH")
+                            .font(
+                                .system(
+                                    size: 15,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .tracking(4.0)
+
+                        Text(
+                            "MOVE BETTER  LIVE LONGER"
+                        )
+                        .font(
+                            .system(
+                                size: 8.2,
+                                weight: .semibold
+                            )
+                        )
+                        .tracking(2.0)
+                        .opacity(0.78)
+                    }
+                    .foregroundStyle(.white)
+
+                    Spacer()
+
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "Cancel",
+                                norwegian: "Avbryt"
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 11.5,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white.opacity(0.20),
+                                    lineWidth: 0.7
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer(minLength: 16)
+
+                HStack {
+                    Text(
+                        ATHLTHLocalization.format(
+                            english: "Step %d of 5",
+                            norwegian: "Steg %d av 5",
+                            step + 1
+                        )
+                    )
+
+                    Spacer()
+
+                    Text(stepTitle)
+                }
+                .font(
+                    .system(
+                        size: 11.5,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white.opacity(0.90)
+                )
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(
+                                Color.white.opacity(0.26)
+                            )
+
+                        Capsule()
+                            .fill(
+                                ATHLTHTheme.accent
+                            )
+                            .frame(
+                                width:
+                                    proxy.size.width
+                                    * CGFloat(step + 1)
+                                    / 5
+                            )
+                    }
+                }
+                .frame(height: 4)
+                .padding(.top, 7)
+                .padding(.bottom, 15)
+
+                Text(goalStepHeroTitle)
+                    .font(
+                        .system(
+                            size: 27,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Text(goalStepHeroSubtitle)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.86)
+                    )
+                    .lineLimit(2)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 31)
+            .shadow(
+                color: Color.black.opacity(0.22),
+                radius: 10,
+                y: 3
+            )
+        }
+        .frame(height: 258)
+        .clipped()
+    }
+
+    private var goalSelectedCategoryCard:
+        some View {
+        HStack(spacing: 12) {
+            let tint =
+                goalCategoryTint(category)
+
+            Image(
+                systemName:
+                    category.systemImage
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(.white)
+            .frame(
+                width: 42,
+                height: 42
+            )
+            .background(
+                tint,
+                in: RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Goal type",
+                        norwegian: "Måltype"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .textCase(.uppercase)
+                .tracking(0.6)
+
+                Text(category.title)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "checkmark.circle.fill"
+            )
+            .font(.system(size: 18))
+            .foregroundStyle(tint)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .background(
+            Color.white.opacity(0.96),
+            in: RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.05),
+                lineWidth: 0.7
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 8,
+            y: 3
+        )
+    }
+
+    private var goalStepHeroTitle: String {
+        switch step {
+        case 1:
+            return ATHLTHLocalization.format(
+                english: "Set the target",
+                norwegian: "Sett målet"
+            )
+        case 2:
+            return ATHLTHLocalization.format(
+                english: "Make it yours",
+                norwegian: "Gjør målet til ditt"
+            )
+        case 3:
+            return ATHLTHLocalization.format(
+                english: "Milestones",
+                norwegian: "Delmål"
+            )
+        default:
+            return ATHLTHLocalization.format(
+                english: "Ready to start",
+                norwegian: "Klar til å starte"
+            )
+        }
+    }
+
+    private var goalStepHeroSubtitle:
+        String {
+        switch step {
+        case 1:
+            return ATHLTHLocalization.format(
+                english:
+                    "Choose a clear target. ATHLTH will use it for progress and milestones.",
+                norwegian:
+                    "Velg et tydelig mål. ATHLTH bruker det til fremdrift og delmål."
+            )
+        case 2:
+            return ATHLTHLocalization.format(
+                english:
+                    "Add the details that make this goal personal.",
+                norwegian:
+                    "Legg til detaljene som gjør målet personlig."
+            )
+        case 3:
+            return ATHLTHLocalization.format(
+                english:
+                    "See the path from today to your final target.",
+                norwegian:
+                    "Se veien fra i dag til det endelige målet."
+            )
+        default:
+            return ATHLTHLocalization.format(
+                english:
+                    "Check the essentials before tracking begins.",
+                norwegian:
+                    "Se over det viktigste før sporingen starter."
+            )
         }
     }
 
@@ -1329,19 +1747,6 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            goalStepHeading(
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Set the target",
-                        norwegian: "Sett målet"
-                    ),
-                subtitle:
-                    ATHLTHLocalization.format(
-                        english: "Keep it specific. ATHLTH will use this to build milestones and tracking.",
-                        norwegian: "Gjør målet konkret. ATHLTH bruker dette til å lage delmål og sporing."
-                    )
-            )
-
             goalInputCard(
                 icon: "text.cursor",
                 title:
@@ -1620,19 +2025,6 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            goalStepHeading(
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Make it yours",
-                        norwegian: "Gjør målet til ditt"
-                    ),
-                subtitle:
-                    ATHLTHLocalization.format(
-                        english: "Add a deadline, visual identity and context without making the setup heavy.",
-                        norwegian: "Legg til frist, uttrykk og kontekst uten å gjøre oppsettet tungt."
-                    )
-            )
-
             goalInputCard(
                 icon: "calendar",
                 title:
@@ -1695,7 +2087,7 @@ struct GoalCreationView: View {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
-                            .frame(height: 112)
+                            .frame(height: 150)
                             .frame(
                                 maxWidth:
                                     .infinity
@@ -1907,19 +2299,6 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            goalStepHeading(
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Milestones",
-                        norwegian: "Delmål"
-                    ),
-                subtitle:
-                    ATHLTHLocalization.format(
-                        english: "ATHLTH proposes a simple path toward your target. You can edit or add manual milestones later.",
-                        norwegian: "ATHLTH foreslår en enkel vei mot målet. Du kan redigere eller legge til manuelle delmål senere."
-                    )
-            )
-
             ForEach(
                 Array(
                     previewMilestones
@@ -2085,16 +2464,16 @@ struct GoalCreationView: View {
                 .padding(13)
                 .background(
                     Color.white.opacity(
-                        0.92
+                        0.97
                     ),
                     in: RoundedRectangle(
-                        cornerRadius: 18,
+                        cornerRadius: 20,
                         style: .continuous
                     )
                 )
                 .overlay {
                     RoundedRectangle(
-                        cornerRadius: 18,
+                        cornerRadius: 20,
                         style: .continuous
                     )
                     .stroke(
@@ -2130,19 +2509,6 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            goalStepHeading(
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Ready to start",
-                        norwegian: "Klar til å starte"
-                    ),
-                subtitle:
-                    ATHLTHLocalization.format(
-                        english: "Review the essentials before ATHLTH starts tracking your goal.",
-                        norwegian: "Se over det viktigste før ATHLTH begynner å spore målet."
-                    )
-            )
-
             GoalPreviewCard(
                 title: resolvedTitle,
                 category: category,
@@ -2296,47 +2662,77 @@ struct GoalCreationView: View {
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 10
+            spacing: 12
         ) {
-            Label(
-                title,
-                systemImage: icon
-            )
-            .font(
-                .caption.weight(
-                    .bold
+            HStack(spacing: 10) {
+                Image(
+                    systemName: icon
                 )
-            )
-            .foregroundStyle(
-                ATHLTHTheme
-                    .primaryText
-            )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 34,
+                    height: 34
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.80),
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+                Text(title)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Spacer()
+            }
 
             content()
         }
-        .padding(13)
+        .padding(14)
         .background(
-            Color.white.opacity(0.92),
+            Color.white.opacity(0.97),
             in: RoundedRectangle(
-                cornerRadius: 18,
+                cornerRadius: 21,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 18,
+                cornerRadius: 21,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(
-                    0.045
-                ),
-                lineWidth: 0.7
+                Color.black.opacity(0.052),
+                lineWidth: 0.75
             )
         }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 9,
+            y: 4
+        )
     }
 
-    private func goalNumberField(
+    private func goalNumberFieldprivate func goalNumberField(
         title: String,
         suffix: String,
         icon: String,
@@ -2349,7 +2745,7 @@ struct GoalCreationView: View {
             HStack(
                 alignment:
                     .firstTextBaseline,
-                spacing: 8
+                spacing: 10
             ) {
                 TextField(
                     "0",
@@ -2366,7 +2762,7 @@ struct GoalCreationView: View {
                 )
                 .font(
                     .system(
-                        size: 28,
+                        size: 32,
                         weight: .bold,
                         design: .rounded
                     )
@@ -2376,36 +2772,56 @@ struct GoalCreationView: View {
                         .primaryText
                 )
                 .minimumScaleFactor(
-                    0.75
+                    0.72
                 )
 
                 Text(suffix)
                     .font(
-                        .subheadline
-                            .weight(
-                                .semibold
-                            )
+                        .system(
+                            size: 14,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
                             .mutedText
                     )
             }
-            .padding(.horizontal, 12)
-            .frame(height: 54)
+            .padding(.horizontal, 14)
+            .frame(height: 62)
             .background(
-                Color.black.opacity(
-                    0.035
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .accentSoft
+                            .opacity(0.50),
+                        Color.black
+                            .opacity(0.025)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 ),
                 in: RoundedRectangle(
-                    cornerRadius: 13,
+                    cornerRadius: 15,
                     style: .continuous
                 )
             )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.10),
+                    lineWidth: 0.8
+                )
+            }
         }
     }
 
-    private var goalActivitySelector:
+    private var goalActivitySelectorprivate var goalActivitySelector:
         some View {
         HStack(spacing: 6) {
             goalActivityButton(
@@ -2445,7 +2861,7 @@ struct GoalCreationView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 14,
+                            size: 15,
                             weight: .semibold
                         )
                     )
@@ -2473,23 +2889,50 @@ struct GoalCreationView: View {
             .frame(
                 maxWidth: .infinity
             )
-            .frame(height: 54)
+            .frame(height: 58)
             .background(
                 isSelected
                     ? ATHLTHTheme
                         .accentDeep
                     : Color.black
-                        .opacity(0.035),
+                        .opacity(0.03),
                 in: RoundedRectangle(
-                    cornerRadius: 13,
+                    cornerRadius: 14,
                     style: .continuous
                 )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .stroke(
+                    isSelected
+                        ? ATHLTHTheme
+                            .accentDeep
+                        : Color.black
+                            .opacity(0.045),
+                    lineWidth:
+                        isSelected
+                            ? 1
+                            : 0.7
+                )
+            }
+            .shadow(
+                color:
+                    isSelected
+                        ? ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.16)
+                        : Color.clear,
+                radius: 8,
+                y: 3
             )
         }
         .buttonStyle(.plain)
     }
 
-    private var activityGoalIcon:
+    private var activityGoalIconprivate var activityGoalIcon:
         String {
         switch activity {
         case .running:
@@ -2512,7 +2955,7 @@ struct GoalCreationView: View {
     ) -> some View {
         HStack(
             alignment: .top,
-            spacing: 10
+            spacing: 11
         ) {
             Image(
                 systemName: icon
@@ -2527,26 +2970,26 @@ struct GoalCreationView: View {
                 ATHLTHTheme.accentDeep
             )
             .frame(
-                width: 32,
-                height: 32
+                width: 36,
+                height: 36
             )
             .background(
-                ATHLTHTheme
-                    .accentSoft,
+                Color.white.opacity(0.72),
                 in: RoundedRectangle(
-                    cornerRadius: 10,
+                    cornerRadius: 11,
                     style: .continuous
                 )
             )
 
             VStack(
                 alignment: .leading,
-                spacing: 2
+                spacing: 3
             ) {
                 Text(title)
                     .font(
-                        .caption.weight(
-                            .bold
+                        .system(
+                            size: 12,
+                            weight: .bold
                         )
                     )
                     .foregroundStyle(
@@ -2574,19 +3017,40 @@ struct GoalCreationView: View {
                 minLength: 0
             )
         }
-        .padding(11)
+        .padding(12)
         .background(
-            ATHLTHTheme
-                .accentSoft
-                .opacity(0.48),
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.62),
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.28)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 18,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.08),
+                lineWidth: 0.7
+            )
+        }
     }
 
-    private func goalTrackingPill(
+    private func goalTrackingPillprivate func goalTrackingPill(
         icon: String,
         text: String,
         emphasized: Bool
