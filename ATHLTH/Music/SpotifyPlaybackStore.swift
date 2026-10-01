@@ -58,11 +58,31 @@ enum SpotifyConnectionState: Equatable {
 
     var title: String {
         switch self {
-        case .unavailable: return "Needs setup"
-        case .disconnected: return "Not connected"
-        case .connecting: return "Connecting…"
-        case .connected: return "Connected"
-        case .error: return "Connection issue"
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Needs setup",
+                norwegian: "Må konfigureres"
+            )
+        case .disconnected:
+            return ATHLTHLocalization.choose(
+                english: "Not connected",
+                norwegian: "Ikke tilkoblet"
+            )
+        case .connecting:
+            return ATHLTHLocalization.choose(
+                english: "Connecting…",
+                norwegian: "Kobler til…"
+            )
+        case .connected:
+            return ATHLTHLocalization.choose(
+                english: "Connected",
+                norwegian: "Tilkoblet"
+            )
+        case .error:
+            return ATHLTHLocalization.choose(
+                english: "Connection issue",
+                norwegian: "Tilkoblingsproblem"
+            )
         }
     }
 }
@@ -778,38 +798,47 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         let receivedScheme =
             received.scheme?
                 .lowercased()
-        let expectedHost =
-            expected.host?
-                .lowercased()
-        let receivedHost =
-            received.host?
-                .lowercased()
 
+        // Some iOS/browser callback paths can be represented either as a
+        // custom-scheme host ("scheme://callback") or as a path
+        // ("scheme:/callback"). Treat those as the same logical callback
+        // location while still requiring our exact scheme. OAuth state + PKCE
+        // below remain the security checks for the authorization response.
         return expectedScheme == receivedScheme &&
-            expectedHost == receivedHost &&
-            Self.normalizedCallbackPath(
-                expected.path
+            Self.normalizedCallbackLocation(
+                expected
             ) ==
-            Self.normalizedCallbackPath(
-                received.path
+            Self.normalizedCallbackLocation(
+                received
             )
     }
 
-    private static func normalizedCallbackPath(
-        _ path: String
+    private static func normalizedCallbackLocation(
+        _ components: URLComponents
     ) -> String {
-        guard !path.isEmpty,
-              path != "/"
-        else {
-            return ""
-        }
+        let host =
+            components.host?
+                .trimmingCharacters(
+                    in: CharacterSet(
+                        charactersIn: "/"
+                    )
+                )
+                .lowercased() ?? ""
 
-        if path.count > 1,
-           path.hasSuffix("/") {
-            return String(path.dropLast())
-        }
+        let path =
+            components.path
+                .trimmingCharacters(
+                    in: CharacterSet(
+                        charactersIn: "/"
+                    )
+                )
+                .lowercased()
 
-        return path
+        return [host, path]
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(separator: "/")
     }
 
     private func callbackLocationForDiagnostics(
