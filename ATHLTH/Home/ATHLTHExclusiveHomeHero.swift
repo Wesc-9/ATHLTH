@@ -270,3 +270,551 @@ private struct ATHLTHExclusiveHomeSheetShape: Shape {
         return path
     }
 }
+
+
+/// Compact Home hero used by the 1.5.3 dashboard.
+///
+/// The hero has only one primary job: expose today's next action. When no
+/// workout is planned it shows two compact Quick Train actions. When a workout
+/// exists it becomes the workout launcher. Weather is intentionally secondary
+/// and lives on the right edge of the artwork.
+struct ATHLTHHomeDashboardHero: View {
+    let imageName: String
+    let workout: PlannedSession?
+    let isStarting: Bool
+    let weather: HomeWeatherSnapshot?
+    let onStart: () -> Void
+    let onQuickRun: () -> Void
+    let onQuickStrength: () -> Void
+    let onOpenPlan: () -> Void
+
+    private let resolvedHeight: CGFloat = 248
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Image(imageName)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .clipped()
+                    .accessibilityHidden(true)
+
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: Color.white.opacity(0.10),
+                            location: 0
+                        ),
+                        .init(
+                            color: Color.clear,
+                            location: 0.42
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.08),
+                            location: 0.62
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.47),
+                            location: 1
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.17),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .allowsHitTesting(false)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ATHLTH")
+                            .font(
+                                .system(
+                                    size: 29,
+                                    weight: .medium,
+                                    design: .rounded
+                                )
+                            )
+                            .tracking(6.6)
+                            .foregroundStyle(.white)
+
+                        Text("MOVE  BETTER  LIVE  LONGER")
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight: .semibold
+                                )
+                            )
+                            .tracking(2.7)
+                            .foregroundStyle(
+                                .white.opacity(0.82)
+                            )
+                    }
+                    .padding(.top, 58)
+
+                    Spacer(minLength: 16)
+
+                    if let workout {
+                        plannedWorkoutContent(
+                            workout
+                        )
+                    } else {
+                        quickTrainContent
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .leading
+                )
+
+                weatherBadge
+                    .padding(.trailing, 18)
+                    .padding(.top, 118)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topTrailing
+                    )
+            }
+        }
+        .frame(height: resolvedHeight)
+        .clipped()
+    }
+
+    private func plannedWorkoutContent(
+        _ workout: PlannedSession
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
+            Text("NESTE ØKT")
+                .font(
+                    .system(
+                        size: 10.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.8)
+                .foregroundStyle(
+                    .white.opacity(0.88)
+                )
+
+            Text(workout.title)
+                .font(
+                    .system(
+                        size:
+                            UIDevice.current
+                                .userInterfaceIdiom == .pad
+                                ? 29
+                                : 25,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            HStack(spacing: 13) {
+                if let distance =
+                        workout.targetDistanceKilometers,
+                   distance > 0 {
+                    heroMetric(
+                        icon:
+                            workout.kind.systemImage,
+                        value:
+                            formatDistance(
+                                distance
+                            )
+                    )
+                }
+
+                if let pace =
+                        workout
+                            .targetPaceSecondsPerKilometer,
+                   pace > 0 {
+                    heroMetric(
+                        icon: "speedometer",
+                        value:
+                            formatPace(pace)
+                    )
+                }
+
+                if let minutes =
+                        workout.durationMinutes,
+                   minutes > 0 {
+                    heroMetric(
+                        icon: "stopwatch",
+                        value:
+                            formatDuration(
+                                minutes
+                            )
+                    )
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button(action: onStart) {
+                    HStack(spacing: 7) {
+                        if isStarting {
+                            ProgressView()
+                                .controlSize(
+                                    .mini
+                                )
+                                .tint(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                        } else {
+                            Image(
+                                systemName:
+                                    "play.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 11,
+                                    weight: .bold
+                                )
+                            )
+                        }
+
+                        Text(
+                            isStarting
+                                ? "Starter…"
+                                : "Start økt"
+                        )
+                        .font(
+                            .system(
+                                size: 12.5,
+                                weight: .bold
+                            )
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .padding(
+                        .horizontal,
+                        15
+                    )
+                    .frame(height: 39)
+                    .background(
+                        Color.white.opacity(0.97),
+                        in: Capsule()
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isStarting)
+
+                Button(
+                    action: onOpenPlan
+                ) {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "calendar"
+                        )
+                        .font(
+                            .system(
+                                size: 10.5,
+                                weight: .semibold
+                            )
+                        )
+
+                        Text("Plan")
+                            .font(
+                                .system(
+                                    size: 11.5,
+                                    weight: .semibold
+                                )
+                            )
+                    }
+                    .foregroundStyle(.white)
+                    .padding(
+                        .horizontal,
+                        12
+                    )
+                    .frame(height: 37)
+                    .background(
+                        Color.black
+                            .opacity(0.24),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.white
+                                    .opacity(0.35),
+                                lineWidth: 0.7
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 1)
+        }
+        .shadow(
+            color: Color.black.opacity(0.22),
+            radius: 8,
+            y: 3
+        )
+    }
+
+    private var quickTrainContent:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            Text("Ingen økt planlagt i dag")
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white.opacity(0.94)
+                )
+
+            HStack(spacing: 8) {
+                quickTrainButton(
+                    title: "Run",
+                    icon: "figure.run",
+                    tint:
+                        ATHLTHTheme.vitality,
+                    action: onQuickRun
+                )
+
+                quickTrainButton(
+                    title: "Strength",
+                    icon:
+                        "dumbbell.fill",
+                    tint:
+                        ATHLTHTheme.accentDeep,
+                    action:
+                        onQuickStrength
+                )
+            }
+        }
+        .shadow(
+            color: Color.black.opacity(0.18),
+            radius: 7,
+            y: 3
+        )
+    }
+
+    private func quickTrainButton(
+        title: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(
+                        .system(
+                            size: 12.5,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+            }
+            .padding(.horizontal, 13)
+            .frame(
+                minWidth: 96,
+                minHeight: 39
+            )
+            .background(
+                Color.white.opacity(0.96),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(0.76),
+                        lineWidth: 0.7
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var weatherBadge:
+        some View {
+        if let weather {
+            VStack(
+                alignment: .trailing,
+                spacing: 1
+            ) {
+                HStack(spacing: 5) {
+                    Image(
+                        systemName:
+                            weather.symbolName
+                    )
+                    .symbolRenderingMode(
+                        .multicolor
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+
+                    Text(
+                        "\(Int(weather.temperatureCelsius.rounded()))°"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(.white)
+                }
+
+                if let location =
+                        weather.locationName,
+                   !location.isEmpty {
+                    Text(location)
+                        .font(
+                            .system(
+                                size: 10.5,
+                                weight: .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            .white.opacity(0.86)
+                        )
+                        .lineLimit(1)
+                }
+            }
+            .padding(
+                .horizontal,
+                9
+            )
+            .padding(
+                .vertical,
+                6
+            )
+            .background(
+                Color.black.opacity(0.16),
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+        }
+    }
+
+    private func heroMetric(
+        icon: String,
+        value: String
+    ) -> some View {
+        Label {
+            Text(value)
+                .font(
+                    .system(
+                        size: 11.5,
+                        weight: .semibold
+                    )
+                )
+        } icon: {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+        }
+        .foregroundStyle(.white)
+    }
+
+    private func formatDistance(
+        _ kilometers: Double
+    ) -> String {
+        if kilometers.rounded() ==
+            kilometers {
+            return
+                "\(Int(kilometers)) km"
+        }
+
+        return String(
+            format: "%.1f km",
+            locale: Locale.current,
+            kilometers
+        )
+    }
+
+    private func formatPace(
+        _ seconds: Double
+    ) -> String {
+        let rounded =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+        let minutes = rounded / 60
+        let remaining = rounded % 60
+
+        return String(
+            format: "%d:%02d/km",
+            minutes,
+            remaining
+        )
+    }
+
+    private func formatDuration(
+        _ minutes: Int
+    ) -> String {
+        if minutes < 60 {
+            return "\(minutes) min"
+        }
+
+        let hours = minutes / 60
+        let remainder =
+            minutes % 60
+
+        if remainder == 0 {
+            return "\(hours) t"
+        }
+
+        return
+            "\(hours)t \(remainder)m"
+    }
+}
