@@ -559,10 +559,6 @@ struct AppRootView: View {
 
             Task {
                 await social.syncChallenges(challengeStore)
-                await social.publishChallenges(
-                    updatedChallenges,
-                    visibility: settings.defaultActivityVisibility
-                )
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
             }
