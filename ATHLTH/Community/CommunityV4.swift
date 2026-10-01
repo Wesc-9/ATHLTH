@@ -1190,8 +1190,13 @@ private struct CommunityReferenceFriendsCard: View {
     }
 
     private var totalKilometers: Double {
-        currentKilometers +
-            (topFriend.map(friendKilometers) ?? 0)
+        let friendValue =
+            topFriend.map {
+                friendKilometers($0)
+            } ?? 0
+
+        return currentKilometers +
+            friendValue
     }
 
     private var currentShare: Double {
