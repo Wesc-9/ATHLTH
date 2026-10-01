@@ -568,6 +568,8 @@ struct GhostFriendRaceHubView: View {
                     challenge.reference(),
                 ownerID:
                     session.profile.userID,
+                comparisonRouteID:
+                    challenge.id,
                 ghostRace:
                     ghostRace,
                 watchConnection:
