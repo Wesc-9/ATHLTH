@@ -870,6 +870,7 @@ struct ATHLTHSettingsView: View {
         }
         .task {
             await notifications.refreshAuthorizationStatus()
+            _ = await health.restoreAuthorizationStateFromSystem()
 
             if health.hasRequestedAuthorization,
                health.lastSuccessfulRefreshAt == nil,
@@ -1327,6 +1328,13 @@ struct ATHLTHSettingsView: View {
             )
         }
 
+        if health.authorizationReviewNeeded {
+            return ATHLTHLocalization.choose(
+                english: "Connected · optional new Health permissions are available",
+                norwegian: "Tilkoblet · valgfrie nye Health-tillatelser er tilgjengelige"
+            )
+        }
+
         if health.hasTrainingHealthData {
             return health.canWriteWorkouts
                 ? ATHLTHLocalization.choose(
@@ -1443,15 +1451,22 @@ struct ATHLTHSettingsView: View {
     }
 
     private func handleAppleHealthTap() {
-        if health.hasRequestedAuthorization {
-            runHealthSync()
-            return
-        }
-
         Task {
             healthRequestInProgress = true
-            await health.requestAuthorization()
-            await health.completeAuthorizationSetup()
+
+            let restoredExistingSetup =
+                await health.restoreAuthorizationStateFromSystem()
+
+            if !restoredExistingSetup || health.authorizationReviewNeeded {
+                // The Apple Health row is the explicit place to connect or
+                // review newly introduced permissions. Normal sync never
+                // reopens the Health permission flow.
+                await health.requestAuthorization()
+                await health.completeAuthorizationSetup()
+            } else {
+                health.resumeUserInitiatedHealthSync()
+            }
+
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
@@ -1470,8 +1485,13 @@ struct ATHLTHSettingsView: View {
 
         Task {
             healthRequestInProgress = true
-            await health.requestAuthorization()
-            await health.completeAuthorizationSetup()
+
+            // Sync with the permissions that are already in place. Do not
+            // reopen Health authorization simply because the app was updated
+            // or because ATHLTH added another optional Health data type.
+            _ = await health.restoreAuthorizationStateFromSystem()
+            health.resumeUserInitiatedHealthSync()
+
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
