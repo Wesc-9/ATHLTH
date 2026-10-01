@@ -419,11 +419,11 @@ struct RunQuickStartSheet: View {
         _selectedWorkout = State(
             initialValue: initialWorkout
         )
+        // A quick workout started from iPhone must never silently
+        // jump to Apple Watch. Start with iPhone selected and let the user
+        // explicitly choose Apple Watch for this workout.
         _captureDevice = State(
-            initialValue:
-                watchConnected
-                    ? .appleWatch
-                    : .iPhone
+            initialValue: .iPhone
         )
     }
 
@@ -606,8 +606,6 @@ struct RunQuickStartSheet: View {
                 }
             }
             .task {
-                captureDevice = watchConnected ? .appleWatch : .iPhone
-
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
@@ -1365,8 +1363,6 @@ struct WalkQuickStartSheet: View {
                 }
             }
             .task {
-                captureDevice = watchConnected ? .appleWatch : .iPhone
-
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
