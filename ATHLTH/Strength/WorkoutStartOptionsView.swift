@@ -155,30 +155,10 @@ struct WorkoutStartOptionsView: View {
                             }
 
                             ATHLTHCard {
-                                HStack {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Train with someone",
-                                            norwegian:
-                                                "Tren med noen"
-                                        ),
-                                        systemImage:
-                                            "person.2.fill"
-                                    )
-                                    .font(.headline)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.accent
-                                    )
-
-                                    Spacer()
-                                }
-
                                 WorkoutFriendPicker(
                                     selectedFriendIDs:
                                         $selectedFriendIDs
                                 )
-                                .padding(.top, 8)
                             }
                         }
                         .transition(
@@ -419,41 +399,4 @@ struct WorkoutStartOptionsView: View {
         .opacity(disabled ? 0.56 : 1)
     }
 
-    @ViewBuilder
-    private func optionRow(
-        title: String,
-        subtitle: String,
-        icon: String,
-        selected: Bool,
-        disabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(disabled ? Color.secondary : ATHLTHTheme.accent)
-                    .frame(width: 36)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.headline)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer()
-
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? ATHLTHTheme.accent : Color.secondary)
-            }
-            .padding(12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.55 : 1)
-    }
 }
