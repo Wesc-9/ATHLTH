@@ -847,7 +847,7 @@ private struct OfficialWeeklyCoverRecipe {
     }
 }
 
-private struct OfficialWeeklyChallengeArtwork: View {
+struct OfficialWeeklyChallengeArtwork: View {
     let challenge: OfficialWeeklyChallenge
 
     private var recipe: OfficialWeeklyCoverRecipe? {
