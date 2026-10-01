@@ -141,6 +141,7 @@ struct AppRootView: View {
     @EnvironmentObject private var subscriptionBackend: SubscriptionBackendService
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
@@ -722,6 +723,7 @@ struct AppRootView: View {
         .background {
             ZStack {
                 ATHLTHSurfaceRuntimeObserver()
+                ATHLTHGhostRuntimeObserver()
                 ATHLTHStrengthWatchSyncObserver()
                 ATHLTHBackupDirtyObserver()
             }
