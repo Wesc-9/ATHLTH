@@ -900,7 +900,7 @@ struct AroundYouExploreView: View {
 
                     Spacer()
 
-                    Text("OpenStreetMap")
+                    Text("Open trail data")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(
                             ATHLTHTheme.vitality
@@ -1104,7 +1104,7 @@ struct AroundYouExploreView: View {
                             .ultraThinMaterial,
                             in: Capsule()
                         )
-                        // Keep OSM attribution immediately above MapKit's
+                        // Keep open-data attribution immediately above MapKit's
                         // own map-rights/legal attribution in the lower-left.
                         .padding(.leading, 10)
                         .padding(.bottom, 34)
@@ -1826,6 +1826,11 @@ struct AroundYouExploreView: View {
         profile: SocialProfileCard?
     ) -> String {
         if isPublicTrailRoute(route) {
+            if route.routeSource ==
+                "kartverket_turrutebasen" {
+                return "Public Trail · Kartverket"
+            }
+
             return "Public Trail · OpenStreetMap"
         }
 
@@ -1871,6 +1876,7 @@ struct AroundYouExploreView: View {
         _ route: TrainingRoute
     ) -> Bool {
         route.routeSource == "openstreetmap" ||
+        route.routeSource == "kartverket_turrutebasen" ||
         route.ownerID ==
             PublicTrailRecord
                 .publicSourceOwnerID ||
