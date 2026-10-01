@@ -1884,15 +1884,33 @@ struct ATHLTHAccountSecurityView: View {
         }
 
         return session.signInMethod == .apple
-            ? "Managed by Apple"
-            : "Unavailable"
+            ? accountText(
+                english: "Managed by Apple",
+                norwegian: "Administreres av Apple"
+            )
+            : accountText(
+                english: "Unavailable",
+                norwegian: "Ikke tilgjengelig"
+            )
     }
 
     private var signInMethodTitle: String {
         switch session.signInMethod {
-        case .apple: return "Sign in with Apple"
-        case .email: return "Email & password"
-        case .none: return "ATHLTH account"
+        case .apple:
+            return accountText(
+                english: "Sign in with Apple",
+                norwegian: "Logg på med Apple"
+            )
+        case .email:
+            return accountText(
+                english: "Email & password",
+                norwegian: "E-post og passord"
+            )
+        case .none:
+            return accountText(
+                english: "ATHLTH account",
+                norwegian: "ATHLTH-konto"
+            )
         }
     }
 
@@ -1904,7 +1922,11 @@ struct ATHLTHAccountSecurityView: View {
         do {
             try await accountService.sendPasswordResetForCurrentAccount()
             statusIsError = false
-            statusMessage = "We sent a secure password-reset link to \(accountEmail)."
+            statusMessage = ATHLTHLocalization.format(
+                english: "We sent a secure password-reset link to %@.",
+                norwegian: "Vi sendte en sikker lenke for å tilbakestille passordet til %@.",
+                accountEmail
+            )
         } catch {
             statusIsError = true
             statusMessage = error.localizedDescription
