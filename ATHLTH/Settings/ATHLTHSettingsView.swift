@@ -1050,22 +1050,46 @@ struct ATHLTHSettingsView: View {
 
     private var spotifyConnectionSubtitle: String {
         if spotify.isConnected {
-            return spotify.playlists.isEmpty
-                ? "Spotify connected"
-                : "Connected · \(spotify.playlists.count) playlists available"
+            if spotify.playlists.isEmpty {
+                return ATHLTHLocalization.choose(
+                    english: "Spotify connected",
+                    norwegian: "Spotify tilkoblet"
+                )
+            }
+
+            return ATHLTHLocalization.format(
+                english: "Connected · %d playlists available",
+                norwegian: "Tilkoblet · %d spillelister tilgjengelig",
+                spotify.playlists.count
+            )
         }
 
         switch spotify.connectionState {
         case .unavailable:
-            return "Spotify setup is unavailable in this build"
+            return ATHLTHLocalization.choose(
+                english: "Spotify setup is unavailable in this build",
+                norwegian: "Spotify-oppsett er ikke tilgjengelig i denne versjonen"
+            )
         case .connecting:
-            return "Connecting to Spotify…"
+            return ATHLTHLocalization.choose(
+                english: "Connecting to Spotify…",
+                norwegian: "Kobler til Spotify…"
+            )
         case .error:
-            return "Connection needs attention"
+            return ATHLTHLocalization.choose(
+                english: "Connection needs attention",
+                norwegian: "Tilkoblingen krever oppmerksomhet"
+            )
         case .disconnected:
-            return "Connect Spotify for workout playlists"
+            return ATHLTHLocalization.choose(
+                english: "Connect Spotify for workout playlists",
+                norwegian: "Koble til Spotify for spillelister til trening"
+            )
         case .connected:
-            return "Spotify connected"
+            return ATHLTHLocalization.choose(
+                english: "Spotify connected",
+                norwegian: "Spotify tilkoblet"
+            )
         }
     }
 
