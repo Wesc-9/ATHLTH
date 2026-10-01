@@ -3657,67 +3657,84 @@ private struct ATHLTHTrainSectionSwitcher: View {
     @Binding var selection: Int
 
     var body: some View {
-        HStack(spacing: 6) {
-            ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
+        HStack(spacing: 8) {
+            ForEach(
+                Array(titles.enumerated()),
+                id: \.offset
+            ) { index, title in
                 Button {
-                    guard selection != index else { return }
+                    guard selection != index
+                    else {
+                        return
+                    }
 
-                    var transaction = Transaction()
-                    transaction.animation = nil
-
-                    withTransaction(transaction) {
+                    withAnimation(
+                        .easeOut(duration: 0.16)
+                    ) {
                         selection = index
                     }
                 } label: {
-                    VStack(spacing: 7) {
-                        Text(title)
-                            .font(
-                                .subheadline.weight(
-                                    selection == index ? .bold : .semibold
-                                )
+                    Text(title)
+                        .font(
+                            .system(
+                                size: 12.5,
+                                weight:
+                                    selection == index
+                                        ? .bold
+                                        : .semibold,
+                                design: .rounded
                             )
-                            .foregroundStyle(
-                                selection == index
-                                    ? ATHLTHTheme.primaryText
-                                    : ATHLTHTheme.mutedText
-                            )
-                            .frame(maxWidth: .infinity)
-
-                        Capsule()
-                            .fill(
-                                selection == index
-                                    ? ATHLTHTheme.accent
-                                    : Color.clear
-                            )
-                            .frame(height: 2.5)
-                    }
-                    .padding(.top, 11)
-                    .padding(.horizontal, 8)
-                    .contentShape(Rectangle())
-                    .background(
-                        selection == index
-                            ? Color.white.opacity(0.72)
-                            : Color.clear,
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
                         )
-                    )
+                        .foregroundStyle(
+                            selection == index
+                                ? ATHLTHTheme.primaryText
+                                : Color.white.opacity(0.92)
+                        )
+                        .padding(.horizontal, 15)
+                        .frame(height: 34)
+                        .background {
+                            ZStack {
+                                Capsule()
+                                    .fill(.ultraThinMaterial)
+
+                                Capsule()
+                                    .fill(
+                                        selection == index
+                                            ? Color.white.opacity(0.94)
+                                            : Color.black.opacity(0.24)
+                                    )
+                            }
+                        }
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white.opacity(
+                                        selection == index
+                                            ? 0.54
+                                            : 0.28
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                        }
+                        .shadow(
+                            color:
+                                Color.black.opacity(
+                                    selection == index
+                                        ? 0.11
+                                        : 0.07
+                                ),
+                            radius: 8,
+                            y: 3
+                        )
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(
-                    selection == index ? .isSelected : []
+                    selection == index
+                        ? .isSelected
+                        : []
                 )
             }
-        }
-        .padding(4)
-        .background(
-            Color.white.opacity(0.56),
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
         }
     }
 }
@@ -3802,6 +3819,27 @@ struct ATHLTHTrainView: View {
                         subtitle: "Build a stronger, healthier you."
                     )
 
+                    ATHLTHTrainSectionSwitcher(
+                        titles: [
+                            ATHLTHLocalization.choose(
+                                english: "Today",
+                                norwegian: "I dag"
+                            ),
+                            ATHLTHLocalization.choose(
+                                english: "Plan",
+                                norwegian: "Plan"
+                            )
+                        ],
+                        selection: $selectedSection
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.top, 64)
+                    .padding(.leading, 16)
+                    .padding(.trailing, 68)
+
                     Button {
                         showingLibrary = true
                     } label: {
@@ -3827,12 +3865,7 @@ struct ATHLTHTrainView: View {
                     .padding(.trailing, 16)
                 }
             } content: {
-                VStack(spacing: 16) {
-                    ATHLTHTrainSectionSwitcher(
-                        titles: ["Today", "Plan"],
-                        selection: $selectedSection
-                    )
-
+                VStack(spacing: 15) {
                     switch selectedSection {
                     case 1:
                         planContent
@@ -3841,7 +3874,7 @@ struct ATHLTHTrainView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 10)
+                .padding(.top, 16)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
@@ -4056,30 +4089,139 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var todayContent: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("TODAY")
-                .font(.caption2.weight(.bold))
-                .tracking(2.4)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-
-            Text("Ready for today?")
-                .font(
-                    .system(
-                        size: 30,
-                        weight: .bold,
-                        design: .serif
+        HStack(
+            alignment: .top,
+            spacing: 14
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "TODAY",
+                        norwegian: "I DAG"
                     )
                 )
+                .font(.caption2.weight(.bold))
+                .tracking(2.4)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
 
-            Text(
-                session.activePlan == nil
-                    ? "Start freely or build a plan around what you want to achieve."
-                    : "Your plan, quick starts and training tools in one place."
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Ready for today?",
+                        norwegian: "Klar for i dag?"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 29,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Text(
+                    session.activePlan == nil
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Train freely, or build a plan around what you want to achieve.",
+                            norwegian:
+                                "Tren fritt, eller bygg en plan rundt det du vil oppnå."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Today's sessions, quick starts and training tools in one place.",
+                            norwegian:
+                                "Dagens økter, hurtigstart og treningsverktøy samlet på ett sted."
+                        )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            Spacer(minLength: 4)
+
+            VStack(spacing: 1) {
+                Text(
+                    Date.now.formatted(
+                        .dateTime.day()
+                    )
+                )
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Text(
+                    Date.now.formatted(
+                        .dateTime.weekday(
+                            .abbreviated
+                        )
+                    )
+                    .uppercased()
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .tracking(0.8)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+            .frame(
+                width: 54,
+                height: 58
             )
-            .font(.subheadline)
-            .foregroundStyle(ATHLTHTheme.mutedText)
+            .background(
+                Color.white.opacity(0.72),
+                in: RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.82),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    Color.black.opacity(0.035),
+                radius: 9,
+                y: 4
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
 
         if let plan = session.activePlan {
             todaysPlanCard(plan)
@@ -4087,67 +4229,146 @@ struct ATHLTHTrainView: View {
             noActivePlanCard
         }
 
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("QUICK START")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.8)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+        VStack(
+            alignment: .leading,
+            spacing: 13
+        ) {
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "QUICK START",
+                            norwegian: "HURTIGSTART"
+                        )
+                    )
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.8)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
 
-                    Text("Move now")
-                        .font(.title3.weight(.bold))
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Move now",
+                            norwegian: "Kom i gang"
+                        )
+                    )
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
                 }
 
                 Spacer()
 
-                Text("No plan needed")
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Text(quickStartDeviceTitle)
+                    .font(
+                        .system(
+                            size: 10.5,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .multilineTextAlignment(
+                        .trailing
+                    )
+                    .lineLimit(2)
             }
 
             HStack(spacing: 8) {
                 quickStartTile(
-                    title: "Run",
-                    subtitle: quickStartSubtitle(.running),
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Run",
+                            norwegian: "Løp"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Free run",
+                            norwegian: "Fri løping"
+                        ),
                     icon: "figure.run",
-                    enabled: quickStartAvailable(.running)
+                    enabled:
+                        quickStartAvailable(
+                            .running
+                        )
                 ) {
                     handleQuickStart(.running)
                 }
 
                 quickStartTile(
-                    title: "Walk",
-                    subtitle: quickStartSubtitle(.walking),
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Walk",
+                            norwegian: "Gå"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Free walk",
+                            norwegian: "Fri gange"
+                        ),
                     icon: "figure.walk",
-                    enabled: quickStartAvailable(.walking)
+                    enabled:
+                        quickStartAvailable(
+                            .walking
+                        )
                 ) {
                     handleQuickStart(.walking)
                 }
 
                 quickStartTile(
-                    title: "Strength",
-                    subtitle: "Gym / Home",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Gym / Home",
+                            norwegian: "Gym / hjemme"
+                        ),
                     icon: "dumbbell.fill",
-                    enabled: quickStartAvailable(.strength)
+                    enabled:
+                        quickStartAvailable(
+                            .strength
+                        )
                 ) {
                     handleQuickStart(.strength)
                 }
 
                 quickStartTile(
-                    title: "Custom",
-                    subtitle: quickStartCustomSubtitle,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Custom",
+                            norwegian: "Egen"
+                        ),
+                    subtitle:
+                        quickStartCustomSubtitle,
                     icon: "plus",
-                    enabled: customQuickStartAvailable
+                    enabled:
+                        customQuickStartAvailable
                 ) {
                     showingCustomQuickStart = true
                 }
             }
-            .padding(.top, 2)
         }
-        .padding(16)
+        .padding(15)
         .background(
-            Color.white.opacity(0.78),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.84),
+                    ATHLTHTheme.accentSoft.opacity(0.20)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 24,
                 style: .continuous
@@ -4158,8 +4379,17 @@ struct ATHLTHTrainView: View {
                 cornerRadius: 24,
                 style: .continuous
             )
-            .stroke(Color.white.opacity(0.86), lineWidth: 0.8)
+            .stroke(
+                Color.white.opacity(0.88),
+                lineWidth: 0.8
+            )
         }
+        .shadow(
+            color:
+                Color.black.opacity(0.025),
+            radius: 12,
+            y: 5
+        )
 
         Button {
             showingGhostHub = true
@@ -4484,43 +4714,87 @@ struct ATHLTHTrainView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(height: 26)
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft
+                            .opacity(0.88),
+                        in: Circle()
+                    )
 
                 Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .font(
+                        .system(
+                            size: 11.5,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
                     .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.78)
 
                 Text(subtitle)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .font(
+                        .system(
+                            size: 9.2,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.70)
             }
-            .frame(maxWidth: .infinity, minHeight: 88)
-            .padding(.horizontal, 4)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 92
+            )
+            .padding(.horizontal, 3)
             .background(
-                ATHLTHTheme.accentSoft.opacity(enabled ? 0.72 : 0.34),
-                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                Color.white.opacity(
+                    enabled
+                        ? 0.68
+                        : 0.40
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(
-                        enabled
-                            ? ATHLTHTheme.accent.opacity(0.10)
-                            : ATHLTHTheme.border,
-                        lineWidth: 1
-                    )
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    enabled
+                        ? ATHLTHTheme.accent.opacity(
+                            0.08
+                        )
+                        : ATHLTHTheme.border,
+                    lineWidth: 0.8
+                )
             }
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.48)
+        .opacity(enabled ? 1 : 0.50)
     }
 
     private func watchWorkoutKind(
@@ -4548,8 +4822,14 @@ struct ATHLTHTrainView: View {
 
     private var quickStartCustomSubtitle: String {
         customQuickStartAvailable
-            ? "Build yours"
-            : "Watch required"
+            ? ATHLTHLocalization.choose(
+                english: "Build yours",
+                norwegian: "Lag egen"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Watch",
+                norwegian: "Watch"
+            )
     }
 
     private func quickStartSubtitle(
@@ -4599,8 +4879,11 @@ struct ATHLTHTrainView: View {
 
     private var quickStartDeviceTitle: String {
         watchConnection.isReady
-            ? "Choose iPhone or Apple Watch at start"
-            : "iPhone · Apple Watch not connected"
+            ? "iPhone / Watch"
+            : ATHLTHLocalization.choose(
+                english: "iPhone · Watch offline",
+                norwegian: "iPhone · Watch frakoblet"
+            )
     }
 
     @ViewBuilder
