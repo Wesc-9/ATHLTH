@@ -81,6 +81,9 @@ struct GhostRaceResult: Equatable {
     let signedTimeSeconds: TimeInterval?
     let finalDistanceDeltaMeters: Double?
     let finishedAt: Date
+    var maximumLeadMeters: Double = 0
+    var maximumDeficitMeters: Double = 0
+    var leadChangeCount: Int = 0
 
     var beatGhost: Bool? {
         guard completedRoute,
@@ -121,6 +124,10 @@ final class GhostRaceStore: ObservableObject {
     @Published var errorMessage: String?
 
     private var lastMatchedIndex: Int?
+    private var maximumLeadMeters: Double = 0
+    private var maximumDeficitMeters: Double = 0
+    private var leadChangeCount = 0
+    private var lastMeaningfulLeadSign = 0
 
     var isPrepared: Bool {
         reference != nil
@@ -261,6 +268,7 @@ final class GhostRaceStore: ObservableObject {
         result = nil
         errorMessage = nil
         lastMatchedIndex = nil
+        resetRaceDynamics()
     }
 
     func prepareTarget(
@@ -363,6 +371,7 @@ final class GhostRaceStore: ObservableObject {
         result = nil
         errorMessage = nil
         lastMatchedIndex = nil
+        resetRaceDynamics()
     }
 
     func prepare(
@@ -381,6 +390,7 @@ final class GhostRaceStore: ObservableObject {
         result = nil
         errorMessage = nil
         lastMatchedIndex = nil
+        resetRaceDynamics()
     }
 
     func cancel() {
@@ -389,6 +399,7 @@ final class GhostRaceStore: ObservableObject {
         result = nil
         errorMessage = nil
         lastMatchedIndex = nil
+        resetRaceDynamics()
     }
 
     func dismissResult() {
@@ -417,7 +428,13 @@ final class GhostRaceStore: ObservableObject {
                 finalDistanceDeltaMeters:
                     comparison?
                         .signedDistanceMeters,
-                finishedAt: Date()
+                finishedAt: Date(),
+                maximumLeadMeters:
+                    maximumLeadMeters,
+                maximumDeficitMeters:
+                    maximumDeficitMeters,
+                leadChangeCount:
+                    leadChangeCount
             )
             return
         }
@@ -491,26 +508,34 @@ final class GhostRaceStore: ObservableObject {
                 from: matched.location
             )
 
-        comparison = GhostRaceComparison(
-            userLatitude: latitude,
-            userLongitude: longitude,
-            ghostLatitude:
-                ghost.latitude,
-            ghostLongitude:
-                ghost.longitude,
-            userProgress:
-                userProgress,
-            ghostProgress:
-                ghostProgress,
+        let nextComparison =
+            GhostRaceComparison(
+                userLatitude: latitude,
+                userLongitude: longitude,
+                ghostLatitude:
+                    ghost.latitude,
+                ghostLongitude:
+                    ghost.longitude,
+                userProgress:
+                    userProgress,
+                ghostProgress:
+                    ghostProgress,
+                signedDistanceMeters:
+                    matched.cumulativeMeters -
+                    ghost.cumulativeMeters,
+                signedTimeSeconds:
+                    matched.elapsedTime -
+                    snapshot.elapsedTime,
+                routeDeviationMeters:
+                    deviation,
+                updatedAt: Date()
+            )
+
+        comparison = nextComparison
+        recordRaceDynamics(
             signedDistanceMeters:
-                matched.cumulativeMeters -
-                ghost.cumulativeMeters,
-            signedTimeSeconds:
-                matched.elapsedTime -
-                snapshot.elapsedTime,
-            routeDeviationMeters:
-                deviation,
-            updatedAt: Date()
+                nextComparison
+                    .signedDistanceMeters
         )
 
         if snapshot.state == .completed {
@@ -639,8 +664,62 @@ final class GhostRaceStore: ObservableObject {
             finalDistanceDeltaMeters:
                 comparison?
                     .signedDistanceMeters,
-            finishedAt: Date()
+            finishedAt: Date(),
+            maximumLeadMeters:
+                maximumLeadMeters,
+            maximumDeficitMeters:
+                maximumDeficitMeters,
+            leadChangeCount:
+                leadChangeCount
         )
+    }
+
+    private func resetRaceDynamics() {
+        maximumLeadMeters = 0
+        maximumDeficitMeters = 0
+        leadChangeCount = 0
+        lastMeaningfulLeadSign = 0
+    }
+
+    private func recordRaceDynamics(
+        signedDistanceMeters: Double
+    ) {
+        guard signedDistanceMeters.isFinite else {
+            return
+        }
+
+        maximumLeadMeters =
+            max(
+                maximumLeadMeters,
+                signedDistanceMeters
+            )
+        maximumDeficitMeters =
+            max(
+                maximumDeficitMeters,
+                -signedDistanceMeters
+            )
+
+        let threshold = 8.0
+        let sign: Int
+
+        if signedDistanceMeters >= threshold {
+            sign = 1
+        } else if signedDistanceMeters <= -threshold {
+            sign = -1
+        } else {
+            sign = 0
+        }
+
+        guard sign != 0 else {
+            return
+        }
+
+        if lastMeaningfulLeadSign != 0,
+           sign != lastMeaningfulLeadSign {
+            leadChangeCount += 1
+        }
+
+        lastMeaningfulLeadSign = sign
     }
 
     private func nearestReferenceIndex(
