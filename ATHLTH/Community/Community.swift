@@ -134,6 +134,7 @@ struct CommunityEventDraft {
 }
 
 private struct CommunityEventWrite: Encodable {
+    let id: UUID
     let creatorID: UUID
     let title: String
     let summary: String
@@ -152,6 +153,7 @@ private struct CommunityEventWrite: Encodable {
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
+        case id
         case creatorID = "creator_id"
         case title
         case summary
@@ -382,7 +384,7 @@ final class SupabaseCommunityService {
         }
     }
 
-    func createEvent(_ draft: CommunityEventDraft) async throws {
+    func createEvent(_ draft: CommunityEventDraft) async throws -> UUID {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
         }
@@ -405,10 +407,13 @@ final class SupabaseCommunityService {
             resolvedCoordinate = await resolveMeetingCoordinate(cleanMeeting)
         }
 
+        let eventID = UUID()
+
         try await client
             .from("community_events")
             .insert(
                 CommunityEventWrite(
+                    id: eventID,
                     creatorID: currentUserID,
                     title: cleanTitle,
                     summary: draft.summary.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -428,6 +433,8 @@ final class SupabaseCommunityService {
                 )
             )
             .execute()
+
+        return eventID
     }
 
     private func resolveMeetingCoordinate(
@@ -666,12 +673,25 @@ final class CommunityEventStore: ObservableObject {
 
     func create(_ draft: CommunityEventDraft) async -> Bool {
         do {
-            try await service.createEvent(draft)
+            _ = try await service.createEvent(draft)
             await refresh(force: true)
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func createAndReturnID(
+        _ draft: CommunityEventDraft
+    ) async -> UUID? {
+        do {
+            let eventID = try await service.createEvent(draft)
+            await refresh(force: true)
+            return eventID
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
         }
     }
 
@@ -1615,11 +1635,13 @@ struct CommunityEventCreateView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     @State private var draft = CommunityEventDraft()
     @State private var limitParticipants = false
     @State private var maxParticipants = 20
     @State private var selectedRouteID: UUID?
+    @State private var shareToCommunity = true
     @State private var isCreating = false
 
     private var canCreate: Bool {
@@ -1699,6 +1721,19 @@ struct CommunityEventCreateView: View {
                     }
                 }
 
+                Section("Community") {
+                    Toggle(
+                        "Share to Community activity",
+                        isOn: $shareToCommunity
+                    )
+
+                    Text(
+                        "When enabled, people who can see this event also get a compact event card in their Community feed."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section {
                     Label(
                         "Public events can be discovered by signed-in ATHLTH users. Friends-only events are limited to your ATHLTH friends.",
@@ -1736,10 +1771,30 @@ struct CommunityEventCreateView: View {
                                 draft.routeTitle = nil
                             }
 
-                            let created = await community.create(draft)
+                            let eventID =
+                                await community
+                                    .createAndReturnID(draft)
+
+                            if let eventID,
+                               shareToCommunity {
+                                _ = await social
+                                    .shareCommunityEvent(
+                                        id: eventID,
+                                        title: draft.title,
+                                        activityType:
+                                            draft.activityType,
+                                        startsAt:
+                                            draft.startsAt,
+                                        meetingName:
+                                            draft.meetingName,
+                                        visibility:
+                                            draft.visibility
+                                    )
+                            }
+
                             isCreating = false
 
-                            if created {
+                            if eventID != nil {
                                 dismiss()
                             }
                         }
