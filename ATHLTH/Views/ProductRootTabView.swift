@@ -8895,30 +8895,38 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var strengthWorkout:
+        StrengthWorkoutStore
+    @EnvironmentObject private var challenges:
+        ChallengeStore
 
-    @State private var performanceStats: ProfilePerformanceStats?
+    @State private var performanceStats:
+        ProfilePerformanceStats?
     @State private var performanceStatsLoading = false
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
-            accent: ATHLTHTheme.premiumGold.opacity(0.62)
+            accent:
+                ATHLTHTheme.premiumGold.opacity(0.42),
+            softTransition: true
         ) {
             profileHero
         } content: {
             LazyVStack(spacing: 16) {
                 profileSocialStatsCard
-                ProfileGearSummaryView()
-                WorkoutHistoryPreviewSection()
-                goalsCard
+                trophyShowcaseSection
 
-                if settings.showPerformanceStatsOnProfile {
+                if settings
+                    .showPerformanceStatsOnProfile {
                     ProfilePerformanceSection(
                         stats: performanceStats,
-                        isLoading: performanceStatsLoading
+                        isLoading:
+                            performanceStatsLoading
                     )
                 }
 
-                trophiesCard
+                ProfileGearSummaryView()
+                WorkoutHistoryPreviewSection()
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)
@@ -8926,173 +8934,282 @@ struct ATHLTHProfileView: View {
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle("")
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Profile",
+                norwegian: "Profil"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
+        )
+        .toolbarColorScheme(
+            .dark,
+            for: .navigationBar
+        )
         .background {
             ATHLTHSwipeBackEnabler()
-                .frame(width: 0, height: 0)
+                .frame(
+                    width: 0,
+                    height: 0
+                )
         }
         .refreshable {
-            await refreshProfile(forceRefresh: true)
+            await refreshProfile(
+                forceRefresh: true
+            )
         }
         .task {
             await refreshProfile()
         }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(
+                placement: .topBarTrailing
+            ) {
                 NavigationLink {
                     ATHLTHEditProfileView()
                 } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            ATHLTHTheme.cardWarm.opacity(0.82),
-                            in: Circle()
+                    Image(
+                        systemName: "pencil"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .semibold
                         )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.80),
-                                    lineWidth: 1
-                                )
-                        }
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        Color.black.opacity(0.24),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(0.30),
+                                lineWidth: 0.8
+                            )
+                    }
                 }
-                .accessibilityLabel("Edit Profile")
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Edit Profile",
+                        norwegian: "Rediger profil"
+                    )
+                )
 
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            ATHLTHTheme.cardWarm.opacity(0.82),
-                            in: Circle()
+                    Image(
+                        systemName:
+                            "gearshape.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
                         )
-                        .overlay {
-                            Circle()
-                                .stroke(Color.white.opacity(0.80), lineWidth: 1)
-                        }
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        Color.black.opacity(0.24),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(0.30),
+                                lineWidth: 0.8
+                            )
+                    }
                 }
-                .accessibilityLabel("Settings")
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Settings",
+                        norwegian:
+                            "Innstillinger"
+                    )
+                )
             }
         }
     }
 
     private var profileHero: some View {
         GeometryReader { proxy in
-            ZStack {
+            ZStack(alignment: .bottom) {
                 Image("ProfileHero")
                     .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
                     .scaledToFill()
                     .frame(
                         width: proxy.size.width,
-                        height: proxy.size.height,
-                        alignment: .leading
+                        height: proxy.size.height
                     )
                     .clipped()
+                    .accessibilityHidden(true)
 
                 LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.92),
-                        ATHLTHTheme.cardWarm.opacity(0.74),
-                        ATHLTHTheme.cardWarm.opacity(0.28)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        ATHLTHTheme.canvasBottom.opacity(0.38)
+                    stops: [
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.10),
+                            location: 0
+                        ),
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.08),
+                            location: 0.42
+                        ),
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.72),
+                            location: 1
+                        )
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
-                HStack(alignment: .center, spacing: 16) {
+                HStack(
+                    alignment: .bottom,
+                    spacing: 15
+                ) {
                     profileAvatar
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("PROFILE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.6)
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        Text(
+                            session.profile
+                                .displayName
+                        )
+                        .font(
+                            .system(
+                                size: 27,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+
+                        if !session.profile
+                            .username.isEmpty {
+                            Text(
+                                "@\(session.profile.username)"
+                            )
+                            .font(
+                                .subheadline.weight(
+                                    .medium
+                                )
+                            )
                             .foregroundStyle(
-                                ATHLTHTheme.accentDeep.opacity(0.62)
+                                .white.opacity(0.84)
                             )
-
-                        Text(session.profile.displayName)
-                            .font(.system(size: 27, weight: .bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.76)
-
-                        Text("@\(session.profile.username)")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-
-                        if let focus = trainingIdentityFocus {
-                            Label(
-                                focus.title,
-                                systemImage: focus.systemImage
-                            )
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(identityTint(focus))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(
-                                Color.white.opacity(0.66),
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(
-                                        identityTint(focus).opacity(0.14),
-                                        lineWidth: 0.8
-                                    )
-                            }
-                            .padding(.top, 2)
                         }
 
-                        if !session.profile.bio
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
+                        if let focus =
+                            trainingIdentityFocus {
+                            Label(
+                                focus.title,
+                                systemImage:
+                                    focus.systemImage
                             )
-                            .isEmpty {
-                            Text(session.profile.bio)
+                            .font(
+                                .caption2.weight(
+                                    .bold
+                                )
+                            )
+                            .foregroundStyle(.white)
+                            .padding(
+                                .horizontal,
+                                9
+                            )
+                            .padding(
+                                .vertical,
+                                5
+                            )
+                            .background(
+                                identityTint(
+                                    focus
+                                )
+                                .opacity(0.78),
+                                in: Capsule()
+                            )
+                            .padding(.top, 1)
+                        }
+
+                        let bio =
+                            session.profile.bio
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+
+                        if !bio.isEmpty {
+                            Text(bio)
                                 .font(.caption)
                                 .foregroundStyle(
-                                    ATHLTHTheme.primaryText.opacity(0.72)
+                                    .white.opacity(0.88)
                                 )
                                 .lineLimit(2)
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
                                 .padding(.top, 1)
                         }
                     }
 
-                    Spacer(minLength: 6)
+                    Spacer(minLength: 4)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 72)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 42)
+                .shadow(
+                    color:
+                        Color.black.opacity(0.28),
+                    radius: 10,
+                    y: 4
+                )
             }
         }
-        .frame(height: 236)
+        .frame(height: 318)
         .clipped()
     }
 
-    private var profileSocialStatsCard: some View {
+    private var profileSocialStatsCard:
+        some View {
         HStack(spacing: 0) {
             NavigationLink {
-                ProfileFollowListView(mode: .followers)
+                ProfileFollowListView(
+                    mode: .followers
+                )
             } label: {
                 socialStat(
-                    value: social.followerCount,
-                    title: "Followers",
+                    value:
+                        social.followerCount,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Followers",
+                            norwegian: "Følgere"
+                        ),
                     icon: "person.2.fill"
                 )
             }
@@ -9101,207 +9218,567 @@ struct ATHLTHProfileView: View {
             profileStatDivider
 
             NavigationLink {
-                ProfileFollowListView(mode: .following)
+                ProfileFollowListView(
+                    mode: .following
+                )
             } label: {
                 socialStat(
-                    value: social.followingCount,
-                    title: "Following",
-                    icon: "person.badge.plus"
+                    value:
+                        social.followingCount,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
+                    icon:
+                        "person.badge.plus"
                 )
             }
             .buttonStyle(.plain)
+
+            profileStatDivider
+
+            socialStat(
+                value: profileWorkoutCount,
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Workouts",
+                        norwegian: "Økter"
+                    ),
+                icon: "chart.bar.fill"
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 13)
         .frame(maxWidth: .infinity)
         .background {
             RoundedRectangle(
-                cornerRadius: ATHLTHTheme.cornerRadius,
+                cornerRadius: 24,
                 style: .continuous
             )
             .fill(
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.card,
-                        ATHLTHTheme.cardWarm.opacity(0.62)
+                        Color.white
+                            .opacity(0.92),
+                        ATHLTHTheme
+                            .cardWarm
+                            .opacity(0.72)
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
                 )
             )
         }
         .overlay {
             RoundedRectangle(
-                cornerRadius: ATHLTHTheme.cornerRadius,
+                cornerRadius: 24,
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.72),
-                lineWidth: 0.8
+                Color.white.opacity(0.82),
+                lineWidth: 0.9
             )
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.055),
-            radius: 12,
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.06),
+            radius: 14,
             x: 0,
-            y: 5
+            y: 6
         )
     }
 
+    private var trophyShowcaseSection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Trophy cabinet",
+                            norwegian:
+                                "Troféskap"
+                        )
+                    )
+                    .font(
+                        .title3.weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
 
-    private var goalsCard: some View {
-        NavigationLink {
-            GoalsHubView()
-        } label: {
-            ATHLTHCard {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "target")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.green)
-                        .frame(width: 46, height: 46)
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Achievements that tell your story",
+                            norwegian:
+                                "Prestasjonene som forteller historien din"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    TrophyCollectionView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "See all",
+                                norwegian: "Se alle"
+                            )
+                        )
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                }
+            }
+
+            NavigationLink {
+                TrophyCollectionView()
+            } label: {
+                VStack(spacing: 13) {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "trophy.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
                         .background(
-                            Color.green.opacity(0.10),
+                            ATHLTHTheme
+                                .champagneSoft
+                                .opacity(0.94),
                             in: RoundedRectangle(
                                 cornerRadius: 14,
                                 style: .continuous
                             )
                         )
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 7) {
-                            Text("Goals")
-                                .font(.headline)
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-
-                            if !goalStore.activeGoals.isEmpty {
-                                Text(
-                                    "\(goalStore.activeGoals.count)"
-                                )
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.green)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Color.green.opacity(0.10),
-                                    in: Capsule()
-                                )
-                            }
-                        }
-
-                        if let goal = goalStore.primaryGoal ??
-                            goalStore.activeGoals.first {
-                            Text(goal.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .lineLimit(1)
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                "\(trophyStore.unlockedCount)"
+                            )
+                            .font(
+                                .title3
+                                    .monospacedDigit()
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
 
                             Text(
-                                ATHLTHLocalization.format(
-                                    "%d%% complete · Open Goal Hub",
-                                    Int(
-                                        (goal.progress * 100)
-                                            .rounded()
-                                    )
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Unlocked trophies",
+                                    norwegian:
+                                        "Opplåste troféer"
                                 )
                             )
                             .font(.caption)
-                            .foregroundStyle(.secondary)
-                        } else {
-                            Text("Create and manage your goals")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        Spacer()
+
+                        if let next =
+                            trophyStore
+                                .nextTrophies
+                                .first {
+                            VStack(
+                                alignment: .trailing,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Next",
+                                        norwegian:
+                                            "Neste"
+                                    )
+                                )
+                                .font(
+                                    .caption2
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                                Text(
+                                    next.title
+                                )
+                                .font(
+                                    .caption
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(1)
+                            }
                         }
                     }
 
-                    Spacer()
+                    if !profileFeaturedTrophies
+                        .isEmpty {
+                        HStack(spacing: 8) {
+                            ForEach(
+                                profileFeaturedTrophies
+                            ) { trophy in
+                                profileTrophyTile(
+                                    trophy
+                                )
+                            }
+                        }
+                    } else if let next =
+                        trophyStore
+                            .nextTrophies
+                            .first {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 7
+                        ) {
+                            HStack {
+                                Label(
+                                    next.title,
+                                    systemImage:
+                                        next.systemImage
+                                )
+                                .font(
+                                    .caption
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
 
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("See All")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                                Spacer()
 
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundStyle(.tertiary)
-                    }
-                }
+                                Text(
+                                    "\(Int((next.progress * 100).rounded()))%"
+                                )
+                                .font(
+                                    .caption
+                                        .monospacedDigit()
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                            }
 
-                if let goal = goalStore.primaryGoal ??
-                    goalStore.activeGoals.first {
-                    ProgressView(value: goal.progress)
-                        .tint(.green)
-                        .padding(.top, 10)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
-
-    private var trophiesCard: some View {
-        NavigationLink {
-            TrophyCollectionView()
-        } label: {
-            ATHLTHCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "trophy.fill")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.orange)
-                        .frame(width: 44, height: 44)
+                            ProgressView(
+                                value:
+                                    next.progress
+                            )
+                            .tint(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+                        }
+                        .padding(12)
                         .background(
-                            Color.orange.opacity(0.10),
-                            in: Circle()
+                            ATHLTHTheme
+                                .champagneSoft
+                                .opacity(0.48),
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
                         )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Trophies")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text("\(trophyStore.unlockedCount)")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text("Unlocked")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Complete workouts and challenges to start filling your cabinet.",
+                                norwegian:
+                                    "Fullfør økter og utfordringer for å begynne å fylle troféskapet."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            alignment: .leading
+                        )
                     }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.tertiary)
                 }
+                .padding(15)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white
+                                .opacity(0.94),
+                            ATHLTHTheme
+                                .champagneSoft
+                                .opacity(0.30)
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white
+                            .opacity(0.84),
+                        lineWidth: 0.9
+                    )
+                }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(0.035),
+                    radius: 13,
+                    y: 5
+                )
             }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
     }
 
-    private var trainingIdentityFocus: TrainingFocus? {
-        session.onboardingProfile?.trainingFocus
+    private var profileFeaturedTrophies:
+        [TrophyProgressItem] {
+        let showcase =
+            trophyStore.showcaseTrophies
+
+        if !showcase.isEmpty {
+            return Array(
+                showcase.prefix(3)
+            )
+        }
+
+        let unlocked =
+            trophyStore.trophies
+                .filter(\.isUnlocked)
+
+        if !unlocked.isEmpty {
+            return Array(
+                unlocked.prefix(3)
+            )
+        }
+
+        return []
     }
 
-    private func identityTint(_ focus: TrainingFocus) -> Color {
+    private func profileTrophyTile(
+        _ trophy: TrophyProgressItem
+    ) -> some View {
+        let tint =
+            profileTrophyTint(
+                trophy.displayRarity
+            )
+
+        return VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Image(
+                systemName:
+                    trophy.systemImage
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(tint)
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                tint.opacity(0.10),
+                in: Circle()
+            )
+
+            Text(trophy.title)
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+
+            Text(trophy.stageLabel)
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(10)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 100,
+            alignment: .leading
+        )
+        .background(
+            LinearGradient(
+                colors: [
+                    tint.opacity(0.075),
+                    Color.white.opacity(0.68)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var profileWorkoutCount: Int {
+        performanceStats?
+            .totalWorkoutCount ??
+            health.workouts.count
+    }
+
+    private var trainingIdentityFocus:
+        TrainingFocus? {
+        session.onboardingProfile?
+            .trainingFocus
+    }
+
+    private func identityTint(
+        _ focus: TrainingFocus
+    ) -> Color {
         switch focus {
-        case .running: return .green
-        case .strength: return .purple
-        case .hybrid: return .orange
-        case .walking: return .blue
-        case .generalFitness: return ATHLTHTheme.accent
-        case .recovery: return .teal
+        case .running:
+            return .green
+        case .strength:
+            return .purple
+        case .hybrid:
+            return .orange
+        case .walking:
+            return .blue
+        case .generalFitness:
+            return ATHLTHTheme.accent
+        case .recovery:
+            return .teal
         }
     }
 
-    private var profileStatDivider: some View {
+    private func profileTrophyTint(
+        _ rarity: TrophyRarity
+    ) -> Color {
+        switch rarity {
+        case .core:
+            return ATHLTHTheme.accentDeep
+        case .rare:
+            return .blue
+        case .epic:
+            return .purple
+        case .signature:
+            return ATHLTHTheme.premiumGold
+        }
+    }
+
+    private var profileStatDivider:
+        some View {
         Rectangle()
-            .fill(Color.black.opacity(0.07))
-            .frame(width: 1, height: 42)
+            .fill(
+                Color.black.opacity(0.07)
+            )
+            .frame(
+                width: 1,
+                height: 42
+            )
     }
 
     private func socialStat(
@@ -9309,31 +9786,62 @@ struct ATHLTHProfileView: View {
         title: String,
         icon: String
     ) -> some View {
-        HStack(spacing: 10) {
+        VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(value.formatted())
-                    .font(.headline.monospacedDigit().weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(
+                value.formatted()
+            )
+            .font(
+                .headline
+                    .monospacedDigit()
+                    .weight(.bold)
+            )
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
 
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+            Text(title)
+                .font(
+                    .system(
+                        size: 10.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
+        .frame(
+            maxWidth: .infinity
+        )
+        .contentShape(
+            Rectangle()
+        )
     }
 
     @ViewBuilder
-    private var profileAvatar: some View {
-        if let avatarURL = session.profile.avatarURL {
-            AsyncImage(url: avatarURL) { phase in
+    private var profileAvatar:
+        some View {
+        if let avatarURL =
+            session.profile.avatarURL {
+            AsyncImage(
+                url: avatarURL
+            ) { phase in
                 switch phase {
-                case .success(let image):
+                case .success(
+                    let image
+                ):
                     image
                         .resizable()
                         .scaledToFill()
@@ -9341,56 +9849,125 @@ struct ATHLTHProfileView: View {
                     avatarFallback
                 }
             }
-            .frame(width: 96, height: 96)
+            .frame(
+                width: 94,
+                height: 94
+            )
             .clipShape(Circle())
             .overlay {
                 Circle()
-                    .stroke(Color.white.opacity(0.95), lineWidth: 3)
+                    .stroke(
+                        Color.white
+                            .opacity(0.96),
+                        lineWidth: 3
+                    )
             }
-            .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 5)
+            .shadow(
+                color:
+                    .black.opacity(0.18),
+                radius: 12,
+                x: 0,
+                y: 6
+            )
         } else {
             avatarFallback
-                .frame(width: 96, height: 96)
+                .frame(
+                    width: 94,
+                    height: 94
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.96),
+                            lineWidth: 3
+                        )
+                }
         }
     }
 
-    private var avatarFallback: some View {
+    private var avatarFallback:
+        some View {
         Circle()
-            .fill(ATHLTHTheme.accentSoft)
+            .fill(
+                ATHLTHTheme.accentSoft
+            )
             .overlay {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Image(
+                    systemName: "person.fill"
+                )
+                .font(
+                    .system(
+                        size: 39,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
             }
     }
 
     @MainActor
-    private func refreshProfile(forceRefresh: Bool = false) async {
-        async let socialRefresh: Void = social.refresh()
-        async let gearRefresh: Void = gear.refresh()
+    private func refreshProfile(
+        forceRefresh: Bool = false
+    ) async {
+        async let socialRefresh: Void =
+            social.refresh()
+        async let gearRefresh: Void =
+            gear.refresh()
 
-        if health.hasRequestedAuthorization {
+        if health
+            .hasRequestedAuthorization {
             performanceStatsLoading = true
-            performanceStats = try? await health.profilePerformanceStats(
-                forceRefresh: forceRefresh
-            )
+            performanceStats =
+                try? await health
+                    .profilePerformanceStats(
+                        forceRefresh:
+                            forceRefresh
+                    )
             performanceStatsLoading = false
         } else {
             performanceStats = nil
         }
 
-        _ = await (socialRefresh, gearRefresh)
+        await trophyStore.refresh(
+            health: health,
+            strength: strengthWorkout,
+            goals: goalStore,
+            challenges: challenges,
+            currentUserID:
+                session.profile.userID
+        )
 
-        if social.privacy?.sharePerformanceStats == true {
-            await social.syncOwnPerformance(performanceStats)
+        _ = await (
+            socialRefresh,
+            gearRefresh
+        )
+
+        if social.privacy?
+            .sharePerformanceStats == true {
+            await social
+                .syncOwnPerformance(
+                    performanceStats
+                )
         }
-        if social.privacy?.shareTrophyCabinet == true {
-            await social.syncOwnTrophies(trophyStore.showcaseTrophies)
+
+        if social.privacy?
+            .shareTrophyCabinet == true {
+            await social
+                .syncOwnTrophies(
+                    trophyStore
+                        .showcaseTrophies
+                )
         }
-        if let privacy = social.privacy {
+
+        if let privacy =
+            social.privacy {
             await social.syncOwnGoals(
                 goalStore.goals,
-                enabled: privacy.shareGoals
+                enabled:
+                    privacy.shareGoals
             )
         }
     }
