@@ -484,7 +484,7 @@ struct AdvancedPlannerView: View {
                         selectedDayID = day.id
                         showingSessionEditor = true
                     } label: {
-                        Label("Add workout", systemImage: "plus")
+                        Label("Add", systemImage: "plus")
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
@@ -502,7 +502,7 @@ struct AdvancedPlannerView: View {
                                 .foregroundStyle(ATHLTHTheme.accent)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Rest day — or add a workout")
+                                Text("Rest day — or add")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(
                                         ATHLTHTheme.primaryText
@@ -3184,6 +3184,7 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
+    @State private var showingContentPicker = false
 
     @State private var plannedExercises: [PlannedExercise] = []
     @State private var exerciseBeingEdited: PlannedExercise?
@@ -3357,50 +3358,6 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if existingWorkout == nil {
-                    Section("Start from") {
-                        Button {
-                            showingSavedWorkoutPicker = true
-                        } label: {
-                            HStack(spacing: 11) {
-                                Image(
-                                    systemName:
-                                        "rectangle.stack.fill"
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.accent
-                                )
-                                .frame(width: 28)
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text("My Workouts")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.primaryText
-                                        )
-
-                                    Text(
-                                        "Use a complete saved workout as this plan session."
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                Image(
-                                    systemName: "chevron.right"
-                                )
-                                .font(.caption.bold())
-                                .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
                 if !workoutBlocks.isEmpty {
                     Section("Workout Structure") {
                         HStack {
@@ -3583,6 +3540,51 @@ struct SessionEditorView: View {
                     .textCase(nil)
                 }
 
+                if existingWorkout == nil ||
+                    kind == .strength {
+                    Section {
+                        Button {
+                            showingContentPicker = true
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(
+                                    systemName:
+                                        "plus.circle.fill"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(width: 28)
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text("Add exercise or workout")
+                                        .foregroundStyle(
+                                            ATHLTHTheme.primaryText
+                                        )
+
+                                    Text(
+                                        "Choose one exercise, or insert a complete workout with all of its exercises."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName: "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 if editorMode == .advanced {
                     advancedOptions
                 }
@@ -3626,8 +3628,38 @@ struct SessionEditorView: View {
                     .disabled(!canAdd)
                 }
             }
+            .confirmationDialog(
+                "Add to this plan session",
+                isPresented: $showingContentPicker,
+                titleVisibility: .visible
+            ) {
+                Button {
+                    showingSavedWorkoutPicker = true
+                } label: {
+                    Label(
+                        "Workout",
+                        systemImage: "rectangle.stack.fill"
+                    )
+                }
+
+                Button {
+                    kind = .strength
+                    showingExerciseLibrary = true
+                } label: {
+                    Label(
+                        "Exercise",
+                        systemImage: "dumbbell.fill"
+                    )
+                }
+
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "A workout inserts the complete session. An exercise adds one movement to this session."
+                )
+            }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
-                SavedWorkoutPickerView { workout in
+                PlanWorkoutPickerView { workout in
                     applySavedWorkout(workout)
                     showingSavedWorkoutPicker = false
                 }
@@ -3691,7 +3723,19 @@ struct SessionEditorView: View {
                 )
             }
             .task {
-                await gear.refresh()
+                async let gearRefresh: Void =
+                    gear.refresh()
+
+                async let exerciseRefresh: Void = {
+                    if exerciseLibrary.allExercises.isEmpty {
+                        await exerciseLibrary.refresh()
+                    }
+                }()
+
+                _ = await (
+                    gearRefresh,
+                    exerciseRefresh
+                )
                 applyDefaultRunningShoeIfNeeded()
             }
             .onChange(of: kind) { _, newKind in
@@ -4385,14 +4429,6 @@ struct SessionEditorView: View {
                 }
             }
 
-            Button {
-                showingExerciseLibrary = true
-            } label: {
-                Label(
-                    "Add Exercise",
-                    systemImage: "plus.circle.fill"
-                )
-            }
         }
         .environment(\.editMode, .constant(.active))
     }
@@ -4912,6 +4948,142 @@ struct SessionEditorView: View {
     }
 
 
+    private func clonePlannedExercises(
+        _ exercises: [PlannedExercise]
+    ) -> [PlannedExercise] {
+        var supersetIDs:
+            [UUID: UUID] = [:]
+
+        return exercises.map { exercise in
+            let clonedSupersetID =
+                exercise.supersetGroupID.map {
+                    originalID in
+                    if let existing =
+                        supersetIDs[originalID] {
+                        return existing
+                    }
+
+                    let replacement = UUID()
+                    supersetIDs[originalID] =
+                        replacement
+                    return replacement
+                }
+
+            return PlannedExercise(
+                id: UUID(),
+                exerciseID:
+                    exercise.exerciseID,
+                embeddedExercise:
+                    exercise.embeddedExercise,
+                sets: exercise.sets,
+                reps: exercise.reps,
+                targetWeightKilograms:
+                    exercise.targetWeightKilograms,
+                targetRPE:
+                    exercise.targetRPE,
+                restSeconds:
+                    exercise.restSeconds,
+                notes: exercise.notes,
+                targetRIR:
+                    exercise.targetRIR,
+                supersetGroupID:
+                    clonedSupersetID,
+                progression:
+                    exercise.progression
+            )
+        }
+    }
+
+    private func plannedExercisesFromBlocks(
+        _ blocks: [WorkoutTemplateBlock]
+    ) -> [PlannedExercise] {
+        blocks
+            .filter {
+                $0.kind == .exercise
+            }
+            .map { block in
+                let slug =
+                    block.exerciseSlug?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                let resolvedEntry =
+                    exerciseLibrary
+                        .allExercises
+                        .first { entry in
+                            if let slug,
+                               let identifier =
+                                entry.sourceIdentifier {
+                                return identifier
+                                    .caseInsensitiveCompare(
+                                        slug
+                                    ) == .orderedSame
+                            }
+
+                            return entry.name
+                                .caseInsensitiveCompare(
+                                    block.title
+                                ) == .orderedSame
+                        }
+
+                let snapshot =
+                    resolvedEntry?
+                        .exercise
+                        .snapshot ??
+                    ExerciseSnapshot(
+                        name: block.title,
+                        instructions: [],
+                        primaryMuscles: [],
+                        equipment: [],
+                        imageURL: nil
+                    )
+
+                let noteParts =
+                    [
+                        block.loadNote,
+                        block.notes
+                    ]
+                    .compactMap { value in
+                        value?
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                    }
+                    .filter {
+                        !$0.isEmpty
+                    }
+
+                return PlannedExercise(
+                    id: UUID(),
+                    exerciseID:
+                        resolvedEntry?
+                            .exercise.id,
+                    embeddedExercise:
+                        snapshot,
+                    sets: 1,
+                    reps:
+                        block.repetitions,
+                    targetWeightKilograms:
+                        block.targetWeightKilograms,
+                    targetRPE: nil,
+                    restSeconds: nil,
+                    notes:
+                        noteParts.isEmpty
+                            ? nil
+                            : noteParts.joined(
+                                separator: " · "
+                            ),
+                    targetRIR: nil,
+                    supersetGroupID: nil,
+                    progression:
+                        StrengthProgressionRule.none
+                )
+            }
+    }
+
     private func applySavedWorkout(
         _ workout: PlannedSession
     ) {
@@ -4923,7 +5095,18 @@ struct SessionEditorView: View {
             workout.targetDistanceKilometers ??
             distanceKilometers
         notes = workout.notes ?? ""
-        plannedExercises = workout.exercises
+
+        let copiedExercises =
+            clonePlannedExercises(
+                workout.exercises
+            )
+        plannedExercises =
+            copiedExercises.isEmpty
+                ? plannedExercisesFromBlocks(
+                    workout.resolvedWorkoutBlocks
+                )
+                : copiedExercises
+
         selectedRunningWorkouts =
             workout.resolvedRunningWorkouts
         selectedRouteID = workout.routeID
