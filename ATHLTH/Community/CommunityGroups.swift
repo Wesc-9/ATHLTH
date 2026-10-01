@@ -4107,9 +4107,9 @@ struct CommunityGroupDetailView: View {
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.08),
-                    Color.black.opacity(0.22),
-                    Color.black.opacity(0.68)
+                    Color.black.opacity(0.05),
+                    Color.black.opacity(0.20),
+                    Color.black.opacity(0.72)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -4117,118 +4117,12 @@ struct CommunityGroupDetailView: View {
 
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.accentDeep.opacity(0.34),
+                    Color.black.opacity(0.42),
                     Color.clear
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
             )
-
-            HStack(alignment: .bottom, spacing: 14) {
-                if groups.canManage(currentGroup) {
-                    Button {
-                        showingGroupSettings = true
-                    } label: {
-                        detailGroupImage
-                            .overlay(alignment: .bottomTrailing) {
-                                Image(systemName: "pencil")
-                                    .font(
-                                        .system(
-                                            size: 10,
-                                            weight: .bold
-                                        )
-                                    )
-                                    .foregroundStyle(.white)
-                                    .frame(width: 24, height: 24)
-                                    .background(
-                                        ATHLTHTheme.accentDeep,
-                                        in: Circle()
-                                    )
-                                    .overlay {
-                                        Circle()
-                                            .stroke(
-                                                Color.white,
-                                                lineWidth: 2
-                                            )
-                                    }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Change Club image")
-                } else {
-                    detailGroupImage
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("CLUB")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.8)
-                        .foregroundStyle(
-                            ATHLTHTheme.champagne
-                        )
-
-                    Text(currentGroup.name)
-                        .font(
-                            .system(
-                                size: 29,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.76)
-
-                    if !currentGroup.summary
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        .isEmpty {
-                        Text(currentGroup.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(
-                                .white.opacity(0.84)
-                            )
-                            .lineLimit(2)
-                    }
-
-                    HStack(spacing: 7) {
-                        clubHeaderChip(
-                            currentGroup.visibility == "private"
-                                ? "Private"
-                                : "Public",
-                            icon:
-                                currentGroup.visibility == "private"
-                                    ? "lock.fill"
-                                    : "globe"
-                        )
-
-                        if isMember ||
-                            currentGroup.creatorID ==
-                                session.profile.userID {
-                            clubHeaderChip(
-                                memberCountText,
-                                icon: "person.2.fill"
-                            )
-                        }
-
-                        if !currentGroup.locationName
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            )
-                            .isEmpty {
-                            clubHeaderChip(
-                                currentGroup.locationName,
-                                icon: "location.fill"
-                            )
-                        }
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 22)
 
             VStack {
                 HStack(spacing: 10) {
@@ -4240,7 +4134,12 @@ struct CommunityGroupDetailView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Back")
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Back",
+                            norwegian: "Tilbake"
+                        )
+                    )
 
                     Spacer()
 
@@ -4257,68 +4156,55 @@ struct CommunityGroupDetailView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.format(
-                                english: "Members, %@",
-                                norwegian: "Medlemmer, %@",
-                                memberCountText
-                            )
-                        )
 
-                        if groups.canManage(currentGroup) {
-                            Menu {
+                        Menu {
+                            if groups.canManage(
+                                currentGroup
+                            ) {
                                 Button {
-                                    showingGroupSettings = true
-                                } label: {
-                                    Label(
-                                        "Club Settings",
-                                        systemImage: "gearshape"
-                                    )
-                                }
-
-                                Button {
-                                    showingNotificationSettings =
+                                    showingGroupSettings =
                                         true
                                 } label: {
                                     Label(
-                                        "Notifications",
-                                        systemImage: "bell"
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Club Settings",
+                                                norwegian:
+                                                    "Club-innstillinger"
+                                            ),
+                                        systemImage:
+                                            "gearshape"
                                     )
                                 }
+                            }
 
-                                if !groups.isOwner(
-                                    of: currentGroup
-                                ) {
-                                    Button(
-                                        "Leave Club",
-                                        role: .destructive
-                                    ) {
-                                        Task {
-                                            await groups.leave(
-                                                currentGroup
-                                            )
-                                        }
-                                    }
-                                }
+                            Button {
+                                showingNotificationSettings =
+                                    true
                             } label: {
-                                headerCircleButton(
-                                    icon: "ellipsis"
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Notifications",
+                                            norwegian:
+                                                "Varsler"
+                                        ),
+                                    systemImage: "bell"
                                 )
                             }
-                        } else {
-                            Menu {
-                                Button {
-                                    showingNotificationSettings =
-                                        true
-                                } label: {
-                                    Label(
-                                        "Notifications",
-                                        systemImage: "bell"
-                                    )
-                                }
 
+                            if !groups.isOwner(
+                                of: currentGroup
+                            ) {
                                 Button(
-                                    "Leave Club",
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Leave Club",
+                                        norwegian:
+                                            "Forlat Club"
+                                    ),
                                     role: .destructive
                                 ) {
                                     Task {
@@ -4327,11 +4213,11 @@ struct CommunityGroupDetailView: View {
                                         )
                                     }
                                 }
-                            } label: {
-                                headerCircleButton(
-                                    icon: "ellipsis"
-                                )
                             }
+                        } label: {
+                            headerCircleButton(
+                                icon: "ellipsis"
+                            )
                         }
                     }
                 }
@@ -4343,25 +4229,207 @@ struct CommunityGroupDetailView: View {
 
                 Spacer()
             }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Stronger\nTogether",
+                    norwegian: "Sterkere\nSammen"
+                )
+            )
+            .font(
+                .system(
+                    size: 21,
+                    weight: .medium,
+                    design: .serif
+                )
+            )
+            .italic()
+            .multilineTextAlignment(.center)
+            .foregroundStyle(
+                .white.opacity(0.88)
+            )
+            .rotationEffect(.degrees(-7))
+            .shadow(
+                color: .black.opacity(0.18),
+                radius: 4,
+                y: 2
+            )
+            .padding(.trailing, 95)
+            .padding(
+                .top,
+                max(topInset + 5, 16)
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topTrailing
+            )
+            .allowsHitTesting(false)
+
+            HStack(
+                alignment: .bottom,
+                spacing: 14
+            ) {
+                if groups.canManage(
+                    currentGroup
+                ) {
+                    Button {
+                        showingGroupSettings = true
+                    } label: {
+                        detailGroupImage
+                            .overlay(
+                                alignment:
+                                    .bottomTrailing
+                            ) {
+                                Image(
+                                    systemName:
+                                        "pencil"
+                                )
+                                .font(
+                                    .system(
+                                        size: 12,
+                                        weight:
+                                            .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .frame(
+                                    width: 30,
+                                    height: 30
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .accentDeep,
+                                    in: Circle()
+                                )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            .white,
+                                            lineWidth:
+                                                2
+                                        )
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    detailGroupImage
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(currentGroup.name)
+                        .font(
+                            .system(
+                                size: 31,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                        .shadow(
+                            color:
+                                .black.opacity(
+                                    0.20
+                                ),
+                            radius: 4,
+                            y: 1
+                        )
+
+                    if !currentGroup.summary
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty {
+                        Text(
+                            currentGroup.summary
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            .white.opacity(0.92)
+                        )
+                        .lineLimit(2)
+                    }
+
+                    HStack(spacing: 7) {
+                        clubHeaderChip(
+                            currentGroup.visibility ==
+                                "private"
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Private",
+                                        norwegian:
+                                            "Privat"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Public",
+                                        norwegian:
+                                            "Offentlig"
+                                    ),
+                            icon:
+                                currentGroup.visibility ==
+                                    "private"
+                                    ? "lock.fill"
+                                    : "globe"
+                        )
+
+                        clubHeaderChip(
+                            memberCountText,
+                            icon:
+                                "person.2.fill"
+                        )
+
+                        if !currentGroup.locationName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            clubHeaderChip(
+                                currentGroup
+                                    .locationName,
+                                icon:
+                                    "location.fill"
+                            )
+                        }
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 18)
         }
         .frame(
-            height: 286 + max(topInset, 0)
+            height: 238 + max(topInset, 0)
         )
         .frame(maxWidth: .infinity)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: 30,
-                bottomTrailingRadius: 30,
+                bottomLeadingRadius: 28,
+                bottomTrailingRadius: 28,
                 topTrailingRadius: 0,
                 style: .continuous
             )
         )
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.11),
-            radius: 22,
-            x: 0,
-            y: 9
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.10),
+            radius: 18,
+            y: 7
         )
     }
 
