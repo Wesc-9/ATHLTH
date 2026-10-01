@@ -88,7 +88,15 @@ struct ProductRootTabView: View {
             ATHLTHRecoveryView { tab in
                 selectedTab = tab
             }
-                .tabItem { Label("Insights", systemImage: "sparkles") }
+                .tabItem {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Insights",
+                            norwegian: "Innsikt"
+                        ),
+                        systemImage: "sparkles"
+                    )
+                }
                 .tag(2)
 
             ATHLTHExploreView()
@@ -5395,9 +5403,18 @@ struct ATHLTHRecoveryView: View {
             ) {
                 ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
-                    title: "Insights",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Insights",
+                            norwegian: "Innsikt"
+                        ),
                     subtitle:
-                        "Understand your body. Make better decisions. Stay in the game."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Understand your body. Make better decisions. Stay in the game.",
+                            norwegian:
+                                "Forstå kroppen din. Ta bedre valg. Hold deg i gang."
+                        )
                 )
             } content: {
                 LazyVStack(spacing: 16) {
