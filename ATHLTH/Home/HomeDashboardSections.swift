@@ -1944,28 +1944,6 @@ private struct HomeMetricMiniBars:
                     ),
                     id: \.offset
                 ) { _, value in
-                    let height:
-                        CGFloat
-
-                    if let value,
-                       value.isFinite,
-                       value >= 0 {
-                        height =
-                            max(
-                                4,
-                                proxy.size.height *
-                                    CGFloat(
-                                        min(
-                                            value /
-                                                maximum,
-                                            1
-                                        )
-                                    )
-                            )
-                    } else {
-                        height = 4
-                    }
-
                     Capsule()
                         .fill(
                             value == nil
@@ -1981,12 +1959,45 @@ private struct HomeMetricMiniBars:
                                 .infinity
                         )
                         .frame(
-                            height: height
+                            height:
+                                barHeight(
+                                    value: value,
+                                    maximum:
+                                        maximum,
+                                    availableHeight:
+                                        proxy
+                                            .size
+                                            .height
+                                )
                         )
                 }
             }
         }
         .accessibilityHidden(true)
+    }
+
+    private func barHeight(
+        value: Double?,
+        maximum: Double,
+        availableHeight: CGFloat
+    ) -> CGFloat {
+        guard let value,
+              value.isFinite,
+              value >= 0
+        else {
+            return 4
+        }
+
+        return max(
+            4,
+            availableHeight *
+                CGFloat(
+                    min(
+                        value / maximum,
+                        1
+                    )
+                )
+        )
     }
 }
 
