@@ -395,6 +395,19 @@ final class IPhoneWorkoutStore:
         manager.startUpdatingLocation()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
+
+        if audioCoach?.enabled == true {
+            speak(
+                localizedCoachPhrase(
+                    english: "Audio Coach ready.",
+                    norwegian: "Audio Coach er klar.",
+                    configuration: audioCoach
+                ),
+                configuration: audioCoach,
+                priority: .routineCoach
+            )
+        }
+
         announceStructuredStepIfNeeded(
             prefix: "Starting"
         )
@@ -2241,6 +2254,52 @@ final class IPhoneWorkoutStore:
                 options:
                     .notifyOthersOnDeactivation
             )
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self.speechSynthesizer.isSpeaking
+            else {
+                return
+            }
+
+            self.guidancePriorityGate.voiceDidFinish()
+
+            try? AVAudioSession
+                .sharedInstance()
+                .setActive(
+                    false,
+                    options:
+                        .notifyOthersOnDeactivation
+                )
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  !self.speechSynthesizer.isSpeaking
+            else {
+                return
+            }
+
+            self.guidancePriorityGate.voiceDidFinish()
+
+            try? AVAudioSession
+                .sharedInstance()
+                .setActive(
+                    false,
+                    options:
+                        .notifyOthersOnDeactivation
+                )
+        }
     }
 
     private func durationPhrase(
