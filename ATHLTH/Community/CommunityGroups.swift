@@ -6191,6 +6191,9 @@ struct CommunityGroupCreateView: View {
     @State private var membersCanCreateContent = true
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var selectedHeaderPhoto: PhotosPickerItem?
+    @State private var selectedHeaderImageData: Data?
+    @State private var selectedFeaturedChallengeID: UUID?
     @State private var saving = false
 
     var body: some View {
@@ -6537,6 +6540,32 @@ struct CommunityGroupCreateView: View {
         )
     }
 
+    private var availableFeaturedChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return groups.challenges(in: currentGroup.id)
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.endsAt >= now
+            }
+            .sorted { lhs, rhs in
+                let lhsActive =
+                    lhs.startsAt <= now &&
+                    lhs.endsAt >= now
+                let rhsActive =
+                    rhs.startsAt <= now &&
+                    rhs.endsAt >= now
+
+                if lhsActive != rhsActive {
+                    return lhsActive
+                }
+
+                return lhs.startsAt < rhs.startsAt
+            }
+    }
+
     private var joinModeDescription: String {
         switch joinMode {
         case "open":
@@ -6574,6 +6603,9 @@ struct CommunityGroupSettingsView: View {
         _joinMode = State(initialValue: group.joinMode)
         _membersCanCreateContent = State(
             initialValue: group.membersCanCreateContent
+        )
+        _selectedFeaturedChallengeID = State(
+            initialValue: group.featuredChallengeID
         )
     }
 
@@ -6638,7 +6670,7 @@ struct CommunityGroupSettingsView: View {
                         }
 
                         Text(
-                            "The Club photo is used as the hero image with an ATHLTH readability gradient, and as the Club thumbnail elsewhere in Community."
+                            "The Club image is the square identity used on the Club page and in Community."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -6647,7 +6679,92 @@ struct CommunityGroupSettingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 } header: {
-                    Text("Club photo")
+                    Text("Club image")
+                }
+
+                Section {
+                    VStack(spacing: 14) {
+                        groupHeaderImagePreview
+
+                        HStack(spacing: 10) {
+                            PhotosPicker(
+                                selection: $selectedHeaderPhoto,
+                                matching: .images
+                            ) {
+                                Label(
+                                    selectedHeaderImageData == nil
+                                        ? "Choose Header"
+                                        : "Change Header",
+                                    systemImage: "photo.on.rectangle.angled"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accent)
+
+                            if selectedHeaderImageData != nil {
+                                Button(role: .destructive) {
+                                    selectedHeaderImageData = nil
+                                    selectedHeaderPhoto = nil
+                                } label: {
+                                    Label(
+                                        "Remove",
+                                        systemImage: "trash"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                            } else if currentGroup.headerImageURL != nil {
+                                Button(role: .destructive) {
+                                    Task {
+                                        saving = true
+                                        _ = await groups.removeGroupHeaderImage(
+                                            currentGroup
+                                        )
+                                        saving = false
+                                    }
+                                } label: {
+                                    Label(
+                                        "Remove",
+                                        systemImage: "trash"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(saving)
+                            }
+                        }
+
+                        Text(
+                            "The header is the wide cover image behind the Club identity. Owner and Admin can change it."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Club header")
+                }
+
+                Section("Featured Club Challenge") {
+                    Picker(
+                        "Club Challenge",
+                        selection: $selectedFeaturedChallengeID
+                    ) {
+                        Text("None")
+                            .tag(nil as UUID?)
+
+                        ForEach(availableFeaturedChallenges) {
+                            challenge in
+                            Text(challenge.title)
+                                .tag(challenge.id as UUID?)
+                        }
+                    }
+
+                    Text(
+                        "The selected challenge gets the premium Club Challenge card at the top of Overview. Owner and Admin can change it at any time."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section("Group") {
@@ -6789,6 +6906,32 @@ struct CommunityGroupSettingsView: View {
                     }
                 }
             }
+            .onChange(of: selectedHeaderPhoto) { _, item in
+                guard let item else {
+                    return
+                }
+
+                Task {
+                    do {
+                        guard
+                            let data = try await item
+                                .loadTransferable(type: Data.self),
+                            let jpeg = prepareGroupImageData(data)
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that header image. Try another photo."
+                            return
+                        }
+
+                        await MainActor.run {
+                            selectedHeaderImageData = jpeg
+                        }
+                    } catch {
+                        groups.errorMessage =
+                            error.localizedDescription
+                    }
+                }
+            }
             .confirmationDialog(
                 ATHLTHLocalization.format(
                     english: "Delete %@?",
@@ -6857,6 +7000,23 @@ struct CommunityGroupSettingsView: View {
             )
         }
 
+        if saved,
+           let selectedHeaderImageData {
+            saved = await groups.uploadGroupHeaderImage(
+                currentGroup,
+                jpegData: selectedHeaderImageData
+            )
+        }
+
+        if saved,
+           selectedFeaturedChallengeID !=
+            currentGroup.featuredChallengeID {
+            saved = await groups.setFeaturedChallenge(
+                selectedFeaturedChallengeID,
+                in: currentGroup
+            )
+        }
+
         saving = false
 
         if saved {
@@ -6920,16 +7080,74 @@ struct CommunityGroupSettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var groupHeaderImagePreview: some View {
+        Group {
+            if let selectedHeaderImageData,
+               let image = UIImage(data: selectedHeaderImageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let value = currentGroup.headerImageURL,
+                      let url = URL(string: value) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        groupHeaderImagePlaceholder
+                    }
+                }
+            } else {
+                groupHeaderImagePlaceholder
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 160)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
+    }
+
+    private var groupHeaderImagePlaceholder: some View {
+        LinearGradient(
+            colors: [
+                ATHLTHTheme.accentDeep,
+                ATHLTHTheme.accent,
+                ATHLTHTheme.vitality.opacity(0.78)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.86))
+        }
+    }
+
     private var groupImagePlaceholder: some View {
         RoundedRectangle(
             cornerRadius: 22,
             style: .continuous
         )
-        .fill(Color.indigo.opacity(0.10))
+        .fill(ATHLTHTheme.accentSoft)
         .overlay {
             Image(systemName: "person.3.fill")
                 .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.indigo)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
         }
     }
 
