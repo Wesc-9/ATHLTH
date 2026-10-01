@@ -698,6 +698,7 @@ struct GoalCreationView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                goalFlowHeader
                 progressHeader
 
                 ScrollView {
@@ -710,19 +711,20 @@ struct GoalCreationView: View {
                         default: reviewStep
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
+                    .padding(.bottom, 28)
                 }
+                .scrollIndicators(.hidden)
 
                 footer
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Create Goal")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
+            .background(
+                ATHLTHTheme.canvasTop
+                    .ignoresSafeArea()
+            )
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
             .onChange(of: category) { _, newValue in
                 applyDefaults(for: newValue)
             }
@@ -734,6 +736,99 @@ struct GoalCreationView: View {
         }
     }
 
+    private var goalFlowHeader: some View {
+        ZStack {
+            HStack {
+                Button {
+                    if step > 0 {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            step -= 1
+                        }
+                    } else {
+                        dismiss()
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .frame(
+                            width: 40,
+                            height: 40
+                        )
+                        .background(
+                            Color.white.opacity(0.86),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.black.opacity(0.05),
+                                    lineWidth: 0.7
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    step > 0
+                        ? ATHLTHLocalization.format(
+                            english: "Back",
+                            norwegian: "Tilbake"
+                        )
+                        : ATHLTHLocalization.format(
+                            english: "Close",
+                            norwegian: "Lukk"
+                        )
+                )
+
+                Spacer()
+
+                if step > 0 {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "Cancel",
+                                norwegian: "Avbryt"
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .padding(.horizontal, 10)
+                        .frame(height: 36)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Color.clear
+                        .frame(width: 56, height: 36)
+                }
+            }
+
+            Text(
+                ATHLTHLocalization.format(
+                    english: "Create Goal",
+                    norwegian: "Opprett mål"
+                )
+            )
+            .font(.headline.weight(.bold))
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
+    }
+
     private var goalImageButtonTitle: String {
         imageData == nil
             ? "Choose from Photos"
@@ -741,56 +836,219 @@ struct GoalCreationView: View {
     }
 
     private var progressHeader: some View {
-        VStack(spacing: 8) {
-            ProgressView(value: Double(step + 1), total: 5)
-                .tint(ATHLTHTheme.accent)
-            Text(stepTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 7) {
+            HStack {
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Step %d of 5",
+                        norwegian: "Steg %d av 5",
+                        step + 1
+                    )
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Spacer()
+
+                Text(stepTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+            }
+
+            ProgressView(
+                value: Double(step + 1),
+                total: 5
+            )
+            .tint(ATHLTHTheme.accentDeep)
+            .scaleEffect(
+                x: 1,
+                y: 0.72,
+                anchor: .center
+            )
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 4)
     }
 
     private var categoryStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("What do you want to achieve?")
-                .font(.title2.bold())
+            VStack(alignment: .leading, spacing: 5) {
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "What do you want to achieve?",
+                        norwegian: "Hva ønsker du å oppnå?"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 26,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
 
-            Text("Choose the closest match. ATHLTH will configure safe tracking rules for that kind of goal.")
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Choose the goal that fits best. You can fine-tune the target in the next step.",
+                        norwegian: "Velg målet som passer best. Du kan finjustere målet i neste steg."
+                    )
+                )
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+            .padding(.bottom, 2)
 
             ForEach(GoalCategory.allCases) { option in
-                Button {
-                    category = option
-                } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: option.systemImage)
-                            .font(.title3)
-                            .foregroundStyle(category == option ? .white : ATHLTHTheme.accent)
-                            .frame(width: 42, height: 42)
-                            .background(
-                                category == option ? ATHLTHTheme.accent : ATHLTHTheme.accent.opacity(0.10),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            )
+                let isSelected =
+                    category == option
 
-                        VStack(alignment: .leading, spacing: 3) {
+                Button {
+                    withAnimation(
+                        .snappy(duration: 0.18)
+                    ) {
+                        category = option
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                option.systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 17,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            isSelected
+                                ? .white
+                                : ATHLTHTheme.accentDeep
+                        )
+                        .frame(
+                            width: 40,
+                            height: 40
+                        )
+                        .background(
+                            isSelected
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 12,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
                             Text(option.title)
-                                .font(.headline)
+                                .font(
+                                    .subheadline
+                                        .weight(.bold)
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .lineLimit(1)
+
                             Text(option.subtitle)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                                .lineLimit(2)
+                                .multilineTextAlignment(
+                                    .leading
+                                )
                         }
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
-                        Image(systemName: category == option ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(category == option ? ATHLTHTheme.accent : .secondary)
+                        ZStack {
+                            Circle()
+                                .stroke(
+                                    isSelected
+                                        ? ATHLTHTheme.accentDeep
+                                        : Color.secondary.opacity(0.34),
+                                    lineWidth: isSelected ? 1.5 : 1.2
+                                )
+                                .frame(
+                                    width: 23,
+                                    height: 23
+                                )
+
+                            if isSelected {
+                                Circle()
+                                    .fill(
+                                        ATHLTHTheme.accentDeep
+                                    )
+                                    .frame(
+                                        width: 23,
+                                        height: 23
+                                    )
+
+                                Image(
+                                    systemName:
+                                        "checkmark"
+                                )
+                                .font(
+                                    .system(
+                                        size: 10,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                            }
+                        }
                     }
-                    .padding()
-                    .goalCard()
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 11)
+                    .background(
+                        isSelected
+                            ? ATHLTHTheme.accentSoft.opacity(0.72)
+                            : Color.white.opacity(0.92),
+                        in: RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                        .stroke(
+                            isSelected
+                                ? ATHLTHTheme.accentDeep.opacity(0.34)
+                                : Color.black.opacity(0.045),
+                            lineWidth: isSelected ? 1.1 : 0.7
+                        )
+                    }
+                    .shadow(
+                        color:
+                            Color.black.opacity(
+                                isSelected ? 0.04 : 0.018
+                            ),
+                        radius: isSelected ? 10 : 6,
+                        y: 3
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -1026,32 +1284,98 @@ struct GoalCreationView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            if step > 0 {
-                Button("Back") {
-                    withAnimation { step -= 1 }
-                }
-                .buttonStyle(.bordered)
-            }
+        VStack(spacing: 0) {
+            Divider()
+                .opacity(0.35)
 
-            Button(step == 4 ? "Create Goal" : "Continue") {
+            Button {
                 if step == 4 {
                     createGoal()
                 } else {
-                    withAnimation { step += 1 }
+                    withAnimation(
+                        .snappy(duration: 0.22)
+                    ) {
+                        step += 1
+                    }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(
+                        step == 4
+                            ? ATHLTHLocalization.format(
+                                english: "Create Goal",
+                                norwegian: "Opprett mål"
+                            )
+                            : ATHLTHLocalization.format(
+                                english: "Next",
+                                norwegian: "Neste"
+                            )
+                    )
+                    .font(.headline.weight(.bold))
+
+                    Image(
+                        systemName:
+                            step == 4
+                                ? "checkmark"
+                                : "arrow.right"
+                    )
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .bold
+                        )
+                    )
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    canContinue
+                        ? ATHLTHTheme.accentDeep
+                        : Color.secondary.opacity(0.30),
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
             .disabled(!canContinue)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
         }
-        .padding()
         .background(.ultraThinMaterial)
     }
 
     private var stepTitle: String {
-        ["Goal type", "Target", "Identity", "Milestones", "Review"][step]
+        switch step {
+        case 0:
+            return ATHLTHLocalization.format(
+                english: "Goal type",
+                norwegian: "Måltype"
+            )
+        case 1:
+            return ATHLTHLocalization.format(
+                english: "Target",
+                norwegian: "Mål"
+            )
+        case 2:
+            return ATHLTHLocalization.format(
+                english: "Details",
+                norwegian: "Detaljer"
+            )
+        case 3:
+            return ATHLTHLocalization.format(
+                english: "Milestones",
+                norwegian: "Delmål"
+            )
+        default:
+            return ATHLTHLocalization.format(
+                english: "Review",
+                norwegian: "Oppsummering"
+            )
+        }
     }
 
     private var canContinue: Bool {
