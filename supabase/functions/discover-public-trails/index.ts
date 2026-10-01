@@ -1813,6 +1813,35 @@ out body geom qt 160;
       }
     }
 
+    const cellWrite:
+      Record<
+        string,
+        unknown
+      > = {
+        cell_key:
+          key,
+        center_latitude:
+          latitude,
+        center_longitude:
+          longitude,
+        radius_kilometers:
+          radiusKilometers,
+        refresh_started_at:
+          null,
+        last_error:
+          null,
+        last_success_count:
+          combinedWrites.length,
+      };
+
+    // A forced map search may refresh OSM more often, but it must not
+    // extend the Kartverket refresh window unless the secondary source
+    // was actually eligible for refresh on this cache cycle.
+    if (refreshKartverket) {
+      cellWrite.fetched_at =
+        now;
+    }
+
     const {
       error:
         cellError,
@@ -1822,24 +1851,7 @@ out body geom qt 160;
           "public_trail_fetch_cells",
         )
         .upsert(
-          {
-            cell_key:
-              key,
-            center_latitude:
-              latitude,
-            center_longitude:
-              longitude,
-            radius_kilometers:
-              radiusKilometers,
-            fetched_at:
-              now,
-            refresh_started_at:
-              null,
-            last_error:
-              null,
-            last_success_count:
-              combinedWrites.length,
-          },
+          cellWrite,
           {
             onConflict:
               "cell_key",
