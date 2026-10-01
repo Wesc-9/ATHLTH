@@ -372,6 +372,7 @@ function difficultyFromTags(
 function cellKey(
   latitude: number,
   longitude: number,
+  radiusKilometers: number,
 ): string {
   const step = 0.05;
   const lat =
@@ -382,8 +383,18 @@ function cellKey(
     Math.round(
       longitude / step,
     ) * step;
+  const radiusBucket =
+    radiusKilometers <= 3
+      ? 3
+      : radiusKilometers <= 6
+        ? 6
+        : radiusKilometers <= 12
+          ? 12
+          : 20;
 
-  return `v2:${lat.toFixed(2)}:${lon.toFixed(2)}`;
+  // Radius is part of the cache key so a previous small-area search
+  // cannot incorrectly satisfy a later, larger viewport search.
+  return `v3:${lat.toFixed(2)}:${lon.toFixed(2)}:r${radiusBucket}`;
 }
 
 function boundingBox(
@@ -419,6 +430,899 @@ function boundingBox(
       longitude +
       lonDelta,
   };
+}
+
+
+type TrailWrite = Record<
+  string,
+  unknown
+>;
+
+type KartverketRouteGroup = {
+  routeNumber: string;
+  names: string[];
+  operators: string[];
+  grades: string[];
+  markings: string[];
+  surfaces: string[];
+  segments: OSMPoint[][];
+};
+
+function shouldUseKartverket(
+  bounds: Bounds,
+): boolean {
+  // Turrutebasen is a Norway-only source. A deliberately generous
+  // bounding box keeps the check cheap while the WFS itself provides
+  // the authoritative national coverage.
+  return (
+    bounds.north >= 57 &&
+    bounds.south <= 72.5 &&
+    bounds.east >= 4 &&
+    bounds.west <= 32
+  );
+}
+
+function decodeXMLText(
+  value: string,
+): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+}
+
+function xmlValues(
+  block: string,
+  tag: string,
+): string[] {
+  const expression =
+    new RegExp(
+      "<app:" +
+        tag +
+        "\\b[^>]*>([\\s\\S]*?)<\\/app:" +
+        tag +
+        ">",
+      "gi",
+    );
+  const values: string[] = [];
+
+  for (
+    const match
+    of block.matchAll(expression)
+  ) {
+    const value =
+      decodeXMLText(
+        String(match[1] ?? ""),
+      );
+
+    if (value) {
+      values.push(value);
+    }
+  }
+
+  return values;
+}
+
+function firstUsefulValue(
+  values: string[],
+): string | null {
+  return (
+    values.find(
+      (value) => {
+        const normalized =
+          value
+            .trim()
+            .toLowerCase();
+
+        return (
+          normalized.length > 0 &&
+          normalized !== "ukjent" &&
+          normalized !== "unknown"
+        );
+      },
+    ) ?? null
+  );
+}
+
+function parsePosList(
+  value: string,
+): OSMPoint[] {
+  const numbers =
+    value
+      .trim()
+      .split(/\s+/)
+      .map(Number)
+      .filter(Number.isFinite);
+
+  const points: OSMPoint[] = [];
+
+  // Turrutebasen WFS uses EPSG:4326 with axis order latitude,
+  // longitude (south, west, north, east).
+  for (
+    let index = 0;
+    index + 1 < numbers.length;
+    index += 2
+  ) {
+    const lat = numbers[index];
+    const lon = numbers[index + 1];
+
+    if (
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180
+    ) {
+      points.push({
+        lat,
+        lon,
+      });
+    }
+  }
+
+  return points;
+}
+
+function geometryPartsFromGML(
+  block: string,
+): OSMPoint[][] {
+  const expression =
+    /<gml:posList\b[^>]*>([\s\S]*?)<\/gml:posList>/gi;
+  const result: OSMPoint[][] = [];
+
+  for (
+    const match
+    of block.matchAll(expression)
+  ) {
+    const points =
+      parsePosList(
+        String(match[1] ?? ""),
+      );
+
+    if (points.length >= 2) {
+      result.push(points);
+    }
+  }
+
+  return result;
+}
+
+function stitchSegments(
+  rawSegments: OSMPoint[][],
+): OSMPoint[] {
+  const pending =
+    rawSegments
+      .filter(
+        (segment) =>
+          segment.length >= 2,
+      )
+      .map(
+        (segment) =>
+          segment.slice(),
+      );
+
+  const chains: OSMPoint[][] = [];
+  const maxJoinMeters = 160;
+
+  while (pending.length > 0) {
+    let current =
+      pending.shift()!;
+    let extended = true;
+
+    while (
+      extended &&
+      pending.length > 0
+    ) {
+      extended = false;
+
+      const head =
+        current[0];
+      const tail =
+        current[
+          current.length - 1
+        ];
+
+      let bestIndex = -1;
+      let bestGap =
+        Number.POSITIVE_INFINITY;
+      let bestMode = 0;
+
+      for (
+        let index = 0;
+        index < pending.length;
+        index += 1
+      ) {
+        const candidate =
+          pending[index];
+        const first =
+          candidate[0];
+        const last =
+          candidate[
+            candidate.length - 1
+          ];
+        const options = [
+          haversineMeters(
+            tail,
+            first,
+          ),
+          haversineMeters(
+            tail,
+            last,
+          ),
+          haversineMeters(
+            head,
+            last,
+          ),
+          haversineMeters(
+            head,
+            first,
+          ),
+        ];
+
+        for (
+          let mode = 0;
+          mode < options.length;
+          mode += 1
+        ) {
+          if (
+            options[mode] <
+            bestGap
+          ) {
+            bestGap =
+              options[mode];
+            bestIndex = index;
+            bestMode = mode;
+          }
+        }
+      }
+
+      if (
+        bestIndex < 0 ||
+        bestGap >
+          maxJoinMeters
+      ) {
+        break;
+      }
+
+      let candidate =
+        pending.splice(
+          bestIndex,
+          1,
+        )[0];
+
+      switch (bestMode) {
+      case 0:
+        if (
+          haversineMeters(
+            current[
+              current.length - 1
+            ],
+            candidate[0],
+          ) < 8
+        ) {
+          candidate =
+            candidate.slice(1);
+        }
+        current.push(
+          ...candidate,
+        );
+        break;
+
+      case 1:
+        candidate =
+          candidate.reverse();
+        if (
+          haversineMeters(
+            current[
+              current.length - 1
+            ],
+            candidate[0],
+          ) < 8
+        ) {
+          candidate =
+            candidate.slice(1);
+        }
+        current.push(
+          ...candidate,
+        );
+        break;
+
+      case 2:
+        if (
+          haversineMeters(
+            candidate[
+              candidate.length - 1
+            ],
+            current[0],
+          ) < 8
+        ) {
+          candidate =
+            candidate.slice(
+              0,
+              -1,
+            );
+        }
+        current = [
+          ...candidate,
+          ...current,
+        ];
+        break;
+
+      case 3:
+        candidate =
+          candidate.reverse();
+        if (
+          haversineMeters(
+            candidate[
+              candidate.length - 1
+            ],
+            current[0],
+          ) < 8
+        ) {
+          candidate =
+            candidate.slice(
+              0,
+              -1,
+            );
+        }
+        current = [
+          ...candidate,
+          ...current,
+        ];
+        break;
+      }
+
+      extended = true;
+    }
+
+    chains.push(current);
+  }
+
+  return (
+    chains
+      .filter(
+        (chain) =>
+          chain.length >= 2,
+      )
+      .sort(
+        (lhs, rhs) =>
+          polylineLengthMeters(
+            rhs,
+          ) -
+          polylineLengthMeters(
+            lhs,
+          ),
+      )[0] ?? []
+  );
+}
+
+function kartverketDifficulty(
+  value: string | null,
+): string | null {
+  switch (
+    value
+      ?.trim()
+      .toUpperCase()
+  ) {
+  case "G":
+    return "Easy";
+  case "B":
+    return "Moderate";
+  case "R":
+    return "Hard";
+  case "S":
+    return "Expert";
+  default:
+    return null;
+  }
+}
+
+function stableHash32(
+  value: string,
+): number {
+  let hash =
+    0x811c9dc5;
+
+  for (
+    let index = 0;
+    index < value.length;
+    index += 1
+  ) {
+    hash ^=
+      value.charCodeAt(index);
+    hash =
+      Math.imul(
+        hash,
+        0x01000193,
+      );
+  }
+
+  return hash >>> 0;
+}
+
+function kartverketSourceID(
+  routeNumber: string,
+): number {
+  // Reserve a bigint-safe namespace far away from real OSM relation/way IDs.
+  return (
+    -8_000_000_000_000_000 -
+    stableHash32(
+      routeNumber,
+    )
+  );
+}
+
+function normalizedTrailName(
+  value: unknown,
+): string {
+  return String(
+    value ?? "",
+  )
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    )
+    .replace(
+      /[^a-z0-9]+/g,
+      " ",
+    )
+    .trim();
+}
+
+function mergeSecondaryTrails(
+  primary: TrailWrite[],
+  secondary: TrailWrite[],
+): TrailWrite[] {
+  const result =
+    primary.slice();
+
+  for (
+    const candidate
+    of secondary
+  ) {
+    const candidateName =
+      normalizedTrailName(
+        candidate.name,
+      );
+    const candidateLat =
+      Number(
+        candidate.center_latitude,
+      );
+    const candidateLon =
+      Number(
+        candidate.center_longitude,
+      );
+
+    const duplicate =
+      result.some(
+        (existing) => {
+          if (
+            normalizedTrailName(
+              existing.name,
+            ) !==
+            candidateName
+          ) {
+            return false;
+          }
+
+          const existingLat =
+            Number(
+              existing
+                .center_latitude,
+            );
+          const existingLon =
+            Number(
+              existing
+                .center_longitude,
+            );
+
+          if (
+            !Number.isFinite(
+              candidateLat,
+            ) ||
+            !Number.isFinite(
+              candidateLon,
+            ) ||
+            !Number.isFinite(
+              existingLat,
+            ) ||
+            !Number.isFinite(
+              existingLon,
+            )
+          ) {
+            return true;
+          }
+
+          return (
+            haversineMeters(
+              {
+                lat:
+                  candidateLat,
+                lon:
+                  candidateLon,
+              },
+              {
+                lat:
+                  existingLat,
+                lon:
+                  existingLon,
+              },
+            ) < 1_000
+          );
+        },
+      );
+
+    if (!duplicate) {
+      result.push(
+        candidate,
+      );
+    }
+  }
+
+  return result;
+}
+
+async function fetchKartverketTrails(
+  bounds: Bounds,
+): Promise<TrailWrite[]> {
+  if (
+    !shouldUseKartverket(
+      bounds,
+    )
+  ) {
+    return [];
+  }
+
+  const params =
+    new URLSearchParams({
+      service: "WFS",
+      version: "2.0.0",
+      request: "GetFeature",
+      typeNames:
+        "app:Fotrute",
+      bbox:
+        [
+          bounds.south,
+          bounds.west,
+          bounds.north,
+          bounds.east,
+        ].join(",") +
+        ",urn:ogc:def:crs:EPSG::4326",
+      count: "1200",
+    });
+  const url =
+    "https://wfs.geonorge.no/skwms1/wfs.turogfriluftsruter?" +
+    params.toString();
+
+  try {
+    const response =
+      await fetch(
+        url,
+        {
+          method: "GET",
+          signal:
+            AbortSignal.timeout(
+              7_000,
+            ),
+          headers: {
+            "Accept":
+              "application/gml+xml, text/xml, application/xml",
+            "User-Agent":
+              "ATHLTH/1.5 trail-discovery (Kartverket Turrutebasen)",
+          },
+        },
+      );
+
+    if (!response.ok) {
+      console.warn(
+        "Kartverket Turrutebasen request failed",
+        {
+          status:
+            response.status,
+        },
+      );
+      return [];
+    }
+
+    const xml =
+      await response.text();
+    const featureBlocks =
+      xml.match(
+        /<app:Fotrute\b[\s\S]*?<\/app:Fotrute>/gi,
+      ) ?? [];
+    const groups =
+      new Map<
+        string,
+        KartverketRouteGroup
+      >();
+
+    for (
+      const feature
+      of featureBlocks
+    ) {
+      const geometryParts =
+        geometryPartsFromGML(
+          feature,
+        );
+
+      if (
+        geometryParts.length ===
+        0
+      ) {
+        continue;
+      }
+
+      const infoBlocks =
+        feature.match(
+          /<app:FotruteInfo\b[\s\S]*?<\/app:FotruteInfo>/gi,
+        ) ?? [feature];
+      const featureSurfaces =
+        xmlValues(
+          feature,
+          "underlagstype",
+        );
+      const featureMarkings =
+        xmlValues(
+          feature,
+          "merking",
+        );
+
+      for (
+        const info
+        of infoBlocks
+      ) {
+        const routeNumber =
+          firstUsefulValue(
+            xmlValues(
+              info,
+              "rutenummer",
+            ),
+          ) ??
+          firstUsefulValue(
+            xmlValues(
+              feature,
+              "rutenummer",
+            ),
+          );
+
+        if (!routeNumber) {
+          continue;
+        }
+
+        const existing =
+          groups.get(
+            routeNumber,
+          ) ?? {
+            routeNumber,
+            names: [],
+            operators: [],
+            grades: [],
+            markings: [],
+            surfaces: [],
+            segments: [],
+          };
+
+        existing.names.push(
+          ...xmlValues(
+            info,
+            "rutenavn",
+          ),
+        );
+        existing.operators.push(
+          ...xmlValues(
+            info,
+            "vedlikeholdsansvarlig",
+          ),
+        );
+        existing.grades.push(
+          ...xmlValues(
+            info,
+            "gradering",
+          ),
+        );
+        existing.markings.push(
+          ...featureMarkings,
+        );
+        existing.surfaces.push(
+          ...featureSurfaces,
+        );
+        existing.segments.push(
+          ...geometryParts,
+        );
+
+        groups.set(
+          routeNumber,
+          existing,
+        );
+      }
+    }
+
+    const now =
+      new Date()
+        .toISOString();
+    const writes:
+      TrailWrite[] = [];
+
+    for (
+      const group
+      of groups.values()
+    ) {
+      const name =
+        firstUsefulValue(
+          group.names,
+        );
+
+      // Avoid turning technical route IDs into user-facing trail names.
+      // Turrutebasen remains a high-quality secondary source for named routes.
+      if (!name) {
+        continue;
+      }
+
+      const fullGeometry =
+        stitchSegments(
+          group.segments,
+        );
+
+      if (
+        fullGeometry.length < 2
+      ) {
+        continue;
+      }
+
+      const distanceKilometers =
+        polylineLengthMeters(
+          fullGeometry,
+        ) / 1000;
+
+      if (
+        distanceKilometers <
+          MIN_DISCOVERY_KM ||
+        distanceKilometers >
+          MAX_ROUTE_KM
+      ) {
+        continue;
+      }
+
+      const geometry =
+        simplify(
+          fullGeometry,
+        );
+      const midpoint =
+        center(
+          geometry,
+        );
+      const marking =
+        firstUsefulValue(
+          group.markings,
+        );
+      const operatorName =
+        firstUsefulValue(
+          group.operators,
+        );
+      const surface =
+        firstUsefulValue(
+          group.surfaces,
+        );
+      const grade =
+        firstUsefulValue(
+          group.grades,
+        );
+
+      writes.push({
+        osm_relation_id:
+          kartverketSourceID(
+            group.routeNumber,
+          ),
+        name:
+          name.slice(
+            0,
+            180,
+          ),
+        route_kind:
+          "foot",
+        network:
+          "no:turrutebasen",
+        reference:
+          group.routeNumber
+            .slice(
+              0,
+              80,
+            ),
+        operator_name:
+          operatorName
+            ?.slice(
+              0,
+              160,
+            ) ?? null,
+        symbol:
+          marking
+            ?.slice(
+              0,
+              160,
+            ) ?? null,
+        route_shape:
+          inferRouteShape(
+            geometry,
+            distanceKilometers,
+            undefined,
+          ),
+        surface_summary:
+          surface
+            ?.slice(
+              0,
+              80,
+            ) ?? null,
+        difficulty:
+          kartverketDifficulty(
+            grade,
+          ),
+        osm_description:
+          null,
+        website:
+          null,
+        estimated_run_seconds:
+          distanceKilometers *
+          360,
+        estimated_walk_seconds:
+          distanceKilometers *
+          720,
+        coordinates:
+          geometry.map(
+            (
+              point,
+              index,
+            ) => ({
+              latitude:
+                point.lat,
+              longitude:
+                point.lon,
+              altitude: null,
+              sequence:
+                index,
+            }),
+          ),
+        distance_kilometers:
+          distanceKilometers,
+        center_latitude:
+          midpoint.latitude,
+        center_longitude:
+          midpoint.longitude,
+        leaderboard_enabled:
+          distanceKilometers >=
+          MIN_LEADERBOARD_KM,
+        source:
+          "kartverket_turrutebasen",
+        source_updated_at:
+          now,
+        last_fetched_at:
+          now,
+        updated_at:
+          now,
+      });
+    }
+
+    return writes;
+  } catch (error) {
+    console.warn(
+      "Kartverket Turrutebasen unavailable",
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    );
+
+    // This is deliberately a soft failure. OpenStreetMap remains the
+    // primary source and Explore must continue to work if WFS is slow/down.
+    return [];
+  }
 }
 
 async function loadCachedTrails(
@@ -517,6 +1421,19 @@ async function refreshCell(
 out body geom qt 160;
 `.trim();
 
+  // Start the Norway-only secondary source in parallel with Overpass.
+  // Its 7 s timeout cannot block or replace the primary OSM result.
+  const kartverketPromise =
+    shouldUseKartverket(
+      bounds,
+    )
+      ? fetchKartverketTrails(
+          bounds,
+        )
+      : Promise.resolve(
+          [] as TrailWrite[],
+        );
+
   const configuredOverpassURL =
     Deno.env.get(
       "OVERPASS_API_URL",
@@ -596,8 +1513,12 @@ out body geom qt 160;
     }
 
     if (!payload) {
-      throw new Error(
-        lastFailure,
+      console.warn(
+        "OpenStreetMap trail discovery unavailable; trying secondary source",
+        {
+          message:
+            lastFailure,
+        },
       );
     }
 
@@ -847,8 +1768,25 @@ out body geom qt 160;
       });
     }
 
+    const kartverketWrites =
+      await kartverketPromise;
+    const combinedWrites =
+      mergeSecondaryTrails(
+        writes,
+        kartverketWrites,
+      );
+
     if (
-      writes.length > 0
+      !payload &&
+      combinedWrites.length === 0
+    ) {
+      throw new Error(
+        lastFailure,
+      );
+    }
+
+    if (
+      combinedWrites.length > 0
     ) {
       const {
         error:
@@ -859,7 +1797,7 @@ out body geom qt 160;
             "public_trails",
           )
           .upsert(
-            writes,
+            combinedWrites,
             {
               onConflict:
                 "osm_relation_id",
@@ -898,7 +1836,7 @@ out body geom qt 160;
             last_error:
               null,
             last_success_count:
-              writes.length,
+              combinedWrites.length,
           },
           {
             onConflict:
@@ -1107,6 +2045,7 @@ Deno.serve(
       cellKey(
         latitude,
         longitude,
+        radiusKilometers,
       );
 
     const [
@@ -1318,7 +2257,13 @@ Deno.serve(
       minimumLeaderboardKilometers:
         MIN_LEADERBOARD_KM,
       attribution:
-        "© OpenStreetMap contributors",
+        cachedTrails.some(
+          (trail: { source?: string }) =>
+            trail.source ===
+            "kartverket_turrutebasen",
+        )
+          ? "© OpenStreetMap contributors · © Kartverket"
+          : "© OpenStreetMap contributors",
     });
   },
 );
