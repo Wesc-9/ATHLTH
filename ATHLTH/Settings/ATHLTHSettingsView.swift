@@ -266,44 +266,6 @@ struct ATHLTHSettingsView: View {
                         }
                     }
 
-                    settingsSection("Privacy & Data") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                ATHLTHPrivacyCenterView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "shield.lefthalf.filled",
-                                    title: "Privacy & AI",
-                                    subtitle: privacySummary
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText.opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                TrainingDataSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "icloud",
-                                    title: "Training data & Coach",
-                                    subtitle: "Cloud backup, restore and training-history sharing"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText.opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
                     settingsSection("Health & Sync") {
                         PremiumSettingsCard {
                             PremiumSettingsRow(
@@ -737,7 +699,7 @@ struct ATHLTHSettingsView: View {
                                 PremiumSettingsRow(
                                     icon: "person.badge.key",
                                     title: "Account & Security",
-                                    subtitle: "Sign-in, password, export and account controls"
+                                    subtitle: "Sign-in, security, privacy and your data"
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
