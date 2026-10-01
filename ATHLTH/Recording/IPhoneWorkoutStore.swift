@@ -396,11 +396,12 @@ final class IPhoneWorkoutStore:
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
-        if audioCoach?.enabled == true {
+        if audioCoach?.enabled == true,
+           audioCoach?.shouldAnnounceWorkoutStart == true {
             speak(
                 localizedCoachPhrase(
-                    english: "Audio Coach ready.",
-                    norwegian: "Audio Coach er klar.",
+                    english: "Audio Coach ready. Workout started.",
+                    norwegian: "Audio Coach er klar. Økten er startet.",
                     configuration: audioCoach
                 ),
                 configuration: audioCoach,
@@ -436,6 +437,28 @@ final class IPhoneWorkoutStore:
         lastLocation = nil
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
+
+        if workout
+            .audioCoachConfiguration?
+            .enabled == true,
+           workout
+            .audioCoachConfiguration?
+            .shouldAnnouncePauseResume == true {
+            speak(
+                localizedCoachPhrase(
+                    english: "Workout paused.",
+                    norwegian: "Økten er satt på pause.",
+                    configuration:
+                        workout
+                            .audioCoachConfiguration
+                ),
+                configuration:
+                    workout
+                        .audioCoachConfiguration,
+                priority:
+                    .structuredStep
+            )
+        }
     }
 
     func resume() {
@@ -462,6 +485,28 @@ final class IPhoneWorkoutStore:
         manager.startUpdatingLocation()
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
+
+        if workout
+            .audioCoachConfiguration?
+            .enabled == true,
+           workout
+            .audioCoachConfiguration?
+            .shouldAnnouncePauseResume == true {
+            speak(
+                localizedCoachPhrase(
+                    english: "Workout resumed.",
+                    norwegian: "Økten fortsetter.",
+                    configuration:
+                        workout
+                            .audioCoachConfiguration
+                ),
+                configuration:
+                    workout
+                        .audioCoachConfiguration,
+                priority:
+                    .structuredStep
+            )
+        }
     }
 
     func finish() async {
@@ -502,7 +547,30 @@ final class IPhoneWorkoutStore:
         resetRouteRuntime()
         persistActiveCheckpoint(force: true)
         persistHistory()
-        deactivateCoachAudioSession()
+
+        if workout
+            .audioCoachConfiguration?
+            .enabled == true,
+           workout
+            .audioCoachConfiguration?
+            .shouldAnnounceWorkoutComplete == true {
+            speak(
+                localizedCoachPhrase(
+                    english: "Workout complete.",
+                    norwegian: "Økten er fullført.",
+                    configuration:
+                        workout
+                            .audioCoachConfiguration
+                ),
+                configuration:
+                    workout
+                        .audioCoachConfiguration,
+                priority:
+                    .structuredStep
+            )
+        } else {
+            deactivateCoachAudioSession()
+        }
 
         // Publish a stable pre-save completion checkpoint. The app captures
         // Goals/Challenge/Gear state here, before HealthKit can change the
@@ -2224,20 +2292,38 @@ final class IPhoneWorkoutStore:
                 string: phrase
             )
 
-        switch configuration.language {
-        case .english:
-            utterance.voice =
+        if let voiceIdentifier =
+                configuration
+                    .voiceIdentifier,
+           let selectedVoice =
                 AVSpeechSynthesisVoice(
-                    language: "en-US"
-                )
-        case .norwegian:
-            utterance.voice =
-                AVSpeechSynthesisVoice(
-                    language: "nb-NO"
-                )
-        case .system:
-            break
+                    identifier:
+                        voiceIdentifier
+                ) {
+            utterance.voice = selectedVoice
+        } else {
+            switch configuration.language {
+            case .english:
+                utterance.voice =
+                    AVSpeechSynthesisVoice(
+                        language: "en-US"
+                    )
+            case .norwegian:
+                utterance.voice =
+                    AVSpeechSynthesisVoice(
+                        language: "nb-NO"
+                    )
+            case .system:
+                break
+            }
         }
+
+        utterance.rate =
+            configuration
+                .resolvedSpeechRate
+        utterance.volume =
+            configuration
+                .resolvedSpeechVolume
 
         speechSynthesizer.speak(utterance)
     }
