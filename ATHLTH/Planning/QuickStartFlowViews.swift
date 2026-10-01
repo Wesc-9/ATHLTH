@@ -2097,6 +2097,11 @@ struct AudioCoachSetupCard: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        .onChange(
+                            of: draft.language
+                        ) { _, _ in
+                            draft.voiceIdentifier = nil
+                        }
                     }
 
                     Text(
