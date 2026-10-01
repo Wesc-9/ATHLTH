@@ -56,6 +56,19 @@ final class StrengthMuscleProfileTests: XCTestCase {
         )
     }
 
+    func testPredefinedCustomExerciseMuscleGroupsMapToVisualRegions() {
+        for group in ExerciseMuscleGroup.allCases {
+            XCTAssertFalse(
+                StrengthMuscleResolver
+                    .regions(
+                        for: group.rawValue
+                    )
+                    .isEmpty,
+                group.rawValue
+            )
+        }
+    }
+
     func testRepDBBodyPartFallbackAlwaysProducesVisualRegions() {
         let supported = [
             "Chest",
