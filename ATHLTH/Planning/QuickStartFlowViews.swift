@@ -103,6 +103,12 @@ struct AudioCoachDraft {
     var announceRemainingStepTime = true
     var announceRemainingStepDistance = true
     var duckOtherAudio = true
+    var voiceIdentifier: String? = nil
+    var speechRate: Double = 0.48
+    var speechVolume: Double = 1.0
+    var announceWorkoutStart = true
+    var announcePauseResume = true
+    var announceWorkoutComplete = true
     var guidanceQuietPeriodSeconds:
         TimeInterval = 10
 
@@ -141,6 +147,18 @@ struct AudioCoachDraft {
             settings.audioCoachAnnounceRemainingStepDistance
         duckOtherAudio =
             settings.audioCoachDuckOtherAudio
+        voiceIdentifier =
+            settings.audioCoachVoiceIdentifier
+        speechRate =
+            settings.audioCoachSpeechRate
+        speechVolume =
+            settings.audioCoachSpeechVolume
+        announceWorkoutStart =
+            settings.audioCoachAnnounceWorkoutStart
+        announcePauseResume =
+            settings.audioCoachAnnouncePauseResume
+        announceWorkoutComplete =
+            settings.audioCoachAnnounceWorkoutComplete
         guidanceQuietPeriodSeconds =
             TimeInterval(
                 settings
@@ -187,7 +205,35 @@ struct AudioCoachDraft {
             duckOtherAudio:
                 duckOtherAudio,
             guidanceQuietPeriodSeconds:
-                guidanceQuietPeriodSeconds
+                guidanceQuietPeriodSeconds,
+            voiceIdentifier:
+                voiceIdentifier,
+            speechRate:
+                Float(
+                    min(
+                        max(
+                            speechRate,
+                            0.35
+                        ),
+                        0.65
+                    )
+                ),
+            speechVolume:
+                Float(
+                    min(
+                        max(
+                            speechVolume,
+                            0.2
+                        ),
+                        1.0
+                    )
+                ),
+            announceWorkoutStart:
+                announceWorkoutStart,
+            announcePauseResume:
+                announcePauseResume,
+            announceWorkoutComplete:
+                announceWorkoutComplete
         )
     }
 }
