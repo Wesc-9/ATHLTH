@@ -3864,7 +3864,7 @@ struct CommunityGroupDetailView: View {
                                     geometry.safeAreaInsets.top
                             )
 
-                            VStack(spacing: 16) {
+                            VStack(spacing: 12) {
                                 if isMember {
                                     groupAreaPicker
 
@@ -3882,8 +3882,8 @@ struct CommunityGroupDetailView: View {
                                     membershipAccessCard
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.top, 14)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 10)
                             .padding(.bottom, 30)
                             .frame(maxWidth: 760)
                             .frame(maxWidth: .infinity)
