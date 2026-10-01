@@ -1734,6 +1734,7 @@ final class CommunityGroupStore: ObservableObject {
     func createGroup(
         name: String,
         summary: String,
+        locationName: String = "",
         visibility: String,
         joinMode: String = "open",
         membersCanCreateContent: Bool = true,
@@ -1741,7 +1742,12 @@ final class CommunityGroupStore: ObservableObject {
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanName = name.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let cleanLocation = locationName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
 
         guard cleanName.count >= 2 else {
             errorMessage = "Add a group name."
@@ -1771,7 +1777,8 @@ final class CommunityGroupStore: ObservableObject {
                 creatorID: userID,
                 name: String(cleanName.prefix(80)),
                 summary: String(summary.prefix(800)),
-                locationName: "",
+                locationName:
+                    String(cleanLocation.prefix(120)),
                 visibility: resolvedVisibility,
                 joinMode: resolvedJoinMode,
                 membersCanCreateContent:
@@ -8309,6 +8316,7 @@ struct CommunityGroupCreateView: View {
 
     @State private var name = ""
     @State private var summary = ""
+    @State private var locationName = ""
     @State private var visibility = "public"
     @State private var joinMode = "open"
     @State private var membersCanCreateContent = true
@@ -8369,6 +8377,19 @@ struct CommunityGroupCreateView: View {
 
                 Section("Club") {
                     TextField("Club name", text: $name)
+
+                    TextField(
+                        "Location (optional)",
+                        text: $locationName
+                    )
+                    .textContentType(.location)
+
+                    Text(
+                        "City, area or place. Leave empty if the Club is not tied to one location."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                     TextField(
                         "Description",
                         text: $summary,
@@ -8463,6 +8484,7 @@ struct CommunityGroupCreateView: View {
                             let ok = await groups.createGroup(
                                 name: name,
                                 summary: summary,
+                                locationName: locationName,
                                 visibility: visibility,
                                 joinMode: joinMode,
                                 membersCanCreateContent:
@@ -8680,6 +8702,7 @@ struct CommunityGroupSettingsView: View {
 
     @State private var name: String
     @State private var summary: String
+    @State private var locationName: String
     @State private var visibility: String
     @State private var joinMode: String
     @State private var membersCanCreateContent: Bool
@@ -8696,6 +8719,9 @@ struct CommunityGroupSettingsView: View {
         self.group = group
         _name = State(initialValue: group.name)
         _summary = State(initialValue: group.summary)
+        _locationName = State(
+            initialValue: group.locationName
+        )
         _visibility = State(initialValue: group.visibility)
         _joinMode = State(initialValue: group.joinMode)
         _membersCanCreateContent = State(
@@ -8866,6 +8892,19 @@ struct CommunityGroupSettingsView: View {
 
                 Section("Club") {
                     TextField("Club name", text: $name)
+
+                    TextField(
+                        "Location (optional)",
+                        text: $locationName
+                    )
+                    .textContentType(.location)
+
+                    Text(
+                        "Shown in the Club header and Club discovery when provided."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                     TextField(
                         "Description",
                         text: $summary,
@@ -9107,7 +9146,7 @@ struct CommunityGroupSettingsView: View {
         var saved = await groups.updateGroup(
             currentGroup,
             name: name,
-            locationName: currentGroup.locationName,
+            locationName: locationName,
             summary: summary,
             visibility: visibility,
             joinMode: joinMode,
