@@ -885,7 +885,7 @@ struct GoalCreationView: View {
                 )
                 .font(
                     .system(
-                        size: 26,
+                        size: 23,
                         weight: .bold,
                         design: .rounded
                     )
@@ -900,7 +900,12 @@ struct GoalCreationView: View {
                         norwegian: "Velg målet som passer best. Du kan finjustere målet i neste steg."
                     )
                 )
-                .font(.subheadline)
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .regular
+                    )
+                )
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
                 )
@@ -958,8 +963,10 @@ struct GoalCreationView: View {
                         ) {
                             Text(option.title)
                                 .font(
-                                    .subheadline
-                                        .weight(.bold)
+                                    .system(
+                                        size: 14,
+                                        weight: .bold
+                                    )
                                 )
                                 .foregroundStyle(
                                     ATHLTHTheme.primaryText
@@ -967,7 +974,12 @@ struct GoalCreationView: View {
                                 .lineLimit(1)
 
                             Text(option.subtitle)
-                                .font(.caption)
+                                .font(
+                                    .system(
+                                        size: 11.5,
+                                        weight: .regular
+                                    )
+                                )
                                 .foregroundStyle(
                                     ATHLTHTheme.mutedText
                                 )
@@ -1019,7 +1031,7 @@ struct GoalCreationView: View {
                         }
                     }
                     .padding(.horizontal, 13)
-                    .padding(.vertical, 11)
+                    .padding(.vertical, 9)
                     .background(
                         isSelected
                             ? ATHLTHTheme.accentSoft.opacity(0.72)
@@ -1284,9 +1296,8 @@ struct GoalCreationView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 0) {
-            Divider()
-                .opacity(0.35)
+        HStack {
+            Spacer()
 
             Button {
                 if step == 4 {
@@ -1299,7 +1310,7 @@ struct GoalCreationView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Text(
                         step == 4
                             ? ATHLTHLocalization.format(
@@ -1307,11 +1318,16 @@ struct GoalCreationView: View {
                                 norwegian: "Opprett mål"
                             )
                             : ATHLTHLocalization.format(
-                                english: "Next",
-                                norwegian: "Neste"
+                                english: "Continue",
+                                norwegian: "Fortsett"
                             )
                     )
-                    .font(.headline.weight(.bold))
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
 
                     Image(
                         systemName:
@@ -1321,31 +1337,40 @@ struct GoalCreationView: View {
                     )
                     .font(
                         .system(
-                            size: 13,
+                            size: 11.5,
                             weight: .bold
                         )
                     )
                 }
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .padding(.horizontal, 22)
+                .frame(
+                    minWidth: 154,
+                    minHeight: 44
+                )
                 .background(
                     canContinue
                         ? ATHLTHTheme.accentDeep
                         : Color.secondary.opacity(0.30),
-                    in: RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
+                    in: Capsule()
+                )
+                .shadow(
+                    color: Color.black.opacity(0.08),
+                    radius: 8,
+                    y: 3
                 )
             }
             .buttonStyle(.plain)
             .disabled(!canContinue)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 12)
+
+            Spacer()
         }
-        .background(.ultraThinMaterial)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(
+            Color(.systemGroupedBackground)
+                .opacity(0.96)
+        )
     }
 
     private var stepTitle: String {
