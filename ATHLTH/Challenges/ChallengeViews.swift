@@ -576,6 +576,7 @@ struct ChallengeCreationView: View {
     @State private var mapPosition: MapCameraPosition = .automatic
 
     @State private var visibility: ProfileVisibility = .friends
+    @State private var shareToCommunity = true
     @State private var creatingChallenge = false
     @State private var createError: String?
 
@@ -1969,6 +1970,25 @@ struct ChallengeCreationView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
+                Label("Community activity", systemImage: "person.2.wave.2.fill")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.accent)
+
+                Toggle(
+                    "Share this challenge to Community",
+                    isOn: $shareToCommunity
+                )
+
+                Text(
+                    "People who can see the challenge will get a compact challenge card in their Community feed."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding()
+            .challengeCard()
+
+            VStack(alignment: .leading, spacing: 6) {
                 Label("Fair-play rules", systemImage: "checkmark.shield.fill")
                     .font(.headline)
                     .foregroundStyle(ATHLTHTheme.accent)
@@ -2267,6 +2287,13 @@ struct ChallengeCreationView: View {
                 social.errorMessage ??
                 "This athlete may not be accepting challenge requests."
             return
+        }
+
+        if shareToCommunity {
+            _ = await social
+                .shareChallengeToCommunity(
+                    challenge
+                )
         }
 
         dismiss()
