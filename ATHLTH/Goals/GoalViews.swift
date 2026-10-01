@@ -3167,43 +3167,174 @@ private struct GoalPreviewCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             Group {
-                if let imageData, let image = UIImage(data: imageData) {
+                if let imageData,
+                   let image =
+                        UIImage(
+                            data: imageData
+                        ) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                 } else {
                     LinearGradient(
-                        colors: [ATHLTHTheme.accent.opacity(0.88), .black.opacity(0.84)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        colors: coverColors,
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
                     )
                 }
             }
-            .frame(height: 190)
+            .frame(height: 158)
             .clipped()
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.75)],
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(
+                        0.66
+                    )
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(category.title.uppercased())
-                    .font(.caption2.bold())
-                    .tracking(1)
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                HStack {
+                    Label(
+                        category.title,
+                        systemImage:
+                            category
+                                .systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .frame(height: 25)
+                    .background(
+                        Color.white
+                            .opacity(
+                                0.18
+                            ),
+                        in: Capsule()
+                    )
+
+                    Spacer()
+                }
+
+                Spacer()
+
                 Text(title)
-                    .font(.title2.bold())
+                    .font(
+                        .system(
+                            size: 21,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .lineLimit(2)
+
                 if let deadline {
-                    Text(deadline.formatted(date: .long, time: .omitted))
-                        .font(.caption)
+                    Label(
+                        deadline.formatted(
+                            date:
+                                .abbreviated,
+                            time: .omitted
+                        ),
+                        systemImage:
+                            "calendar"
+                    )
+                    .font(
+                        .system(
+                            size: 10.5,
+                            weight:
+                                .medium
+                        )
+                    )
                 }
             }
             .foregroundStyle(.white)
-            .padding()
+            .padding(14)
         }
-        .frame(height: 190)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .frame(height: 158)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(
+                    0.18
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    0.06
+                ),
+            radius: 10,
+            y: 4
+        )
+    }
+
+    private var coverColors:
+        [Color] {
+        switch coverStyle {
+        case .forest:
+            return [
+                ATHLTHTheme
+                    .vitality
+                    .opacity(0.86),
+                Color.black
+                    .opacity(0.78)
+            ]
+        case .summit:
+            return [
+                Color.blue
+                    .opacity(0.78),
+                Color.indigo
+                    .opacity(0.84)
+            ]
+        case .track:
+            return [
+                Color.orange
+                    .opacity(0.86),
+                Color.red
+                    .opacity(0.76)
+            ]
+        case .strength:
+            return [
+                Color.gray
+                    .opacity(0.84),
+                Color.black
+                    .opacity(0.90)
+            ]
+        case .calm:
+            return [
+                Color.mint
+                    .opacity(0.68),
+                Color.blue
+                    .opacity(0.68)
+            ]
+        }
     }
 }
 
