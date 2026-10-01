@@ -1034,10 +1034,10 @@ struct GoalCreationView: View {
 
     private var goalSelectedCategoryCard:
         some View {
-        HStack(spacing: 12) {
-            let tint =
-                goalCategoryTint(category)
+        let tint =
+            goalCategoryTint(category)
 
+        return HStack(spacing: 12) {
             Image(
                 systemName:
                     category.systemImage
