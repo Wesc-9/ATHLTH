@@ -521,6 +521,39 @@ final class GhostRaceStore: ObservableObject {
         }
     }
 
+    func updatePhoneWorkout(
+        location: CLLocation?,
+        elapsedTime: TimeInterval,
+        state: WatchWorkoutMirrorState
+    ) {
+        let snapshot =
+            WatchWorkoutLiveSnapshot(
+                kind: .running,
+                state: state,
+                startedAt: nil,
+                capturedAt: Date(),
+                elapsedTime:
+                    max(elapsedTime, 0),
+                heartRate: 0,
+                activeCalories: 0,
+                distanceMeters: 0,
+                averageHeartRate: nil,
+                maxHeartRate: nil,
+                routePointCount:
+                    location == nil ? 0 : 1,
+                currentLatitude:
+                    location?
+                        .coordinate
+                        .latitude,
+                currentLongitude:
+                    location?
+                        .coordinate
+                        .longitude
+            )
+
+        update(with: snapshot)
+    }
+
     func temporaryRoute(
         ownerID: UUID,
         title: String? = nil
