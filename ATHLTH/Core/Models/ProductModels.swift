@@ -363,6 +363,13 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // per-workout Audio Coach override.
     var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
 
+    // Per-workout Spotify override. spotifyAutoplayOnStart == nil keeps
+    // backwards compatibility by inheriting the program-level Spotify
+    // setting. false explicitly disables Spotify for this workout, while
+    // true starts spotifyPlaylist when one is selected.
+    var spotifyPlaylist: SpotifyPlaylistReference? = nil
+    var spotifyAutoplayOnStart: Bool? = nil
+
     // Optional per-workout live target alerts. Route-deviation alerts stay
     // global in Settings; heart-rate / pace targets belong to the workout.
     var targetAlertConfiguration:
