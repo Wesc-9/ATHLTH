@@ -1254,7 +1254,7 @@ struct ATHLTHHomeView: View {
     private var homeTodayCalendarCard: some View {
         let plan = session.activePlan
         let workouts =
-            plan.map(homeTodaySessions(in:)) ?? []
+            plan.map { homeTodaySessions(in: $0) } ?? []
 
         return VStack(alignment: .leading, spacing: 9) {
             Button {
