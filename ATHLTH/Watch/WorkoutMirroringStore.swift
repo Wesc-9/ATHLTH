@@ -3,6 +3,12 @@ import Foundation
 @preconcurrency import HealthKit
 
 @MainActor
+enum ATHLTHWatchWorkoutRuntime {
+    static var isMirroredWorkoutActive = false
+    static var lastMirrorDetectedAt: Date?
+}
+
+@MainActor
 final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var snapshot: WatchWorkoutLiveSnapshot?
     @Published private(set) var connectionText = "Waiting for Apple Watch"
@@ -58,6 +64,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     func dismissSummary() {
         guard !hasActiveMirroredWorkout else { return }
 
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
+
         publish {
             self.isPresentationRequested = false
             self.snapshot = nil
@@ -69,6 +77,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     private func attach(_ session: HKWorkoutSession) {
         session.delegate = self
         mirroredSession = session
+        ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = true
+        ATHLTHWatchWorkoutRuntime.lastMirrorDetectedAt = Date()
 
         let initialSnapshot = WatchWorkoutLiveSnapshot(
             kind: workoutKind(for: session.workoutConfiguration.activityType),
@@ -210,6 +220,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
 
             if newState == .completed {
                 self.mirroredSession = nil
+                ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
             }
         }
     }
@@ -232,6 +243,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
 
             self.connectionText = "Mirroring error"
             self.isPresentationRequested = true
+            ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
         }
     }
 
