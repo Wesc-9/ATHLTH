@@ -895,14 +895,24 @@ struct RouteDetailView: View {
                         }
                     }
 
-                    Text(
-                        metadata.source ==
-                            "kartverket_turrutebasen"
-                            ? "Route geometry and trail metadata: © Kartverket."
-                            : "Route geometry and trail metadata: OpenStreetMap contributors."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    if metadata.source ==
+                        "kartverket_turrutebasen" {
+                        Link(
+                            "Route geometry and trail metadata: © Kartverket",
+                            destination: URL(
+                                string:
+                                    "https://www.kartverket.no"
+                            )!
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else {
+                        Text(
+                            "Route geometry and trail metadata: OpenStreetMap contributors."
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                 } else {
                     HStack(spacing: 9) {
                         ProgressView()
