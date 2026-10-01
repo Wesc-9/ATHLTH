@@ -3943,11 +3943,15 @@ struct CommunityGroupDetailView: View {
     }
 
     private var groupAreaPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(CommunityGroupsTab.allCases) { tab in
+        HStack(spacing: 3) {
+            ForEach(
+                CommunityGroupsTab.allCases
+            ) { tab in
                 Button {
                     withAnimation(
-                        .easeInOut(duration: 0.18)
+                        .easeInOut(
+                            duration: 0.18
+                        )
                     ) {
                         selectedTab = tab
                     }
@@ -3964,36 +3968,81 @@ struct CommunityGroupDetailView: View {
                         .foregroundStyle(
                             selectedTab == tab
                                 ? Color.white
-                                : ATHLTHTheme.primaryText
+                                : ATHLTHTheme
+                                    .primaryText
                         )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            selectedTab == tab
-                                ? ATHLTHTheme.accentDeep
-                                : Color.clear,
-                            in: Capsule()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .frame(
+                            maxWidth:
+                                .infinity
                         )
+                        .frame(height: 42)
+                        .background {
+                            if selectedTab ==
+                                tab {
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        15,
+                                    style:
+                                        .continuous
+                                )
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme
+                                                .accentDeep,
+                                            ATHLTHTheme
+                                                .vitality
+                                        ],
+                                        startPoint:
+                                            .leading,
+                                        endPoint:
+                                            .trailing
+                                    )
+                                )
+                                .shadow(
+                                    color:
+                                        ATHLTHTheme
+                                            .accentDeep
+                                            .opacity(
+                                                0.16
+                                            ),
+                                    radius: 7,
+                                    y: 3
+                                )
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
         .background(
-            ATHLTHTheme.card.opacity(0.96),
-            in: Capsule()
+            Color.white.opacity(0.92),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
         )
         .overlay {
-            Capsule()
-                .stroke(
-                    ATHLTHTheme.border,
-                    lineWidth: 1
-                )
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.05),
+                lineWidth: 0.8
+            )
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.06),
-            radius: 12,
-            y: 5
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.05),
+            radius: 10,
+            y: 4
         )
     }
 
