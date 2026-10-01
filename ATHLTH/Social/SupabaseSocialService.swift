@@ -1332,11 +1332,129 @@ final class SupabaseSocialService: Sendable {
                 .execute()
         }
     }
+
+    func loadWorkoutMedia(
+        for userID: UUID,
+        limit: Int = 60
+    ) async throws -> [WorkoutMediaRecord] {
+        try await client
+            .from("workout_media")
+            .select()
+            .eq("user_id", value: userID)
+            .order("created_at", ascending: false)
+            .limit(max(1, min(limit, 120)))
+            .execute()
+            .value
+    }
+
+    func uploadWorkoutMedia(
+        workoutID: UUID,
+        jpegData: Data,
+        caption: String?
+    ) async throws -> WorkoutMediaRecord {
+        guard let userID = currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        guard !jpegData.isEmpty,
+              jpegData.count <= 10_485_760
+        else {
+            throw SocialServiceError.invalidWorkoutMedia(
+                "Workout photos must be smaller than 10 MB."
+            )
+        }
+
+        let mediaID = UUID()
+        let createdAt = Date()
+        let storagePath =
+            "\(userID.uuidString.lowercased())/" +
+            "\(workoutID.uuidString.lowercased())/" +
+            "\(mediaID.uuidString.lowercased()).jpg"
+
+        try await client.storage
+            .from("workout-media")
+            .upload(
+                storagePath,
+                data: jpegData,
+                options: FileOptions(
+                    cacheControl: "31536000",
+                    contentType: "image/jpeg",
+                    upsert: false
+                )
+            )
+
+        let publicURL = try client.storage
+            .from("workout-media")
+            .getPublicURL(path: storagePath)
+
+        let cleanCaption =
+            caption?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        let record = WorkoutMediaRecord(
+            id: mediaID,
+            userID: userID,
+            workoutID: workoutID,
+            imageURL: publicURL.absoluteString,
+            storagePath: storagePath,
+            caption:
+                cleanCaption?.isEmpty == false
+                    ? cleanCaption
+                    : nil,
+            createdAt: createdAt
+        )
+
+        do {
+            try await client
+                .from("workout_media")
+                .insert(
+                    WorkoutMediaInsert(
+                        id: record.id,
+                        userID: record.userID,
+                        workoutID: record.workoutID,
+                        imageURL: record.imageURL,
+                        storagePath: record.storagePath,
+                        caption: record.caption,
+                        createdAt: record.createdAt
+                    )
+                )
+                .execute()
+        } catch {
+            try? await client.storage
+                .from("workout-media")
+                .remove(paths: [storagePath])
+            throw error
+        }
+
+        return record
+    }
+
+    func deleteWorkoutMedia(
+        _ media: WorkoutMediaRecord
+    ) async throws {
+        guard currentUserID == media.userID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("workout_media")
+            .delete()
+            .eq("id", value: media.id)
+            .execute()
+
+        try? await client.storage
+            .from("workout-media")
+            .remove(paths: [media.storagePath])
+    }
+
 }
 
 enum SocialServiceError: LocalizedError {
     case notAuthenticated
     case invalidFriendRequestState
+    case invalidWorkoutMedia(String)
 
     var errorDescription: String? {
         switch self {
@@ -1344,6 +1462,8 @@ enum SocialServiceError: LocalizedError {
             return "Sign in to use ATHLTH social features."
         case .invalidFriendRequestState:
             return "That friend request action is not available."
+        case .invalidWorkoutMedia(let message):
+            return message
         }
     }
 }
