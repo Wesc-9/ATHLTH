@@ -42,6 +42,7 @@ enum GhostRaceStartService {
     static func start(
         reference: GhostRaceReference,
         ownerID: UUID,
+        comparisonRouteID: UUID? = nil,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
@@ -55,6 +56,8 @@ enum GhostRaceStartService {
         try await launchPrepared(
             title: reference.title,
             ownerID: ownerID,
+            comparisonRouteID:
+                comparisonRouteID,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
@@ -392,6 +395,7 @@ enum GhostRaceStartService {
     private static func launchPrepared(
         title: String,
         ownerID: UUID,
+        comparisonRouteID: UUID? = nil,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore?,
@@ -400,7 +404,9 @@ enum GhostRaceStartService {
     ) async throws {
         guard let raceRoute =
                 ghostRace.temporaryRoute(
-                    ownerID: ownerID
+                    ownerID: ownerID,
+                    comparisonRouteID:
+                        comparisonRouteID
                 ),
               let reference =
                 ghostRace.reference
