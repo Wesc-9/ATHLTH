@@ -255,27 +255,6 @@ struct WatchLiveWorkoutFocusCard: View {
                     .minimumScaleFactor(0.72)
 
                 Text(
-                    liveGhostIsStale,
-                    format: .number
-                )
-                .hidden()
-                .frame(width: 0, height: 0)
-
-                Text(
-                    liveGhostIsStale,
-                    format: .number
-                )
-                .hidden()
-                .frame(width: 0, height: 0)
-
-                Text(
-                    liveGhostIsStale,
-                    format: .number
-                )
-                .hidden()
-                .frame(width: 0, height: 0)
-
-                Text(
                     liveGhostIsStale &&
                     liveGhostAge != nil
                         ? "\(title) · \(Int((liveGhostAge ?? 0).rounded()))s ago"
