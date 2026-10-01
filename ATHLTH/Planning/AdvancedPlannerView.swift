@@ -1628,6 +1628,7 @@ struct TrainingPlanManagerView: View {
     @State private var showingProgramCreation = false
     @State private var showingAllPlans = false
     @State private var programToStart: TrainingPlan?
+    @State private var scheduledPlanToOpen: TrainingPlan?
     @State private var aiMode: AIProgramGenerationMode?
     @State private var showingPlanAdaptation = false
     @State private var showingAISubscriptionOffer = false
@@ -1740,6 +1741,11 @@ struct TrainingPlanManagerView: View {
             }
             .padding(2)
 
+            if let nextPlan =
+                session.nextTrainingPlan {
+                upcomingPlanCard(nextPlan)
+            }
+
             if !session.planTemplates.isEmpty {
                 ATHLTHCard {
                     ATHLTHSectionHeader(
@@ -1791,6 +1797,28 @@ struct TrainingPlanManagerView: View {
         .sheet(isPresented: $showingProgramCreation) {
             TrainingPlanCreationView()
         }
+        .sheet(item: $scheduledPlanToOpen) { plan in
+            NavigationStack {
+                ScrollView {
+                    AdvancedPlannerView(
+                        planID: plan.id
+                    )
+                    .padding()
+                }
+                .background(
+                    ATHLTHPremiumCanvas(
+                        accent:
+                            ATHLTHTheme
+                                .accent
+                                .opacity(0.35)
+                    )
+                )
+                .navigationTitle(plan.title)
+                .navigationBarTitleDisplayMode(
+                    .inline
+                )
+            }
+        }
         .sheet(item: $programToStart) { program in
             ProgramStartView(
                 program: program,
@@ -1815,6 +1843,147 @@ struct TrainingPlanManagerView: View {
             }
             .environmentObject(subscriptionStore)
         }
+    }
+
+    private func upcomingPlanCard(
+        _ plan: TrainingPlan
+    ) -> some View {
+        Button {
+            scheduledPlanToOpen = plan
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 13) {
+                    Image(
+                        systemName:
+                            "calendar.badge.clock"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "NEXT PLAN",
+                                norwegian:
+                                    "NESTE PLAN"
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                        .tracking(1.4)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(plan.title)
+                            .font(
+                                .headline.weight(
+                                    .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+
+                        if let start =
+                            plan.startDate {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english:
+                                        "Starts %@",
+                                    norwegian:
+                                        "Starter %@",
+                                    start.formatted(
+                                        date:
+                                            .abbreviated,
+                                        time:
+                                            .omitted
+                                    )
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(
+                        alignment: .trailing,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Upcoming",
+                                norwegian: "Kommende"
+                            )
+                        )
+                        .font(
+                            .caption2.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accent
+                        )
+                        .padding(
+                            .horizontal,
+                            8
+                        )
+                        .padding(.vertical, 4)
+                        .background(
+                            ATHLTHTheme
+                                .accentSoft,
+                            in: Capsule()
+                        )
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
