@@ -1,6 +1,19 @@
 import AVFoundation
 import SwiftUI
 
+private struct ATHLTHAudioCoachVoiceOption:
+    Identifiable,
+    Hashable
+{
+    let id: String
+    let name: String
+    let language: String
+
+    var displayTitle: String {
+        "\(name) · \(language)"
+    }
+}
+
 @MainActor
 private final class ATHLTHAudioCoachPreviewSpeaker:
     NSObject,
@@ -19,6 +32,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 
     func speak(
         language: WatchAudioCoachLanguage,
+        voiceIdentifier: String?,
+        speechRate: Double,
+        speechVolume: Double,
         duckOtherAudio: Bool
     ) {
         synthesizer.stopSpeaking(
@@ -70,7 +86,13 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
                         : "Audio Coach is ready."
             )
 
-        if language == .norwegian ||
+        if let voiceIdentifier,
+           let selectedVoice =
+                AVSpeechSynthesisVoice(
+                    identifier: voiceIdentifier
+                ) {
+            utterance.voice = selectedVoice
+        } else if language == .norwegian ||
             (language == .system &&
              useNorwegian) {
             utterance.voice =
@@ -84,8 +106,26 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
                 )
         }
 
-        utterance.rate = 0.48
-        utterance.volume = 1.0
+        utterance.rate =
+            Float(
+                min(
+                    max(
+                        speechRate,
+                        0.35
+                    ),
+                    0.65
+                )
+            )
+        utterance.volume =
+            Float(
+                min(
+                    max(
+                        speechVolume,
+                        0.2
+                    ),
+                    1.0
+                )
+            )
         synthesizer.speak(utterance)
     }
 
@@ -133,13 +173,13 @@ struct ATHLTHAudioCoachSettingsView: View {
             ) {
                 VStack(spacing: 16) {
                     defaultsCard
+                    voiceCard
                     triggerCard
                     contentCard
+                    eventCard
                     routeCard
                     structuredWorkoutCard
                     musicCard
-                    languageCard
-                    previewCard
                 }
             }
             .padding()
@@ -309,22 +349,72 @@ struct ATHLTHAudioCoachSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            pickerRow(
+                ATHLTHLocalization.choose(
+                    english: "Quiet period after important alerts",
+                    norwegian: "Pause etter viktige varsler"
+                )
+            ) {
+                Picker(
+                    "Quiet period",
+                    selection:
+                        $settings
+                            .guidanceQuietPeriodSeconds
+                ) {
+                    Text("0 s").tag(0)
+                    Text("5 s").tag(5)
+                    Text("10 s").tag(10)
+                    Text("15 s").tag(15)
+                    Text("30 s").tag(30)
+                }
+                .pickerStyle(.menu)
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Prevents routine pace and distance updates from talking over route, interval or target alerts.",
+                    norwegian:
+                        "Hindrer vanlige tempo- og distanseoppdateringer i å snakke over rute-, intervall- eller målvarsler."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
     }
 
-    private var languageCard: some View {
+    private var voiceCard: some View {
         settingsCard(
-            title: "Voice",
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Voice",
+                    norwegian: "Stemme"
+                ),
             subtitle:
-                "The selected language is used for Audio Coach speech on iPhone or Apple Watch."
+                ATHLTHLocalization.choose(
+                    english:
+                        "Choose the language, voice, speaking speed and volume used by Audio Coach.",
+                    norwegian:
+                        "Velg språk, stemme, talehastighet og volum for Audio Coach."
+                )
         ) {
-            pickerRow("Language") {
+            pickerRow(
+                ATHLTHLocalization.choose(
+                    english: "Language",
+                    norwegian: "Språk"
+                )
+            ) {
                 Picker(
                     "Language",
-                    selection: $settings.audioCoachLanguage
+                    selection:
+                        $settings.audioCoachLanguage
                 ) {
                     ForEach(
-                        WatchAudioCoachLanguage.allCases,
+                        WatchAudioCoachLanguage
+                            .allCases,
                         id: \.rawValue
                     ) { language in
                         Text(language.title)
@@ -334,30 +424,113 @@ struct ATHLTHAudioCoachSettingsView: View {
                 .pickerStyle(.menu)
             }
 
-            Text(
-                "System uses the recording device language when an appropriate voice is available."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+            Divider()
 
-    private var previewCard: some View {
-        settingsCard(
-            title:
+            pickerRow(
                 ATHLTHLocalization.choose(
-                    english: "Test Audio Coach",
-                    norwegian: "Test Audio Coach"
-                ),
-            subtitle:
+                    english: "Voice",
+                    norwegian: "Stemme"
+                )
+            ) {
+                Picker(
+                    "Voice",
+                    selection:
+                        $settings
+                            .audioCoachVoiceIdentifier
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Automatic",
+                            norwegian: "Automatisk"
+                        )
+                    )
+                    .tag(
+                        Optional<String>.none
+                    )
+
+                    ForEach(
+                        availableVoiceOptions
+                    ) { voice in
+                        Text(
+                            voice.displayTitle
+                        )
+                        .tag(
+                            Optional(voice.id)
+                        )
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "Play a short sample on this iPhone before starting a workout.",
+                        "Voice availability can differ between iPhone and Apple Watch. If the selected voice is unavailable on Watch, ATHLTH falls back to the selected language automatically.",
                     norwegian:
-                        "Spill av en kort test på denne iPhonen før du starter en økt."
+                        "Tilgjengelige stemmer kan være forskjellige på iPhone og Apple Watch. Hvis valgt stemme ikke finnes på klokken, bruker ATHLTH automatisk en stemme for valgt språk."
                 )
-        ) {
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            Divider()
+
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Speaking speed",
+                            norwegian: "Talehastighet"
+                        )
+                    )
+                    Spacer()
+                    Text(
+                        speechRateTitle
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
+
+                Slider(
+                    value:
+                        $settings
+                            .audioCoachSpeechRate,
+                    in: 0.38...0.60,
+                    step: 0.01
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Voice volume",
+                            norwegian: "Stemmevolum"
+                        )
+                    )
+                    Spacer()
+                    Text(
+                        "\(Int((settings.audioCoachSpeechVolume * 100).rounded()))%"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
+
+                Slider(
+                    value:
+                        $settings
+                            .audioCoachSpeechVolume,
+                    in: 0.3...1.0,
+                    step: 0.05
+                )
+            }
+
             Button {
                 ATHLTHAudioCoachPreviewSpeaker
                     .shared
@@ -365,6 +538,15 @@ struct ATHLTHAudioCoachSettingsView: View {
                         language:
                             settings
                                 .audioCoachLanguage,
+                        voiceIdentifier:
+                            settings
+                                .audioCoachVoiceIdentifier,
+                        speechRate:
+                            settings
+                                .audioCoachSpeechRate,
+                        speechVolume:
+                            settings
+                                .audioCoachSpeechVolume,
                         duckOtherAudio:
                             settings
                                 .audioCoachDuckOtherAudio
@@ -383,6 +565,126 @@ struct ATHLTHAudioCoachSettingsView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accent)
+        }
+    }
+
+    private var eventCard: some View {
+        settingsCard(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Workout events",
+                    norwegian: "Hendelser i økten"
+                ),
+            subtitle:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Choose which important workout events Audio Coach should confirm.",
+                    norwegian:
+                        "Velg hvilke viktige hendelser Audio Coach skal bekrefte."
+                )
+        ) {
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Workout started",
+                    norwegian: "Økten starter"
+                ),
+                isOn:
+                    $settings
+                        .audioCoachAnnounceWorkoutStart
+            )
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Pause and resume",
+                    norwegian: "Pause og fortsett"
+                ),
+                isOn:
+                    $settings
+                        .audioCoachAnnouncePauseResume
+            )
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Workout completed",
+                    norwegian: "Økten fullføres"
+                ),
+                isOn:
+                    $settings
+                        .audioCoachAnnounceWorkoutComplete
+            )
+        }
+    }
+
+    private var availableVoiceOptions:
+        [ATHLTHAudioCoachVoiceOption] {
+        let prefixes: [String]
+
+        switch settings.audioCoachLanguage {
+        case .norwegian:
+            prefixes = ["nb", "nn", "no"]
+        case .english:
+            prefixes = ["en"]
+        case .system:
+            let code =
+                Locale.autoupdatingCurrent
+                    .language
+                    .languageCode?
+                    .identifier
+                    .lowercased() ??
+                "en"
+            prefixes =
+                ["nb", "nn", "no"]
+                    .contains(code)
+                    ? ["nb", "nn", "no"]
+                    : [code]
+        }
+
+        return AVSpeechSynthesisVoice
+            .speechVoices()
+            .filter { voice in
+                let language =
+                    voice.language
+                        .lowercased()
+
+                return prefixes
+                    .contains {
+                        language
+                            .hasPrefix($0)
+                    }
+            }
+            .map {
+                ATHLTHAudioCoachVoiceOption(
+                    id: $0.identifier,
+                    name: $0.name,
+                    language: $0.language
+                )
+            }
+            .sorted {
+                if $0.name == $1.name {
+                    return $0.language <
+                        $1.language
+                }
+                return $0.name < $1.name
+            }
+    }
+
+    private var speechRateTitle: String {
+        switch settings.audioCoachSpeechRate {
+        case ..<0.44:
+            return ATHLTHLocalization.choose(
+                english: "Slow",
+                norwegian: "Rolig"
+            )
+        case 0.54...:
+            return ATHLTHLocalization.choose(
+                english: "Fast",
+                norwegian: "Rask"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Normal",
+                norwegian: "Normal"
+            )
         }
     }
 
