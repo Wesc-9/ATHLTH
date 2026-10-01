@@ -803,129 +803,7 @@ struct AroundYouExploreView: View {
         ExploreRouteSort = .nearest
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Picker("Map filter", selection: $filter) {
-                    ForEach(
-                        AroundYouFilter.allCases
-                    ) { option in
-                        Text(option.rawValue)
-                            .tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Menu {
-                    Picker(
-                        "Distance",
-                        selection: $routeLengthFilter
-                    ) {
-                        ForEach(
-                            ExploreRouteLengthFilter
-                                .allCases
-                        ) { option in
-                            Text(option.rawValue)
-                                .tag(option)
-                        }
-                    }
-
-                    Divider()
-
-                    Picker(
-                        "Sort",
-                        selection: $routeSort
-                    ) {
-                        ForEach(
-                            ExploreRouteSort.allCases
-                        ) { option in
-                            Text(option.rawValue)
-                                .tag(option)
-                        }
-                    }
-                } label: {
-                    Image(
-                        systemName:
-                            routeLengthFilter == .any &&
-                            routeSort == .nearest
-                                ? "slider.horizontal.3"
-                                : "slider.horizontal.3.circle.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        routeLengthFilter == .any &&
-                        routeSort == .nearest
-                            ? ATHLTHTheme.accentDeep
-                            : ATHLTHTheme.vitality
-                    )
-                    .frame(width: 42, height: 32)
-                    .background(
-                        Color.primary.opacity(0.045),
-                        in: RoundedRectangle(
-                            cornerRadius: 10,
-                            style: .continuous
-                        )
-                    )
-                }
-                .accessibilityLabel(
-                    "Filter and sort routes"
-                )
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-
-            if (
-                publicTrailDiscovery.isLoading ||
-                publicTrailDiscovery.isWarmingCache
-               ) &&
-               publicTrailDiscovery.trails.isEmpty {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-
-                    Text(
-                        publicTrailDiscovery.isWarmingCache
-                            ? "Finding public trails nearby…"
-                            : "Loading public trails…"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-
-                    Spacer()
-
-                    Text("Open trail data")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.vitality
-                        )
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            } else if let publicTrailError =
-                publicTrailDiscovery.errorMessage,
-                publicTrailDiscovery.trails.isEmpty {
-                HStack(spacing: 7) {
-                    Image(
-                        systemName:
-                            "exclamationmark.triangle"
-                    )
-                    Text(publicTrailError)
-                }
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-            }
-
+        ZStack {
             MapReader { proxy in
                 Map(position: $mapPosition) {
                     if locationStore.canShowUserLocation {
@@ -1046,7 +924,6 @@ struct AroundYouExploreView: View {
                 .mapControls {
                     MapCompass()
                     MapScaleView()
-                    MapUserLocationButton()
                 }
                 .onMapCameraChange(
                     frequency: .onEnd
@@ -1110,55 +987,6 @@ struct AroundYouExploreView: View {
                         .padding(.bottom, 34)
                     }
                 }
-                .overlay(alignment: .top) {
-                    if shouldSearchVisibleArea,
-                       visibleRegion != nil {
-                        Button {
-                            Task {
-                                await searchVisibleArea()
-                            }
-                        } label: {
-                            HStack(spacing: 7) {
-                                if isSearchingVisibleArea {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                } else {
-                                    Image(
-                                        systemName:
-                                            "magnifyingglass"
-                                    )
-                                }
-
-                                Text("Search this area")
-                            }
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .padding(.horizontal, 14)
-                            .frame(height: 38)
-                            .background(
-                                .ultraThinMaterial,
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(
-                                        Color.white.opacity(0.72),
-                                        lineWidth: 1
-                                    )
-                            }
-                            .shadow(
-                                color: .black.opacity(0.12),
-                                radius: 10,
-                                y: 4
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isSearchingVisibleArea)
-                        .padding(.top, 12)
-                    }
-                }
                 .overlay(alignment: .bottom) {
                     if let route = selectedRoute {
                         routePreviewCard(route)
@@ -1179,10 +1007,27 @@ struct AroundYouExploreView: View {
                     value: selectedRoute?.id
                 )
             }
+
+            exploreFloatingControls
+                .frame(
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
+                .allowsHitTesting(true)
         }
         .background(ATHLTHPremiumCanvas())
-        .navigationTitle(embeddedInTab ? "Explore" : "Around You")
+        .ignoresSafeArea(
+            .container,
+            edges: embeddedInTab ? .top : []
+        )
+        .navigationTitle(
+            embeddedInTab ? "" : "Around You"
+        )
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(
+            embeddedInTab ? .hidden : .visible,
+            for: .navigationBar
+        )
         .toolbar(
             embeddedInTab ? .visible : .hidden,
             for: .tabBar
@@ -1274,6 +1119,333 @@ struct AroundYouExploreView: View {
                 routeActionError ??
                 routeActionMessage ??
                 ""
+            )
+        }
+    }
+
+    private var exploreFloatingControls:
+        some View {
+        VStack(spacing: 10) {
+            if embeddedInTab {
+                Text("Explore")
+                    .font(
+                        .system(
+                            size: 22,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .shadow(
+                        color:
+                            Color.black.opacity(0.24),
+                        radius: 5,
+                        y: 2
+                    )
+                    .padding(.bottom, 2)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    locationStore.start()
+                    centerOnUser()
+                } label: {
+                    Image(
+                        systemName:
+                            "location.north.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        .ultraThinMaterial,
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(
+                                    0.78
+                                ),
+                                lineWidth: 1
+                            )
+                    }
+                    .shadow(
+                        color:
+                            .black.opacity(0.12),
+                        radius: 10,
+                        y: 4
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Center on my location",
+                        norwegian:
+                            "Sentrer på min posisjon"
+                    )
+                )
+
+                Picker(
+                    "Map filter",
+                    selection: $filter
+                ) {
+                    ForEach(
+                        AroundYouFilter.allCases
+                    ) { option in
+                        Text(option.rawValue)
+                            .tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(3)
+                .background(
+                    .ultraThinMaterial,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            Color.white.opacity(
+                                0.72
+                            ),
+                            lineWidth: 1
+                        )
+                }
+                .shadow(
+                    color:
+                        .black.opacity(0.10),
+                    radius: 9,
+                    y: 4
+                )
+
+                Menu {
+                    Picker(
+                        "Distance",
+                        selection:
+                            $routeLengthFilter
+                    ) {
+                        ForEach(
+                            ExploreRouteLengthFilter
+                                .allCases
+                        ) { option in
+                            Text(option.rawValue)
+                                .tag(option)
+                        }
+                    }
+
+                    Divider()
+
+                    Picker(
+                        "Sort",
+                        selection: $routeSort
+                    ) {
+                        ForEach(
+                            ExploreRouteSort
+                                .allCases
+                        ) { option in
+                            Text(option.rawValue)
+                                .tag(option)
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            routeLengthFilter ==
+                                .any &&
+                            routeSort ==
+                                .nearest
+                                ? "slider.horizontal.3"
+                                : "slider.horizontal.3.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        routeLengthFilter ==
+                            .any &&
+                        routeSort ==
+                            .nearest
+                            ? ATHLTHTheme
+                                .accentDeep
+                            : ATHLTHTheme
+                                .vitality
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        .ultraThinMaterial,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.white.opacity(
+                                0.78
+                            ),
+                            lineWidth: 1
+                        )
+                    }
+                    .shadow(
+                        color:
+                            .black.opacity(0.12),
+                        radius: 10,
+                        y: 4
+                    )
+                }
+                .accessibilityLabel(
+                    "Filter and sort routes"
+                )
+            }
+
+            if visibleRegion != nil {
+                Button {
+                    Task {
+                        await searchVisibleArea()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isSearchingVisibleArea {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(
+                                systemName:
+                                    "magnifyingglass"
+                            )
+                        }
+
+                        Text("Search this area")
+                    }
+                    .font(
+                        .subheadline.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .padding(.horizontal, 17)
+                    .frame(height: 42)
+                    .background(
+                        .ultraThinMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.white.opacity(
+                                    0.76
+                                ),
+                                lineWidth: 1
+                            )
+                    }
+                    .shadow(
+                        color:
+                            .black.opacity(0.12),
+                        radius: 10,
+                        y: 4
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isSearchingVisibleArea)
+            }
+
+            exploreTrailStatusOverlay
+        }
+        .padding(.horizontal, 12)
+        .safeAreaPadding(
+            .top,
+            embeddedInTab ? 8 : 0
+        )
+    }
+
+    @ViewBuilder
+    private var exploreTrailStatusOverlay:
+        some View {
+        if (
+            publicTrailDiscovery.isLoading ||
+            publicTrailDiscovery.isWarmingCache
+           ) &&
+           publicTrailDiscovery.trails.isEmpty {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text(
+                    publicTrailDiscovery
+                        .isWarmingCache
+                        ? "Finding public trails nearby…"
+                        : "Loading public trails…"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(
+                .ultraThinMaterial,
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(0.68),
+                        lineWidth: 1
+                    )
+            }
+        } else if let publicTrailError =
+                    publicTrailDiscovery
+                        .errorMessage,
+                  publicTrailDiscovery
+                    .trails.isEmpty {
+            HStack(spacing: 7) {
+                Image(
+                    systemName:
+                        "exclamationmark.triangle"
+                )
+                Text(publicTrailError)
+                    .lineLimit(2)
+            }
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
             )
         }
     }
