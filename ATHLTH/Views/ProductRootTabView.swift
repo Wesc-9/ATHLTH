@@ -130,9 +130,15 @@ struct ProductRootTabView: View {
 }
 
 private struct ATHLTHMirroredWorkoutPresenter: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @State private var presentationReady = false
+
+    private var presentationTrigger: String {
+        "\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+    }
 
     var body: some View {
         Color.clear
@@ -140,7 +146,10 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
             .sheet(
                 isPresented: Binding(
                     get: {
-                        guard workoutMirroring.isPresentationRequested else {
+                        guard presentationReady,
+                              scenePhase == .active,
+                              workoutMirroring.isPresentationRequested
+                        else {
                             return false
                         }
 
@@ -170,6 +179,33 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
             ) {
                 MirroredWorkoutLiveView()
                     .environmentObject(workoutMirroring)
+            }
+            .task(id: presentationTrigger) {
+                guard scenePhase == .active,
+                      workoutMirroring.isPresentationRequested
+                else {
+                    presentationReady = false
+                    return
+                }
+
+                presentationReady = false
+
+                // The mirroring callback can arrive while authentication is
+                // swapping the launch gate for the product tabs. Give SwiftUI
+                // one short, cancellable settling window before presenting a
+                // sheet from the new root hierarchy.
+                try? await Task.sleep(
+                    for: .milliseconds(400)
+                )
+
+                guard !Task.isCancelled,
+                      scenePhase == .active,
+                      workoutMirroring.isPresentationRequested
+                else {
+                    return
+                }
+
+                presentationReady = true
             }
     }
 }
