@@ -663,10 +663,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               kind == .running,
               let distanceDelta =
                     liveGhost
-                        .distanceDeltaMeters,
-              let timeDelta =
-                    liveGhost
-                        .estimatedTimeDeltaSeconds
+                        .distanceDeltaMeters
         else {
             return
         }
@@ -681,7 +678,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             distanceDelta:
                 distanceDelta,
             timeDelta:
-                timeDelta
+                liveGhost
+                    .estimatedTimeDeltaSeconds
         )
     }
 
@@ -2246,7 +2244,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             WatchGhostRaceAudioConfiguration?,
         userDistance: Double,
         distanceDelta: Double,
-        timeDelta: TimeInterval
+        timeDelta: TimeInterval?
     ) {
         guard state == .running,
               let configuration,
@@ -2400,14 +2398,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func announceGhostRaceLead(
         distanceDelta: Double,
-        timeDelta: TimeInterval,
+        timeDelta: TimeInterval?,
         delivery: WatchAlertDelivery,
         priority: ATHLTHGuidancePriority
     ) {
         let meters =
             abs(distanceDelta)
-        let seconds =
-            abs(timeDelta)
 
         let english: String
         let norwegian: String
@@ -2418,31 +2414,79 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             norwegian =
                 "Spøkelsesløp. Helt jevnt."
         } else if distanceDelta > 0 {
-            english =
+            var englishParts = [
                 "Ghost Race. You are " +
-                spokenDistance(meters) +
-                " ahead. About " +
-                spokenDuration(seconds) +
-                " ahead."
-            norwegian =
+                    spokenDistance(meters) +
+                    " ahead."
+            ]
+            var norwegianParts = [
                 "Spøkelsesløp. Du er " +
-                spokenDistance(meters) +
-                " foran. Omtrent " +
-                spokenDuration(seconds) +
-                " foran."
-        } else {
+                    spokenDistance(meters) +
+                    " foran."
+            ]
+
+            if let timeDelta {
+                englishParts.append(
+                    "About " +
+                    spokenDuration(
+                        abs(timeDelta)
+                    ) +
+                    " ahead."
+                )
+                norwegianParts.append(
+                    "Omtrent " +
+                    spokenDuration(
+                        abs(timeDelta)
+                    ) +
+                    " foran."
+                )
+            }
+
             english =
-                "Ghost Race. Your ghost is " +
-                spokenDistance(meters) +
-                " ahead. About " +
-                spokenDuration(seconds) +
-                " behind."
+                englishParts.joined(
+                    separator: " "
+                )
             norwegian =
+                norwegianParts.joined(
+                    separator: " "
+                )
+        } else {
+            var englishParts = [
+                "Ghost Race. Your ghost is " +
+                    spokenDistance(meters) +
+                    " ahead."
+            ]
+            var norwegianParts = [
                 "Spøkelsesløp. Spøkelset er " +
-                spokenDistance(meters) +
-                " foran. Omtrent " +
-                spokenDuration(seconds) +
-                " bak."
+                    spokenDistance(meters) +
+                    " foran."
+            ]
+
+            if let timeDelta {
+                englishParts.append(
+                    "About " +
+                    spokenDuration(
+                        abs(timeDelta)
+                    ) +
+                    " behind."
+                )
+                norwegianParts.append(
+                    "Omtrent " +
+                    spokenDuration(
+                        abs(timeDelta)
+                    ) +
+                    " bak."
+                )
+            }
+
+            english =
+                englishParts.joined(
+                    separator: " "
+                )
+            norwegian =
+                norwegianParts.joined(
+                    separator: " "
+                )
         }
 
         deliverWorkoutAlert(
