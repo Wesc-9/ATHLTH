@@ -457,6 +457,27 @@ private struct CommunityGroupImageUpdate: Encodable {
         case imageURL = "image_url"
         case updatedAt = "updated_at"
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container =
+            encoder.container(keyedBy: CodingKeys.self)
+
+        if let imageURL {
+            try container.encode(
+                imageURL,
+                forKey: .imageURL
+            )
+        } else {
+            try container.encodeNil(
+                forKey: .imageURL
+            )
+        }
+
+        try container.encode(
+            updatedAt,
+            forKey: .updatedAt
+        )
+    }
 }
 
 private struct CommunityGroupHeaderImageUpdate: Encodable {
@@ -467,6 +488,27 @@ private struct CommunityGroupHeaderImageUpdate: Encodable {
         case headerImageURL = "header_image_url"
         case updatedAt = "updated_at"
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container =
+            encoder.container(keyedBy: CodingKeys.self)
+
+        if let headerImageURL {
+            try container.encode(
+                headerImageURL,
+                forKey: .headerImageURL
+            )
+        } else {
+            try container.encodeNil(
+                forKey: .headerImageURL
+            )
+        }
+
+        try container.encode(
+            updatedAt,
+            forKey: .updatedAt
+        )
+    }
 }
 
 private struct CommunityGroupFeaturedChallengeUpdate: Encodable {
@@ -476,6 +518,27 @@ private struct CommunityGroupFeaturedChallengeUpdate: Encodable {
     enum CodingKeys: String, CodingKey {
         case featuredChallengeID = "featured_challenge_id"
         case updatedAt = "updated_at"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container =
+            encoder.container(keyedBy: CodingKeys.self)
+
+        if let featuredChallengeID {
+            try container.encode(
+                featuredChallengeID,
+                forKey: .featuredChallengeID
+            )
+        } else {
+            try container.encodeNil(
+                forKey: .featuredChallengeID
+            )
+        }
+
+        try container.encode(
+            updatedAt,
+            forKey: .updatedAt
+        )
     }
 }
 
