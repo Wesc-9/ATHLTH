@@ -175,12 +175,6 @@ struct GhostFriendRaceHubView: View {
         .navigationTitle("Race a Friend")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            if watchConnection.isReady &&
-                settings.trainingDeviceProvider ==
-                    .appleWatch {
-                captureDevice = .appleWatch
-            }
-
             await social.refresh()
             await friendRaces.refresh()
             await realtime.refreshOnlineUsers()
@@ -567,6 +561,8 @@ struct GhostFriendRaceHubView: View {
         }
 
         do {
+            realtime.selectLiveGhost(nil)
+
             try await GhostRaceStartService.start(
                 reference:
                     challenge.reference(),
