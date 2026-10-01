@@ -25,12 +25,12 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var subtitle: String {
         switch self {
-        case .event: return ATHLTHLocalization.string( "Prepare for a race, HYROX, ride or custom event.")
+        case .event: return ATHLTHLocalization.string( "Prepare for a race or event.")
         case .endurance: return ATHLTHLocalization.string( "Distance, pace and endurance targets.")
-        case .strength: return ATHLTHLocalization.string( "Exercise-specific weight and rep goals.")
-        case .body: return ATHLTHLocalization.string( "Weight and body-composition goals.")
-        case .consistency: return ATHLTHLocalization.string( "Workouts, steps and repeatable habits.")
-        case .recovery: return ATHLTHLocalization.string( "Sleep and recovery-related targets.")
+        case .strength: return ATHLTHLocalization.string( "Exercise-specific strength targets.")
+        case .body: return ATHLTHLocalization.string( "Body-weight goals.")
+        case .consistency: return ATHLTHLocalization.string( "Workout frequency and consistency.")
+        case .recovery: return ATHLTHLocalization.string( "Sleep-duration goals.")
         case .custom: return ATHLTHLocalization.string( "Define a goal that does not fit a template.")
         }
     }
