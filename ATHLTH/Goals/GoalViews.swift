@@ -2486,6 +2486,11 @@ struct GoalCreationView: View {
                         lineWidth: 0.8
                     )
                 }
+                .shadow(
+                    color: Color.black.opacity(0.035),
+                    radius: 9,
+                    y: 4
+                )
             }
 
             goalTrackingNote(
@@ -2732,7 +2737,7 @@ struct GoalCreationView: View {
         )
     }
 
-    private func goalNumberFieldprivate func goalNumberField(
+    private func goalNumberField(
         title: String,
         suffix: String,
         icon: String,
@@ -2821,7 +2826,7 @@ struct GoalCreationView: View {
         }
     }
 
-    private var goalActivitySelectorprivate var goalActivitySelector:
+    private var goalActivitySelector:
         some View {
         HStack(spacing: 6) {
             goalActivityButton(
@@ -2932,7 +2937,7 @@ struct GoalCreationView: View {
         .buttonStyle(.plain)
     }
 
-    private var activityGoalIconprivate var activityGoalIcon:
+    private var activityGoalIcon:
         String {
         switch activity {
         case .running:
@@ -3050,7 +3055,7 @@ struct GoalCreationView: View {
         }
     }
 
-    private func goalTrackingPillprivate func goalTrackingPill(
+    private func goalTrackingPill(
         icon: String,
         text: String,
         emphasized: Bool
