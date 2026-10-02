@@ -445,7 +445,7 @@ enum TrophyCatalog {
             .init(id: "10", title: "Ignition", threshold: 10, displayTarget: "10 workouts", rarity: .core),
             .init(id: "50", title: "Momentum", threshold: 50, displayTarget: "50 workouts", rarity: .rare),
             .init(id: "100", title: "Committed", threshold: 100, displayTarget: "100 workouts", rarity: .epic),
-            .init(id: "250", title: "Relentless", threshold: 250, displayTarget: "250 workouts", rarity: .signature)
+            .init(id: "500", title: "Relentless", threshold: 500, displayTarget: "500 workouts", rarity: .signature)
         ]
     )
 
@@ -460,7 +460,7 @@ enum TrophyCatalog {
             .init(id: "10", title: "First Paths", threshold: 10_000, displayTarget: "10 km", rarity: .core),
             .init(id: "50", title: "Trail Maker", threshold: 50_000, displayTarget: "50 km", rarity: .rare),
             .init(id: "250", title: "Pathfinder", threshold: 250_000, displayTarget: "250 km", rarity: .epic),
-            .init(id: "1000", title: "Long Way Home", threshold: 1_000_000, displayTarget: "1,000 km", rarity: .signature)
+            .init(id: "2500", title: "Long Way Home", threshold: 2_500_000, displayTarget: "2,500 km", rarity: .signature)
         ]
     )
 
@@ -475,7 +475,7 @@ enum TrophyCatalog {
             .init(id: "10", title: "Out the Door", threshold: 10, displayTarget: "10 walks", rarity: .core),
             .init(id: "50", title: "Regular", threshold: 50, displayTarget: "50 walks", rarity: .rare),
             .init(id: "150", title: "Wayfarer", threshold: 150, displayTarget: "150 walks", rarity: .epic),
-            .init(id: "500", title: "Keep Walking", threshold: 500, displayTarget: "500 walks", rarity: .signature)
+            .init(id: "1000", title: "Keep Walking", threshold: 1_000, displayTarget: "1,000 walks", rarity: .signature)
         ]
     )
 
@@ -490,7 +490,7 @@ enum TrophyCatalog {
             .init(id: "25", title: "First Miles", threshold: 25_000, displayTarget: "25 km", rarity: .core),
             .init(id: "100", title: "Road Built", threshold: 100_000, displayTarget: "100 km", rarity: .rare),
             .init(id: "500", title: "Distance Engine", threshold: 500_000, displayTarget: "500 km", rarity: .epic),
-            .init(id: "1000", title: "Thousand Club", threshold: 1_000_000, displayTarget: "1,000 km", rarity: .signature)
+            .init(id: "2500", title: "Endurance Archive", threshold: 2_500_000, displayTarget: "2,500 km", rarity: .signature)
         ]
     )
 
@@ -505,7 +505,7 @@ enum TrophyCatalog {
             .init(id: "3", title: "Spark", threshold: 3, displayTarget: "3 days", rarity: .core),
             .init(id: "7", title: "Rhythm", threshold: 7, displayTarget: "7 days", rarity: .rare),
             .init(id: "14", title: "Locked In", threshold: 14, displayTarget: "14 days", rarity: .epic),
-            .init(id: "30", title: "Unbroken", threshold: 30, displayTarget: "30 days", rarity: .signature)
+            .init(id: "90", title: "Unbroken", threshold: 90, displayTarget: "90 days", rarity: .signature)
         ]
     )
 
@@ -520,7 +520,7 @@ enum TrophyCatalog {
             .init(id: "10", title: "Foundation", threshold: 10, displayTarget: "10 sessions", rarity: .core),
             .init(id: "25", title: "Under Load", threshold: 25, displayTarget: "25 sessions", rarity: .rare),
             .init(id: "50", title: "Forged", threshold: 50, displayTarget: "50 sessions", rarity: .epic),
-            .init(id: "100", title: "Iron Core", threshold: 100, displayTarget: "100 sessions", rarity: .signature)
+            .init(id: "250", title: "Iron Core", threshold: 250, displayTarget: "250 sessions", rarity: .signature)
         ]
     )
 
@@ -535,7 +535,7 @@ enum TrophyCatalog {
             .init(id: "10000", title: "Loaded", threshold: 10_000, displayTarget: "10,000 kg", rarity: .core),
             .init(id: "50000", title: "Heavy Work", threshold: 50_000, displayTarget: "50,000 kg", rarity: .rare),
             .init(id: "250000", title: "Forged", threshold: 250_000, displayTarget: "250,000 kg", rarity: .epic),
-            .init(id: "1000000", title: "Million Kilo Club", threshold: 1_000_000, displayTarget: "1,000,000 kg", rarity: .signature)
+            .init(id: "2500000", title: "Heavy Legacy", threshold: 2_500_000, displayTarget: "2,500,000 kg", rarity: .signature)
         ]
     )
 
@@ -550,7 +550,7 @@ enum TrophyCatalog {
             .init(id: "7", title: "Reset", threshold: 7, displayTarget: "7 nights", rarity: .core),
             .init(id: "30", title: "Restored", threshold: 30, displayTarget: "30 nights", rarity: .rare),
             .init(id: "100", title: "Deep Reserve", threshold: 100, displayTarget: "100 nights", rarity: .epic),
-            .init(id: "365", title: "Year of Recovery", threshold: 365, displayTarget: "365 nights", rarity: .signature)
+            .init(id: "730", title: "Deep Recovery", threshold: 730, displayTarget: "730 nights", rarity: .signature)
         ]
     )
 
@@ -565,7 +565,7 @@ enum TrophyCatalog {
             .init(id: "1", title: "First Finish", threshold: 1, displayTarget: "1 goal", rarity: .core),
             .init(id: "3", title: "Intentional", threshold: 3, displayTarget: "3 goals", rarity: .rare),
             .init(id: "5", title: "Driven", threshold: 5, displayTarget: "5 goals", rarity: .epic),
-            .init(id: "10", title: "Purpose", threshold: 10, displayTarget: "10 goals", rarity: .signature)
+            .init(id: "25", title: "Purpose", threshold: 25, displayTarget: "25 goals", rarity: .signature)
         ]
     )
 
@@ -580,7 +580,7 @@ enum TrophyCatalog {
             .init(id: "1", title: "First Challenge", threshold: 1, displayTarget: "1 challenge", rarity: .core),
             .init(id: "5", title: "Rival", threshold: 5, displayTarget: "5 challenges", rarity: .rare),
             .init(id: "20", title: "Competitor", threshold: 20, displayTarget: "20 challenges", rarity: .epic),
-            .init(id: "50", title: "Head to Head", threshold: 50, displayTarget: "50 challenges", rarity: .signature)
+            .init(id: "100", title: "Head to Head", threshold: 100, displayTarget: "100 challenges", rarity: .signature)
         ]
     )
 
@@ -594,7 +594,7 @@ enum TrophyCatalog {
         stages: [
             .init(id: "1", title: "First Win", threshold: 1, displayTarget: "1 win", rarity: .rare),
             .init(id: "5", title: "Winner", threshold: 5, displayTarget: "5 wins", rarity: .epic),
-            .init(id: "10", title: "On Top", threshold: 10, displayTarget: "10 wins", rarity: .signature)
+            .init(id: "25", title: "On Top", threshold: 25, displayTarget: "25 wins", rarity: .signature)
         ]
     )
 
