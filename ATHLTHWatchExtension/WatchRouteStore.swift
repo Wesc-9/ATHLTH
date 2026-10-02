@@ -340,6 +340,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
              .todayWorkoutRequest,
              .strengthCommand,
              .spotifyCommand,
+             .spotifyCredentials,
              .connectivityProbe,
              .connectivityAck:
             break
