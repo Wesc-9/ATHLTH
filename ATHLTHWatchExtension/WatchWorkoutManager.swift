@@ -143,6 +143,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastMirrorSnapshotSentAt: Date?
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
+    private var audioCoachActivationTask:
+        Task<Void, Never>?
     private var audioCoachReadyAnnouncedForWorkout = false
     private var strengthRestCoachTask:
         Task<Void, Never>?
@@ -241,6 +243,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             strengthRestCoachTask = nil
             strengthStatusCoachTask?.cancel()
             strengthStatusCoachTask = nil
+            audioCoachActivationTask?.cancel()
+            audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
             return
@@ -527,6 +531,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         } else {
             audioCoachReadyAnnouncedForWorkout = false
+            audioCoachActivationTask?.cancel()
+            audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
         }
@@ -3598,13 +3604,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
+        let audioIsBusy =
+            speechSynthesizer.isSpeaking ||
+            audioCoachActivationTask != nil
+
         let decision =
             guidancePriorityGate
                 .voiceDecision(
                     for: priority,
-                    isSpeaking:
-                        speechSynthesizer
-                            .isSpeaking,
+                    isSpeaking: audioIsBusy,
                     quietPeriodSeconds:
                         audioCoachConfiguration
                             .resolvedGuidanceQuietPeriodSeconds
@@ -3615,6 +3623,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
 
         case .interruptAndDeliver:
+            audioCoachActivationTask?
+                .cancel()
+            audioCoachActivationTask = nil
             speechSynthesizer.stopSpeaking(
                 at: .immediate
             )
@@ -3622,8 +3633,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         case .deliver:
             break
         }
-
-        activateAudioCoachAudioSession()
 
         let utterance = AVSpeechUtterance(
             string: text
@@ -3654,13 +3663,53 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         utterance.volume =
             audioCoachConfiguration
                 .resolvedSpeechVolume
-        speechSynthesizer.speak(utterance)
+
+        audioCoachActivationTask =
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                let activated =
+                    await self
+                        .activateAudioCoachAudioSession()
+
+                guard !Task.isCancelled
+                else {
+                    if activated {
+                        self
+                            .deactivateAudioCoachAudioSession()
+                    }
+                    self.audioCoachActivationTask =
+                        nil
+                    self.guidancePriorityGate
+                        .voiceDidFinish()
+                    return
+                }
+
+                self.audioCoachActivationTask =
+                    nil
+
+                guard activated
+                else {
+                    self.guidancePriorityGate
+                        .voiceDidFinish()
+                    return
+                }
+
+                self.speechSynthesizer
+                    .speak(utterance)
+            }
     }
 
-    private func activateAudioCoachAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        let options: AVAudioSession.CategoryOptions =
-            audioCoachConfiguration.shouldDuckOtherAudio
+    private func activateAudioCoachAudioSession()
+        async -> Bool {
+        let session =
+            AVAudioSession.sharedInstance()
+        let options:
+            AVAudioSession.CategoryOptions =
+                audioCoachConfiguration
+                    .shouldDuckOtherAudio
                 ? [
                     .duckOthers,
                     .interruptSpokenAudioAndMixWithOthers
@@ -3668,18 +3717,65 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 : [.mixWithOthers]
 
         do {
+            // First preserve normal coach/music mixing. On watchOS the
+            // asynchronous activation API is important because the system may
+            // need to resolve or authorize the Watch audio route before TTS
+            // starts.
             try session.setCategory(
                 .playback,
                 mode: .spokenAudio,
                 options: options
             )
-            try session.setActive(true)
-            coachAudioSessionIsActive = true
+
+            if try await session.activate(
+                options: []
+            ) {
+                coachAudioSessionIsActive =
+                    true
+                errorMessage = nil
+                return true
+            }
         } catch {
-            // Speech should still be attempted. A temporary audio-session
-            // failure must never interrupt or end an active workout.
+            // Fall through to the Watch-specific route policy below.
+        }
+
+        do {
+            // If the normal mixed route cannot activate, use the long-form
+            // Watch route policy. On supported Watch models this can resolve
+            // to the built-in speaker; otherwise watchOS may ask the user for
+            // an available audio route.
+            try session.setCategory(
+                .playback,
+                mode: .spokenAudio,
+                policy: .longFormAudio,
+                options: []
+            )
+
+            if try await session.activate(
+                options: []
+            ) {
+                coachAudioSessionIsActive =
+                    true
+                errorMessage = nil
+                return true
+            }
+
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Audio Coach could not open an Apple Watch audio route.",
+                    norwegian:
+                        "Audio Coach kunne ikke åpne en lydutgang på Apple Watch."
+                )
+            return false
+        } catch {
+            // Audio Coach must never interrupt or terminate an active workout.
+            // Keep the workout alive and surface only a lightweight diagnostic.
+            coachAudioSessionIsActive =
+                false
             errorMessage =
                 "Audio Coach: \(error.localizedDescription)"
+            return false
         }
     }
 
