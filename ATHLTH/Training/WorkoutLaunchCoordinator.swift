@@ -49,7 +49,8 @@ struct PlannedWorkoutWatchBuilder {
 
     static func runningTransfer(
         from workout: PlannedSession,
-        routeAlerts: WatchRouteAlertConfiguration
+        routeAlerts: WatchRouteAlertConfiguration,
+        autoPauseEnabled: Bool? = nil
     ) -> WatchRunningWorkoutTransfer {
         let structured = workout.resolvedRunningWorkouts
 
@@ -61,7 +62,10 @@ struct PlannedWorkoutWatchBuilder {
                 },
                 routeAlerts: routeAlerts,
                 targetAlerts:
-                    workout.targetAlertConfiguration
+                    workout.targetAlertConfiguration,
+                autoPauseEnabled:
+                    autoPauseEnabled ??
+                    workout.autoPauseEnabled
             )
         }
 
@@ -117,18 +121,23 @@ struct PlannedWorkoutWatchBuilder {
             steps: [fallback],
             routeAlerts: routeAlerts,
             targetAlerts:
-                workout.targetAlertConfiguration
+                workout.targetAlertConfiguration,
+            autoPauseEnabled:
+                autoPauseEnabled ??
+                workout.autoPauseEnabled
         )
     }
 
     static func runningTransfer(
         from workout: RunningWorkoutTemplate,
-        routeAlerts: WatchRouteAlertConfiguration
+        routeAlerts: WatchRouteAlertConfiguration,
+        autoPauseEnabled: Bool? = nil
     ) -> WatchRunningWorkoutTransfer {
         WatchRunningWorkoutTransfer(
             title: workout.title,
             steps: runningSteps(from: workout),
-            routeAlerts: routeAlerts
+            routeAlerts: routeAlerts,
+            autoPauseEnabled: autoPauseEnabled
         )
     }
 
