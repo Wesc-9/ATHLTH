@@ -179,7 +179,6 @@ struct ATHLTHCommunityV4View: View {
                     spacing: 12
                 ) {
                     CommunityReferenceHeader(
-                        unreadMessages: messaging.unreadCount,
                         attentionCount: attentionCount,
                         canManageWeekly:
                             session.currentRole
@@ -1125,7 +1124,6 @@ struct ATHLTHCommunityV4View: View {
 // MARK: - Reference Community Front Page
 
 private struct CommunityReferenceHeader: View {
-    let unreadMessages: Int
     let attentionCount: Int
     let canManageWeekly: Bool
 
@@ -1161,19 +1159,6 @@ private struct CommunityReferenceHeader: View {
             Spacer(minLength: 4)
 
             HStack(spacing: 8) {
-                NavigationLink {
-                    MessageInboxDestinationView()
-                } label: {
-                    button(
-                        icon:
-                            unreadMessages > 0
-                                ? "envelope.fill"
-                                : "envelope",
-                        badge: unreadMessages
-                    )
-                }
-                .buttonStyle(.plain)
-
                 NavigationLink {
                     ATHLTHNotificationCenterView()
                 } label: {
