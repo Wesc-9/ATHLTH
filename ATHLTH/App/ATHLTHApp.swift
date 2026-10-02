@@ -284,6 +284,8 @@ struct AppRootView: View {
             // without presenting the Health permission sheet.
             _ = await health.restoreAuthorizationStateFromSystem()
 
+            await allowWatchMirroringToAttachIfNeeded()
+
             if health.needsHealthRefreshRecovery {
                 // Give the UI a stable launch first. Clearing the recovery
                 // latch here only affects future launches because this
@@ -443,6 +445,8 @@ struct AppRootView: View {
                         calendarRefresh
                     )
                 }
+
+                await allowWatchMirroringToAttachIfNeeded()
 
                 guard health.hasRequestedAuthorization,
                       !health.shouldDeferAutomaticHealthWork,
@@ -1042,16 +1046,148 @@ struct AppRootView: View {
     }
 
     @MainActor
+    private func allowWatchMirroringToAttachIfNeeded()
+        async {
+        switch watchConnection.state {
+        case .unsupported,
+             .notPaired,
+             .appNotInstalled:
+            return
+
+        case .checking,
+             .ready:
+            // HealthKit can deliver workoutSessionMirroringStartHandler just
+            // after the iPhone scene becomes active. Waiting here affects
+            // background Health reads only; it does not block the first UI
+            // frame or Watch controls.
+            try? await Task.sleep(
+                for: .milliseconds(550)
+            )
+        }
+    }
+
+    @MainActor
+    private func refreshHealthAfterWatchCompletion()
+        async {
+        // The Watch result can beat HealthKit's mirrored-session "ended"
+        // callback. Avoid launching the heavy Health query set until mirroring
+        // has settled, especially the activity-summary query that caused the
+        // historical app-open crash during Watch workouts.
+        for _ in 0..<30 {
+            if !workoutMirroring
+                    .hasActiveMirroredWorkout &&
+                !ATHLTHWatchWorkoutRuntime
+                    .isMirroredWorkoutActive {
+                await health.refreshAll()
+                return
+            }
+
+            try? await Task.sleep(
+                for: .milliseconds(100)
+            )
+        }
+
+        // Do not force Health queries through an active/stale mirror flag.
+        // The next scene activation/background delivery will retry safely.
+    }
+
+    @MainActor
     private func handleWatchWorkoutCompletion(
         _ result: WatchWorkoutResult
     ) {
+        // A completed Watch result is authoritative evidence that the matching
+        // mirrored workout has ended, even if HealthKit's mirror callback is
+        // a fraction of a second late.
+        workoutMirroring
+            .reconcileCompletedWatchWorkout(
+                result
+            )
+
+        let watchFinishedActiveStrength =
+            result.kind == .strength &&
+            strengthWorkout.activeWorkout?
+                .captureDevice == .appleWatch
+
+        let watchMatchesCompletedStrength =
+            result.kind == .strength &&
+            strengthWorkout.completedWorkout?
+                .captureDevice == .appleWatch &&
+            strengthWorkout.completedWorkout.map {
+                abs(
+                    result.endedAt.timeIntervalSince(
+                        $0.endedAt ??
+                        result.endedAt
+                    )
+                ) < 180
+            } == true
+
+        let watchBelongsToATHLTHStrength =
+            watchFinishedActiveStrength ||
+            watchMatchesCompletedStrength
+
+        if watchBelongsToATHLTHStrength {
+            let metrics =
+                LinkedHealthWorkoutMetrics(
+                    healthKitWorkoutUUID:
+                        result
+                            .healthKitWorkoutUUID,
+                    duration: result.duration,
+                    activeCalories:
+                        result.activeCalories,
+                    averageHeartRate:
+                        result.averageHeartRate,
+                    maxHeartRate:
+                        result.maxHeartRate
+                )
+
+            if watchFinishedActiveStrength {
+                // This transition publishes completedWorkout. The regular
+                // strength completion handler below is therefore the single
+                // owner of review, challenges, social, gear and trophies.
+                strengthWorkout.finish(
+                    healthKitWorkoutUUID:
+                        metrics
+                            .healthKitWorkoutUUID,
+                    duration:
+                        metrics.duration,
+                    activeCalories:
+                        metrics.activeCalories,
+                    averageHeartRate:
+                        metrics.averageHeartRate,
+                    maxHeartRate:
+                        metrics.maxHeartRate
+                )
+                appSession.endTrainingStatus()
+            } else {
+                strengthWorkout
+                    .attachHealthMetrics(
+                        metrics
+                    )
+            }
+
+            Task { @MainActor in
+                await refreshHealthAfterWatchCompletion()
+                await officialWeeklyChallenges
+                    .syncCompletionState(
+                        workouts:
+                            health.workouts
+                    )
+                syncAppleHealthProfileDetailsIfNeeded()
+                watchConnection
+                    .clearCompletedWorkout()
+            }
+            return
+        }
+
+        // Workouts started directly on Watch, or Watch workouts that are not
+        // backed by an ATHLTH strength log, use the generic Watch pipeline.
         let publishable =
             SocialPublishableWorkout(
                 watchResult: result
             )
-        var completionSourceIDs: Set<UUID> = [
-            result.id
-        ]
+        var completionSourceIDs:
+            Set<UUID> = [result.id]
+
         if let healthKitWorkoutUUID =
                 result.healthKitWorkoutUUID {
             completionSourceIDs.insert(
@@ -1071,79 +1207,24 @@ struct AppRootView: View {
             trophies: trophies
         )
 
-        let watchFinishedActiveStrength =
-            result.kind == .strength &&
-            strengthWorkout.activeWorkout?
-                .captureDevice == .appleWatch
+        notifications
+            .recordWatchWorkout(result)
 
-        let watchMatchesCompletedStrength =
-            result.kind == .strength &&
-            strengthWorkout.completedWorkout?
-                .captureDevice == .appleWatch &&
-            strengthWorkout.completedWorkout.map {
-                abs(
-                    result.endedAt.timeIntervalSince(
-                        $0.endedAt ?? result.endedAt
-                    )
-                ) < 180
-            } == true
+        Task { @MainActor in
+            await refreshHealthAfterWatchCompletion()
 
-        let watchBelongsToATHLTHStrength =
-            watchFinishedActiveStrength ||
-            watchMatchesCompletedStrength
-
-        if result.kind == .strength {
-            let metrics =
-                LinkedHealthWorkoutMetrics(
-                    healthKitWorkoutUUID:
-                        result.healthKitWorkoutUUID,
-                    duration: result.duration,
-                    activeCalories:
-                        result.activeCalories,
-                    averageHeartRate:
-                        result.averageHeartRate,
-                    maxHeartRate:
-                        result.maxHeartRate
-                )
-
-            if watchFinishedActiveStrength {
-                strengthWorkout.finish(
-                    healthKitWorkoutUUID:
-                        metrics.healthKitWorkoutUUID,
-                    duration: metrics.duration,
-                    activeCalories:
-                        metrics.activeCalories,
-                    averageHeartRate:
-                        metrics.averageHeartRate,
-                    maxHeartRate:
-                        metrics.maxHeartRate
-                )
-                appSession.endTrainingStatus()
-            } else {
-                strengthWorkout
-                    .attachHealthMetrics(
-                        metrics
-                    )
-            }
-        }
-
-        if !watchBelongsToATHLTHStrength {
-            notifications
-                .recordWatchWorkout(result)
-        }
-
-        Task {
-            await health.refreshAll()
             await officialWeeklyChallenges
                 .syncCompletionState(
                     workouts: health.workouts
                 )
             syncAppleHealthProfileDetailsIfNeeded()
 
-            await goals.refreshAutomaticMilestones(
-                health: health,
-                strength: strengthWorkout
-            )
+            await goals
+                .refreshAutomaticMilestones(
+                    health: health,
+                    strength:
+                        strengthWorkout
+                )
             notifications.syncGoalEvents(
                 from: goals.goals
             )
@@ -1153,24 +1234,21 @@ struct AppRootView: View {
                     result,
                     health: health,
                     userID:
-                        appSession.profile.userID,
+                        appSession.profile
+                            .userID,
                     displayName:
-                        appSession.profile.displayName,
+                        appSession.profile
+                            .displayName,
                     maximumHeartRateBPM:
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
                 )
 
-            if watchBelongsToATHLTHStrength {
-                watchConnection
-                    .clearCompletedWorkout()
-                return
-            }
-
             await social.finishActiveWorkout(
                 sourceWorkoutID:
-                    result.healthKitWorkoutUUID ??
+                    result
+                        .healthKitWorkoutUUID ??
                     result.id,
                 endedAt: result.endedAt
             )
@@ -1182,13 +1260,15 @@ struct AppRootView: View {
                 .recordCompletedWorkout(
                     publishable
                 )
-            notifications.syncGearUsageAlerts(
-                from: gear
-            )
+            notifications
+                .syncGearUsageAlerts(
+                    from: gear
+                )
 
             finalizeWorkoutCompletionImpact(
                 workout: publishable,
-                sourceIDs: completionSourceIDs
+                sourceIDs:
+                    completionSourceIDs
             )
 
             await handleCompletedWorkoutReview(
@@ -1198,14 +1278,16 @@ struct AppRootView: View {
 
             finalizeWorkoutCompletionImpact(
                 workout: publishable,
-                sourceIDs: completionSourceIDs
+                sourceIDs:
+                    completionSourceIDs
             )
 
             await social.syncChallenges(
                 challengeStore
             )
             await syncSocialOwnedData()
-            watchConnection.clearCompletedWorkout()
+            watchConnection
+                .clearCompletedWorkout()
         }
     }
 
