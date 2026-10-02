@@ -205,12 +205,16 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    private var hasPermanentOwnerAccess: Bool {
+        signedIn && currentRole == .owner
+    }
+
     var hasPaidAccess: Bool {
-        subscriptionAccess.hasPaidAccess
+        hasPermanentOwnerAccess || subscriptionAccess.hasPaidAccess
     }
 
     var effectiveSubscriptionTier: SubscriptionTier {
-        subscriptionAccess.effectiveTier
+        hasPaidAccess ? .paid : .free
     }
 
     func canAccess(_ feature: ATHLTHFeature) -> Bool {
@@ -318,7 +322,16 @@ final class AppSessionStore: ObservableObject {
     }
 
     private func recomputeSubscriptionAccess() {
-        if backendSubscriptionAccess.lifecycleState == .revoked {
+        if hasPermanentOwnerAccess {
+            // The product owner must never lose ATHLTH+ because a StoreKit
+            // receipt, TestFlight environment, or subscription row changes.
+            // The owner role is server-controlled and is therefore safe to
+            // use as the permanent first-priority entitlement.
+            subscriptionAccess = SubscriptionAccess(
+                state: .paid,
+                source: .serverVerified
+            )
+        } else if backendSubscriptionAccess.lifecycleState == .revoked {
             subscriptionAccess = backendSubscriptionAccess
         } else if signedIn,
                   let entitlement = storeEntitlement,
