@@ -472,6 +472,8 @@ final class AppSettingsStore: ObservableObject {
     @Published var mentionNotificationsEnabled: Bool { didSet { persist() } }
 
     @Published var spotifyAutoplayLinkedPlaylists: Bool { didSet { persist() } }
+    @Published var spotifyDefaultPlaylist:
+        SpotifyPlaylistReference? { didSet { persist() } }
 
     var interfaceLocale: Locale {
         var components =
@@ -832,6 +834,20 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(
                 forKey: "settings.spotifyAutoplayLinkedPlaylists"
             ) as? Bool ?? true
+        if let playlistData =
+                defaults.data(
+                    forKey:
+                        "settings.spotifyDefaultPlaylist"
+                ),
+           let playlist =
+                try? JSONDecoder().decode(
+                    SpotifyPlaylistReference.self,
+                    from: playlistData
+                ) {
+            spotifyDefaultPlaylist = playlist
+        } else {
+            spotifyDefaultPlaylist = nil
+        }
         watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
         spotifyConnected =
             defaults.object(
@@ -1076,6 +1092,22 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(mentionNotificationsEnabled, forKey: "settings.mentionNotifications")
 
         defaults.set(spotifyAutoplayLinkedPlaylists, forKey: "settings.spotifyAutoplayLinkedPlaylists")
+        if let spotifyDefaultPlaylist,
+           let playlistData =
+                try? JSONEncoder().encode(
+                    spotifyDefaultPlaylist
+                ) {
+            defaults.set(
+                playlistData,
+                forKey:
+                    "settings.spotifyDefaultPlaylist"
+            )
+        } else {
+            defaults.removeObject(
+                forKey:
+                    "settings.spotifyDefaultPlaylist"
+            )
+        }
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
