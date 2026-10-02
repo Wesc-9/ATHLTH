@@ -2066,7 +2066,7 @@ struct ATHLTHHomeView: View {
                                 alignment: .leading
                             )
                         } else {
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 Image(
                                     systemName:
                                         "checkmark.circle.fill"
@@ -9720,7 +9720,7 @@ struct ATHLTHProfileView: View {
     }
 
     private var heroStatRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             heroStat(
                 value:
                     social.followerCount
