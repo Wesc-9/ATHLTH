@@ -9402,6 +9402,8 @@ struct ATHLTHProfileView: View {
     @State private var personalRecords:
         [HealthPersonalRecord] = []
     @State private var loadingProfileData = false
+    @AppStorage(ProfileFeaturedRecordKind.storageKey)
+    private var featuredRecordSelectionRaw = ""
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
@@ -10040,47 +10042,33 @@ struct ATHLTHProfileView: View {
                 )
         ) {
             HStack(spacing: 8) {
-                recordCard(
-                    kind: .fastest5K,
-                    shortTitle: "5 km",
-                    tint: .green,
-                    icon: "figure.run"
-                )
-
-                recordCard(
-                    kind: .fastest10K,
-                    shortTitle: "10 km",
-                    tint:
-                        ATHLTHTheme.premiumGold,
-                    icon: "figure.run"
-                )
-
-                recordCard(
-                    kind:
-                        .fastestHalfMarathon,
-                    shortTitle:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Half marathon",
-                            norwegian:
-                                "Halvmaraton"
-                        ),
-                    tint: .blue,
-                    icon: "figure.run"
-                )
-
-                recordCard(
-                    kind: .longestRun,
-                    shortTitle:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Longest run",
-                            norwegian:
-                                "Lengste tur"
-                        ),
-                    tint: .brown,
-                    icon: "mountain.2.fill"
-                )
+                ForEach(
+                    0..<ProfileFeaturedRecordKind
+                        .showcaseLimit,
+                    id: \.self
+                ) { index in
+                    if featuredRecordKinds.indices
+                        .contains(index) {
+                        recordCard(
+                            kind:
+                                featuredRecordKinds[
+                                    index
+                                ]
+                        )
+                    } else {
+                        NavigationLink {
+                            PerformanceStatsView(
+                                stats:
+                                    performanceStats,
+                                healthRecords:
+                                    personalRecords
+                            )
+                        } label: {
+                            emptyRecordShowcaseCard
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
     }
@@ -10424,32 +10412,36 @@ struct ATHLTHProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func recordCard(
-        kind: HealthPersonalRecordKind,
-        shortTitle: String,
-        tint: Color,
-        icon: String
-    ) -> some View {
-        let record =
-            personalRecords.first {
-                $0.kind == kind
-            }
+    private var featuredRecordKinds:
+        [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind
+            .decodedSelection(
+                from:
+                    featuredRecordSelectionRaw
+            )
+    }
 
-        return VStack(
+    private func recordCard(
+        kind:
+            ProfileFeaturedRecordKind
+    ) -> some View {
+        VStack(
             alignment: .leading,
             spacing: 6
         ) {
             HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(
-                        .system(
-                            size: 13,
-                            weight: .semibold
-                        )
+                Image(
+                    systemName: kind.icon
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
                     )
-                    .foregroundStyle(tint)
+                )
+                .foregroundStyle(kind.tint)
 
-                Text(shortTitle)
+                Text(kind.shortTitle)
                     .font(
                         .system(
                             size: 9.5,
@@ -10457,15 +10449,22 @@ struct ATHLTHProfileView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.primaryText
+                        ATHLTHTheme
+                            .primaryText
                     )
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(
+                        0.65
+                    )
             }
 
             Text(
-                record?.formattedValue ??
-                    "—"
+                kind.displayValue(
+                    healthRecords:
+                        personalRecords,
+                    stats:
+                        performanceStats
+                )
             )
             .font(
                 .system(
@@ -10479,58 +10478,96 @@ struct ATHLTHProfileView: View {
                 ATHLTHTheme.primaryText
             )
             .lineLimit(1)
-            .minimumScaleFactor(0.64)
-
-            Text(
-                record.map {
-                    $0.date.formatted(
-                        date: .abbreviated,
-                        time: .omitted
-                    )
-                } ?? "—"
-            )
-            .font(
-                .system(
-                    size: 8.5,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
-            .lineLimit(1)
-            .minimumScaleFactor(0.70)
-
-            Spacer(minLength: 0)
+            .minimumScaleFactor(0.62)
         }
         .padding(10)
         .frame(
             maxWidth: .infinity,
-            minHeight: 104,
+            minHeight: 76,
             alignment: .leading
         )
         .background(
             LinearGradient(
                 colors: [
-                    tint.opacity(0.10),
-                    Color.white.opacity(0.76)
+                    kind.tint.opacity(0.065),
+                    Color.white.opacity(0.72)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(
-                cornerRadius: 17,
+                cornerRadius: 16,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 17,
+                cornerRadius: 16,
                 style: .continuous
             )
             .stroke(
-                tint.opacity(0.10),
-                lineWidth: 0.8
+                kind.tint.opacity(0.09),
+                lineWidth: 1
+            )
+        }
+    }
+
+    private var emptyRecordShowcaseCard:
+        some View {
+        VStack(spacing: 6) {
+            Image(systemName: "plus")
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .premiumGold
+                )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Choose",
+                    norwegian: "Velg"
+                )
+            )
+            .font(
+                .system(
+                    size: 9.5,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 76
+        )
+        .background(
+            Color.black.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.16),
+                style:
+                    StrokeStyle(
+                        lineWidth: 1,
+                        dash: [4, 4]
+                    )
             )
         }
     }
