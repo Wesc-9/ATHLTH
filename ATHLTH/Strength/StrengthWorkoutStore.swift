@@ -115,6 +115,31 @@ final class StrengthWorkoutStore: ObservableObject {
             }
         }
 
+        let volumeThresholds = [
+            10_000,
+            50_000,
+            250_000,
+            1_000_000
+        ]
+        var volumeReachedAt: [Int: Date] = [:]
+        var totalVolumeKilograms = 0.0
+
+        for workout in completed {
+            totalVolumeKilograms +=
+                max(
+                    workout.totalVolumeKilograms,
+                    0
+                )
+
+            for threshold in volumeThresholds
+            where volumeReachedAt[threshold] == nil &&
+                    totalVolumeKilograms >= Double(threshold) {
+                volumeReachedAt[threshold] =
+                    workout.endedAt ??
+                    workout.startedAt
+            }
+        }
+
         let firstWeightedSetDate = completed
             .flatMap { workout in
                 workout.exercises.flatMap { exercise in
@@ -135,7 +160,11 @@ final class StrengthWorkoutStore: ObservableObject {
         return TrophyStrengthSnapshot(
             completedWorkoutCount: completed.count,
             workoutCountReachedAt: reachedAt,
-            firstWeightedSetDate: firstWeightedSetDate
+            firstWeightedSetDate: firstWeightedSetDate,
+            totalVolumeKilograms:
+                totalVolumeKilograms,
+            volumeReachedAt:
+                volumeReachedAt
         )
     }
 
