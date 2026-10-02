@@ -171,6 +171,22 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func recordWorkoutSessionSource(
+        sessionID: UUID,
+        sourceWorkoutID: UUID
+    ) async throws {
+        try await client
+            .from("social_workout_sessions")
+            .update(
+                WorkoutSessionSourceWrite(
+                    sourceWorkoutID:
+                        sourceWorkoutID
+                )
+            )
+            .eq("id", value: sessionID)
+            .execute()
+    }
+
     func scheduleWorkoutStart(
         sessionID: UUID,
         startAt: Date
@@ -507,6 +523,14 @@ private struct WorkoutParticipantFinishedWrite: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case workoutFinishedAt = "workout_finished_at"
+    }
+}
+
+private struct WorkoutSessionSourceWrite: Encodable {
+    let sourceWorkoutID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case sourceWorkoutID = "source_workout_id"
     }
 }
 
