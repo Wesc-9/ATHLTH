@@ -125,8 +125,8 @@ struct ActiveStrengthWorkoutView: View {
                     // sessions stay distraction-free once training starts.
                     if strength
                         .activeWorkout?
-                        .exercises
-                        .isEmpty == true {
+                        .allowsLiveExerciseBuilding ==
+                        true {
                         Button {
                             showingExerciseLibrary =
                                 true
