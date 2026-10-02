@@ -204,6 +204,9 @@ final class IPhoneWorkoutStore:
         pendingStructuredWorkout = nil
         pendingRouteAlerts = nil
         pendingGhostAudio = nil
+        pendingAutoPauseEnabled = false
+        automaticPauseActive = false
+        autoPauseDetector.reset(enabled: false)
         resetRouteRuntime()
         lastRouteCompletion = nil
         completionStartedWorkout = nil
@@ -675,6 +678,9 @@ final class IPhoneWorkoutStore:
 
         history.insert(workout, at: 0)
         active = nil
+        automaticPauseActive = false
+        autoPauseDetector.reset(enabled: false)
+        manager.distanceFilter = 5
         resetRouteRuntime()
         persistActiveCheckpoint(force: true)
         persistHistory()
