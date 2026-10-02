@@ -235,49 +235,46 @@ private enum HomePersonalWorkoutCatalog {
                         strengthWorkout
                 )
 
+            let nearestHealthStrength =
+                byID.values
+                    .filter { candidate in
+                        candidate.activity ==
+                            .strength &&
+                        candidate.source ==
+                            "Apple Health"
+                    }
+                    .min { lhs, rhs in
+                        abs(
+                            lhs.startDate
+                                .timeIntervalSince(
+                                    strengthWorkout
+                                        .startedAt
+                                )
+                        ) <
+                        abs(
+                            rhs.startDate
+                                .timeIntervalSince(
+                                    strengthWorkout
+                                        .startedAt
+                                )
+                        )
+                    }
+
             if strengthWorkout
                 .healthMetrics
                 .healthKitWorkoutUUID == nil,
-               let duplicateID =
-                    byID.values
-                        .filter {
-                            $0.activity ==
-                                .strength &&
-                            $0.source ==
-                                "Apple Health"
-                        }
-                        .min(
-                            by: {
-                                abs(
-                                    $0.startDate
-                                        .timeIntervalSince(
-                                            strengthWorkout
-                                                .startedAt
-                                        )
-                                ) <
-                                abs(
-                                    $1.startDate
-                                        .timeIntervalSince(
-                                            strengthWorkout
-                                                .startedAt
-                                        )
-                                )
-                            }
+               let candidate =
+                    nearestHealthStrength,
+               abs(
+                    candidate.startDate
+                        .timeIntervalSince(
+                            strengthWorkout
+                                .startedAt
                         )
-                        .flatMap({
-                            abs(
-                                $0.startDate
-                                    .timeIntervalSince(
-                                        strengthWorkout
-                                            .startedAt
-                                    )
-                            ) <= 120
-                                ? $0.id
-                                : nil
-                        }) {
+               ) <= 120 {
                 byID.removeValue(
                     forKey:
-                        duplicateID
+                        candidate.id
                 )
             }
 
