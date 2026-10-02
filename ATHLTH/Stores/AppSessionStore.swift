@@ -171,6 +171,14 @@ final class AppSessionStore: ObservableObject {
 
         self.onboardingProfile = nil
         self.aiHealthDataSharingEnabled = false
+
+        if self.signedIn && self.currentRole == .owner {
+            self.subscriptionAccess = SubscriptionAccess(
+                state: .paid,
+                source: .ownerOverride
+            )
+        }
+
         // Legacy data stays untouched until its owner is authenticated.
         if defaults.data(forKey: "legacy.onboardingProfile") == nil,
            let legacy = defaults.data(forKey: "session.onboardingProfile") {
@@ -329,7 +337,7 @@ final class AppSessionStore: ObservableObject {
             // use as the permanent first-priority entitlement.
             subscriptionAccess = SubscriptionAccess(
                 state: .paid,
-                source: .serverVerified
+                source: .ownerOverride
             )
         } else if backendSubscriptionAccess.lifecycleState == .revoked {
             subscriptionAccess = backendSubscriptionAccess
@@ -360,11 +368,13 @@ final class AppSessionStore: ObservableObject {
     func applyAuthenticatedRole(_ role: AccountRole) {
         currentRole = role
         defaults.set(role.rawValue, forKey: "session.accountRole")
+        recomputeSubscriptionAccess()
     }
 
     func resetRoleToUser() {
         currentRole = .user
         defaults.set(AccountRole.user.rawValue, forKey: "session.accountRole")
+        recomputeSubscriptionAccess()
     }
 
     func setUsernameSeed(_ value: String) {
