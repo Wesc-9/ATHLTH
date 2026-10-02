@@ -15,7 +15,7 @@ struct WatchHomeView: View {
                         todayWorkoutCard(today)
                     }
 
-                    quickRunCard
+                    quickStartTiles
 
                     if let errorMessage =
                             workoutManager
@@ -420,91 +420,99 @@ struct WatchHomeView: View {
         }
     }
 
-    private var quickRunCard: some View {
+    private var quickStartTiles: some View {
+        HStack(spacing: 8) {
+            quickStartTile(
+                kind: .running,
+                title: ATHLTHLocalization.choose(
+                    english: "Run",
+                    norwegian: "Løp"
+                ),
+                icon: "figure.run",
+                tint: WatchTheme.accent,
+                fill: WatchTheme.accentSoft
+            )
+
+            quickStartTile(
+                kind: .strength,
+                title: ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                ),
+                icon: "dumbbell.fill",
+                tint: WatchTheme.slate,
+                fill: WatchTheme.slateSoft
+            )
+        }
+    }
+
+    private func quickStartTile(
+        kind: WatchWorkoutKind,
+        title: String,
+        icon: String,
+        tint: Color,
+        fill: Color
+    ) -> some View {
         Button {
             Task {
                 await workoutManager.start(
-                    kind: .running
+                    kind: kind
                 )
             }
         } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            WatchTheme.accent
-                        )
-                        .frame(
-                            width: 48,
-                            height: 48
-                        )
-
-                    Image(
-                        systemName:
-                            "figure.run"
-                    )
+            VStack(spacing: 5) {
+                Image(systemName: icon)
                     .font(
                         .system(
-                            size: 23,
+                            size: 22,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(
+                        .system(
+                            size: 13,
                             weight: .bold
                         )
                     )
                     .foregroundStyle(
-                        .black
+                        WatchTheme.textPrimary
                     )
-                }
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text("Quick Run")
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .bold
-                            )
-                        )
-
-                    Text(
-                        "Outdoor · GPS · Heart rate"
-                    )
-                    .font(
-                        .system(size: 9)
-                    )
-                    .foregroundStyle(
-                        WatchTheme
-                            .textSecondary
-                    )
-                    .lineLimit(1)
-                }
-
-                Spacer(
-                    minLength: 2
-                )
-
-                Image(
-                    systemName:
-                        "play.fill"
-                )
-                .font(
-                    .system(
-                        size: 12,
-                        weight: .bold
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Start workout",
+                        norwegian: "Start økt"
                     )
                 )
+                .font(.system(size: 8))
                 .foregroundStyle(
-                    WatchTheme.accent
+                    WatchTheme.textSecondary
                 )
             }
-            .padding(12)
             .frame(
                 maxWidth: .infinity,
                 minHeight: 76
             )
-            .watchSurface(
-                radius: 20
+            .background(
+                fill,
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
             )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    tint.opacity(0.16),
+                    lineWidth: 0.75
+                )
+            }
         }
         .buttonStyle(.plain)
         .disabled(
