@@ -765,7 +765,6 @@ struct RunQuickStartSheet: View {
                         )
                     }
 
-                    startButton
                 }
                 .padding()
             }
@@ -780,6 +779,12 @@ struct RunQuickStartSheet: View {
                 )
                 .ignoresSafeArea()
             )
+            .safeAreaInset(
+                edge: .bottom,
+                spacing: 0
+            ) {
+                runStickyStartBar
+            }
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Start Run",
@@ -1474,6 +1479,22 @@ struct RunQuickStartSheet: View {
                 }
             }
         }
+    }
+
+    private var runStickyStartBar: some View {
+        startButton
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(
+                .ultraThinMaterial
+            )
+            .overlay(
+                alignment: .top
+            ) {
+                Divider()
+                    .opacity(0.35)
+            }
     }
 
     private var startButton: some View {
