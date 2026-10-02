@@ -18,6 +18,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var workoutInvites: [SocialWorkoutInviteDisplay] = []
     @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
+    @Published private(set) var coordinatedLobbySessionID: UUID?
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
@@ -793,18 +794,21 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    @discardableResult
     func beginWorkoutWithFriends(
         title: String,
         kind: WorkoutKind,
         friends: [SocialProfileCard],
         creatorName: String,
         creatorUsername: String?,
-        invitePayload: SocialWorkoutInvitePayload? = nil
-    ) async {
+        invitePayload: SocialWorkoutInvitePayload? = nil,
+        creatorCaptureDevice: WorkoutCaptureDevice? = nil
+    ) async -> Bool {
         guard !friends.isEmpty else {
             activeWorkoutSession = nil
             activeWorkoutParticipants = []
-            return
+            coordinatedLobbySessionID = nil
+            return true
         }
 
         errorMessage = nil
@@ -826,10 +830,197 @@ final class SocialStore: ObservableObject {
             )
 
             activeWorkoutSession = session
-            await refresh()
+            coordinatedLobbySessionID = session.id
+            try await refreshWorkoutLobby(sessionID: session.id)
+
+            if let creatorCaptureDevice,
+               let creator = activeWorkoutParticipants.first(
+                    where: { $0.userID == currentUserID }
+               ) {
+                try await service.setWorkoutReady(
+                    participantID: creator.id,
+                    captureDevice: creatorCaptureDevice
+                )
+                try await refreshWorkoutLobby(sessionID: session.id)
+            }
+
+            return await waitForCoordinatedWorkoutStart(
+                sessionID: session.id
+            )
+        } catch is CancellationError {
+            coordinatedLobbySessionID = nil
+            return false
+        } catch {
+            coordinatedLobbySessionID = nil
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func refreshWorkoutLobby(
+        sessionID: UUID
+    ) async throws {
+        let (session, participants) =
+            try await service.loadWorkoutLobby(
+                sessionID: sessionID
+            )
+
+        if let index = workoutSessions.firstIndex(
+            where: { $0.id == session.id }
+        ) {
+            workoutSessions[index] = session
+        } else {
+            workoutSessions.insert(session, at: 0)
+        }
+
+        workoutParticipants.removeAll {
+            $0.sessionID == sessionID
+        }
+        workoutParticipants.append(
+            contentsOf: participants
+        )
+
+        if session.creatorID == currentUserID {
+            activeWorkoutSession = session
+            activeWorkoutParticipants = participants
+        }
+    }
+
+    @discardableResult
+    func markCurrentUserReady(
+        sessionID: UUID,
+        captureDevice: WorkoutCaptureDevice
+    ) async -> Bool {
+        do {
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+            guard let currentUserID,
+                  let participant = workoutParticipants.first(
+                    where: {
+                        $0.sessionID == sessionID &&
+                        $0.userID == currentUserID
+                    }
+                  )
+            else {
+                return false
+            }
+
+            try await service.setWorkoutReady(
+                participantID: participant.id,
+                captureDevice: captureDevice
+            )
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
+    }
+
+    @discardableResult
+    func scheduleCoordinatedWorkoutStart(
+        sessionID: UUID,
+        countdownSeconds: TimeInterval = 3
+    ) async -> Bool {
+        guard activeWorkoutSession?.creatorID == currentUserID else {
+            return false
+        }
+
+        do {
+            let startAt = Date().addingTimeInterval(
+                max(countdownSeconds, 1)
+            )
+            try await service.scheduleWorkoutStart(
+                sessionID: sessionID,
+                startAt: startAt
+            )
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func waitForCoordinatedWorkoutStart(
+        sessionID: UUID
+    ) async -> Bool {
+        while !Task.isCancelled {
+            do {
+                try await refreshWorkoutLobby(
+                    sessionID: sessionID
+                )
+
+                guard let session = workoutSessions.first(
+                    where: { $0.id == sessionID }
+                ), session.status == .active
+                else {
+                    if coordinatedLobbySessionID == sessionID {
+                        coordinatedLobbySessionID = nil
+                    }
+                    return false
+                }
+
+                if let startAt = session.coordinatedStartAt {
+                    let delay = startAt.timeIntervalSinceNow
+                    if delay > 0 {
+                        try await Task.sleep(
+                            for: .milliseconds(
+                                Int(delay * 1000)
+                            )
+                        )
+                    }
+
+                    guard let currentUserID,
+                          let participant = workoutParticipants.first(
+                            where: {
+                                $0.sessionID == sessionID &&
+                                $0.userID == currentUserID
+                            }
+                          ),
+                          participant.readyAt != nil
+                    else {
+                        return false
+                    }
+
+                    try await service
+                        .markWorkoutParticipantStarted(
+                            participantID:
+                                participant.id
+                        )
+
+                    if coordinatedLobbySessionID == sessionID {
+                        coordinatedLobbySessionID = nil
+                    }
+                    try? await refreshWorkoutLobby(
+                        sessionID: sessionID
+                    )
+                    return true
+                }
+
+                try await Task.sleep(
+                    for: .milliseconds(750)
+                )
+            } catch is CancellationError {
+                if coordinatedLobbySessionID == sessionID {
+                    coordinatedLobbySessionID = nil
+                }
+                return false
+            } catch {
+                errorMessage = error.localizedDescription
+                try? await Task.sleep(
+                    for: .seconds(1)
+                )
+            }
+        }
+
+        return false
     }
 
     func cancelActiveWorkout() async {
@@ -846,6 +1037,7 @@ final class SocialStore: ObservableObject {
             )
             self.activeWorkoutSession = nil
             activeWorkoutParticipants = []
+            coordinatedLobbySessionID = nil
             workoutSessions.removeAll {
                 $0.id == activeWorkoutSession.id
             }
