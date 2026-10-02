@@ -7,7 +7,8 @@ extension SupabaseSocialService {
         workoutKind: WorkoutKind,
         creatorName: String,
         creatorUsername: String?,
-        friends: [SocialProfileCard]
+        friends: [SocialProfileCard],
+        invitePayload: SocialWorkoutInvitePayload? = nil
     ) async throws -> SocialWorkoutSessionRecord {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -24,7 +25,8 @@ extension SupabaseSocialService {
             endedAt: nil,
             sourceWorkoutID: nil,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            invitePayload: invitePayload
         )
 
         try await client
@@ -327,6 +329,7 @@ private struct WorkoutSessionWrite: Encodable {
     let sourceWorkoutID: UUID?
     let createdAt: Date
     let updatedAt: Date?
+    let invitePayload: SocialWorkoutInvitePayload?
 
     init(record: SocialWorkoutSessionRecord) {
         id = record.id
@@ -339,6 +342,7 @@ private struct WorkoutSessionWrite: Encodable {
         sourceWorkoutID = record.sourceWorkoutID
         createdAt = record.createdAt
         updatedAt = record.updatedAt
+        invitePayload = record.invitePayload
     }
 
     enum CodingKeys: String, CodingKey {
@@ -352,6 +356,7 @@ private struct WorkoutSessionWrite: Encodable {
         case sourceWorkoutID = "source_workout_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case invitePayload = "invite_payload"
     }
 }
 
