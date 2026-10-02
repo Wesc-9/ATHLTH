@@ -1216,7 +1216,13 @@ struct TrophyCabinetSection: View {
                                         trophy.isPrestigeTrophy
                                             ? 106
                                             : 86,
-                                    showLabel: true
+                                    showLabel: true,
+                                    inscription:
+                                        trophies
+                                            .inscription(
+                                                for:
+                                                    trophy.id
+                                            )
                                 )
                                 .offset(
                                     y:
@@ -2138,7 +2144,13 @@ struct TrophyCollectionView: View {
                         size:
                             trophy.isPrestigeTrophy
                                 ? 104
-                                : 78
+                                : 78,
+                        inscription:
+                            trophies
+                                .inscription(
+                                    for:
+                                        trophy.id
+                                )
                     )
                     .offset(
                         y:
@@ -2296,7 +2308,13 @@ struct TrophyCollectionView: View {
                 ATHLTHTrophyCoreView(
                     trophy:
                         trophy,
-                    size: 54
+                    size: 54,
+                    inscription:
+                        trophies
+                            .inscription(
+                                for:
+                                    trophy.id
+                            )
                 )
 
                 VStack(
@@ -2473,7 +2491,13 @@ struct TrophyCollectionView: View {
                 ATHLTHTrophyCoreView(
                     trophy:
                         trophy,
-                    size: 96
+                    size: 96,
+                    inscription:
+                        trophies
+                            .inscription(
+                                for:
+                                    trophy.id
+                            )
                 )
 
                 if !trophy.isPrestigeTrophy &&
@@ -2951,8 +2975,8 @@ struct TrophyDetailView: View {
                                trophies.showcaseIDs.count >= TrophyStore.showcaseLimit {
                                 Text(
                                     ATHLTHLocalization.choose(
-                                        english: "Your cabinet can display up to four trophies.",
-                                        norwegian: "Troféskapet kan vise opptil fire trofeer."
+                                        english: "Your cabinet can display up to four achievements or trophies.",
+                                        norwegian: "Troféskapet kan vise opptil fire achievements eller pokaler."
                                     )
                                 )
                                     .font(.caption)
@@ -2988,12 +3012,25 @@ struct TrophyDetailView: View {
                 return
             }
 
-            inscription =
+            if let cached =
+                    trophies
+                        .inscription(
+                            for:
+                                trophy.id
+                        ) {
+                inscription =
+                    cached
+                return
+            }
+
+            let generated =
                 await TrophyInscriptionAIService
                     .shared
                     .inscription(
-                        trophyID: trophy.id,
-                        username: athleteName,
+                        trophyID:
+                            trophy.id,
+                        username:
+                            athleteName,
                         achievementTitle:
                             trophy.title,
                         achievementDetail:
@@ -3001,6 +3038,14 @@ struct TrophyDetailView: View {
                         unlockedAt:
                             trophy.unlockedAt
                     )
+            inscription =
+                generated
+            trophies
+                .cacheInscription(
+                    generated,
+                    for:
+                        trophy.id
+                )
         }
     }
 
@@ -3478,12 +3523,25 @@ struct TrophyUnlockRevealView: View {
                 return
             }
 
-            inscription =
+            if let cached =
+                    trophies
+                        .inscription(
+                            for:
+                                trophy.id
+                        ) {
+                inscription =
+                    cached
+                return
+            }
+
+            let generated =
                 await TrophyInscriptionAIService
                     .shared
                     .inscription(
-                        trophyID: trophy.id,
-                        username: athleteName,
+                        trophyID:
+                            trophy.id,
+                        username:
+                            athleteName,
                         achievementTitle:
                             trophy.title,
                         achievementDetail:
@@ -3491,6 +3549,14 @@ struct TrophyUnlockRevealView: View {
                         unlockedAt:
                             unlock.unlockedAt
                     )
+            inscription =
+                generated
+            trophies
+                .cacheInscription(
+                    generated,
+                    for:
+                        trophy.id
+                )
         }
 
     }
