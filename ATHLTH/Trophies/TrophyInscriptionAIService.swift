@@ -2,6 +2,8 @@ import Foundation
 import Supabase
 
 struct TrophyInscription: Codable, Hashable {
+    static let currentVersion = 1
+
     let athlete: String
     let achievement: String
     let inscription: String
@@ -93,7 +95,7 @@ final class TrophyInscriptionAIService {
             [
                 "athlth",
                 "trophyInscription",
-                "v2",
+                "v\(TrophyInscription.currentVersion)",
                 userScope,
                 trophyID,
                 language
