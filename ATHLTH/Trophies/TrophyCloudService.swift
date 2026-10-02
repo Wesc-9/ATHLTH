@@ -202,9 +202,6 @@ private struct TrophyCloudUnlockRow:
         TrophyInscription?
     {
         guard
-            (engravingVersion ?? 0) >=
-                TrophyInscription
-                    .currentVersion,
             let athlete =
                 usernameAtUnlock?
                     .trimmingCharacters(
