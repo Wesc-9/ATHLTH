@@ -352,6 +352,56 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func refreshActivityHistoryFeed(
+        limit: Int = 100
+    ) async {
+        guard let currentUserID =
+                service.currentUserID
+        else {
+            feed = []
+            return
+        }
+
+        do {
+            if followingIDs.isEmpty {
+                let followingRows =
+                    try await service
+                        .loadFollowing(
+                            for:
+                                currentUserID
+                        )
+                followingIDs =
+                    Set(
+                        followingRows
+                            .map(\.followingID)
+                    )
+            }
+
+            let refreshedFeed =
+                try await service.loadFeed(
+                    limit:
+                        min(
+                            max(limit, 18),
+                            150
+                        )
+                )
+
+            feed =
+                refreshedFeed.filter {
+                    item in
+
+                    item.activity.actorID ==
+                        currentUserID ||
+                    followingIDs.contains(
+                        item.activity.actorID
+                    )
+                }
+        } catch {
+            // History keeps the previously cached feed if the network is
+            // unavailable. Own local/Health workouts remain visible.
+        }
+    }
+
     func search(_ query: String) async {
         let requestedQuery = query.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -1457,6 +1507,10 @@ final class SocialStore: ObservableObject {
                 "source": workout.source,
                 "effort": "\(max(1, min(effort, 10)))"
             ]
+            Self.enrichWorkoutActivityMetadata(
+                &metadata,
+                workout: workout
+            )
 
             let cleanDescription = description
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1525,6 +1579,10 @@ final class SocialStore: ObservableObject {
                 "kind": workout.activity.rawValue,
                 "source": workout.source
             ]
+            Self.enrichWorkoutActivityMetadata(
+                &metadata,
+                workout: workout
+            )
 
             if !acceptedPartners.isEmpty {
                 metadata["with_names"] = acceptedPartners
@@ -2272,6 +2330,59 @@ final class SocialStore: ObservableObject {
         privacy = nil
         workoutMedia = []
         profileCache = [:]
+    }
+
+    private static func enrichWorkoutActivityMetadata(
+        _ metadata: inout [String: String],
+        workout: SocialPublishableWorkout
+    ) {
+        metadata["duration_seconds"] =
+            String(
+                max(
+                    workout.duration,
+                    0
+                )
+            )
+
+        if let distance =
+                workout.distanceMeters,
+           distance > 0 {
+            metadata["distance_meters"] =
+                String(distance)
+        }
+
+        if let calories =
+                workout.activeEnergyKilocalories,
+           calories > 0 {
+            metadata["active_kcal"] =
+                String(calories)
+        }
+
+        if let count =
+                workout.strengthExerciseCount,
+           count > 0 {
+            metadata["exercise_count"] =
+                String(count)
+        }
+
+        if let volume =
+                workout
+                    .strengthTotalVolumeKilograms,
+           volume > 0 {
+            metadata["volume_kg"] =
+                String(volume)
+        }
+
+        if let groups =
+                workout.strengthMuscleGroups,
+           !groups.isEmpty {
+            metadata["muscle_groups"] =
+                groups
+                    .prefix(8)
+                    .joined(
+                        separator: "|"
+                    )
+        }
     }
 
     private static func durationText(_ duration: TimeInterval) -> String {
