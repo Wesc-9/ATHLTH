@@ -152,9 +152,6 @@ struct HomePersonalRecentActivitySection:
         StrengthWorkoutStore
     @EnvironmentObject private var phoneWorkout:
         IPhoneWorkoutStore
-    @EnvironmentObject private var exerciseLibrary:
-        ExerciseLibraryStore
-
     private var workouts:
         [SocialPublishableWorkout] {
         HomePersonalWorkoutCatalog.merge(
@@ -207,9 +204,7 @@ struct HomePersonalRecentActivitySection:
                         phoneWorkout:
                             localPhoneWorkout(
                                 for: latest
-                            ),
-                        exerciseLibrary:
-                            exerciseLibrary
+                            )
                     )
                 }
                 .buttonStyle(.plain)
@@ -456,7 +451,6 @@ private struct HomePersonalFeaturedWorkoutCard:
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
-    let exerciseLibrary: ExerciseLibraryStore
 
     var body: some View {
         VStack(
@@ -809,9 +803,6 @@ struct HomePersonalActivityHistoryView:
         StrengthWorkoutStore
     @EnvironmentObject private var phoneWorkout:
         IPhoneWorkoutStore
-    @EnvironmentObject private var exerciseLibrary:
-        ExerciseLibraryStore
-
     @State private var workouts:
         [SocialPublishableWorkout] = []
     @State private var filter:
@@ -1310,7 +1301,6 @@ private struct HomePersonalHistoryCard:
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
-    let exerciseLibrary: ExerciseLibraryStore
 
     var body: some View {
         VStack(
@@ -1665,10 +1655,12 @@ private struct HomePersonalWorkoutVisual:
     @EnvironmentObject private var health:
         HealthKitManager
 
+    @EnvironmentObject private var exerciseLibrary:
+        ExerciseLibraryStore
+
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
-    let exerciseLibrary: ExerciseLibraryStore
     let height: CGFloat
 
     @State private var detail:
@@ -1892,12 +1884,7 @@ private struct HomePersonalWorkoutVisual:
             )
             .stroke(
                 ATHLTHTheme.accent,
-                style:
-                    StrokeStyle(
-                        lineWidth: 5,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
+                lineWidth: 5
             )
         }
         .allowsHitTesting(false)
