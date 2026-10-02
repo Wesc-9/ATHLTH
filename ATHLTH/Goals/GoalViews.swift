@@ -851,7 +851,7 @@ struct GoalCreationView: View {
     @State private var activity: GoalActivityFilter = .running
     @State private var hasDeadline = true
     @State private var deadline = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
-    @State private var coverStyle: GoalCoverStyle = .forest
+    @State private var coverStyle: GoalCoverStyle = .running
     @State private var whyItMatters = ""
     @State private var notes = ""
     @State private var privacy: GoalPrivacy = .privateOnly
