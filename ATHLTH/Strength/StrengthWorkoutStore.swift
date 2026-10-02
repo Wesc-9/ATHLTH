@@ -544,7 +544,26 @@ final class StrengthWorkoutStore: ObservableObject {
                 workout
                     .advancedConfiguration?
                     .effortMetric?
-                    .rawValue
+                    .rawValue,
+            exerciseQueue:
+                workout.exercises
+                    .enumerated()
+                    .map {
+                        index,
+                        item in
+
+                        WatchStrengthExerciseSummary(
+                            index: index,
+                            name:
+                                item.exercise
+                                    .name,
+                            primaryMuscles:
+                                item.exercise
+                                    .primaryMuscles,
+                            setCount:
+                                item.sets.count
+                        )
+                    }
         )
     }
 
