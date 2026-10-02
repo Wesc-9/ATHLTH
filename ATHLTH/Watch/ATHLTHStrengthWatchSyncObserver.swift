@@ -10,6 +10,8 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
     @State private var processedCommandIDs: Set<UUID> = []
     @State private var pendingDraftSnapshotTask: Task<Void, Never>?
+    @State private var lastStrengthMutationAtByWorkout:
+        [UUID: Date] = [:]
 
     var body: some View {
         Color.clear
@@ -97,6 +99,19 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return
         }
 
+        if command.kind == .updateDraft,
+           let lastMutationAt =
+                lastStrengthMutationAtByWorkout[
+                    workout.id
+                ],
+           command.sentAt <= lastMutationAt {
+            // A draft edit that was sent before a set/rest/exercise action
+            // must never arrive later and overwrite the new authoritative
+            // iPhone state.
+            sendSnapshotNow()
+            return
+        }
+
         switch command.kind {
         case .updateDraft:
             strengthWorkout.setDraft(
@@ -144,6 +159,20 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             break
         }
 
+        if command.kind != .updateDraft &&
+            command.kind != .requestSnapshot {
+            let previous =
+                lastStrengthMutationAtByWorkout[
+                    workout.id
+                ] ?? .distantPast
+            lastStrengthMutationAtByWorkout[
+                workout.id
+            ] = max(
+                previous,
+                command.sentAt
+            )
+        }
+
         // Commands represent explicit Watch actions and should receive the
         // resulting state immediately. Only free-form draft edits are
         // coalesced.
@@ -168,9 +197,11 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         pendingDraftSnapshotTask?.cancel()
         pendingDraftSnapshotTask = nil
 
-        guard settings.trainingDeviceProvider == .appleWatch,
-              strengthWorkout.activeWorkout?.captureDevice == .appleWatch,
-              let snapshot = strengthWorkout.watchSnapshot
+        guard strengthWorkout
+                .activeWorkout?
+                .captureDevice == .appleWatch,
+              let snapshot =
+                strengthWorkout.watchSnapshot
         else {
             return
         }
