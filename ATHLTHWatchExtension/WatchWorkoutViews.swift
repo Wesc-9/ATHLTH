@@ -589,6 +589,57 @@ struct WatchActiveWorkoutView: View {
                     tint: WatchTheme.accentDeep
                 )
 
+                if snapshot.effortMetricRaw == "rpe" {
+                    WatchStrengthCrownControl(
+                        title: "RPE",
+                        valueText:
+                            String(
+                                format: "%.1f",
+                                snapshot.draftRPE ?? 8
+                            ),
+                        value: strengthRPEBinding,
+                        range: 1...10,
+                        step: 0.5,
+                        icon: "gauge.with.dots.needle.50percent",
+                        tint: WatchTheme.accent
+                    )
+                } else if
+                    snapshot.effortMetricRaw == "rir" {
+                    WatchStrengthCrownControl(
+                        title: "RIR",
+                        valueText:
+                            String(
+                                format: "%.1f",
+                                snapshot.draftRIR ?? 2
+                            ),
+                        value: strengthRIRBinding,
+                        range: 0...10,
+                        step: 0.5,
+                        icon: "repeat.circle",
+                        tint: WatchTheme.accent
+                    )
+                }
+
+                Button {
+                    workoutManager.updateStrengthDraft(
+                        isWarmUp:
+                            !(snapshot.isWarmUp ?? false)
+                    )
+                } label: {
+                    Label(
+                        snapshot.isWarmUp == true
+                            ? "Warm-up set"
+                            : "Working set",
+                        systemImage:
+                            snapshot.isWarmUp == true
+                                ? "flame.fill"
+                                : "dumbbell.fill"
+                    )
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
                 Button {
                     workoutManager.completeStrengthSet()
                 } label: {
@@ -695,6 +746,36 @@ struct WatchActiveWorkoutView: View {
                 workoutManager.updateStrengthDraft(
                     restSeconds:
                         min(max(rounded, 0), 600)
+                )
+            }
+        )
+    }
+
+    private var strengthRPEBinding: Binding<Double> {
+        Binding(
+            get: {
+                workoutManager
+                    .strengthSession?
+                    .draftRPE ?? 8
+            },
+            set: {
+                workoutManager.updateStrengthDraft(
+                    rpe: $0
+                )
+            }
+        )
+    }
+
+    private var strengthRIRBinding: Binding<Double> {
+        Binding(
+            get: {
+                workoutManager
+                    .strengthSession?
+                    .draftRIR ?? 2
+            },
+            set: {
+                workoutManager.updateStrengthDraft(
+                    rir: $0
                 )
             }
         )
