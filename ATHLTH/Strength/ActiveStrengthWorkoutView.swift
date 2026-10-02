@@ -34,6 +34,8 @@ struct ActiveStrengthWorkoutView: View {
                         VStack(spacing: 18) {
                             workoutHeader(workout)
 
+                            TrainTogetherStatusStrip()
+
                             addExerciseCard(workout)
 
                             if workout.trackingMode == .advanced,
