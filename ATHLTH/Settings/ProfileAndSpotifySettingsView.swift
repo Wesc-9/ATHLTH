@@ -1991,8 +1991,7 @@ struct SpotifySettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
-    @State private var showingPlaylistPreview = false
-    @State private var previewSelection: SpotifyPlaylistReference?
+    @State private var showingPlaylistPicker = false
 
     var body: some View {
         Form {
@@ -2058,22 +2057,36 @@ struct SpotifySettingsView: View {
                     )
 
                     Button {
-                        previewSelection = spotify.playlists.first
-                        showingPlaylistPreview = true
+                        showingPlaylistPicker = true
                     } label: {
                         HStack {
                             Label(
-                                "Browse Spotify playlists",
+                                ATHLTHLocalization.choose(
+                                    english: "Default workout playlist",
+                                    norwegian: "Standardspilleliste for økter"
+                                ),
                                 systemImage: "music.note.list"
                             )
                             Spacer()
-                            Text("\(spotify.playlists.count)")
-                                .foregroundStyle(.secondary)
+                            Text(
+                                settings
+                                    .spotifyDefaultPlaylist?
+                                    .name ??
+                                ATHLTHLocalization.choose(
+                                    english: "None",
+                                    norwegian: "Ingen"
+                                )
+                            )
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                         }
                     }
 
                     Text(
-                        "A program can link one Spotify playlist. On iPhone, ATHLTH can wake Spotify and start that playlist when the workout begins. Apple Watch workouts never wait for Spotify."
+                        ATHLTHLocalization.choose(
+                            english: "Choose a default playlist for new quick workouts. Planned workouts and programs can still use their own playlist or turn Spotify off.",
+                            norwegian: "Velg en standardspilleliste for nye quick-økter. Planlagte økter og programmer kan fortsatt velge en egen spilleliste eller slå av Spotify."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -2176,10 +2189,15 @@ struct SpotifySettingsView: View {
         }
         .navigationTitle("Spotify")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingPlaylistPreview) {
+        .sheet(isPresented: $showingPlaylistPicker) {
             SpotifyPlaylistPickerView(
-                title: "Spotify Playlists",
-                selection: $previewSelection
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Default Spotify Playlist",
+                        norwegian: "Standardspilleliste"
+                    ),
+                selection:
+                    $settings.spotifyDefaultPlaylist
             )
         }
         .task {
