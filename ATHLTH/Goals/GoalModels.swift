@@ -217,6 +217,16 @@ enum GoalCoverStyle: String, CaseIterable, Identifiable, Codable, Hashable {
         case .calm: return ATHLTHLocalization.string( "Calm")
         }
     }
+
+    var assetName: String {
+        switch self {
+        case .forest: return "HomeHero"
+        case .summit: return "OnboardingHero"
+        case .track: return "TrainHero"
+        case .strength: return "StrengthPostWorkoutHero"
+        case .calm: return "RecoveryHero"
+        }
+    }
 }
 
 struct GoalAutomationRule: Codable, Hashable {
