@@ -827,6 +827,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var confirmFinish = false
     @State private var followMe = true
     @State private var routeCamera:
@@ -1443,6 +1444,33 @@ struct IPhoneWorkoutView: View {
                 }
             }
         }
+        .onAppear {
+            updateScreenAwakeState()
+        }
+        .onDisappear {
+            ATHLTHWorkoutScreenAwake.set(
+                false,
+                reason: "iphone-live-workout"
+            )
+        }
+        .onChange(
+            of: recorder.active?.id
+        ) { _, _ in
+            updateScreenAwakeState()
+        }
+        .onChange(
+            of: scenePhase
+        ) { _, _ in
+            updateScreenAwakeState()
+        }
+    }
+
+    private func updateScreenAwakeState() {
+        ATHLTHWorkoutScreenAwake.set(
+            recorder.active != nil &&
+                scenePhase == .active,
+            reason: "iphone-live-workout"
+        )
     }
 
     private var premiumHistoryHeader:
