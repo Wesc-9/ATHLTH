@@ -2040,11 +2040,21 @@ private struct CommunityDiscoveryView: View {
 
     private var publicEvents:
         [CommunityEventItem] {
-        community.upcomingEvents.filter {
-            $0.event.visibility ==
-                ProfileVisibility
-                    .publicProfile
-                    .rawValue
+        community.upcomingEvents.filter { item in
+            guard item.event.visibility ==
+                    ProfileVisibility
+                        .publicProfile
+                        .rawValue
+            else {
+                return false
+            }
+
+            return item.event.creatorID !=
+                    session.profile.userID &&
+                !item.participantRows.contains {
+                    $0.userID ==
+                        session.profile.userID
+                }
         }
     }
 
@@ -2064,11 +2074,7 @@ private struct CommunityDiscoveryView: View {
             return !challenge.participants
                 .contains {
                     $0.userID ==
-                        session.profile.userID &&
-                    (
-                        $0.state == .creator ||
-                        $0.state == .accepted
-                    )
+                        session.profile.userID
                 }
         }
     }
