@@ -171,6 +171,7 @@ private struct TrophyCloudUnlockRow:
     let usernameAtUnlock: String?
     let engravingAchievement: String?
     let engravingText: String?
+    let engravingVersion: Int?
 
     enum CodingKeys:
         String,
@@ -193,12 +194,17 @@ private struct TrophyCloudUnlockRow:
             "engraving_achievement"
         case engravingText =
             "engraving_text"
+        case engravingVersion =
+            "engraving_version"
     }
 
     var inscription:
         TrophyInscription?
     {
         guard
+            (engravingVersion ?? 0) >=
+                TrophyInscription
+                    .currentVersion,
             let athlete =
                 usernameAtUnlock?
                     .trimmingCharacters(
