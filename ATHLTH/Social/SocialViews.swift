@@ -3404,6 +3404,8 @@ private struct WorkoutInviteLaunchSheet: View {
                                             .autoPauseEnabled ??
                                         settings
                                             .autoPauseOutdoorWorkouts,
+                                    spotifyPlaylist: nil,
+                                    spotifyAutoplay: false,
                                     friends: [],
                                     gearIDs: []
                                 ),
@@ -3414,6 +3416,7 @@ private struct WorkoutInviteLaunchSheet: View {
                                 phoneWorkout,
                             watchConnection:
                                 watchConnection,
+                            spotify: spotify,
                             ghostRace:
                                 ghostRace
                         )
@@ -3437,6 +3440,8 @@ private struct WorkoutInviteLaunchSheet: View {
                                             .autoPauseEnabled ??
                                         settings
                                             .autoPauseOutdoorWorkouts,
+                                    spotifyPlaylist: nil,
+                                    spotifyAutoplay: false,
                                     friends: [],
                                     gearIDs: []
                                 ),
@@ -3445,7 +3450,8 @@ private struct WorkoutInviteLaunchSheet: View {
                             phoneWorkout:
                                 phoneWorkout,
                             watchConnection:
-                                watchConnection
+                                watchConnection,
+                            spotify: spotify
                         )
                     _ = await social
                         .confirmCurrentJoinedWorkoutStarted()
