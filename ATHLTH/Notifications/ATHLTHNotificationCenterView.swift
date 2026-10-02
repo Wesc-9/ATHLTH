@@ -1783,7 +1783,16 @@ private struct NotificationSwipeDeleteContainer<
     Content: View
 >: View {
     let onDelete: () -> Void
-    @ViewBuilder let content: () -> Content
+    let content: () -> Content
+
+    init(
+        onDelete: @escaping () -> Void,
+        @ViewBuilder content:
+            @escaping () -> Content
+    ) {
+        self.onDelete = onDelete
+        self.content = content
+    }
 
     @State private var restingOffset:
         CGFloat = 0
