@@ -8233,70 +8233,585 @@ struct CommunityGroupDetailView: View {
         }
     }
 
+    private var activeGroupChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return visibleGroupChallenges
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.startsAt <= now &&
+                $0.endsAt >= now
+            }
+            .sorted {
+                $0.endsAt < $1.endsAt
+            }
+    }
+
+    private var plannedGroupChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return visibleGroupChallenges
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.startsAt > now
+            }
+            .sorted {
+                $0.startsAt < $1.startsAt
+            }
+    }
+
+    private var previousGroupChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return visibleGroupChallenges
+            .filter {
+                $0.status == "cancelled" ||
+                $0.endsAt < now
+            }
+            .sorted {
+                $0.endsAt > $1.endsAt
+            }
+    }
+
     private var challenges: some View {
-        ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Club Challenges")
-                        .font(.title3.weight(.bold))
-                    Text(
-                        groups.canCreateGroupContent(
-                            currentGroup
+        VStack(spacing: 14) {
+            ATHLTHCard {
+                HStack(spacing: 12) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Club Challenges",
+                                norwegian:
+                                    "Club Challenges"
+                            )
                         )
-                            ? "Create shared goals for the group."
-                            : "Creation is restricted by the group settings."
+                        .font(
+                            .title3.weight(.bold)
+                        )
+
+                        Text(
+                            groups.canCreateGroupContent(
+                                currentGroup
+                            )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Run one now or schedule several challenges ahead.",
+                                        norwegian:
+                                            "Kjør én nå eller planlegg flere challenges fremover."
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "See active and planned challenges for the Club.",
+                                        norwegian:
+                                            "Se aktive og planlagte challenges for Club-en."
+                                    )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    if groups.canCreateGroupContent(
+                        currentGroup
+                    ) {
+                        Button {
+                            showingCreateChallenge = true
+                        } label: {
+                            Image(
+                                systemName:
+                                    "calendar.badge.plus"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(.white)
+                            .frame(
+                                width: 40,
+                                height: 40
+                            )
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme
+                                            .accentDeep,
+                                        ATHLTHTheme
+                                            .premiumGold
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                ),
+                                in: Circle()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Plan a Club challenge",
+                                norwegian:
+                                    "Planlegg Club challenge"
+                            )
+                        )
+                    }
+                }
+
+                if groups.canManage(
+                    currentGroup
+                ) &&
+                    !plannedGroupChallenges
+                        .isEmpty {
+                    HStack(spacing: 8) {
+                        Image(
+                            systemName:
+                                "calendar.circle.fill"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+
+                        Text(
+                            ATHLTHLocalization.format(
+                                english:
+                                    plannedGroupChallenges
+                                        .count == 1
+                                        ? "%d challenge planned ahead"
+                                        : "%d challenges planned ahead",
+                                norwegian:
+                                    plannedGroupChallenges
+                                        .count == 1
+                                        ? "%d challenge planlagt fremover"
+                                        : "%d challenges planlagt fremover",
+                                plannedGroupChallenges
+                                    .count
+                            )
+                        )
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
+            }
+
+            if activeGroupChallenges.isEmpty &&
+                plannedGroupChallenges.isEmpty &&
+                previousGroupChallenges.isEmpty {
+                ATHLTHCard {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No Club challenges yet",
+                            norwegian:
+                                "Ingen Club challenges ennå"
+                        ),
+                        systemImage:
+                            "calendar.badge.plus",
+                        description:
+                            Text(
+                                groups
+                                    .canCreateGroupContent(
+                                        currentGroup
+                                    )
+                                    ? ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Create one now or schedule a future challenge from a Club template.",
+                                            norwegian:
+                                                "Opprett en nå eller planlegg en fremtidig challenge fra en Club-mal."
+                                        )
+                                    : ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "No challenges have been scheduled yet.",
+                                            norwegian:
+                                                "Ingen challenges er planlagt ennå."
+                                        )
+                            )
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 18)
+                }
+            }
+
+            if !activeGroupChallenges.isEmpty {
+                challengeScheduleSection(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Active now",
+                            norwegian: "Aktive nå"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Challenges currently counting workouts.",
+                            norwegian:
+                                "Challenges som teller økter akkurat nå."
+                        ),
+                    icon: "bolt.fill",
+                    challenges:
+                        activeGroupChallenges,
+                    planned: false
+                )
+            }
+
+            if !plannedGroupChallenges.isEmpty {
+                challengeScheduleSection(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Planned",
+                            norwegian: "Planlagte"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Upcoming challenges in the Club schedule.",
+                            norwegian:
+                                "Kommende challenges i Club-planen."
+                        ),
+                    icon:
+                        "calendar.badge.clock",
+                    challenges:
+                        plannedGroupChallenges,
+                    planned: true
+                )
+            }
+
+            if !previousGroupChallenges.isEmpty {
+                challengeScheduleSection(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Previous",
+                            norwegian: "Tidligere"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Recently completed or cancelled challenges.",
+                            norwegian:
+                                "Nylig fullførte eller avlyste challenges."
+                        ),
+                    icon:
+                        "clock.arrow.circlepath",
+                    challenges:
+                        Array(
+                            previousGroupChallenges
+                                .prefix(4)
+                        ),
+                    planned: false
+                )
+            }
+        }
+    }
+
+    private func challengeScheduleSection(
+        title: String,
+        subtitle: String,
+        icon: String,
+        challenges:
+            [CommunityGroupChallengeRecord],
+        planned: Bool
+    ) -> some View {
+        ATHLTHCard {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        planned
+                            ? ATHLTHTheme
+                                .premiumGold
+                            : ATHLTHTheme
+                                .accentDeep
+                    )
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        (
+                            planned
+                                ? ATHLTHTheme
+                                    .premiumGoldSoft
+                                : ATHLTHTheme
+                                    .accentSoft
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 10,
+                                style: .continuous
+                            )
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(title)
+                        .font(
+                            .headline.weight(
+                                .bold
+                            )
+                        )
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
                 }
 
                 Spacer()
 
-                if groups.canCreateGroupContent(
-                    currentGroup
-                ) {
-                    Button {
-                        showingCreateChallenge = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-
-            if visibleGroupChallenges.isEmpty {
-                ContentUnavailableView(
-                    "No group challenges",
-                    systemImage: "bolt.badge.plus",
-                    description: Text(
-                        groups.canCreateGroupContent(
-                            currentGroup
-                        )
-                            ? "Create a collective goal for the group."
-                            : "No challenges have been created yet."
+                Text(
+                    String(
+                        challenges.count
                     )
                 )
-                .padding(.vertical, 20)
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(
-                        visibleGroupChallenges
-                    ) { challenge in
-                        NavigationLink {
-                            CommunityGroupChallengeDetailView(
-                                group: currentGroup,
-                                challenge: challenge
+                .font(
+                    .caption.weight(
+                        .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    ATHLTHTheme
+                        .champagneSoft,
+                    in: Capsule()
+                )
+            }
+
+            VStack(spacing: 10) {
+                ForEach(challenges) {
+                    challenge in
+                    NavigationLink {
+                        CommunityGroupChallengeDetailView(
+                            group:
+                                currentGroup,
+                            challenge:
+                                challenge
+                        )
+                    } label: {
+                        if planned {
+                            plannedGroupChallengeCard(
+                                challenge
                             )
-                        } label: {
+                        } else {
                             groupChallengeCard(
                                 challenge
                             )
                         }
-                        .buttonStyle(.plain)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.top, 10)
             }
+            .padding(.top, 8)
+        }
+    }
+
+    private func plannedGroupChallengeCard(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme
+                                .accentDeep,
+                            ATHLTHTheme
+                                .premiumGold
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    )
+                )
+
+                Image(
+                    systemName:
+                        challenge.metric.icon
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.white)
+            }
+            .frame(width: 52, height: 52)
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                HStack(spacing: 7) {
+                    Text(challenge.title)
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "PLANNED",
+                            norwegian: "PLANLAGT"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.6)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .padding(
+                        .horizontal,
+                        6
+                    )
+                    .padding(
+                        .vertical,
+                        3
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .premiumGoldSoft,
+                        in: Capsule()
+                    )
+                }
+
+                Text(
+                    challenge.startsAt
+                        .formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Ends %@",
+                        norwegian:
+                            "Slutter %@",
+                        challenge.endsAt
+                            .formatted(
+                                date:
+                                    .abbreviated,
+                                time:
+                                    .omitted
+                            )
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                .tertiary
+            )
+        }
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme
+                        .champagneSoft
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.14),
+                lineWidth: 0.8
+            )
         }
     }
 
@@ -11727,24 +12242,225 @@ struct CommunityGroupChallengeCreateView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Window") {
+                Section {
+                    if startsAt >
+                        Date()
+                            .addingTimeInterval(
+                                60
+                            ) {
+                        Label(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Planned · starts %@",
+                                norwegian:
+                                    "Planlagt · starter %@",
+                                startsAt.formatted(
+                                    date:
+                                        .abbreviated,
+                                    time:
+                                        .shortened
+                                )
+                            ),
+                            systemImage:
+                                "calendar.badge.clock"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    } else {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Starts now",
+                                norwegian:
+                                    "Starter nå"
+                            ),
+                            systemImage:
+                                "bolt.fill"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
+
+                    ScrollView(
+                        .horizontal,
+                        showsIndicators: false
+                    ) {
+                        HStack(spacing: 8) {
+                            challengeStartShortcut(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Now",
+                                            norwegian:
+                                                "Nå"
+                                        ),
+                                days: 0
+                            )
+                            challengeStartShortcut(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Tomorrow",
+                                            norwegian:
+                                                "I morgen"
+                                        ),
+                                days: 1
+                            )
+                            challengeStartShortcut(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "+1 week",
+                                            norwegian:
+                                                "+1 uke"
+                                        ),
+                                days: 7
+                            )
+                            challengeStartShortcut(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "+2 weeks",
+                                            norwegian:
+                                                "+2 uker"
+                                        ),
+                                days: 14
+                            )
+                        }
+                    }
+
                     DatePicker(
-                        "Starts",
+                        ATHLTHLocalization.choose(
+                            english: "Starts",
+                            norwegian: "Starter"
+                        ),
                         selection: $startsAt,
                         displayedComponents: [
                             .date,
                             .hourAndMinute
                         ]
                     )
+                    .onChange(
+                        of: startsAt
+                    ) { oldValue, newValue in
+                        if endsAt <= newValue {
+                            let oldDuration =
+                                max(
+                                    endsAt
+                                        .timeIntervalSince(
+                                            oldValue
+                                        ),
+                                    7 * 86_400
+                                )
+                            endsAt =
+                                newValue
+                                    .addingTimeInterval(
+                                        oldDuration
+                                    )
+                        }
+                    }
 
                     DatePicker(
-                        "Ends",
+                        ATHLTHLocalization.choose(
+                            english: "Ends",
+                            norwegian: "Slutter"
+                        ),
                         selection: $endsAt,
                         in: startsAt...,
                         displayedComponents: [
                             .date,
                             .hourAndMinute
                         ]
+                    )
+
+                    HStack(spacing: 8) {
+                        ForEach(
+                            [3, 7, 14, 30],
+                            id: \.self
+                        ) { days in
+                            Button {
+                                setChallengeDuration(
+                                    days: days
+                                )
+                            } label: {
+                                Text(
+                                    ATHLTHLocalization.format(
+                                        english:
+                                            "%dd",
+                                        norwegian:
+                                            "%d d",
+                                        days
+                                    )
+                                )
+                                .font(
+                                    .caption.weight(
+                                        .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+                                .padding(
+                                    .horizontal,
+                                    10
+                                )
+                                .padding(
+                                    .vertical,
+                                    7
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .champagneSoft,
+                                    in: Capsule()
+                                )
+                            }
+                            .buttonStyle(
+                                .plain
+                            )
+                        }
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "You can create several future challenges. They stay under Planned until their start time and then become active automatically.",
+                            norwegian:
+                                "Du kan opprette flere challenges fremover. De ligger under Planlagte frem til starttidspunktet og blir aktive automatisk."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                } header: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Schedule",
+                            norwegian:
+                                "Planlegging"
+                        )
                     )
                 }
 
@@ -11829,6 +12545,96 @@ struct CommunityGroupChallengeCreateView: View {
                 Text(creationError ?? "")
             }
         }
+    }
+
+    private func challengeStartShortcut(
+        title: String,
+        days: Int
+    ) -> some View {
+        Button {
+            let currentDuration =
+                max(
+                    endsAt
+                        .timeIntervalSince(
+                            startsAt
+                        ),
+                    86_400
+                )
+
+            let newStart: Date
+
+            if days == 0 {
+                newStart = Date()
+            } else {
+                newStart =
+                    Calendar.current.date(
+                        byAdding: .day,
+                        value: days,
+                        to: Date()
+                    ) ??
+                    Date().addingTimeInterval(
+                        TimeInterval(days) *
+                            86_400
+                    )
+            }
+
+            startsAt = newStart
+            endsAt =
+                newStart.addingTimeInterval(
+                    currentDuration
+                )
+        } label: {
+            Text(title)
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    11
+                )
+                .padding(
+                    .vertical,
+                    7
+                )
+                .background(
+                    ATHLTHTheme
+                        .cardWarm,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(
+                                    0.16
+                                ),
+                            lineWidth: 0.8
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func setChallengeDuration(
+        days: Int
+    ) {
+        endsAt =
+            Calendar.current.date(
+                byAdding: .day,
+                value: days,
+                to: startsAt
+            ) ??
+            startsAt.addingTimeInterval(
+                TimeInterval(days) *
+                    86_400
+            )
     }
 
     private func applyTemplate(
