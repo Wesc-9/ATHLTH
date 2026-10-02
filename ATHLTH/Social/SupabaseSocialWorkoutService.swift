@@ -187,19 +187,23 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    @discardableResult
     func scheduleWorkoutStart(
         sessionID: UUID,
-        startAt: Date
-    ) async throws {
+        countdownSeconds: Int
+    ) async throws -> Date {
         try await client
-            .from("social_workout_sessions")
-            .update(
-                WorkoutSessionStartWrite(
-                    coordinatedStartAt: startAt
-                )
+            .rpc(
+                "schedule_social_workout_start",
+                params:
+                    WorkoutSessionStartParams(
+                        sessionID: sessionID,
+                        countdownSeconds:
+                            countdownSeconds
+                    )
             )
-            .eq("id", value: sessionID)
             .execute()
+            .value
     }
 
     func respondToWorkoutInvite(
@@ -548,11 +552,14 @@ private struct WorkoutSessionSourceWrite: Encodable {
     }
 }
 
-private struct WorkoutSessionStartWrite: Encodable {
-    let coordinatedStartAt: Date
+private struct WorkoutSessionStartParams: Encodable {
+    let sessionID: UUID
+    let countdownSeconds: Int
 
     enum CodingKeys: String, CodingKey {
-        case coordinatedStartAt = "coordinated_start_at"
+        case sessionID = "p_session_id"
+        case countdownSeconds =
+            "p_countdown_seconds"
     }
 }
 
