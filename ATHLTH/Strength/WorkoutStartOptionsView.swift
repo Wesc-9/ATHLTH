@@ -279,14 +279,20 @@ struct WorkoutStartOptionsView: View {
                                         : .iPhone
                             )
 
+                        var watchAudioCoach =
+                            trackingMode == .advanced
+                                ? strengthAudioCoach
+                                    .watchConfiguration
+                                : .disabled
+                        watchAudioCoach
+                            .strengthHapticsEnabled =
+                            restCues.hapticsEnabled
+
                         onStart(
                             captureDevice,
                             trackingMode,
                             selectedFriends,
-                            trackingMode == .advanced
-                                ? strengthAudioCoach
-                                    .watchConfiguration
-                                : .disabled,
+                            watchAudioCoach,
                             advancedConfiguration
                         )
                         dismiss()
