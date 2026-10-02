@@ -152,7 +152,7 @@ final class StrengthWorkoutStore: ObservableObject {
             .flatMap { workout in
                 workout.exercises.flatMap { exercise in
                     exercise.sets.compactMap { set -> Date? in
-                        guard set.isCompleted,
+                        guard set.countsTowardTrainingLoad,
                               let weight = set.completedWeightKilograms,
                               weight > 0
                         else {
@@ -195,7 +195,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 let key = exerciseName.lowercased()
 
                 for set in exercise.sets {
-                    guard set.isCompleted,
+                    guard set.countsTowardTrainingLoad,
                           let weight = set.completedWeightKilograms,
                           let reps = set.completedReps,
                           weight > 0,
@@ -310,7 +310,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 let normalizedExercise = exerciseName.lowercased()
 
                 for set in exercise.sets {
-                    guard set.isCompleted,
+                    guard set.countsTowardTrainingLoad,
                           let weight = set.completedWeightKilograms,
                           let reps = set.completedReps,
                           weight > 0,
@@ -1180,7 +1180,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased() == exerciseName {
                 for set in exercise.sets {
-                    guard set.isCompleted,
+                    guard set.countsTowardTrainingLoad,
                           let weight = set.completedWeightKilograms,
                           weight > 0
                     else {
