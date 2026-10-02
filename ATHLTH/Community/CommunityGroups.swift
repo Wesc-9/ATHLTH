@@ -4579,24 +4579,18 @@ struct CommunityGroupDetailView: View {
     @ViewBuilder
     private var groupHeroBackground: some View {
         if let value =
-            currentGroup.headerImageURL ??
-            currentGroup.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity
-                        )
-                        .clipped()
-                default:
-                    groupHeroFallback
-                }
-            }
+                currentGroup.headerImageURL ??
+                currentGroup.imageURL {
+            ATHLTHArtworkImage(
+                reference: value,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .clipped()
         } else {
             groupHeroFallback
         }
@@ -5575,26 +5569,12 @@ struct CommunityGroupDetailView: View {
         _ challenge:
             CommunityGroupChallengeRecord
     ) -> some View {
-        if let value =
-            challenge.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Image("CommunityHero")
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-        } else {
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
-        }
+        ATHLTHArtworkImage(
+            reference:
+                challenge.imageURL,
+            fallbackAssetName:
+                "CommunityHero"
+        )
     }
 
     private var referenceComingUpSection:
@@ -5852,26 +5832,12 @@ struct CommunityGroupDetailView: View {
         _ event:
             CommunityGroupEventRecord
     ) -> some View {
-        if let value =
-            event.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Image("CommunityHero")
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-        } else {
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
-        }
+        ATHLTHArtworkImage(
+            reference:
+                event.imageURL,
+            fallbackAssetName:
+                "CommunityHero"
+        )
     }
 
     private func referenceUpcomingChallengeRow(
@@ -6484,16 +6450,14 @@ struct CommunityGroupDetailView: View {
                     )
                 )
 
-                if let value = challenge.imageURL,
-                   let url = URL(string: value) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .opacity(0.38)
-                        }
-                    }
+                if challenge.imageURL != nil {
+                    ATHLTHArtworkImage(
+                        reference:
+                            challenge.imageURL,
+                        fallbackAssetName:
+                            "CommunityHero"
+                    )
+                    .opacity(0.38)
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 24,
@@ -8220,34 +8184,19 @@ struct CommunityGroupDetailView: View {
         _ value: String,
         height: CGFloat
     ) -> some View {
-        if let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accentDeep.opacity(0.12),
-                            ATHLTHTheme.cardWarm,
-                            ATHLTHTheme.canvasTop
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
-                )
+        ATHLTHArtworkImage(
+            reference: value,
+            fallbackAssetName:
+                "CommunityHero"
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
             )
-        }
+        )
     }
 
     private func eventDetailText(
