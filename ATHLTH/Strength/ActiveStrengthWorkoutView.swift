@@ -2324,6 +2324,8 @@ private struct StrengthPlateCalculatorView: View {
             1.25,
             0.5
         ]
+    @State private var availablePlates:
+        Set<Double>
 
     init(
         targetWeightKilograms:
@@ -2335,6 +2337,18 @@ private struct StrengthPlateCalculatorView: View {
                     targetWeightKilograms,
                     0
                 )
+        )
+        _availablePlates = State(
+            initialValue:
+                Set([
+                    25,
+                    20,
+                    15,
+                    10,
+                    5,
+                    2.5,
+                    1.25
+                ])
         )
     }
 
@@ -2362,7 +2376,8 @@ private struct StrengthPlateCalculatorView: View {
         var result:
             [(Double, Int)] = []
 
-        for plate in plates {
+        for plate in plates
+        where availablePlates.contains(plate) {
             let count =
                 Int(
                     floor(
@@ -2412,7 +2427,7 @@ private struct StrengthPlateCalculatorView: View {
                     Stepper(
                         value: $targetWeight,
                         in: 0...500,
-                        step: 2.5
+                        step: 0.5
                     ) {
                         HStack {
                             Text(
@@ -2442,6 +2457,45 @@ private struct StrengthPlateCalculatorView: View {
                             .tag(15.0)
                         Text("10 kg")
                             .tag(10.0)
+                    }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Available plates",
+                        norwegian: "Tilgjengelige skiver"
+                    )
+                ) {
+                    ForEach(
+                        plates,
+                        id: \.self
+                    ) { plate in
+                        Toggle(
+                            "\(plate, specifier: "%g") kg",
+                            isOn:
+                                Binding(
+                                    get: {
+                                        availablePlates
+                                            .contains(
+                                                plate
+                                            )
+                                    },
+                                    set: {
+                                        enabled in
+                                        if enabled {
+                                            availablePlates
+                                                .insert(
+                                                    plate
+                                                )
+                                        } else {
+                                            availablePlates
+                                                .remove(
+                                                    plate
+                                                )
+                                        }
+                                    }
+                                )
+                        )
                     }
                 }
 
