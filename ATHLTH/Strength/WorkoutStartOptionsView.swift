@@ -54,52 +54,36 @@ struct WorkoutStartOptionsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
-                    ATHLTHCard {
-                        HStack(
-                            alignment: .top,
-                            spacing: 12
-                        ) {
-                            VStack(
-                                alignment: .leading,
-                                spacing: 4
-                            ) {
-                                Text(session.title)
-                                    .font(
-                                        .title2
-                                            .weight(.bold)
-                                    )
+                VStack(spacing: 12) {
+                    strengthIntroCard
 
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            trackingMode == .advanced
-                                                ? "Advanced tracking and workout options."
-                                                : "A fast setup with only the essentials.",
-                                        norwegian:
-                                            trackingMode == .advanced
-                                                ? "Avansert registrering og flere treningsvalg."
-                                                : "Raskt oppsett med bare det viktigste."
-                                    )
+                    ATHLTHCard {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(
+                                cornerRadius: 2,
+                                style: .continuous
+                            )
+                            .fill(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+                            .frame(
+                                width: 4,
+                                height: 26
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Workout device",
+                                    norwegian:
+                                        "Treningsenhet"
                                 )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Spacer(minLength: 8)
-
-                            trackingModeButton
-                        }
-                    }
-
-                    ATHLTHCard {
-                        HStack {
-                            ATHLTHSectionHeader(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english: "Workout device",
-                                        norwegian: "Treningsenhet"
-                                    )
+                            )
+                            .font(
+                                .title3.weight(
+                                    .bold
+                                )
                             )
 
                             Spacer()
@@ -221,9 +205,11 @@ struct WorkoutStartOptionsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHTheme.vitality)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 18)
                 .animation(
                     .easeInOut(duration: 0.18),
                     value: trackingMode
@@ -266,6 +252,104 @@ struct WorkoutStartOptionsView: View {
         }
     }
 
+    private var strengthIntroCard: some View {
+        ZStack {
+            Image(
+                "StrengthPostWorkoutHero"
+            )
+            .resizable()
+            .scaledToFill()
+            .frame(height: 118)
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.68),
+                    Color.black.opacity(0.28),
+                    Color.black.opacity(0.08)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            HStack(
+                alignment: .top,
+                spacing: 12
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(session.title)
+                        .font(
+                            .title2.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.82
+                        )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                trackingMode == .advanced
+                                    ? "Detailed tracking, exercise by exercise."
+                                    : "Fast setup. Add the exercises you want next.",
+                            norwegian:
+                                trackingMode == .advanced
+                                    ? "Detaljert registrering, øvelse for øvelse."
+                                    : "Raskt oppsett. Legg til øvelsene du ønsker på neste side."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.84
+                        )
+                    )
+                    .lineLimit(2)
+                }
+
+                Spacer(minLength: 6)
+
+                trackingModeButton
+            }
+            .padding(16)
+        }
+        .frame(height: 118)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(
+                    0.22
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    0.08
+                ),
+            radius: 16,
+            y: 8
+        )
+    }
+
     private var trackingModeButton: some View {
         Button {
             trackingMode =
@@ -301,18 +385,27 @@ struct WorkoutStartOptionsView: View {
                 )
             }
             .foregroundStyle(
-                trackingMode == .advanced
-                    ? Color.white
-                    : ATHLTHTheme.accentDeep
+                Color.white
             )
             .padding(.horizontal, 11)
             .frame(height: 34)
             .background(
                 trackingMode == .advanced
-                    ? ATHLTHTheme.accent
-                    : ATHLTHTheme.accentSoft,
+                    ? ATHLTHTheme.vitality
+                    : Color.black.opacity(
+                        0.34
+                    ),
                 in: Capsule()
             )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.white.opacity(
+                            0.24
+                        ),
+                        lineWidth: 0.8
+                    )
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
