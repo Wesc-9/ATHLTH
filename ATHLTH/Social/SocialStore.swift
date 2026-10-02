@@ -1191,9 +1191,31 @@ final class SocialStore: ObservableObject {
                     $0.sessionID == sessionID &&
                     $0.userID == currentUserID
                 }
-            ),
-            participant.workoutStartedAt != nil
+            )
             else {
+                currentJoinedWorkoutSessionID = nil
+                return
+            }
+
+            var participantDidStart =
+                participant.workoutStartedAt != nil
+
+            // A completed local workout is authoritative evidence that the
+            // launch succeeded. Repair a missed social start marker if the
+            // network was unavailable immediately after 3-2-1.
+            if !participantDidStart,
+               participant.readyAt != nil,
+               participant.launchFailedAt == nil,
+               session.coordinatedStartAt != nil {
+                try await service
+                    .markWorkoutParticipantStarted(
+                        participantID:
+                            participant.id
+                    )
+                participantDidStart = true
+            }
+
+            guard participantDidStart else {
                 currentJoinedWorkoutSessionID = nil
                 return
             }
