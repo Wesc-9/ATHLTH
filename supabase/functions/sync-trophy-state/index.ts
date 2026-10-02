@@ -301,6 +301,7 @@ Deno.serve(
       const [
         unlockResult,
         preferenceResult,
+        legacyShowcaseResult,
       ] =
         await Promise.all([
           admin
@@ -327,6 +328,18 @@ Deno.serve(
             )
             .select(
               "showcase_ids,updated_at",
+            )
+            .eq(
+              "user_id",
+              user.id,
+            )
+            .maybeSingle(),
+          admin
+            .from(
+              "social_trophy_showcases",
+            )
+            .select(
+              "items,updated_at",
             )
             .eq(
               "user_id",
@@ -363,20 +376,68 @@ Deno.serve(
         );
       }
 
+      if (
+        legacyShowcaseResult.error
+      ) {
+        return json(
+          {
+            error:
+              legacyShowcaseResult
+                .error
+                .message,
+          },
+          500,
+        );
+      }
+
+      const legacyItems =
+        Array.isArray(
+          legacyShowcaseResult
+            .data
+            ?.items,
+        )
+          ? legacyShowcaseResult
+              .data
+              .items
+          : [];
+      const legacyIDs =
+        legacyItems
+          .map(
+            (item: any) =>
+              clean(
+                item?.trophy_id,
+                160,
+              ),
+          )
+          .filter(Boolean)
+          .slice(0, 4);
+
+      const hasPreferences =
+        Boolean(
+          preferenceResult.data,
+        );
+
       return json({
         unlocks:
           unlockResult.data ??
           [],
         showcase_ids:
-          preferenceResult
-            .data
-            ?.showcase_ids ??
-          [],
+          hasPreferences
+            ? preferenceResult
+                .data
+                ?.showcase_ids ??
+              []
+            : legacyIDs,
         cabinet_updated_at:
-          preferenceResult
-            .data
-            ?.updated_at ??
-          null,
+          hasPreferences
+            ? preferenceResult
+                .data
+                ?.updated_at ??
+              null
+            : legacyShowcaseResult
+                .data
+                ?.updated_at ??
+              null,
       });
     }
 
