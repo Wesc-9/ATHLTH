@@ -31,6 +31,15 @@ struct ATHLTHTrophyCoreView: View {
     var inscription: TrophyInscription? = nil
     var athleteName: String? = nil
 
+    @ObservedObject private var tilt =
+        AchievementTiltMotionStore.shared
+
+    private var usesSignatureTilt: Bool {
+        trophy.isUnlocked &&
+        !trophy.isPrestigeTrophy &&
+        trophy.displayRarity == .signature
+    }
+
     private var visualForm: TrophyVisualForm {
         if trophy.category == .challenges {
             return .cup
@@ -71,54 +80,21 @@ struct ATHLTHTrophyCoreView: View {
                 Color(.systemGray4),
                 Color(.systemGray3)
             ]
+        } else if trophy.isPrestigeTrophy {
+            colors = [
+                ATHLTHTheme.premiumGold,
+                Color(
+                    red: 0.58,
+                    green: 0.36,
+                    blue: 0.08
+                ),
+                Color.black
+            ]
         } else {
-            switch trophy.displayRarity {
-            case .core:
-                colors = [
-                    trophy.category
-                        .trophyAccent
-                        .opacity(0.72),
-                    trophy.category
-                        .trophyAccent
-                        .opacity(0.34),
-                    Color.black.opacity(0.78)
-                ]
-            case .rare:
-                colors = [
-                    Color.white.opacity(0.82),
-                    trophy.category
-                        .trophyAccent
-                        .opacity(0.92),
-                    Color(
-                        red: 0.16,
-                        green: 0.18,
-                        blue: 0.22
-                    )
-                ]
-            case .epic:
-                colors = [
-                    trophy.category
-                        .trophyAccent,
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.84),
-                    Color.black.opacity(0.90)
-                ]
-            case .signature:
-                colors = [
-                    Color(
-                        red: 0.08,
-                        green: 0.08,
-                        blue: 0.10
-                    ),
-                    ATHLTHTheme
-                        .premiumGold,
-                    trophy.category
-                        .trophyAccent
-                        .opacity(0.86),
-                    Color.black
-                ]
-            }
+            colors =
+                trophy
+                    .displayRarity
+                    .achievementPalette
         }
 
         return LinearGradient(
@@ -146,6 +122,42 @@ struct ATHLTHTrophyCoreView: View {
                     width: size,
                     height: size * 1.10
                 )
+                .rotation3DEffect(
+                    .degrees(
+                        usesSignatureTilt
+                            ? -tilt.y * 4.5
+                            : 0
+                    ),
+                    axis:
+                        (
+                            x: 1,
+                            y: 0,
+                            z: 0
+                        )
+                )
+                .rotation3DEffect(
+                    .degrees(
+                        usesSignatureTilt
+                            ? tilt.x * 5.5
+                            : 0
+                    ),
+                    axis:
+                        (
+                            x: 0,
+                            y: 1,
+                            z: 0
+                        )
+                )
+                .onAppear {
+                    if usesSignatureTilt {
+                        tilt.begin()
+                    }
+                }
+                .onDisappear {
+                    if usesSignatureTilt {
+                        tilt.end()
+                    }
+                }
                 .accessibilityElement(
                     children: .ignore
                 )
@@ -188,25 +200,59 @@ struct ATHLTHTrophyCoreView: View {
 
     private var emblemArtwork: some View {
         ZStack {
+            if trophy.isUnlocked &&
+               trophy.displayRarity == .epic {
+                ATHLTHTrophyPlateShape()
+                    .fill(
+                        trophy.category
+                            .trophyAccent
+                            .opacity(0.22)
+                    )
+                    .blur(
+                        radius:
+                            size * 0.12
+                    )
+                    .scaleEffect(1.08)
+            }
+
             ATHLTHTrophyPlateShape()
                 .fill(artworkGradient)
                 .overlay {
                     ATHLTHTrophyPlateShape()
                         .stroke(
-                            Color.white.opacity(
-                                trophy.isUnlocked
-                                    ? 0.48
-                                    : 0.18
-                            ),
-                            lineWidth: 1.2
+                            emblemBorder,
+                            lineWidth:
+                                trophy
+                                    .displayRarity ==
+                                    .signature
+                                    ? 1.7
+                                    : 1.1
                         )
                 }
+
+            if trophy.isUnlocked &&
+               trophy.displayRarity == .rare {
+                metallicSheen
+            }
+
+            if trophy.isUnlocked &&
+               trophy.displayRarity == .epic {
+                epicInnerGlow
+            }
+
+            if usesSignatureTilt {
+                signatureHolographicSheen
+            }
 
             ATHLTHTrophyPlateShape()
                 .fill(
                     Color.black.opacity(
                         trophy.isUnlocked
-                            ? 0.10
+                            ? trophy
+                                .displayRarity ==
+                                .core
+                                ? 0.22
+                                : 0.09
                             : 0.035
                     )
                 )
@@ -225,14 +271,15 @@ struct ATHLTHTrophyCoreView: View {
                                 6,
                                 size * 0.065
                             ),
-                        weight: .bold
+                        weight:
+                            .bold
                     )
                 )
                 .tracking(size * 0.012)
                 .foregroundStyle(
                     .white.opacity(
                         trophy.isUnlocked
-                            ? 0.76
+                            ? 0.82
                             : 0.42
                     )
                 )
@@ -255,11 +302,17 @@ struct ATHLTHTrophyCoreView: View {
                     )
                 )
                 .foregroundStyle(
-                    .white.opacity(
-                        trophy.isUnlocked
-                            ? 0.72
-                            : 0.30
-                    )
+                    trophy.isUnlocked
+                        ? trophy
+                            .displayRarity ==
+                            .core
+                            ? trophy.category
+                                .trophyAccent
+                                .opacity(0.95)
+                            : Color.white
+                                .opacity(0.80)
+                        : Color.white
+                            .opacity(0.30)
                 )
             }
 
@@ -267,14 +320,289 @@ struct ATHLTHTrophyCoreView: View {
         }
         .shadow(
             color:
-                trophy.isUnlocked
-                    ? trophy.category
-                        .trophyAccent
-                        .opacity(0.24)
-                    : .clear,
-            radius: 16,
-            y: 8
+                achievementShadowColor,
+            radius:
+                achievementShadowRadius,
+            y:
+                achievementShadowYOffset
         )
+    }
+
+    private var emblemBorder: LinearGradient {
+        let colors: [Color]
+
+        if !trophy.isUnlocked {
+            colors = [
+                Color.white.opacity(0.18),
+                Color.white.opacity(0.05)
+            ]
+        } else {
+            switch trophy.displayRarity {
+            case .core:
+                colors = [
+                    Color.white.opacity(0.20),
+                    Color.black.opacity(0.26)
+                ]
+            case .rare:
+                colors = [
+                    Color.white.opacity(0.90),
+                    Color(
+                        red: 0.56,
+                        green: 0.72,
+                        blue: 0.88
+                    ),
+                    Color.white.opacity(0.38)
+                ]
+            case .epic:
+                colors = [
+                    Color(
+                        red: 0.76,
+                        green: 0.46,
+                        blue: 1.00
+                    ),
+                    Color(
+                        red: 1.00,
+                        green: 0.63,
+                        blue: 0.20
+                    )
+                ]
+            case .signature:
+                colors = [
+                    Color(
+                        red: 0.20,
+                        green: 0.92,
+                        blue: 1.00
+                    ),
+                    Color(
+                        red: 0.98,
+                        green: 0.34,
+                        blue: 0.90
+                    ),
+                    Color(
+                        red: 1.00,
+                        green: 0.84,
+                        blue: 0.28
+                    ),
+                    Color(
+                        red: 0.48,
+                        green: 0.55,
+                        blue: 1.00
+                    )
+                ]
+            }
+        }
+
+        return LinearGradient(
+            colors: colors,
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    @ViewBuilder
+    private var metallicSheen: some View {
+        GeometryReader { proxy in
+            let width =
+                proxy.size.width
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color.white
+                        .opacity(0.10),
+                    Color.white
+                        .opacity(0.66),
+                    Color.white
+                        .opacity(0.08),
+                    .clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(
+                width: width * 0.58
+            )
+            .rotationEffect(
+                .degrees(-18)
+            )
+            .offset(
+                x: width * 0.18
+            )
+        }
+        .mask(
+            ATHLTHTrophyPlateShape()
+        )
+        .blendMode(.screen)
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var epicInnerGlow: some View {
+        ATHLTHTrophyPlateShape()
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.56),
+                        Color(
+                            red: 0.79,
+                            green: 0.42,
+                            blue: 1.00
+                        )
+                        .opacity(0.72),
+                        Color(
+                            red: 1.00,
+                            green: 0.57,
+                            blue: 0.18
+                        )
+                        .opacity(0.68)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                ),
+                lineWidth:
+                    size * 0.032
+            )
+            .padding(
+                size * 0.055
+            )
+            .blur(
+                radius:
+                    size * 0.018
+            )
+            .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var signatureHolographicSheen: some View {
+        GeometryReader { proxy in
+            let width =
+                proxy.size.width
+            let height =
+                proxy.size.height
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color(
+                        red: 0.18,
+                        green: 0.92,
+                        blue: 1.00
+                    )
+                    .opacity(0.72),
+                    Color(
+                        red: 0.98,
+                        green: 0.32,
+                        blue: 0.89
+                    )
+                    .opacity(0.58),
+                    Color(
+                        red: 1.00,
+                        green: 0.83,
+                        blue: 0.25
+                    )
+                    .opacity(0.62),
+                    Color(
+                        red: 0.47,
+                        green: 0.54,
+                        blue: 1.00
+                    )
+                    .opacity(0.58),
+                    .clear
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            )
+            .frame(
+                width: width * 0.72,
+                height: height * 1.35
+            )
+            .rotationEffect(
+                .degrees(
+                    -18 +
+                    tilt.x * 16
+                )
+            )
+            .offset(
+                x:
+                    tilt.x *
+                    width * 0.30,
+                y:
+                    tilt.y *
+                    height * 0.22
+            )
+        }
+        .mask(
+            ATHLTHTrophyPlateShape()
+                .padding(
+                    size * 0.018
+                )
+        )
+        .blendMode(.screen)
+        .allowsHitTesting(false)
+    }
+
+    private var achievementShadowColor:
+        Color
+    {
+        guard trophy.isUnlocked
+        else {
+            return .clear
+        }
+
+        switch trophy.displayRarity {
+        case .core:
+            return Color.black
+                .opacity(0.18)
+        case .rare:
+            return Color(
+                red: 0.55,
+                green: 0.72,
+                blue: 0.90
+            )
+            .opacity(0.22)
+        case .epic:
+            return Color(
+                red: 0.63,
+                green: 0.30,
+                blue: 1.00
+            )
+            .opacity(0.48)
+        case .signature:
+            return Color(
+                red: 0.34,
+                green: 0.79,
+                blue: 1.00
+            )
+            .opacity(0.44)
+        }
+    }
+
+    private var achievementShadowRadius:
+        CGFloat
+    {
+        switch trophy.displayRarity {
+        case .core:
+            return 8
+        case .rare:
+            return 12
+        case .epic:
+            return 22
+        case .signature:
+            return 24
+        }
+    }
+
+    private var achievementShadowYOffset:
+        CGFloat
+    {
+        trophy.displayRarity == .core
+            ? 5
+            : 8
     }
 
     private var medalArtwork: some View {
@@ -783,8 +1111,8 @@ struct TrophyCabinetSection: View {
                         .font(.title3.weight(.bold))
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Your hardest-earned gold trophies.",
-                            norwegian: "Gullpokalene du har jobbet hardest for."
+                            english: "Show your favorite achievements and hardest-earned trophies.",
+                            norwegian: "Vis favoritt-achievements og pokalene du har jobbet hardest for."
                         )
                     )
                         .font(.caption)
@@ -821,9 +1149,9 @@ struct TrophyCabinetSection: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Earn a qualifying gold trophy and choose it from the trophy hub.",
+                                    "Unlock achievements or earn gold trophies, then choose up to four for your profile.",
                                 norwegian:
-                                    "Tjen en kvalifiserende gullpokal og velg den fra pokaloversikten."
+                                    "Lås opp achievements eller tjen gullpokaler, og velg opptil fire til profilen."
                             )
                         )
                             .font(.caption)
@@ -1032,7 +1360,7 @@ struct TrophyCollectionView: View {
     private var unlocked:
         [TrophyProgressItem] {
         trophies
-            .unlockedPrestigeTrophies
+            .unlockedCabinetCandidates
     }
 
     var body: some View {
@@ -1406,9 +1734,9 @@ struct TrophyCollectionView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Choose up to four unlocked gold trophies for your profile.",
+                                    "Choose up to four unlocked achievements or trophies for your profile.",
                                 norwegian:
-                                    "Velg opptil fire opplåste gullpokaler som skal vises på profilen."
+                                    "Velg opptil fire opplåste achievements eller pokaler til profilen din."
                             )
                         )
                         .font(.caption)
@@ -1533,9 +1861,9 @@ struct TrophyCollectionView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Complete a qualifying standout performance to earn your first gold trophy.",
+                                "Unlock an achievement or earn a gold trophy to start filling your cabinet.",
                             norwegian:
-                                "Fullfør en kvalifiserende større prestasjon for å tjene din første gullpokal."
+                                "Lås opp et achievement eller tjen en gullpokal for å begynne å fylle skapet."
                         )
                     )
                 }
@@ -1554,9 +1882,9 @@ struct TrophyCollectionView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Choose from unlocked gold trophies",
+                                "Choose from unlocked achievements & trophies",
                             norwegian:
-                                "Velg blant opplåste gullpokaler"
+                                "Velg blant opplåste achievements og pokaler"
                         )
                     )
                     .font(
@@ -1922,7 +2250,14 @@ struct TrophyCollectionView: View {
                     .lineLimit(1)
 
                     Text(
-                        trophy.stageLabel
+                        trophy.isPrestigeTrophy
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Gold Trophy",
+                                norwegian:
+                                    "Gullpokal"
+                            )
+                            : trophy.stageLabel
                     )
                     .font(.caption2)
                     .foregroundStyle(
@@ -2063,11 +2398,41 @@ struct TrophyCollectionView: View {
             TrophyProgressItem
     ) -> some View {
         VStack(spacing: 10) {
-            ATHLTHTrophyCoreView(
-                trophy:
-                    trophy,
-                size: 96
-            )
+            ZStack(
+                alignment: .topTrailing
+            ) {
+                ATHLTHTrophyCoreView(
+                    trophy:
+                        trophy,
+                    size: 96
+                )
+
+                if !trophy.isPrestigeTrophy &&
+                   !trophy.isComplete {
+                    AchievementProgressRing(
+                        progress:
+                            trophy.progress,
+                        rarity:
+                            trophy
+                                .displayRarity,
+                        lineWidth: 3.5
+                    )
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .padding(4)
+                    .background(
+                        Color.black
+                            .opacity(0.62),
+                        in: Circle()
+                    )
+                    .offset(
+                        x: 10,
+                        y: -2
+                    )
+                }
+            }
 
             VStack(spacing: 3) {
                 Text(trophy.title)
@@ -2127,14 +2492,44 @@ struct TrophyCollectionView: View {
             }
 
             if !trophy.isComplete {
-                ProgressView(
-                    value:
-                        trophy.progress
-                )
-                .tint(
-                    trophy.category
-                        .trophyAccent
-                )
+                GeometryReader {
+                    proxy in
+                    ZStack(
+                        alignment:
+                            .leading
+                    ) {
+                        Capsule()
+                            .fill(
+                                Color.black
+                                    .opacity(
+                                        0.06
+                                    )
+                            )
+
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors:
+                                        trophy
+                                            .displayRarity
+                                            .progressPalette,
+                                    startPoint:
+                                        .leading,
+                                    endPoint:
+                                        .trailing
+                                )
+                            )
+                            .frame(
+                                width:
+                                    proxy
+                                        .size
+                                        .width *
+                                    trophy
+                                        .progress
+                            )
+                    }
+                }
+                .frame(height: 6)
             }
 
             if trophies
@@ -2341,8 +2736,7 @@ struct TrophyDetailView: View {
                         }
 
                         if trophy.isUnlocked {
-                            if trophy.isPrestigeTrophy {
-                                Button {
+                            Button {
                                     trophies.toggleShowcase(
                                         trophy.id
                                     )
@@ -2383,8 +2777,11 @@ struct TrophyDetailView: View {
                                         trophy.id
                                     )
                                         ? .secondary
-                                        : ATHLTHTheme
-                                            .premiumGold
+                                        : trophy.isPrestigeTrophy
+                                            ? ATHLTHTheme
+                                                .premiumGold
+                                            : trophy.category
+                                                .trophyAccent
                                 )
                                 .disabled(
                                     !trophies.isShowcased(
@@ -2396,7 +2793,6 @@ struct TrophyDetailView: View {
                                         TrophyStore
                                             .showcaseLimit
                                 )
-                            }
 
                             if let unlock = history.first {
                                 Button {
@@ -2459,8 +2855,7 @@ struct TrophyDetailView: View {
                                     .frame(maxWidth: .infinity)
                             }
 
-                            if trophy.isPrestigeTrophy &&
-                               !trophies.isShowcased(trophy.id) &&
+                            if !trophies.isShowcased(trophy.id) &&
                                trophies.showcaseIDs.count >= TrophyStore.showcaseLimit {
                                 Text(
                                     ATHLTHLocalization.choose(
@@ -2563,8 +2958,67 @@ struct TrophyDetailView: View {
                     .foregroundStyle(ATHLTHTheme.accent)
                 }
             } else {
-                ProgressView(value: trophy.progress)
-                    .tint(ATHLTHTheme.accent)
+                HStack(
+                    alignment: .center,
+                    spacing: 14
+                ) {
+                    AchievementProgressRing(
+                        progress:
+                            trophy.progress,
+                        rarity:
+                            trophy.displayRarity,
+                        lineWidth: 5
+                    )
+                    .frame(
+                        width: 52,
+                        height: 52
+                    )
+                    .padding(5)
+                    .background(
+                        Color.black
+                            .opacity(0.78),
+                        in: Circle()
+                    )
+
+                    GeometryReader {
+                        proxy in
+                        ZStack(
+                            alignment:
+                                .leading
+                        ) {
+                            Capsule()
+                                .fill(
+                                    Color.black
+                                        .opacity(
+                                            0.07
+                                        )
+                                )
+
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors:
+                                            trophy
+                                                .displayRarity
+                                                .progressPalette,
+                                        startPoint:
+                                            .leading,
+                                        endPoint:
+                                            .trailing
+                                    )
+                                )
+                                .frame(
+                                    width:
+                                        proxy
+                                            .size
+                                            .width *
+                                        trophy
+                                            .progress
+                                )
+                        }
+                    }
+                    .frame(height: 8)
+                }
 
                 HStack {
                     Text("\(Int((trophy.progress * 100).rounded()))%")
@@ -2735,6 +3189,15 @@ struct TrophyUnlockRevealView: View {
             )
             .ignoresSafeArea()
 
+            AchievementParticleBurst(
+                rarity: unlock.rarity
+            )
+            .opacity(
+                revealed
+                    ? 1
+                    : 0
+            )
+
             VStack(spacing: 24) {
                 Text(
                     unlock.isPrestigeTrophy
@@ -2805,6 +3268,11 @@ struct TrophyUnlockRevealView: View {
         }
         .onAppear {
             revealed = true
+            AchievementUnlockFeedback
+                .play(
+                    rarity:
+                        unlock.rarity
+                )
         }
         .task(id: unlock.stageKey) {
             guard unlock.isPrestigeTrophy,
@@ -2829,7 +3297,7 @@ struct TrophyUnlockRevealView: View {
                             unlock.unlockedAt
                     )
         }
-        .sensoryFeedback(.success, trigger: revealed)
+
     }
 }
 
