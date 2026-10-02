@@ -2,6 +2,7 @@ import Foundation
 
 enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     case signature
+    case walking
     case endurance
     case strength
     case consistency
@@ -14,11 +15,20 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     var title: String {
         switch self {
         case .signature: return ATHLTHLocalization.string( "Signature")
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåing"
+            )
         case .endurance: return ATHLTHLocalization.string( "Endurance")
         case .strength: return ATHLTHLocalization.string( "Strength")
         case .consistency: return ATHLTHLocalization.string( "Consistency")
         case .goals: return ATHLTHLocalization.string( "Goals")
-        case .recovery: return ATHLTHLocalization.string( "Recovery")
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Health & Recovery",
+                norwegian: "Helse & restitusjon"
+            )
         case .challenges: return ATHLTHLocalization.string( "Challenges")
         }
     }
@@ -26,6 +36,7 @@ enum TrophyCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     var systemImage: String {
         switch self {
         case .signature: return "sparkles"
+        case .walking: return "figure.walk"
         case .endurance: return "figure.run"
         case .strength: return "dumbbell.fill"
         case .consistency: return "flame.fill"
@@ -111,8 +122,19 @@ struct TrophyHealthSnapshot: Hashable, Codable {
 
     let longestRunMeters: Double
     let firstFiveKDate: Date?
+    let firstTenKDate: Date?
     let firstHalfMarathonDate: Date?
     let firstMarathonDate: Date?
+
+    // Optional so an existing on-device trophy cache from an older ATHLTH
+    // build remains decodable after the walking trophy expansion.
+    let walkingWorkoutCount: Int?
+    let walkingWorkoutCountReachedAt: [Int: Date]?
+    let totalWalkingDistanceMeters: Double?
+    let walkingDistanceReachedAt: [Int: Date]?
+    let longestWalkMeters: Double?
+    let firstFiveKWalkDate: Date?
+    let firstTenKWalkDate: Date?
 
     let longestWorkoutStreakDays: Int
     let workoutStreakReachedAt: [Int: Date]
@@ -125,6 +147,8 @@ struct TrophyStrengthSnapshot: Hashable {
     let completedWorkoutCount: Int
     let workoutCountReachedAt: [Int: Date]
     let firstWeightedSetDate: Date?
+    let totalVolumeKilograms: Double
+    let volumeReachedAt: [Int: Date]
 }
 
 struct TrophyProgressItem: Identifiable, Hashable {
@@ -206,6 +230,36 @@ enum TrophyCatalog {
         ]
     )
 
+    static let walkingDistance = TrophySeriesDefinition(
+        id: "walking.total-distance",
+        title: "Pathfinder",
+        subtitle: "Every recorded walking workout adds distance to this evolving trophy.",
+        category: .walking,
+        verificationSource: .appleHealth,
+        systemImage: "figure.walk",
+        stages: [
+            .init(id: "10", title: "First Paths", threshold: 10_000, displayTarget: "10 km", rarity: .core),
+            .init(id: "50", title: "Trail Maker", threshold: 50_000, displayTarget: "50 km", rarity: .rare),
+            .init(id: "250", title: "Pathfinder", threshold: 250_000, displayTarget: "250 km", rarity: .epic),
+            .init(id: "1000", title: "Long Way Home", threshold: 1_000_000, displayTarget: "1,000 km", rarity: .signature)
+        ]
+    )
+
+    static let walkingSessions = TrophySeriesDefinition(
+        id: "walking.sessions",
+        title: "Keep Walking",
+        subtitle: "Build a walking habit one recorded session at a time.",
+        category: .walking,
+        verificationSource: .appleHealth,
+        systemImage: "shoeprints.fill",
+        stages: [
+            .init(id: "10", title: "Out the Door", threshold: 10, displayTarget: "10 walks", rarity: .core),
+            .init(id: "50", title: "Regular", threshold: 50, displayTarget: "50 walks", rarity: .rare),
+            .init(id: "150", title: "Wayfarer", threshold: 150, displayTarget: "150 walks", rarity: .epic),
+            .init(id: "500", title: "Keep Walking", threshold: 500, displayTarget: "500 walks", rarity: .signature)
+        ]
+    )
+
     static let runningDistance = TrophySeriesDefinition(
         id: "endurance.running-distance",
         title: "Distance Engine",
@@ -251,6 +305,21 @@ enum TrophyCatalog {
         ]
     )
 
+    static let strengthVolume = TrophySeriesDefinition(
+        id: "strength.total-volume",
+        title: "Iron Ledger",
+        subtitle: "Cumulative lifted volume from completed ATHLTH strength sets.",
+        category: .strength,
+        verificationSource: .athlth,
+        systemImage: "scalemass.fill",
+        stages: [
+            .init(id: "10000", title: "Loaded", threshold: 10_000, displayTarget: "10,000 kg", rarity: .core),
+            .init(id: "50000", title: "Heavy Work", threshold: 50_000, displayTarget: "50,000 kg", rarity: .rare),
+            .init(id: "250000", title: "Forged", threshold: 250_000, displayTarget: "250,000 kg", rarity: .epic),
+            .init(id: "1000000", title: "Million Kilo Club", threshold: 1_000_000, displayTarget: "1,000,000 kg", rarity: .signature)
+        ]
+    )
+
     static let recoveryNights = TrophySeriesDefinition(
         id: "recovery.restored-nights",
         title: "Restored",
@@ -261,7 +330,8 @@ enum TrophyCatalog {
         stages: [
             .init(id: "7", title: "Reset", threshold: 7, displayTarget: "7 nights", rarity: .core),
             .init(id: "30", title: "Restored", threshold: 30, displayTarget: "30 nights", rarity: .rare),
-            .init(id: "100", title: "Deep Reserve", threshold: 100, displayTarget: "100 nights", rarity: .epic)
+            .init(id: "100", title: "Deep Reserve", threshold: 100, displayTarget: "100 nights", rarity: .epic),
+            .init(id: "365", title: "Year of Recovery", threshold: 365, displayTarget: "365 nights", rarity: .signature)
         ]
     )
 
@@ -325,9 +395,12 @@ enum TrophyCatalog {
 
     static let allSeries: [TrophySeriesDefinition] = [
         workoutMomentum,
+        walkingDistance,
+        walkingSessions,
         runningDistance,
         streak,
         strengthSessions,
+        strengthVolume,
         recoveryNights,
         completedGoals,
         challengeParticipation,
