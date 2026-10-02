@@ -8750,6 +8750,8 @@ struct CommunityGroupSettingsView: View {
     @State private var selectedImageData: Data?
     @State private var selectedHeaderPhoto: PhotosPickerItem?
     @State private var selectedHeaderImageData: Data?
+    @State private var selectedHeaderArtwork:
+        ATHLTHStandardArtwork?
     @State private var selectedFeaturedChallengeID: UUID?
     @State private var saving = false
     @State private var deleting = false
@@ -8766,6 +8768,13 @@ struct CommunityGroupSettingsView: View {
         _joinMode = State(initialValue: group.joinMode)
         _membersCanCreateContent = State(
             initialValue: group.membersCanCreateContent
+        )
+        _selectedHeaderArtwork = State(
+            initialValue:
+                ATHLTHStandardArtwork(
+                    reference:
+                        group.headerImageURL
+                )
         )
         _selectedFeaturedChallengeID = State(
             initialValue: group.featuredChallengeID
@@ -8846,8 +8855,43 @@ struct CommunityGroupSettingsView: View {
                 }
 
                 Section {
-                    VStack(spacing: 14) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
                         groupHeaderImagePreview
+
+                        Text("ATHLTH images")
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                        ATHLTHStandardArtworkPicker(
+                            selection:
+                                Binding(
+                                    get: {
+                                        selectedHeaderArtwork
+                                    },
+                                    set: {
+                                        artwork in
+                                        selectedHeaderArtwork =
+                                            artwork
+                                        if artwork != nil {
+                                            selectedHeaderPhoto =
+                                                nil
+                                            selectedHeaderImageData =
+                                                nil
+                                        }
+                                    }
+                                )
+                        )
 
                         HStack(spacing: 10) {
                             PhotosPicker(
@@ -8856,7 +8900,7 @@ struct CommunityGroupSettingsView: View {
                             ) {
                                 Label(
                                     selectedHeaderImageData == nil
-                                        ? "Choose Header"
+                                        ? "Upload Header"
                                         : "Change Header",
                                     systemImage: "photo.on.rectangle.angled"
                                 )
@@ -8864,10 +8908,31 @@ struct CommunityGroupSettingsView: View {
                             .buttonStyle(.bordered)
                             .tint(ATHLTHTheme.accent)
 
-                            if selectedHeaderImageData != nil {
+                            if selectedHeaderImageData != nil ||
+                                selectedHeaderArtwork != nil {
                                 Button(role: .destructive) {
-                                    selectedHeaderImageData = nil
-                                    selectedHeaderPhoto = nil
+                                    if selectedHeaderImageData != nil ||
+                                        currentGroup.headerImageURL !=
+                                            selectedHeaderArtwork?
+                                                .reference {
+                                        selectedHeaderImageData =
+                                            nil
+                                        selectedHeaderPhoto =
+                                            nil
+                                        selectedHeaderArtwork =
+                                            nil
+                                    } else {
+                                        Task {
+                                            saving = true
+                                            _ = await groups
+                                                .removeGroupHeaderImage(
+                                                    currentGroup
+                                                )
+                                            selectedHeaderArtwork =
+                                                nil
+                                            saving = false
+                                        }
+                                    }
                                 } label: {
                                     Label(
                                         "Remove",
@@ -8875,6 +8940,7 @@ struct CommunityGroupSettingsView: View {
                                     )
                                 }
                                 .buttonStyle(.bordered)
+                                .disabled(saving)
                             } else if currentGroup.headerImageURL != nil {
                                 Button(role: .destructive) {
                                     Task {
@@ -8896,11 +8962,11 @@ struct CommunityGroupSettingsView: View {
                         }
 
                         Text(
-                            "The header is the wide cover image behind the Club identity. Owner and Admin can change it."
+                            "Choose an ATHLTH image or upload your own. The header is the wide cover image behind the Club identity."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                        .multilineTextAlignment(.leading)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -9101,6 +9167,7 @@ struct CommunityGroupSettingsView: View {
 
                         await MainActor.run {
                             selectedHeaderImageData = jpeg
+                            selectedHeaderArtwork = nil
                         }
                     } catch {
                         groups.errorMessage =
@@ -9208,6 +9275,15 @@ struct CommunityGroupSettingsView: View {
                 currentGroup,
                 jpegData: selectedHeaderImageData
             )
+        } else if saved,
+                  let selectedHeaderArtwork,
+                  currentGroup.headerImageURL !=
+                    selectedHeaderArtwork.reference {
+            saved = await groups.setGroupHeaderArtwork(
+                currentGroup,
+                artwork:
+                    selectedHeaderArtwork
+            )
         }
 
         if saved,
@@ -9286,22 +9362,29 @@ struct CommunityGroupSettingsView: View {
     private var groupHeaderImagePreview: some View {
         Group {
             if let selectedHeaderImageData,
-               let image = UIImage(data: selectedHeaderImageData) {
+               let image =
+                    UIImage(
+                        data:
+                            selectedHeaderImageData
+                    ) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-            } else if let value = currentGroup.headerImageURL,
-                      let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        groupHeaderImagePlaceholder
-                    }
-                }
+            } else if let selectedHeaderArtwork,
+                      let image =
+                        selectedHeaderArtwork
+                            .resolvedUIImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if currentGroup.headerImageURL != nil {
+                ATHLTHArtworkImage(
+                    reference:
+                        currentGroup
+                            .headerImageURL,
+                    fallbackAssetName:
+                        "CommunityHero"
+                )
             } else {
                 groupHeaderImagePlaceholder
             }
@@ -9319,7 +9402,10 @@ struct CommunityGroupSettingsView: View {
                 cornerRadius: 22,
                 style: .continuous
             )
-            .stroke(ATHLTHTheme.border, lineWidth: 1)
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 1
+            )
         }
     }
 
