@@ -795,7 +795,34 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         if allSetsCompleted {
-            restEndsAt = nil
+            let hasNextExercise =
+                workout.exercises
+                    .enumerated()
+                    .contains {
+                        index,
+                        exercise in
+
+                        index !=
+                            currentExerciseIndex &&
+                        !exercise.isCompleted
+                    }
+
+            // Finishing the final set of an exercise should still enter the
+            // programmed rest period before the athlete deliberately starts
+            // the next exercise. We keep the current exercise selected until
+            // "Ready for next exercise" is tapped so transition time can be
+            // measured accurately.
+            restEndsAt =
+                hasNextExercise &&
+                automaticRestTimer &&
+                resolvedRestSeconds > 0
+                    ? Date()
+                        .addingTimeInterval(
+                            TimeInterval(
+                                resolvedRestSeconds
+                            )
+                        )
+                    : nil
         } else {
             restEndsAt =
                 automaticRestTimer &&
@@ -1260,7 +1287,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func moveToNextExercise() {
         guard
-            let workout = activeWorkout,
+            var workout = activeWorkout,
             workout.exercises.indices
                 .contains(
                     currentExerciseIndex
@@ -1298,6 +1325,22 @@ final class StrengthWorkoutStore: ObservableObject {
             return
         }
 
+        if let completedAt =
+                workout.exercises[
+                    currentExerciseIndex
+                ].completedAt {
+            workout.exercises[
+                currentExerciseIndex
+            ].transitionToNextExerciseSeconds =
+                max(
+                    Date()
+                        .timeIntervalSince(
+                            completedAt
+                        ),
+                    0
+                )
+        }
+
         currentExerciseIndex = nextIndex
         currentSetIndex =
             workout.exercises[nextIndex]
@@ -1309,6 +1352,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restEndsAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
+        persistCheckpointNow()
     }
 
     func finish(
