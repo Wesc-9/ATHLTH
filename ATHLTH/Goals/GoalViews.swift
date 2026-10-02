@@ -210,6 +210,21 @@ struct GoalCoverView: View {
         case .track: return [.orange.opacity(0.90), .red.opacity(0.82)]
         case .strength: return [.gray.opacity(0.92), .black]
         case .calm: return [.mint.opacity(0.72), .blue.opacity(0.72)]
+        case .sprint,
+             .walking,
+             .mountain,
+             .progress,
+             .relax,
+             .running,
+             .endurance,
+             .recovery,
+             .consistency,
+             .event,
+             .adventure:
+            return [
+                ATHLTHTheme.accent.opacity(0.72),
+                Color.black.opacity(0.78)
+            ]
         }
     }
 }
@@ -5205,6 +5220,24 @@ private struct GoalPreviewCard: View {
                     .opacity(0.68),
                 Color.blue
                     .opacity(0.68)
+            ]
+        case .sprint,
+             .walking,
+             .mountain,
+             .progress,
+             .relax,
+             .running,
+             .endurance,
+             .recovery,
+             .consistency,
+             .event,
+             .adventure:
+            return [
+                ATHLTHTheme
+                    .accent
+                    .opacity(0.70),
+                Color.black
+                    .opacity(0.78)
             ]
         }
     }
