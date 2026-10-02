@@ -784,14 +784,126 @@ struct ActiveStrengthWorkoutView: View {
                     Text(exercise.exercise.primaryMuscles.joined(separator: " · "))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    HStack(spacing: 6) {
+                        if let style =
+                                exercise.groupStyle {
+                            Label(
+                                style.title,
+                                systemImage:
+                                    style == .superset
+                                        ? "link"
+                                        : "square.grid.2x2"
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        }
+
+                        if let rest =
+                                exercise.restSecondsOverride {
+                            Label(
+                                "\(rest)s",
+                                systemImage: "timer"
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        }
+
+                        if let substituted =
+                                exercise.substitutedFromExerciseName {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Replaced \(substituted)",
+                                    norwegian: "Byttet fra \(substituted)"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        }
+                    }
                 }
 
                 Spacer()
 
-                Image(systemName: "dumbbell.fill")
-                    .font(.title)
-                    .foregroundStyle(ATHLTHTheme.accent)
+                Menu {
+                    Button {
+                        showingExerciseRestEditor =
+                            true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Exercise rest",
+                                norwegian: "Hvile for øvelsen"
+                            ),
+                            systemImage: "timer"
+                        )
+                    }
+
+                    Button {
+                        showingExerciseGroupBuilder =
+                            true
+                    } label: {
+                        Label(
+                            exercise.groupID == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Superset / circuit",
+                                    norwegian: "Supersett / sirkel"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Edit exercise group",
+                                    norwegian: "Rediger øvelsesgruppe"
+                                ),
+                            systemImage: "link"
+                        )
+                    }
+
+                    Button {
+                        showingExerciseSwap = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Swap exercise",
+                                norwegian: "Bytt øvelse"
+                            ),
+                            systemImage:
+                                "arrow.triangle.2.circlepath"
+                        )
+                    }
+
+                    Button {
+                        showingPlateCalculator =
+                            true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Plate calculator",
+                                norwegian: "Skivekalkulator"
+                            ),
+                            systemImage:
+                                "scalemass.fill"
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                }
             }
+        }
+
+        if let suggestion =
+                strength.progressionSuggestion(
+                    for: exercise
+                ) {
+            progressionSuggestionCard(
+                suggestion
+            )
         }
 
         ATHLTHCard {
@@ -818,6 +930,97 @@ struct ActiveStrengthWorkoutView: View {
         } else {
             setEntry
         }
+    }
+
+    private func progressionSuggestionCard(
+        _ suggestion:
+            StrengthProgressionSuggestion
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "chart.line.uptrend.xyaxis"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                ATHLTHTheme.vitality
+                    .opacity(0.10),
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Progression hint",
+                        norwegian: "Progresjonsforslag"
+                    )
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Last: \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps) · Try \(formatWeight(suggestion.suggestedWeightKilograms)) kg × \(suggestion.suggestedReps)",
+                        norwegian:
+                            "Sist: \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps) · Prøv \(formatWeight(suggestion.suggestedWeightKilograms)) kg × \(suggestion.suggestedReps)"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Use",
+                    norwegian: "Bruk"
+                )
+            ) {
+                strength.setDraft(
+                    reps:
+                        suggestion.suggestedReps,
+                    weightKilograms:
+                        suggestion
+                            .suggestedWeightKilograms
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(14)
+        .background(
+            ATHLTHTheme.vitality
+                .opacity(0.055),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+    }
+
+    private func formatWeight(
+        _ value: Double
+    ) -> String {
+        value.rounded() == value
+            ? String(Int(value))
+            : String(
+                format: "%.1f",
+                value
+            )
     }
 
     @ViewBuilder
