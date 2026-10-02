@@ -1,5 +1,10 @@
 import Foundation
 
+enum StrengthDraftMutationOrigin {
+    case iPhone
+    case watch
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -14,6 +19,8 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var draftWarmUp = false { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
+    @Published private(set) var lastPhoneDraftMutationAt:
+        Date = .distantPast
 
     private var accountID: UUID?
     private var loadingAccount = false
@@ -418,7 +425,10 @@ final class StrengthWorkoutStore: ObservableObject {
         restSeconds: Int? = nil,
         rpe: Double? = nil,
         rir: Double? = nil,
-        warmUp: Bool? = nil
+        warmUp: Bool? = nil,
+        origin:
+            StrengthDraftMutationOrigin =
+                .iPhone
     ) {
         if let reps {
             draftReps = max(reps, 0)
@@ -451,6 +461,11 @@ final class StrengthWorkoutStore: ObservableObject {
 
         if let warmUp {
             draftWarmUp = warmUp
+        }
+
+        if origin == .iPhone {
+            lastPhoneDraftMutationAt =
+                Date()
         }
     }
 
