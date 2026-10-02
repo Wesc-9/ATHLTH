@@ -22,9 +22,7 @@ struct ActiveStrengthWorkoutView: View {
                         VStack(spacing: 18) {
                             workoutHeader(workout)
 
-                            if workout.trackingMode == .advanced {
-                                addExerciseCard(workout)
-                            }
+                            addExerciseCard(workout)
 
                             if workout.trackingMode == .advanced,
                                let exercise = strength.currentExercise {
@@ -49,13 +47,18 @@ struct ActiveStrengthWorkoutView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    if strength.activeWorkout?.trackingMode == .advanced {
+                    if strength.activeWorkout != nil {
                         Button {
                             showingExerciseLibrary = true
                         } label: {
                             Image(systemName: "plus")
                         }
-                        .accessibilityLabel("Add exercise")
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Add exercise",
+                                norwegian: "Legg til øvelse"
+                            )
+                        )
                     }
 
                     Button("Finish") {
@@ -222,13 +225,24 @@ struct ActiveStrengthWorkoutView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
                         workout.exercises.isEmpty
-                            ? "Choose your first exercise"
-                            : "Add another exercise"
+                            ? ATHLTHLocalization.choose(
+                                english: "Choose your first exercise",
+                                norwegian: "Velg første øvelse"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Add another exercise",
+                                norwegian: "Legg til en øvelse"
+                            )
                     )
                     .font(.headline)
 
                     Text(
-                        "Pick from RepDB or your own exercises while the workout keeps running."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Choose from the exercise library or your own exercises while the workout keeps running.",
+                            norwegian:
+                                "Velg fra øvelsesbiblioteket eller dine egne øvelser mens økten fortsetter."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -236,7 +250,12 @@ struct ActiveStrengthWorkoutView: View {
 
                 Spacer()
 
-                Button("Add") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Add",
+                        norwegian: "Legg til"
+                    )
+                ) {
                     showingExerciseLibrary = true
                 }
                 .buttonStyle(.borderedProminent)
