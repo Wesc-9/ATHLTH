@@ -56,9 +56,26 @@ final class TrophyStore: ObservableObject {
         showcaseIDs.compactMap { id in
             trophies.first {
                 $0.id == id &&
-                $0.isPrestigeTrophy
+                $0.isUnlocked
             }
         }
+    }
+
+    var unlockedCabinetCandidates: [TrophyProgressItem] {
+        trophies
+            .filter(\.isUnlocked)
+            .sorted {
+                if $0.isPrestigeTrophy != $1.isPrestigeTrophy {
+                    return $0.isPrestigeTrophy
+                }
+
+                if $0.displayRarity != $1.displayRarity {
+                    return $0.displayRarity > $1.displayRarity
+                }
+
+                return ($0.unlockedAt ?? .distantPast) >
+                    ($1.unlockedAt ?? .distantPast)
+            }
     }
 
     var nextTrophies: [TrophyProgressItem] {
@@ -473,8 +490,7 @@ final class TrophyStore: ObservableObject {
                         trophies.contains(
                             where: {
                                 $0.id == id &&
-                                $0.isUnlocked &&
-                                $0.isPrestigeTrophy
+                                $0.isUnlocked
                             }
                         )
                     }
@@ -492,8 +508,7 @@ final class TrophyStore: ObservableObject {
     func toggleShowcase(_ trophyID: String) {
         guard trophies.contains(where: {
             $0.id == trophyID &&
-            $0.isUnlocked &&
-            $0.isPrestigeTrophy
+            $0.isUnlocked
         }) else {
             return
         }
