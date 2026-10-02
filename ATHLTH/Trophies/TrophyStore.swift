@@ -520,60 +520,159 @@ final class TrophyStore: ObservableObject {
             )
         )
 
-        for goal in goals.goals where !goal.milestones.isEmpty {
-            let unlockedAt = goal.status == .completed ? goal.completedAt : nil
-            let currentValue = Double(goal.completedMilestones)
-            let targetValue = Double(max(goal.milestones.count, 1))
-            let stage = unlockedAt.map { _ in
-                TrophyStageDefinition(
-                    id: "complete",
-                    title: "Goal Complete",
-                    threshold: targetValue,
-                    displayTarget: "Completed",
-                    rarity: .epic
+        for goal in goals.goals
+        where !goal.milestones.isEmpty {
+            let goalAwardID =
+                "goal.journey.\(goal.id.uuidString)"
+            let completedAt =
+                goal.status == .completed
+                    ? goal.completedAt
+                    : nil
+            let currentValue =
+                Double(
+                    goal.completedMilestones
+                )
+            let targetValue =
+                Double(
+                    max(
+                        goal.milestones.count,
+                        1
+                    )
+                )
+
+            if let completedAt {
+                registerUnlock(
+                    stageKey:
+                        "\(goalAwardID).complete",
+                    trophyID:
+                        goalAwardID,
+                    stageTitle:
+                        "Goal Complete",
+                    title:
+                        goal.title,
+                    rarity:
+                        .epic,
+                    category:
+                        .goals,
+                    source:
+                        .goal,
+                    unlockedAt:
+                        completedAt
                 )
             }
+
+            let historical =
+                unlocks
+                    .filter {
+                        $0.trophyID ==
+                            goalAwardID
+                    }
+                    .max {
+                        if $0.rarity !=
+                            $1.rarity {
+                            return $0.rarity <
+                                $1.rarity
+                        }
+
+                        return $0.unlockedAt <
+                            $1.unlockedAt
+                    }
+            let effectiveRarity =
+                historical?
+                    .rarity ??
+                (
+                    completedAt == nil
+                        ? .epic
+                        : .epic
+                )
+            let effectiveUnlockedAt =
+                historical?
+                    .unlockedAt ??
+                completedAt
+            let currentStage =
+                effectiveUnlockedAt
+                    .map { _ in
+                        TrophyStageDefinition(
+                            id:
+                                "complete",
+                            title:
+                                historical?
+                                    .stageTitle ??
+                                "Goal Complete",
+                            threshold:
+                                targetValue,
+                            displayTarget:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Completed",
+                                    norwegian:
+                                        "Fullført"
+                                ),
+                            rarity:
+                                effectiveRarity
+                        )
+                    }
 
             resolved.append(
                 TrophyProgressItem(
-                    id: "goal.journey.\(goal.id.uuidString)",
-                    title: goal.title,
-                    subtitle: "Goal Journey · \(goal.completedMilestones) of \(goal.milestones.count) milestones complete.",
-                    category: .goals,
-                    verificationSource: .goal,
-                    systemImage: goal.category.systemImage,
-                    currentValue: currentValue,
-                    nextTargetValue: unlockedAt == nil ? targetValue : nil,
-                    currentStage: stage,
-                    nextStage: unlockedAt == nil
-                        ? TrophyStageDefinition(
-                            id: "complete",
-                            title: "Complete Journey",
-                            threshold: targetValue,
-                            displayTarget: "\(goal.milestones.count) milestones",
-                            rarity: .epic
-                        )
-                        : nil,
-                    highestRarity: .epic,
-                    unlockedAt: unlockedAt,
-                    goalID: goal.id,
-                    journeyMilestonesCompleted: goal.completedMilestones,
-                    journeyMilestonesTotal: goal.milestones.count
+                    id:
+                        goalAwardID,
+                    title:
+                        goal.title,
+                    subtitle:
+                        "Goal Journey · \(goal.completedMilestones) of \(goal.milestones.count) milestones complete.",
+                    category:
+                        historical?
+                            .category ??
+                        .goals,
+                    verificationSource:
+                        .goal,
+                    systemImage:
+                        goal.category
+                            .systemImage,
+                    currentValue:
+                        effectiveUnlockedAt == nil
+                            ? currentValue
+                            : max(
+                                currentValue,
+                                targetValue
+                            ),
+                    nextTargetValue:
+                        effectiveUnlockedAt == nil
+                            ? targetValue
+                            : nil,
+                    currentStage:
+                        currentStage,
+                    nextStage:
+                        effectiveUnlockedAt == nil
+                            ? TrophyStageDefinition(
+                                id:
+                                    "complete",
+                                title:
+                                    "Complete Journey",
+                                threshold:
+                                    targetValue,
+                                displayTarget:
+                                    "\(goal.milestones.count) milestones",
+                                rarity:
+                                    .epic
+                            )
+                            : nil,
+                    highestRarity:
+                        max(
+                            effectiveRarity,
+                            .epic
+                        ),
+                    unlockedAt:
+                        effectiveUnlockedAt,
+                    goalID:
+                        goal.id,
+                    journeyMilestonesCompleted:
+                        goal.completedMilestones,
+                    journeyMilestonesTotal:
+                        goal.milestones.count
                 )
             )
-
-            if let unlockedAt {
-                registerUnlock(
-                    stageKey: "goal.journey.\(goal.id.uuidString).complete",
-                    trophyID: "goal.journey.\(goal.id.uuidString)",
-                    stageTitle: "Goal Complete",
-                    title: goal.title,
-                    rarity: .epic,
-                    category: .goals,
-                    source: .goal,
-                    unlockedAt: unlockedAt
-                )
-            }
         }
 
         trophies = resolved.sorted(by: Self.collectionSort)
