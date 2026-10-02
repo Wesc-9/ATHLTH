@@ -569,10 +569,10 @@ struct BackendChallengeParticipant: Codable, Hashable {
     let invitedBy: UUID
     let invitedAt: Date
     let respondedAt: Date?
-    let readyAt: Date?
-    let captureDevice: String?
-    let workoutStartedAt: Date?
-    let workoutFinishedAt: Date?
+    let readyAt: Date? = nil
+    let captureDevice: String? = nil
+    let workoutStartedAt: Date? = nil
+    let workoutFinishedAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
