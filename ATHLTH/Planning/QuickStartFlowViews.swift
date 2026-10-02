@@ -2234,28 +2234,28 @@ struct StrengthQuickStartSheet: View {
                 VStack(spacing: 14) {
                     ATHLTHCard {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("Start Strength")
-                                .font(.title2.weight(.bold))
                             Text(
-                                "Start completely open, or build the session right before you train."
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Start Strength",
+                                    norwegian:
+                                        "Start styrkeøkt"
+                                )
+                            )
+                            .font(.title2.weight(.bold))
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "For a focused workout, add exercises before pressing Start. Choose no-plan mode only when you want a completely open session.",
+                                    norwegian:
+                                        "For en fokusert økt legger du inn øvelser før du trykker Start. Velg uten plan kun når du ønsker en helt åpen økt."
+                                )
                             )
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         }
                     }
-
-                    Button {
-                        onChoose(emptySession)
-                        dismiss()
-                    } label: {
-                        choiceCard(
-                            title: "Start Empty",
-                            subtitle:
-                                "Start the workout now. Add exercises, sets, reps and weight while you train.",
-                            icon: "play.circle.fill"
-                        )
-                    }
-                    .buttonStyle(.plain)
 
                     NavigationLink {
                         StrengthQuickBuilderView { workout in
@@ -2264,10 +2264,47 @@ struct StrengthQuickStartSheet: View {
                         }
                     } label: {
                         choiceCard(
-                            title: "Build Before Start",
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Add exercises first",
+                                    norwegian:
+                                        "Legg til øvelser først"
+                                ),
                             subtitle:
-                                "Choose exercises and targets now, then start the finished setup.",
-                            icon: "list.bullet.clipboard.fill"
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Build the workout before you start. During training ATHLTH shows one exercise at a time.",
+                                    norwegian:
+                                        "Bygg økten før du starter. Under trening viser ATHLTH én øvelse om gangen."
+                                ),
+                            icon:
+                                "list.bullet.clipboard.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        onChoose(emptySession)
+                        dismiss()
+                    } label: {
+                        choiceCard(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Train without a plan",
+                                    norwegian:
+                                        "Tren uten plan"
+                                ),
+                            subtitle:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Start the timer without preloading exercises. You can add one while training if you want.",
+                                    norwegian:
+                                        "Start tidtaking uten å legge inn øvelser på forhånd. Du kan legge til en øvelse underveis hvis du vil."
+                                ),
+                            icon:
+                                "figure.strengthtraining.traditional"
                         )
                     }
                     .buttonStyle(.plain)
@@ -2356,7 +2393,12 @@ struct StrengthQuickBuilderView: View {
                 TextField("Workout name", text: $title)
 
                 Text(
-                    "Build only as much as you want. Every exercise can still be changed or added after the workout starts."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Add the exercises you want to complete. Once training starts, ATHLTH keeps you focused on one exercise at a time.",
+                        norwegian:
+                            "Legg inn øvelsene du skal gjennomføre. Når økten starter holder ATHLTH fokuset på én øvelse om gangen."
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2365,7 +2407,12 @@ struct StrengthQuickBuilderView: View {
             Section("Exercises") {
                 if exercises.isEmpty {
                     Text(
-                        "No exercises yet. Add one below, or go back and choose Start Empty."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Add at least one exercise before continuing, or go back and choose Train without a plan.",
+                            norwegian:
+                                "Legg til minst én øvelse før du fortsetter, eller gå tilbake og velg Tren uten plan."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -2432,7 +2479,12 @@ struct StrengthQuickBuilderView: View {
                     onStart(builtSession)
                 } label: {
                     Label(
-                        "Continue to Start",
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Continue to Start",
+                            norwegian:
+                                "Fortsett til Start"
+                        ),
                         systemImage: "play.fill"
                     )
                     .frame(maxWidth: .infinity)
@@ -2440,7 +2492,8 @@ struct StrengthQuickBuilderView: View {
                 .disabled(
                     title.trimmingCharacters(
                         in: .whitespacesAndNewlines
-                    ).isEmpty
+                    ).isEmpty ||
+                    exercises.isEmpty
                 )
             }
         }
