@@ -659,11 +659,13 @@ struct ActiveStrengthWorkoutView: View {
             // Apple Watch owns HealthKit for this workout. iPhone only asks it
             // to finish; the local strength log is finalized when the Watch
             // returns the authoritative result/HealthKit UUID.
-            if workoutMirroring
-                .hasActiveMirroredWorkout {
+            let sentViaMirroring =
+                workoutMirroring
+                    .hasActiveMirroredWorkout &&
                 workoutMirroring
                     .sendCommand(.end)
-            } else {
+
+            if !sentViaMirroring {
                 watchConnection
                     .sendWorkoutCommand(
                         .end,
