@@ -844,6 +844,8 @@ struct IPhoneWorkoutView: View {
                             workout
                         )
 
+                        TrainTogetherStatusStrip()
+
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
                             isMetric:
