@@ -1464,6 +1464,43 @@ struct ATHLTHPrivacyCenterView: View {
                     .foregroundStyle(.secondary)
                 }
 
+                Section {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Personal by default",
+                            norwegian:
+                                "Personlig som standard"
+                        ),
+                        systemImage:
+                            "lock.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Performance and personal records stay personal unless you choose to share them below.",
+                            norwegian:
+                                "Prestasjoner og personlige rekorder er personlige som standard, med mindre du velger å dele dem nedenfor."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } header: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Profile privacy",
+                            norwegian:
+                                "Personvern på profil"
+                        )
+                    )
+                }
+
                 Section("What Others Can See") {
                     Toggle(
                         "Training now",
