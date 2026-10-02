@@ -1474,8 +1474,8 @@ struct PostWorkoutReviewView: View {
             return MKCoordinateRegion(
                 center:
                     CLLocationCoordinate2D(
-                        latitude: 63.4305,
-                        longitude: 10.3951
+                        latitude: 0,
+                        longitude: 0
                     ),
                 span:
                     MKCoordinateSpan(
