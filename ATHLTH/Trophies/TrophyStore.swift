@@ -8,6 +8,8 @@ final class TrophyStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var pendingReveal: TrophyUnlockRecord?
 
+    static let showcaseLimit = 4
+
     private var hasInitializedShowcase = false
     private var revealQueue: [TrophyUnlockRecord] = []
     private let activationDate: Date
@@ -138,6 +140,32 @@ final class TrophyStore: ObservableObject {
                     healthSnapshot?.workoutCountReachedAt[Int(threshold)]
                 }
 
+            case TrophyCatalog.walkingDistance.id:
+                value =
+                    healthSnapshot?
+                        .totalWalkingDistanceMeters ??
+                    0
+                evidence = { threshold in
+                    healthSnapshot?
+                        .walkingDistanceReachedAt?[
+                            Int(threshold)
+                        ]
+                }
+
+            case TrophyCatalog.walkingSessions.id:
+                value =
+                    Double(
+                        healthSnapshot?
+                            .walkingWorkoutCount ??
+                        0
+                    )
+                evidence = { threshold in
+                    healthSnapshot?
+                        .walkingWorkoutCountReachedAt?[
+                            Int(threshold)
+                        ]
+                }
+
             case TrophyCatalog.runningDistance.id:
                 value = healthSnapshot?.totalRunningDistanceMeters ?? 0
                 evidence = { threshold in
@@ -154,6 +182,17 @@ final class TrophyStore: ObservableObject {
                 value = Double(strengthSnapshot.completedWorkoutCount)
                 evidence = { threshold in
                     strengthSnapshot.workoutCountReachedAt[Int(threshold)]
+                }
+
+            case TrophyCatalog.strengthVolume.id:
+                value =
+                    strengthSnapshot
+                        .totalVolumeKilograms
+                evidence = { threshold in
+                    strengthSnapshot
+                        .volumeReachedAt[
+                            Int(threshold)
+                        ]
                 }
 
             case TrophyCatalog.recoveryNights.id:
@@ -226,6 +265,19 @@ final class TrophyStore: ObservableObject {
 
             resolved.append(
                 signature(
+                    id: "signature.first-10k",
+                    title: "First 10K",
+                    subtitle: "Your first recorded running workout of at least 10 kilometres.",
+                    icon: "figure.run",
+                    source: .appleHealth,
+                    unlockedAt:
+                        healthSnapshot
+                            .firstTenKDate
+                )
+            )
+
+            resolved.append(
+                signature(
                     id: "signature.half-marathon",
                     title: "Half Marathon",
                     subtitle: "A recorded run reaching 21.1 kilometres.",
@@ -243,6 +295,32 @@ final class TrophyStore: ObservableObject {
                     icon: "flag.checkered",
                     source: .appleHealth,
                     unlockedAt: healthSnapshot.firstMarathonDate
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id: "signature.walk-5k",
+                    title: "Five K on Foot",
+                    subtitle: "A single recorded walking workout reaching 5 kilometres.",
+                    icon: "figure.walk",
+                    source: .appleHealth,
+                    unlockedAt:
+                        healthSnapshot
+                            .firstFiveKWalkDate
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id: "signature.walk-10k",
+                    title: "Ten K Trek",
+                    subtitle: "A single recorded walking workout reaching 10 kilometres.",
+                    icon: "shoeprints.fill",
+                    source: .appleHealth,
+                    unlockedAt:
+                        healthSnapshot
+                            .firstTenKWalkDate
                 )
             )
         }
@@ -339,18 +417,23 @@ final class TrophyStore: ObservableObject {
         trophies = resolved.sorted(by: Self.collectionSort)
 
         if !hasInitializedShowcase {
-            showcaseIDs = Array(
-                trophies
-                    .filter(\.isUnlocked)
-                    .sorted(by: Self.showcaseSort)
-                    .prefix(3)
-                    .map(\.id)
-            )
+            // The cabinet is intentionally empty until the user chooses
+            // which trophies represent them on the profile.
+            showcaseIDs = []
             hasInitializedShowcase = true
         } else {
-            showcaseIDs = showcaseIDs.filter { id in
-                trophies.contains(where: { $0.id == id && $0.isUnlocked })
-            }
+            showcaseIDs = Array(
+                showcaseIDs
+                    .filter { id in
+                        trophies.contains(
+                            where: {
+                                $0.id == id &&
+                                $0.isUnlocked
+                            }
+                        )
+                    }
+                    .prefix(Self.showcaseLimit)
+            )
         }
 
         persist()
@@ -368,7 +451,7 @@ final class TrophyStore: ObservableObject {
         if let index = showcaseIDs.firstIndex(of: trophyID) {
             showcaseIDs.remove(at: index)
         } else {
-            guard showcaseIDs.count < 5 else { return }
+            guard showcaseIDs.count < Self.showcaseLimit else { return }
             showcaseIDs.append(trophyID)
         }
 
