@@ -14,6 +14,10 @@ struct ActiveStrengthWorkoutView: View {
     @State private var finishInProgress = false
     @State private var showingExerciseLibrary = false
     @State private var pendingExercise: ExerciseLibraryEntry?
+    @State private var showingExerciseSwap = false
+    @State private var showingExerciseGroupBuilder = false
+    @State private var showingExerciseRestEditor = false
+    @State private var showingPlateCalculator = false
     @StateObject private var strengthCoach =
         StrengthAudioCoachSpeaker()
     @State private var restCueTask:
@@ -97,6 +101,87 @@ struct ActiveStrengthWorkoutView: View {
                     pendingExercise = nil
                     loadDefaultsFromCurrentSet()
                 }
+            }
+            .sheet(
+                isPresented:
+                    $showingExerciseSwap
+            ) {
+                if let exercise =
+                        strength.currentExercise {
+                    StrengthExerciseSwapView(
+                        current: exercise,
+                        entries:
+                            exerciseLibrary
+                                .allExercises
+                    ) { selected in
+                        strength
+                            .substituteCurrentExercise(
+                                with:
+                                    selected.exercise
+                            )
+                        showingExerciseSwap =
+                            false
+                    }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingExerciseGroupBuilder
+            ) {
+                if let workout =
+                        strength.activeWorkout,
+                   let exercise =
+                        strength.currentExercise {
+                    StrengthExerciseGroupBuilderView(
+                        workout: workout,
+                        currentExerciseID:
+                            exercise.id
+                    ) { ids, style in
+                        strength.groupExercises(
+                            ids: ids,
+                            style: style
+                        )
+                        showingExerciseGroupBuilder =
+                            false
+                    } onUngroup: {
+                        strength.ungroupExercise(
+                            exercise.id
+                        )
+                        showingExerciseGroupBuilder =
+                            false
+                    }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingExerciseRestEditor
+            ) {
+                if let exercise =
+                        strength.currentExercise {
+                    StrengthExerciseRestEditorView(
+                        exercise: exercise,
+                        fallbackSeconds:
+                            strength
+                                .draftRestSeconds
+                    ) { seconds in
+                        strength
+                            .setCurrentExerciseRestSeconds(
+                                seconds
+                            )
+                        showingExerciseRestEditor =
+                            false
+                    }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingPlateCalculator
+            ) {
+                StrengthPlateCalculatorView(
+                    targetWeightKilograms:
+                        strength
+                            .draftWeightKilograms
+                )
             }
             .confirmationDialog(
                 "Finish the full workout?",
