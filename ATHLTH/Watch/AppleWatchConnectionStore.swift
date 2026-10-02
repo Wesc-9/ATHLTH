@@ -32,11 +32,19 @@ enum AppleWatchConnectionState: Equatable {
 
 enum AppleWatchWorkoutLaunchError: LocalizedError {
     case watchUnavailable
+    case launchAlreadyInProgress
 
     var errorDescription: String? {
         switch self {
         case .watchUnavailable:
             return "Apple Watch is not ready to start an ATHLTH workout."
+        case .launchAlreadyInProgress:
+            return ATHLTHLocalization.choose(
+                english:
+                    "ATHLTH is already starting a workout on Apple Watch.",
+                norwegian:
+                    "ATHLTH starter allerede en økt på Apple Watch."
+            )
         }
     }
 }
@@ -275,6 +283,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func startWorkoutOnWatch(_ kind: WatchWorkoutKind) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
+        }
+
+        guard !workoutLaunchInProgress else {
+            throw AppleWatchWorkoutLaunchError
+                .launchAlreadyInProgress
         }
 
         workoutLaunchInProgress = true
