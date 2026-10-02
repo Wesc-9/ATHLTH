@@ -9,7 +9,8 @@ alter table public.social_workout_participants
   add column if not exists ready_at timestamptz,
   add column if not exists capture_device text,
   add column if not exists workout_started_at timestamptz,
-  add column if not exists workout_finished_at timestamptz;
+  add column if not exists workout_finished_at timestamptz,
+  add column if not exists launch_failed_at timestamptz;
 
 alter table public.social_workout_participants
   drop constraint if exists social_workout_participants_capture_device_check;
@@ -106,15 +107,16 @@ begin
     raise exception 'Workout participant identity fields are immutable';
   end if;
 
-  -- The creator may withdraw an invited/accepted athlete before they start.
   if actor = creator and actor <> old.user_id then
     if old.state in ('invited','accepted')
        and new.state = 'declined'
        and old.workout_started_at is null
+       and old.launch_failed_at is null
        and new.ready_at is not distinct from old.ready_at
        and new.capture_device is not distinct from old.capture_device
        and new.workout_started_at is not distinct from old.workout_started_at
-       and new.workout_finished_at is not distinct from old.workout_finished_at then
+       and new.workout_finished_at is not distinct from old.workout_finished_at
+       and new.launch_failed_at is not distinct from old.launch_failed_at then
       new.responded_at := now();
       return new;
     end if;
@@ -132,7 +134,8 @@ begin
       if new.ready_at is distinct from old.ready_at
          or new.capture_device is distinct from old.capture_device
          or new.workout_started_at is distinct from old.workout_started_at
-         or new.workout_finished_at is distinct from old.workout_finished_at then
+         or new.workout_finished_at is distinct from old.workout_finished_at
+         or new.launch_failed_at is distinct from old.launch_failed_at then
         raise exception 'Accept or decline the invitation before changing workout readiness';
       end if;
 
@@ -142,7 +145,8 @@ begin
 
     if old.state = 'accepted'
        and new.state = 'declined'
-       and old.workout_started_at is null then
+       and old.workout_started_at is null
+       and old.launch_failed_at is null then
       new.responded_at := now();
       return new;
     end if;
@@ -174,6 +178,20 @@ begin
 
     if scheduled_start is null then
       raise exception 'Shared workout has not been started by the creator';
+    end if;
+
+    if new.launch_failed_at is not null then
+      raise exception 'A failed launch cannot also be marked started';
+    end if;
+  end if;
+
+  if new.launch_failed_at is not null then
+    if new.ready_at is null then
+      raise exception 'Participant must be ready before a launch can fail';
+    end if;
+
+    if new.workout_started_at is not null then
+      raise exception 'A started workout cannot be marked as launch failed';
     end if;
   end if;
 
@@ -236,8 +254,14 @@ security definer
 set search_path = pg_catalog, public, private
 as $$
 begin
-  if old.workout_finished_at is null
-     and new.workout_finished_at is not null then
+  if (
+       old.workout_finished_at is null
+       and new.workout_finished_at is not null
+     )
+     or (
+       old.launch_failed_at is null
+       and new.launch_failed_at is not null
+     ) then
     update public.social_workout_sessions s
     set
       status = 'completed',
@@ -259,6 +283,7 @@ begin
           and p.state in ('creator','accepted')
           and p.ready_at is not null
           and p.workout_finished_at is null
+          and p.launch_failed_at is null
       );
   end if;
 
@@ -273,10 +298,10 @@ drop trigger if exists social_workout_participants_group_done
 on public.social_workout_participants;
 
 create trigger social_workout_participants_group_done
-after update of workout_finished_at on public.social_workout_participants
+after update of workout_finished_at, launch_failed_at
+on public.social_workout_participants
 for each row
 execute function private.complete_social_workout_when_group_done();
-
 
 create or replace function public.schedule_social_workout_start(
   p_session_id uuid,
