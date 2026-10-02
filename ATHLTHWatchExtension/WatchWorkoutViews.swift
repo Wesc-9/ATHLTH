@@ -96,6 +96,8 @@ struct WatchWorkoutStartView: View {
 
 struct WatchActiveWorkoutView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
+    @Environment(\.isLuminanceReduced)
+    private var isLuminanceReduced
     @State private var selectedNonRunningPage = 0
 
     var body: some View {
@@ -112,6 +114,8 @@ struct WatchActiveWorkoutView: View {
                         workoutManager.kind == .walking {
                 WatchRunWorkoutExperienceView()
                     .environmentObject(workoutManager)
+            } else if isLuminanceReduced {
+                nonRunningAlwaysOnPage
             } else {
                 TabView(
                     selection:
@@ -135,8 +139,284 @@ struct WatchActiveWorkoutView: View {
                 .tabViewStyle(.verticalPage)
             }
         }
-        .background(WatchTheme.canvas.ignoresSafeArea())
+        .background(
+            Group {
+                if isLuminanceReduced &&
+                    workoutManager.state != .completed {
+                    Color.black
+                } else {
+                    WatchTheme.canvas
+                }
+            }
+            .ignoresSafeArea()
+        )
         .interactiveDismissDisabled(workoutManager.state != .completed)
+    }
+
+    private var nonRunningAlwaysOnPage: some View {
+        VStack(spacing: 9) {
+            HStack(spacing: 7) {
+                Image(
+                    systemName:
+                        workoutManager
+                            .kind.systemImage
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .bold
+                    )
+                )
+
+                Text(
+                    stateTitle.uppercased()
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.8)
+
+                Spacer()
+
+                Text(
+                    durationText(
+                        workoutManager
+                            .elapsedTime
+                    )
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+            }
+            .foregroundStyle(
+                Color.white.opacity(0.70)
+            )
+
+            if let snapshot =
+                    workoutManager
+                        .strengthSession {
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline
+                    ) {
+                        Text(
+                            snapshot
+                                .exerciseName ??
+                            "Strength"
+                        )
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .lineLimit(1)
+
+                        Spacer()
+
+                        if let setNumber =
+                                snapshot
+                                    .setNumber,
+                           snapshot
+                            .setCount > 0 {
+                            Text(
+                                "SET \(setNumber)/\(snapshot.setCount)"
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                Color.white
+                                    .opacity(0.58)
+                            )
+                        }
+                    }
+
+                    if snapshot.isResting,
+                       let restEndsAt =
+                            snapshot
+                                .restEndsAt {
+                        TimelineView(
+                            .periodic(
+                                from: .now,
+                                by: 1
+                            )
+                        ) { context in
+                            let remaining =
+                                max(
+                                    Int(
+                                        restEndsAt
+                                            .timeIntervalSince(
+                                                context.date
+                                            )
+                                            .rounded(.up)
+                                    ),
+                                    0
+                                )
+
+                            HStack(
+                                alignment:
+                                    .firstTextBaseline
+                            ) {
+                                Text("REST")
+                                    .font(
+                                        .system(
+                                            size: 8,
+                                            weight: .bold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        Color.white
+                                            .opacity(0.52)
+                                    )
+
+                                Text(
+                                    "\(remaining) s"
+                                )
+                                .font(
+                                    .system(
+                                        size: 28,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+                            }
+                        }
+                    } else if snapshot
+                        .exerciseName != nil {
+                        HStack(spacing: 14) {
+                            Label(
+                                String(
+                                    format:
+                                        "%.1f kg",
+                                    snapshot
+                                        .draftWeightKilograms
+                                ),
+                                systemImage:
+                                    "scalemass"
+                            )
+
+                            Label(
+                                "\(snapshot.draftReps) reps",
+                                systemImage:
+                                    "repeat"
+                            )
+                        }
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white
+                                .opacity(0.66)
+                        )
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+            } else {
+                Text(
+                    workoutManager
+                        .kind.title
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+            }
+
+            Rectangle()
+                .fill(
+                    Color.white
+                        .opacity(0.13)
+                )
+                .frame(height: 0.5)
+
+            HStack(spacing: 0) {
+                alwaysOnMetric(
+                    value:
+                        workoutManager
+                            .heartRate > 0
+                            ? "\(Int(workoutManager.heartRate.rounded()))"
+                            : "—",
+                    label: "BPM"
+                )
+
+                alwaysOnMetric(
+                    value:
+                        "\(Int(workoutManager.activeCalories.rounded()))",
+                    label: "KCAL"
+                )
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .top
+        )
+        .foregroundStyle(
+            Color.white.opacity(0.88)
+        )
+    }
+
+    private func alwaysOnMetric(
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(spacing: 1) {
+            Text(value)
+                .font(
+                    .system(
+                        size: 19,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+
+            Text(label)
+                .font(
+                    .system(
+                        size: 7,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.7)
+                .foregroundStyle(
+                    Color.white.opacity(0.48)
+                )
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var activeContent: some View {
