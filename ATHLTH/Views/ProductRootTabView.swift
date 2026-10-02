@@ -552,7 +552,13 @@ struct ATHLTHHomeView: View {
                                 creatorName:
                                     session.profile.displayName,
                                 creatorUsername:
-                                    session.profile.username
+                                    session.profile.username,
+                                invitePayload:
+                                    configuration
+                                        .trainTogetherInvitePayload(
+                                            savedRoutes:
+                                                session.savedRoutes
+                                        )
                             )
 
                             do {
@@ -590,12 +596,34 @@ struct ATHLTHHomeView: View {
                             watchConnection.isReady
                     ) { selectedFriends, gearIDs, audioCoach in
                         Task { @MainActor in
+                            var inviteWorkout =
+                                PlannedSession(
+                                    id: UUID(),
+                                    title: kind.title,
+                                    kind: kind,
+                                    scheduledStart: nil,
+                                    durationMinutes: nil,
+                                    targetDistanceKilometers: nil,
+                                    targetPaceSecondsPerKilometer: nil,
+                                    routeID: nil,
+                                    exercises: [],
+                                    notes: nil
+                                )
+                            inviteWorkout
+                                .audioCoachConfiguration =
+                                audioCoach
+
                             await social.beginWorkoutWithFriends(
                                 title: kind.title,
                                 kind: kind,
                                 friends: selectedFriends,
                                 creatorName: session.profile.displayName,
-                                creatorUsername: session.profile.username
+                                creatorUsername: session.profile.username,
+                                invitePayload:
+                                    SocialWorkoutInvitePayload(
+                                        workout:
+                                            inviteWorkout
+                                    )
                             )
 
                             startHomeQuickWorkoutOnWatch(
@@ -3969,7 +3997,13 @@ struct ATHLTHTrainView: View {
                             kind: .running,
                             friends: configuration.friends,
                             creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
+                            creatorUsername: session.profile.username,
+                            invitePayload:
+                                configuration
+                                    .trainTogetherInvitePayload(
+                                        savedRoutes:
+                                            session.savedRoutes
+                                    )
                         )
                         startRunQuickWorkout(configuration)
                     }
@@ -3987,7 +4021,10 @@ struct ATHLTHTrainView: View {
                             kind: .walking,
                             friends: configuration.friends,
                             creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username
+                            creatorUsername: session.profile.username,
+                            invitePayload:
+                                configuration
+                                    .trainTogetherInvitePayload
                         )
                         startWalkQuickWorkout(configuration)
                     }
@@ -4034,7 +4071,13 @@ struct ATHLTHTrainView: View {
                                 creatorUsername:
                                     session
                                         .profile
-                                        .username
+                                        .username,
+                                invitePayload:
+                                    configuration
+                                        .trainTogetherInvitePayload(
+                                            savedRoutes:
+                                                session.savedRoutes
+                                        )
                             )
                         startRunQuickWorkout(
                             configuration
