@@ -196,6 +196,56 @@ enum WorkoutCapturePreference: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum WorkoutAutoPausePreference: String, CaseIterable, Identifiable, Codable {
+    case appDefault
+    case on
+    case off
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .appDefault:
+            return ATHLTHLocalization.choose(
+                english: "Use app default",
+                norwegian: "Bruk standard"
+            )
+        case .on:
+            return ATHLTHLocalization.choose(
+                english: "On",
+                norwegian: "På"
+            )
+        case .off:
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+        }
+    }
+
+    var overrideValue: Bool? {
+        switch self {
+        case .appDefault: return nil
+        case .on: return true
+        case .off: return false
+        }
+    }
+
+    func resolved(
+        appDefault: Bool
+    ) -> Bool {
+        overrideValue ?? appDefault
+    }
+
+    init(overrideValue: Bool?) {
+        switch overrideValue {
+        case true?: self = .on
+        case false?: self = .off
+        case nil: self = .appDefault
+        }
+    }
+}
+
 enum StrengthTrackingPreference: String, CaseIterable, Identifiable, Codable {
     case simple
     case advanced
@@ -489,7 +539,7 @@ final class AppSettingsStore: ObservableObject {
         preferredWorkoutCapture = resolvedCapture
 
         defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
-        autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? true
+        autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? false
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         externalWorkoutImportMode = ExternalWorkoutImportMode(
             rawValue: defaults.string(forKey: "settings.externalWorkoutImportMode") ?? ""
