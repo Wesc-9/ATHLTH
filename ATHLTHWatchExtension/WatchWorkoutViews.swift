@@ -95,6 +95,7 @@ struct WatchWorkoutStartView: View {
 
 struct WatchActiveWorkoutView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
+    @State private var selectedNonRunningPage = 0
 
     var body: some View {
         Group {
@@ -111,13 +112,26 @@ struct WatchActiveWorkoutView: View {
                 WatchRunWorkoutExperienceView()
                     .environmentObject(workoutManager)
             } else {
-                ScrollView {
-                    VStack(spacing: 10) {
-                        activeContent
+                TabView(
+                    selection:
+                        $selectedNonRunningPage
+                ) {
+                    ScrollView {
+                        VStack(spacing: 10) {
+                            activeContent
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 10)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 10)
+                    .tag(0)
+
+                    WatchSpotifyRemotePage()
+                        .tag(1)
+
+                    nonRunningControlsPage
+                        .tag(2)
                 }
+                .tabViewStyle(.verticalPage)
             }
         }
         .background(WatchTheme.canvas.ignoresSafeArea())
@@ -263,45 +277,119 @@ struct WatchActiveWorkoutView: View {
                     .multilineTextAlignment(.center)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    if workoutManager.state == .paused {
-                        workoutManager.resume()
-                    } else {
-                        workoutManager.pause()
-                    }
-                } label: {
-                    Image(
-                        systemName: workoutManager.state == .paused
+
+        }
+    }
+
+    private var nonRunningControlsPage: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(
+                    systemName:
+                        "slider.horizontal.3"
+                )
+                .foregroundStyle(
+                    WatchTheme.accent
+                )
+
+                Text("CONTROLS")
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1)
+
+                Spacer()
+            }
+
+            Button {
+                if workoutManager.state == .paused {
+                    workoutManager.resume()
+                } else {
+                    workoutManager.pause()
+                }
+            } label: {
+                Label(
+                    workoutManager.state == .paused
+                        ? "Resume"
+                        : "Pause",
+                    systemImage:
+                        workoutManager.state == .paused
                             ? "play.fill"
                             : "pause.fill"
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 36)
-                }
-                .buttonStyle(.plain)
-                .background(
-                    Color.black.opacity(0.06),
-                    in: RoundedRectangle(cornerRadius: 14)
                 )
-                .disabled(workoutManager.state == .ending)
-
-                Button {
-                    workoutManager.end()
-                } label: {
-                    Image(systemName: "stop.fill")
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                }
-                .buttonStyle(.plain)
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .bold
+                    )
+                )
                 .foregroundStyle(.white)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 48
+                )
+                .background(
+                    WatchTheme.accent,
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                workoutManager.state ==
+                    .ending
+            )
+
+            Button {
+                workoutManager.end()
+            } label: {
+                Label(
+                    "End Workout",
+                    systemImage: "stop.fill"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(.white)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 44
+                )
                 .background(
                     WatchTheme.danger,
-                    in: RoundedRectangle(cornerRadius: 14)
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
                 )
-                .disabled(workoutManager.state == .ending)
             }
+            .buttonStyle(.plain)
+            .disabled(
+                workoutManager.state ==
+                    .ending
+            )
+
+            Text(
+                "Swipe up for workout · Spotify · controls"
+            )
+            .font(.system(size: 8))
+            .foregroundStyle(
+                WatchTheme.muted
+            )
+            .multilineTextAlignment(
+                .center
+            )
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
