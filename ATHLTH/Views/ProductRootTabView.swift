@@ -598,6 +598,8 @@ struct ATHLTHHomeView: View {
                                             phoneWorkout,
                                         watchConnection:
                                             watchConnection,
+                                        spotify:
+                                            spotifyPlayback,
                                         ghostRace:
                                             ghostRace
                                     )
@@ -4059,6 +4061,8 @@ struct ATHLTHTrainView: View {
                                         phoneWorkout,
                                     watchConnection:
                                         watchConnection,
+                                    spotify:
+                                        spotifyPlayback,
                                     ghostRace:
                                         ghostRace
                                 )
@@ -4104,7 +4108,9 @@ struct ATHLTHTrainView: View {
                                     phoneWorkout:
                                         phoneWorkout,
                                     watchConnection:
-                                        watchConnection
+                                        watchConnection,
+                                    spotify:
+                                        spotifyPlayback
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -4183,6 +4189,8 @@ struct ATHLTHTrainView: View {
                                         phoneWorkout,
                                     watchConnection:
                                         watchConnection,
+                                    spotify:
+                                        spotifyPlayback,
                                     ghostRace:
                                         ghostRace
                                 )
