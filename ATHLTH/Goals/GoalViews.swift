@@ -176,17 +176,27 @@ struct GoalCoverView: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                LinearGradient(
-                    colors: coverColors,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .overlay(alignment: .topTrailing) {
-                    Image(systemName: goal.category.systemImage)
-                        .font(.system(size: 64, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.20))
-                        .padding(22)
-                }
+                Image(goal.coverStyle.assetName)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFill()
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.04),
+                                Color.black.opacity(0.24)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: goal.category.systemImage)
+                            .font(.system(size: 64, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.16))
+                            .padding(22)
+                    }
             }
         }
     }
