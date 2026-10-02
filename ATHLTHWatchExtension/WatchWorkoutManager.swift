@@ -62,6 +62,8 @@ private struct WatchPersistedWorkoutState: Codable {
     var lastLapDistanceMeters: Double
     var automaticPauseCount: Int
     var automaticPauseEnabled: Bool? = nil
+    var strengthSession:
+        WatchStrengthSessionSnapshot? = nil
 }
 
 enum WatchWorkoutState: Equatable {
@@ -657,6 +659,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             from: previous,
             to: snapshot
         )
+        persistWorkoutRecoveryState()
     }
 
     private func handleStrengthCoachTransition(
@@ -1412,7 +1415,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 automaticPauseCount:
                     automaticPauseCount,
                 automaticPauseEnabled:
-                    automaticPauseEnabled
+                    automaticPauseEnabled,
+                strengthSession:
+                    strengthSession
             )
 
         guard let data =
@@ -1487,6 +1492,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 snapshot
                     .automaticPauseEnabled ??
                 false
+            self.strengthSession =
+                snapshot.strengthSession
             self.ghostRaceTitle =
                 snapshot.ghostRace?.title
         }
