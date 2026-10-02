@@ -603,9 +603,11 @@ struct ATHLTHHomeView: View {
                                         ghostRace:
                                             ghostRace
                                     )
+                                _ = await social
+                                    .confirmCurrentJoinedWorkoutStarted()
                             } catch {
                                 await social
-                                    .cancelActiveWorkout()
+                                    .markCurrentJoinedWorkoutLaunchFailed()
                                 homeWatchTransferError =
                                     error.localizedDescription
                             }
@@ -2957,10 +2959,12 @@ struct ATHLTHHomeView: View {
                 watchConnection.sendAudioCoachConfiguration(
                     audioCoach
                 )
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
                 homeWatchTransferMessage =
                     "\(watchKind.title) started on Apple Watch."
             } catch {
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = error.localizedDescription
             }
         }
@@ -5044,6 +5048,10 @@ struct ATHLTHTrainView: View {
                 autoPauseEnabled:
                     configuration.autoPauseEnabled
             )
+            Task {
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
+            }
             return
         }
 
@@ -5069,7 +5077,7 @@ struct ATHLTHTrainView: View {
             }
         } catch {
             Task { @MainActor in
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
             }
             watchTransferError = error.localizedDescription
             return
@@ -5115,10 +5123,12 @@ struct ATHLTHTrainView: View {
                     )
                 }
 
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
                 watchTransferMessage =
                     "\(configuration.title) started on Apple Watch."
             } catch {
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 watchTransferError = error.localizedDescription
             }
         }
@@ -5134,6 +5144,10 @@ struct ATHLTHTrainView: View {
                 autoPauseEnabled:
                     configuration.autoPauseEnabled
             )
+            Task {
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
+            }
             return
         }
 
@@ -5165,10 +5179,12 @@ struct ATHLTHTrainView: View {
                 watchConnection.sendAudioCoachConfiguration(
                     configuration.audioCoach
                 )
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
                 watchTransferMessage =
                     "Walk started on Apple Watch."
             } catch {
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 watchTransferError = error.localizedDescription
             }
         }
@@ -5215,7 +5231,7 @@ struct ATHLTHTrainView: View {
             }
         } catch {
             Task { @MainActor in
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
             }
             watchTransferError = error.localizedDescription
             return
@@ -5240,7 +5256,7 @@ struct ATHLTHTrainView: View {
                 watchTransferMessage =
                     "\(workout.title) started on Apple Watch."
             } catch {
-                await social.cancelActiveWorkout()
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 watchTransferError = error.localizedDescription
             }
         }
