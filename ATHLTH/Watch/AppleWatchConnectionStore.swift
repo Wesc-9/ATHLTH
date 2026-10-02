@@ -57,6 +57,8 @@ private struct IncomingWatchPayload: Sendable {
 final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Sendable {
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
+    @Published private(set) var pendingWorkoutResults:
+        [WatchWorkoutResult] = []
     @Published private(set) var lastStrengthCommand: WatchStrengthCommand?
     @Published private(set) var pendingStrengthCommands:
         [WatchStrengthCommand] = []
@@ -88,6 +90,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         "athlth.watch.handledStrengthCommandIDs.v1"
     private static let pendingStrengthCommandsKey =
         "athlth.watch.pendingStrengthCommands.v1"
+    private static let pendingWorkoutResultsKey =
+        "athlth.watch.pendingWorkoutResults.v1"
     private var lastSpotifyCommandSentAt:
         Date = .distantPast
     private var latestTodaySnapshot =
@@ -125,6 +129,29 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                     .compactMap(
                         UUID.init(uuidString:)
                     )
+        }
+
+        if let data =
+                UserDefaults.standard.data(
+                    forKey:
+                        Self.pendingWorkoutResultsKey
+                ),
+           let pending =
+                try? JSONDecoder().decode(
+                    [WatchWorkoutResult].self,
+                    from: data
+                ) {
+            pendingWorkoutResults =
+                pending
+                    .filter {
+                        !handledWorkoutResultIDs
+                            .contains($0.id)
+                    }
+                    .sorted {
+                        $0.endedAt < $1.endedAt
+                    }
+            lastCompletedWorkout =
+                pendingWorkoutResults.first
         }
 
         if let data =
@@ -551,30 +578,60 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func clearCompletedWorkout() {
-        if let id =
-                lastCompletedWorkout?.id {
-            handledWorkoutResultIDs.removeAll {
-                $0 == id
-            }
-            handledWorkoutResultIDs.append(id)
+        guard let id =
+                lastCompletedWorkout?.id
+        else {
+            return
+        }
 
-            if handledWorkoutResultIDs.count > 64 {
+        consumeCompletedWorkout(id)
+    }
+
+    func consumeCompletedWorkout(
+        _ id: UUID
+    ) {
+        pendingWorkoutResults
+            .removeAll {
+                $0.id == id
+            }
+
+        if !handledWorkoutResultIDs
+            .contains(id) {
+            handledWorkoutResultIDs
+                .append(id)
+
+            if handledWorkoutResultIDs.count > 128 {
                 handledWorkoutResultIDs =
                     Array(
                         handledWorkoutResultIDs
                             .suffix(64)
                     )
             }
-
-            UserDefaults.standard.set(
-                handledWorkoutResultIDs
-                    .map(\.uuidString),
-                forKey:
-                    Self.handledWorkoutResultsKey
-            )
         }
 
-        lastCompletedWorkout = nil
+        persistWorkoutResultState()
+        lastCompletedWorkout =
+            pendingWorkoutResults.first
+    }
+
+    private func persistWorkoutResultState() {
+        UserDefaults.standard.set(
+            handledWorkoutResultIDs
+                .map(\.uuidString),
+            forKey:
+                Self.handledWorkoutResultsKey
+        )
+
+        if let data =
+                try? JSONEncoder().encode(
+                    pendingWorkoutResults
+                ) {
+            UserDefaults.standard.set(
+                data,
+                forKey:
+                    Self.pendingWorkoutResultsKey
+            )
+        }
     }
 
     func sendWorkoutCommand(
@@ -936,17 +993,34 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         guard !handledWorkoutResultIDs
-            .contains(result.id)
+                .contains(result.id),
+              !pendingWorkoutResults
+                .contains(
+                    where: {
+                        $0.id == result.id
+                    }
+                )
         else {
             return
         }
 
-        if lastCompletedWorkout?.id ==
-            result.id {
-            return
+        pendingWorkoutResults
+            .append(result)
+        pendingWorkoutResults.sort {
+            $0.endedAt < $1.endedAt
         }
 
-        lastCompletedWorkout = result
+        if pendingWorkoutResults.count > 32 {
+            pendingWorkoutResults =
+                Array(
+                    pendingWorkoutResults
+                        .suffix(32)
+                )
+        }
+
+        persistWorkoutResultState()
+        lastCompletedWorkout =
+            pendingWorkoutResults.first
     }
 
     private func receive(_ payload: IncomingWatchPayload) {
