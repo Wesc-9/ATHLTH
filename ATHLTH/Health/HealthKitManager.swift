@@ -1292,7 +1292,7 @@ final class HealthKitManager: ObservableObject {
         let workouts = try await fetchAllWorkoutsCached()
             .sorted { $0.startDate < $1.startDate }
 
-        let workoutThresholds = [10, 50, 100, 250]
+        let workoutThresholds = [10, 50, 100, 500]
         var workoutCountReachedAt: [Int: Date] = [:]
 
         for (index, workout) in workouts.enumerated() {
@@ -1302,7 +1302,7 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        let runThresholds = [25_000, 100_000, 500_000, 1_000_000]
+        let runThresholds = [25_000, 100_000, 500_000, 2_500_000]
         var runningDistanceReachedAt: [Int: Date] = [:]
         var cumulativeRunDistance = 0.0
         var longestRunMeters = 0.0
@@ -1436,13 +1436,13 @@ final class HealthKitManager: ObservableObject {
             10_000,
             50_000,
             250_000,
-            1_000_000
+            2_500_000
         ]
         let walkSessionThresholds = [
             10,
             50,
             150,
-            500
+            1_000
         ]
         var walkingDistanceReachedAt: [Int: Date] = [:]
         var walkingWorkoutCountReachedAt: [Int: Date] = [:]
@@ -1502,7 +1502,7 @@ final class HealthKitManager: ObservableObject {
         )
         .sorted()
 
-        let streakThresholds = [3, 7, 14, 30]
+        let streakThresholds = [3, 7, 14, 90]
         var workoutStreakReachedAt: [Int: Date] = [:]
         var longestStreak = 0
         var currentStreak = 0
@@ -1543,7 +1543,7 @@ final class HealthKitManager: ObservableObject {
             7,
             30,
             100,
-            365
+            730
         ]
         var qualifyingSleepNightsReachedAt: [Int: Date] = [:]
 
