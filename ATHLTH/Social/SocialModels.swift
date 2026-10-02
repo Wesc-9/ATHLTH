@@ -586,6 +586,7 @@ struct BackendChallengeParticipant: Codable, Hashable {
         case captureDevice = "capture_device"
         case workoutStartedAt = "workout_started_at"
         case workoutFinishedAt = "workout_finished_at"
+        case launchFailedAt = "launch_failed_at"
     }
 }
 
@@ -741,6 +742,7 @@ struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
     var captureDevice: String? = nil
     var workoutStartedAt: Date? = nil
     var workoutFinishedAt: Date? = nil
+    var launchFailedAt: Date? = nil
 
     var isReady: Bool {
         readyAt != nil
