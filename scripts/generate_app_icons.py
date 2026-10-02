@@ -1,66 +1,116 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import struct
 import zlib
 from pathlib import Path
 
 SIZE = 1024
+SOURCE_SIZE = 1024
+SOURCE_PARTS = [
+    Path("ATHLTH/Brand/AppIconSource/v134-logo-part00.b64"),
+    Path("ATHLTH/Brand/AppIconSource/v134-logo-part01.b64"),
+    Path("ATHLTH/Brand/AppIconSource/v134-logo-part02.b64"),
+    Path("ATHLTH/Brand/AppIconSource/v134-logo-part03.b64"),
+]
+EXPECTED_SOURCE_SHA256 = "943986c220c3f228145cc6501eeefbb34e6ba9028165289ad0cb264174fe12a0"
+
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
-SOURCE = IOS_DIR / "AppIcon.png"
 
 
-def validate_png(path: Path) -> bytes:
-    payload = path.read_bytes()
+def load_source_rgb() -> bytes:
+    encoded = "".join(path.read_text(encoding="utf-8").strip() for path in SOURCE_PARTS)
+    compressed = base64.b64decode(encoded, validate=True)
+    raw = zlib.decompress(compressed)
 
-    if payload[:8] != b"\x89PNG\r\n\x1a\n":
-        raise SystemExit(f"{path}: invalid PNG signature")
+    expected_bytes = SOURCE_SIZE * SOURCE_SIZE * 3
+    if len(raw) != expected_bytes:
+        raise SystemExit(
+            f"ATHLTH icon source has {len(raw)} bytes; expected {expected_bytes}."
+        )
 
-    offset = 8
-    saw_idat = False
-    saw_iend = False
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != EXPECTED_SOURCE_SHA256:
+        raise SystemExit(
+            "ATHLTH icon source checksum mismatch: "
+            f"expected {EXPECTED_SOURCE_SHA256}, got {digest}"
+        )
 
-    while offset + 12 <= len(payload):
-        length = struct.unpack(">I", payload[offset:offset + 4])[0]
-        kind = payload[offset + 4:offset + 8]
-        data_start = offset + 8
-        data_end = data_start + length
-        crc_end = data_end + 4
+    return raw
 
-        if crc_end > len(payload):
-            raise SystemExit(f"{path}: truncated PNG chunk {kind!r}")
 
-        data = payload[data_start:data_end]
-        expected_crc = struct.unpack(">I", payload[data_end:crc_end])[0]
+def resize_bilinear(source: bytes) -> list[bytes]:
+    src = memoryview(source)
 
-        if (zlib.crc32(kind + data) & 0xFFFFFFFF) != expected_crc:
-            raise SystemExit(f"{path}: CRC mismatch in {kind!r}")
+    x_lookup: list[tuple[int, int, int]] = []
+    for x in range(SIZE):
+        source_x = (x + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        x0 = max(0, min(SOURCE_SIZE - 1, int(source_x)))
+        x1 = min(SOURCE_SIZE - 1, x0 + 1)
+        fraction = max(0.0, min(1.0, source_x - x0))
+        x_lookup.append((x0, x1, int(round(fraction * 256))))
 
-        if kind == b"IHDR":
-            width, height, bit_depth, color_type, _, _, _ = struct.unpack(
-                ">IIBBBBB",
-                data,
-            )
-            if (width, height, bit_depth, color_type) != (SIZE, SIZE, 8, 2):
-                raise SystemExit(
-                    f"{path}: expected {SIZE}x{SIZE} 8-bit RGB, got "
-                    f"{width}x{height}, bit_depth={bit_depth}, "
-                    f"color_type={color_type}"
-                )
-        elif kind == b"IDAT":
-            saw_idat = True
-        elif kind == b"IEND":
-            saw_iend = True
-            break
+    rows: list[bytes] = []
+    for y in range(SIZE):
+        source_y = (y + 0.5) * SOURCE_SIZE / SIZE - 0.5
+        y0 = max(0, min(SOURCE_SIZE - 1, int(source_y)))
+        y1 = min(SOURCE_SIZE - 1, y0 + 1)
+        fy = int(round(max(0.0, min(1.0, source_y - y0)) * 256))
 
-        offset = crc_end
+        base0 = y0 * SOURCE_SIZE * 3
+        base1 = y1 * SOURCE_SIZE * 3
+        row = bytearray(SIZE * 3)
 
-    if not (saw_idat and saw_iend):
-        raise SystemExit(f"{path}: incomplete PNG structure")
+        for x, (x0, x1, fx) in enumerate(x_lookup):
+            i00 = base0 + x0 * 3
+            i01 = base0 + x1 * 3
+            i10 = base1 + x0 * 3
+            i11 = base1 + x1 * 3
+            output = x * 3
 
-    return payload
+            for channel in range(3):
+                upper = (
+                    src[i00 + channel] * (256 - fx)
+                    + src[i01 + channel] * fx
+                    + 128
+                ) >> 8
+                lower = (
+                    src[i10 + channel] * (256 - fx)
+                    + src[i11 + channel] * fx
+                    + 128
+                ) >> 8
+                row[output + channel] = (
+                    upper * (256 - fy) + lower * fy + 128
+                ) >> 8
+
+        rows.append(bytes(row))
+
+    return rows
+
+
+def png_payload(rows: list[bytes]) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    scanlines = b"".join(b"\x00" + row for row in rows)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(
+            b"IHDR",
+            struct.pack(">IIBBBBB", SIZE, SIZE, 8, 2, 0, 0, 0),
+        )
+        + chunk(b"IDAT", zlib.compress(scanlines, level=9))
+        + chunk(b"IEND", b"")
+    )
 
 
 def write_icon(path: Path, payload: bytes) -> None:
@@ -69,11 +119,14 @@ def write_icon(path: Path, payload: bytes) -> None:
 
 
 def main() -> None:
-    # AppIcon.png is the approved source of truth. Keeping the source PNG
-    # directly in the asset catalog avoids a second embedded raster source
-    # drifting away from the logo selected for ATHLTH.
-    payload = validate_png(SOURCE)
+    source = load_source_rgb()
+    rows = resize_bilinear(source)
+    payload = png_payload(rows)
 
+    # The approved pulse-A ATHLTH mark is intentionally identical across
+    # normal, dark, tinted, and Apple Watch appearances so ATHLTH keeps one
+    # recognizable identity everywhere.
+    write_icon(IOS_DIR / "AppIcon.png", payload)
     write_icon(IOS_DIR / "AppIcon-dark.png", payload)
     write_icon(IOS_DIR / "AppIcon-tinted.png", payload)
     write_icon(WATCH_DIR / "AppIcon.png", payload)
