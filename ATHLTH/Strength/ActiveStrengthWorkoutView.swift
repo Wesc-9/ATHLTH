@@ -1230,10 +1230,30 @@ struct ActiveStrengthWorkoutView: View {
                             .font(.subheadline.weight(.semibold))
                     }
 
-                    if let rpe = set.rpe {
-                        Text("RPE \(rpe, specifier: "%.1f")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 7) {
+                        if set.isWarmUp == true {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Warm-up",
+                                    norwegian: "Oppvarming"
+                                ),
+                                systemImage: "flame"
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        }
+
+                        if let rpe = set.rpe {
+                            Text("RPE \(rpe, specifier: "%.1f")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let rir = set.rir {
+                            Text("RIR \(rir, specifier: "%.1f")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 } else {
                     if let plannedReps = set.plannedReps {
@@ -1318,15 +1338,52 @@ struct ActiveStrengthWorkoutView: View {
             }
             .padding(.top, 14)
 
-            HStack {
-                Text("RPE")
-                    .font(.subheadline.weight(.semibold))
-                Slider(value: draftRPEBinding, in: 1...10, step: 0.5)
-                Text("\(strength.draftRPE, specifier: "%.1f")")
-                    .font(.subheadline.monospacedDigit())
-                    .frame(width: 32)
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Warm-up set",
+                    norwegian: "Oppvarmingssett"
+                ),
+                isOn: draftWarmUpBinding
+            )
+            .font(.subheadline.weight(.semibold))
+            .padding(.top, 12)
+
+            if !strength.draftWarmUp {
+                switch currentEffortMetric {
+                case .rpe:
+                    HStack {
+                        Text("RPE")
+                            .font(.subheadline.weight(.semibold))
+                        Slider(
+                            value: draftRPEBinding,
+                            in: 1...10,
+                            step: 0.5
+                        )
+                        Text("\(strength.draftRPE, specifier: "%.1f")")
+                            .font(.subheadline.monospacedDigit())
+                            .frame(width: 36)
+                    }
+                    .padding(.top, 10)
+
+                case .rir:
+                    HStack {
+                        Text("RIR")
+                            .font(.subheadline.weight(.semibold))
+                        Slider(
+                            value: draftRIRBinding,
+                            in: 0...10,
+                            step: 0.5
+                        )
+                        Text("\(strength.draftRIR, specifier: "%.1f")")
+                            .font(.subheadline.monospacedDigit())
+                            .frame(width: 36)
+                    }
+                    .padding(.top, 10)
+
+                case .off:
+                    EmptyView()
+                }
             }
-            .padding(.top, 14)
 
             Button {
                 strength.completeCurrentDraftSet()
@@ -1350,10 +1407,24 @@ struct ActiveStrengthWorkoutView: View {
             .buttonStyle(.bordered)
             .padding(.top, 6)
 
-            Text("Weight, reps, RPE and rest are optional even in Advanced mode.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 6)
+            Text(
+                strength.draftWarmUp
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Warm-up sets are kept in the workout but do not count toward PRs, training volume or muscle load.",
+                        norwegian:
+                            "Oppvarmingssett beholdes i økten, men teller ikke mot PR-er, treningsvolum eller muskelbelastning."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Weight, reps, effort and rest are optional even in Advanced mode.",
+                        norwegian:
+                            "Vekt, repetisjoner, anstrengelse og hvile er valgfritt også i Avansert."
+                    )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 6)
         }
     }
 
@@ -1482,6 +1553,29 @@ struct ActiveStrengthWorkoutView: View {
             get: { strength.draftRPE },
             set: { strength.setDraft(rpe: $0) }
         )
+    }
+
+    private var draftRIRBinding: Binding<Double> {
+        Binding(
+            get: { strength.draftRIR },
+            set: { strength.setDraft(rir: $0) }
+        )
+    }
+
+    private var draftWarmUpBinding: Binding<Bool> {
+        Binding(
+            get: { strength.draftWarmUp },
+            set: { strength.setDraft(warmUp: $0) }
+        )
+    }
+
+    private var currentEffortMetric:
+        StrengthEffortMetric {
+        strength
+            .activeWorkout?
+            .advancedConfiguration?
+            .effortMetric ??
+        .off
     }
 
     private var restDurationText: String {
