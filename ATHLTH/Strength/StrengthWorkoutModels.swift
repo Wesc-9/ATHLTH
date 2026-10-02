@@ -24,6 +24,50 @@ enum StrengthTrackingMode: String, Codable, Hashable {
     }
 }
 
+enum StrengthEffortMetric: String, Codable, CaseIterable, Identifiable, Hashable {
+    case off
+    case rpe
+    case rir
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .off:
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+        case .rpe:
+            return "RPE"
+        case .rir:
+            return "RIR"
+        }
+    }
+}
+
+enum StrengthExerciseGroupStyle: String, Codable, CaseIterable, Identifiable, Hashable {
+    case superset
+    case circuit
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .superset:
+            return ATHLTHLocalization.choose(
+                english: "Superset",
+                norwegian: "Supersett"
+            )
+        case .circuit:
+            return ATHLTHLocalization.choose(
+                english: "Circuit",
+                norwegian: "Sirkel"
+            )
+        }
+    }
+}
+
 struct StrengthAudioCoachConfiguration:
     Codable,
     Hashable
@@ -132,6 +176,9 @@ struct StrengthAdvancedConfiguration:
     var keepScreenAwake = false
     var inputMode:
         WatchStrengthInputMode = .both
+    // Optional keeps advanced configurations written by earlier 1.5.5 builds decodable.
+    var effortMetric:
+        StrengthEffortMetric? = nil
 
     static let standard =
         StrengthAdvancedConfiguration()
@@ -155,9 +202,16 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var rpe: Double?
     var completedAt: Date?
     var restSeconds: Int?
+    // Optional fields preserve decoding of workouts created before this strength upgrade.
+    var rir: Double? = nil
+    var isWarmUp: Bool? = nil
 
     var isCompleted: Bool {
         completedAt != nil
+    }
+
+    var countsTowardTrainingLoad: Bool {
+        isCompleted && isWarmUp != true
     }
 }
 
@@ -167,6 +221,11 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var exercise: ExerciseSnapshot
     var sets: [StrengthSetLog]
     var completedAt: Date?
+    // Exercise-level behavior is optional for backward-compatible workout history.
+    var restSecondsOverride: Int? = nil
+    var groupID: UUID? = nil
+    var groupStyle: StrengthExerciseGroupStyle? = nil
+    var substitutedFromExerciseName: String? = nil
 
     var isCompleted: Bool {
         completedAt != nil
@@ -244,11 +303,19 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
             .count
     }
 
+    var totalWorkingSets: Int {
+        exercises
+            .flatMap(\.sets)
+            .filter(\.countsTowardTrainingLoad)
+            .count
+    }
+
     var totalVolumeKilograms: Double {
         exercises
             .flatMap(\.sets)
             .reduce(0) { partial, set in
                 guard
+                    set.countsTowardTrainingLoad,
                     let reps = set.completedReps,
                     let weight = set.completedWeightKilograms
                 else {
