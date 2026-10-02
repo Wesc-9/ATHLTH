@@ -4329,6 +4329,28 @@ struct CommunityGroupDetailView: View {
 
                     Spacer()
 
+                    if groups.canManage(
+                        currentGroup
+                    ) {
+                        Button {
+                            showingGroupSettings = true
+                        } label: {
+                            headerCircleButton(
+                                icon:
+                                    "photo.on.rectangle.angled"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Change Club header image",
+                                norwegian:
+                                    "Endre headerbilde"
+                            )
+                        )
+                    }
+
                     if isMember ||
                         currentGroup.creatorID ==
                             session.profile.userID {
@@ -4440,7 +4462,14 @@ struct CommunityGroupDetailView: View {
                 radius: 4,
                 y: 2
             )
-            .padding(.trailing, 95)
+            .padding(
+                .trailing,
+                groups.canManage(
+                    currentGroup
+                )
+                    ? 148
+                    : 95
+            )
             .padding(
                 .top,
                 max(topInset + 5, 16)
@@ -4594,7 +4623,12 @@ struct CommunityGroupDetailView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 18)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .padding(.leading, 24)
+            .padding(.trailing, 18)
             .padding(.bottom, 18)
         }
         .frame(
@@ -4669,8 +4703,7 @@ struct CommunityGroupDetailView: View {
     @ViewBuilder
     private var groupHeroBackground: some View {
         if let value =
-                currentGroup.headerImageURL ??
-                currentGroup.imageURL {
+                currentGroup.headerImageURL {
             ATHLTHArtworkImage(
                 reference: value,
                 fallbackAssetName:
@@ -4724,16 +4757,17 @@ struct CommunityGroupDetailView: View {
                 detailGroupImageFallback
             }
         }
-        .frame(width: 92, height: 92)
+        .frame(width: 82, height: 82)
+        .fixedSize()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 26,
+                cornerRadius: 23,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 26,
+                cornerRadius: 23,
                 style: .continuous
             )
             .stroke(
@@ -5297,45 +5331,67 @@ struct CommunityGroupDetailView: View {
 
     private var referenceEmptyChallengeCard:
         some View {
-        Button {
-            if groups
-                .canCreateGroupContent(
-                    currentGroup
-                ) {
+        let canCreate =
+            groups.canCreateGroupContent(
+                currentGroup
+            )
+
+        return Button {
+            if canCreate {
                 showingCreateChallenge = true
             } else {
                 selectedTab = .challenges
             }
         } label: {
-            ZStack(alignment: .bottomLeading) {
-                Image("CommunityHero")
-                    .resizable()
-                    .scaledToFill()
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme
+                                        .premiumGold
+                                        .opacity(0.92),
+                                    .orange.opacity(0.88)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
 
-                LinearGradient(
-                    colors: [
+                    Image(
+                        systemName:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 25,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                }
+                .frame(width: 58, height: 58)
+                .shadow(
+                    color:
                         ATHLTHTheme
-                            .accentDeep
-                            .opacity(0.42),
-                        Color.black.opacity(0.68)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                            .premiumGold
+                            .opacity(0.20),
+                    radius: 10,
+                    y: 4
                 )
 
                 VStack(
                     alignment: .leading,
-                    spacing: 7
+                    spacing: 5
                 ) {
-                    Label(
+                    Text(
                         ATHLTHLocalization.choose(
                             english:
                                 "CLUB CHALLENGE",
                             norwegian:
-                                "UKENS CHALLENGE"
-                        ),
-                        systemImage:
-                            "trophy.fill"
+                                "CLUB CHALLENGE"
+                        )
                     )
                     .font(
                         .system(
@@ -5343,24 +5399,20 @@ struct CommunityGroupDetailView: View {
                             weight: .bold
                         )
                     )
-                    .tracking(0.7)
+                    .tracking(0.8)
                     .foregroundStyle(
-                        .white.opacity(0.94)
+                        ATHLTHTheme
+                            .mutedText
                     )
 
-                    Spacer(minLength: 0)
-
                     Text(
-                        groups
-                            .canCreateGroupContent(
-                                currentGroup
-                            )
+                        canCreate
                             ? ATHLTHLocalization
                                 .choose(
                                     english:
-                                        "Choose the Club's next challenge",
+                                        "No challenge selected yet",
                                     norwegian:
-                                        "Velg neste challenge for Club-en"
+                                        "Ingen challenge valgt ennå"
                                 )
                             : ATHLTHLocalization
                                 .choose(
@@ -5375,15 +5427,39 @@ struct CommunityGroupDetailView: View {
                             .bold
                         )
                     )
-                    .foregroundStyle(.white)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
                     .lineLimit(2)
 
-                    HStack {
-                        Text(
-                            groups
-                                .canCreateGroupContent(
-                                    currentGroup
+                    Text(
+                        canCreate
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Create the Club's next challenge. Owner and Admin can feature it when it is ready.",
+                                    norwegian:
+                                        "Opprett klubbens neste challenge. Owner og Admin kan fremheve den når den er klar."
                                 )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "When an Admin chooses the next challenge, it will appear here.",
+                                    norwegian:
+                                        "Når en Admin velger neste challenge, vises den her."
+                                )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(3)
+
+                    HStack(spacing: 5) {
+                        Text(
+                            canCreate
                                 ? ATHLTHLocalization
                                     .choose(
                                         english:
@@ -5394,36 +5470,66 @@ struct CommunityGroupDetailView: View {
                                 : ATHLTHLocalization
                                     .choose(
                                         english:
-                                            "View challenges",
+                                            "See challenges",
                                         norwegian:
                                             "Se challenges"
                                     )
-                        )
-                        .font(
-                            .caption.weight(
-                                .semibold
-                            )
                         )
 
                         Image(
                             systemName:
                                 "arrow.right"
                         )
-                        .font(.caption.bold())
                     }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
                     .foregroundStyle(
-                        .white.opacity(0.92)
+                        ATHLTHTheme
+                            .accentDeep
                     )
                 }
-                .padding(14)
-            }
-            .frame(height: 132)
-            .frame(maxWidth: .infinity)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 21,
-                    style: .continuous
+
+                Spacer(minLength: 4)
+
+                Image(
+                    systemName:
+                        "chevron.right"
                 )
+                .font(.caption.bold())
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.65)
+                )
+            }
+            .padding(16)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 138,
+                alignment: .leading
+            )
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.96),
+                        ATHLTHTheme
+                            .premiumGoldSoft
+                            .opacity(0.72),
+                        ATHLTHTheme
+                            .card
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 21,
+                        style: .continuous
+                    )
             )
             .overlay {
                 RoundedRectangle(
@@ -5431,10 +5537,20 @@ struct CommunityGroupDetailView: View {
                     style: .continuous
                 )
                 .stroke(
-                    Color.white.opacity(0.15),
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.18),
                     lineWidth: 0.8
                 )
             }
+            .shadow(
+                color:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.06),
+                radius: 12,
+                y: 5
+            )
         }
         .buttonStyle(.plain)
     }
@@ -5659,12 +5775,55 @@ struct CommunityGroupDetailView: View {
         _ challenge:
             CommunityGroupChallengeRecord
     ) -> some View {
-        ATHLTHArtworkImage(
-            reference:
+        if let reference =
                 challenge.imageURL,
-            fallbackAssetName:
-                "CommunityHero"
-        )
+           !reference
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .isEmpty {
+            ATHLTHArtworkImage(
+                reference: reference,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .accentDeep,
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.82),
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Image(
+                    systemName:
+                        "trophy.fill"
+                )
+                .font(
+                    .system(
+                        size: 66,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white.opacity(0.16)
+                )
+                .offset(
+                    x: 104,
+                    y: -18
+                )
+            }
+        }
     }
 
     private var referenceComingUpSection:
@@ -9031,7 +9190,12 @@ struct CommunityGroupSettingsView: View {
                         }
 
                         Text(
-                            "Choose an ATHLTH image or upload your own. The header is the wide cover image behind the Club identity."
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose one of the shared ATHLTH images or upload your own. This wide image is used only as the Club header.",
+                                norwegian:
+                                    "Velg ett av standardbildene i ATHLTH eller last opp ditt eget. Dette brede bildet brukes kun som header for Club-en."
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -9040,7 +9204,14 @@ struct CommunityGroupSettingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 } header: {
-                    Text("Club header")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Club header image",
+                            norwegian:
+                                "Headerbilde"
+                        )
+                    )
                 }
 
                 Section("Featured Club Challenge") {
