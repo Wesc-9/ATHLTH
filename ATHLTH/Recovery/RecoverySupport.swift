@@ -557,7 +557,7 @@ enum MuscleRecoveryEngine {
             for exercise in workout.exercises {
                 let completedSets =
                     exercise.sets
-                        .filter(\.isCompleted)
+                        .filter(\.countsTowardTrainingLoad)
                         .count
 
                 guard completedSets > 0 else {
@@ -602,7 +602,7 @@ enum MuscleRecoveryEngine {
             let workoutDate = workout.endedAt ?? workout.startedAt
 
             for exercise in workout.exercises {
-                let completedSets = exercise.sets.filter(\.isCompleted).count
+                let completedSets = exercise.sets.filter(\.countsTowardTrainingLoad).count
 
                 guard completedSets > 0 else {
                     continue
@@ -780,7 +780,7 @@ enum MuscleRecoveryEngine {
             for exercise in workout.exercises {
                 let completedSets =
                     exercise.sets
-                        .filter(\.isCompleted)
+                        .filter(\.countsTowardTrainingLoad)
                         .count
 
                 guard completedSets > 0 else {
