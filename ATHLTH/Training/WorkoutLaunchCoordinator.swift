@@ -685,9 +685,8 @@ enum WorkoutLaunchCoordinator {
                     )
                 watchSessionID = UUID()
             } catch {
-                if !selectedFriends.isEmpty {
-                    await social.cancelActiveWorkout()
-                }
+                await social
+                    .markCurrentJoinedWorkoutLaunchFailed()
                 throw error
             }
         } else {
@@ -730,6 +729,12 @@ enum WorkoutLaunchCoordinator {
                 settings: settings,
                 spotify: spotify
             )
+        }
+
+        guard await social
+            .confirmCurrentJoinedWorkoutStarted()
+        else {
+            return false
         }
 
         return true
