@@ -101,6 +101,8 @@ final class AppleCalendarSyncStore: ObservableObject {
             defaults.object(
                 forKey: Key.defaultStartMinute
             ) as? Int ?? 0
+
+        recoverCalendarStateIfNeeded()
     }
 
     var hasFullAccess: Bool {
@@ -144,6 +146,55 @@ final class AppleCalendarSyncStore: ObservableObject {
             EKEventStore.authorizationStatus(
                 for: .event
             )
+
+        recoverCalendarStateIfNeeded()
+    }
+
+    private func recoverCalendarStateIfNeeded() {
+        guard hasFullAccess else {
+            return
+        }
+
+        let existingCalendar: EKCalendar?
+
+        if let calendarIdentifier,
+           let calendar =
+                eventStore.calendar(
+                    withIdentifier:
+                        calendarIdentifier
+                ),
+           calendar.allowsContentModifications {
+            existingCalendar = calendar
+        } else {
+            existingCalendar =
+                eventStore
+                    .calendars(for: .event)
+                    .first(where: {
+                        $0.title == calendarName &&
+                        $0.allowsContentModifications
+                    })
+
+            if let existingCalendar {
+                saveCalendarIdentifier(
+                    existingCalendar
+                        .calendarIdentifier
+                )
+            }
+        }
+
+        // Respect an explicit user choice to turn Calendar sync off.
+        // Only self-heal when the preference key itself disappeared while
+        // iOS still has full access and the ATHLTH calendar still exists.
+        guard defaults.object(
+            forKey: Key.enabled
+        ) == nil,
+        existingCalendar != nil
+        else {
+            return
+        }
+
+        isEnabled = true
+        persistEnabled()
     }
 
     func enable(
