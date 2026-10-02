@@ -2947,6 +2947,10 @@ struct ATHLTHHomeView: View {
         guard watchConnection.isReady,
               let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: kind)
         else {
+            Task {
+                await social
+                    .markCurrentJoinedWorkoutLaunchFailed()
+            }
             homeWatchTransferError =
                 "Apple Watch is not ready for this workout."
             return
