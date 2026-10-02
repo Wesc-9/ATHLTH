@@ -683,6 +683,7 @@ struct GoalCreationView: View {
     @State private var title = ""
     @State private var targetValue = 5.0
     @State private var exerciseName = "Squat"
+    @State private var showingExercisePicker = false
     @State private var activity: GoalActivityFilter = .running
     @State private var hasDeadline = true
     @State private var deadline = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
@@ -741,6 +742,20 @@ struct GoalCreationView: View {
                 Task {
                     imageData = try? await item?.loadTransferable(type: Data.self)
                 }
+            }
+        }
+        .sheet(
+            isPresented: $showingExercisePicker
+        ) {
+            GoalExercisePickerSheet(
+                currentName: exerciseName
+            ) { selectedName in
+                exerciseName =
+                    selectedName
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                showingExercisePicker = false
             }
         }
     }
@@ -1901,23 +1916,138 @@ struct GoalCreationView: View {
                             norwegian: "Øvelse"
                         )
                 ) {
-                    TextField(
-                        ATHLTHLocalization.format(
-                            english: "Exercise name",
-                            norwegian: "Navn på øvelse"
-                        ),
-                        text: $exerciseName
-                    )
-                    .font(.subheadline)
-                    .padding(.horizontal, 12)
-                    .frame(height: 42)
-                    .background(
-                        Color.black.opacity(0.035),
-                        in: RoundedRectangle(
-                            cornerRadius: 12,
-                            style: .continuous
+                    VStack(spacing: 10) {
+                        Button {
+                            showingExercisePicker = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(
+                                    systemName:
+                                        "list.bullet.rectangle"
+                                )
+                                .font(
+                                    .system(
+                                        size: 14,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        ATHLTHLocalization.format(
+                                            english:
+                                                "Choose from exercise library",
+                                            norwegian:
+                                                "Velg fra øvelseslisten"
+                                        )
+                                    )
+                                    .font(
+                                        .caption
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+
+                                    if !exerciseName
+                                        .trimmingCharacters(
+                                            in: .whitespacesAndNewlines
+                                        )
+                                        .isEmpty {
+                                        Text(exerciseName)
+                                            .font(.caption2)
+                                            .foregroundStyle(
+                                                .secondary
+                                            )
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .caption.weight(.bold)
+                                )
+                                .foregroundStyle(
+                                    .tertiary
+                                )
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 52)
+                            .background(
+                                goalFlowBlueSoft.opacity(
+                                    0.72
+                                ),
+                                in: RoundedRectangle(
+                                    cornerRadius: 13,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        HStack(spacing: 8) {
+                            Rectangle()
+                                .fill(
+                                    Color.black.opacity(
+                                        0.07
+                                    )
+                                )
+                                .frame(height: 0.5)
+
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "or enter your own",
+                                    norwegian: "eller skriv inn selv"
+                                )
+                            )
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .fixedSize()
+
+                            Rectangle()
+                                .fill(
+                                    Color.black.opacity(
+                                        0.07
+                                    )
+                                )
+                                .frame(height: 0.5)
+                        }
+
+                        TextField(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Custom exercise name",
+                                norwegian:
+                                    "Skriv inn øvelse"
+                            ),
+                            text: $exerciseName
                         )
-                    )
+                        .font(.subheadline)
+                        .textInputAutocapitalization(
+                            .words
+                        )
+                        .autocorrectionDisabled(false)
+                        .padding(.horizontal, 12)
+                        .frame(height: 42)
+                        .background(
+                            Color.black.opacity(0.035),
+                            in: RoundedRectangle(
+                                cornerRadius: 12,
+                                style: .continuous
+                            )
+                        )
+                    }
                 }
 
                 goalNumberField(
@@ -3800,6 +3930,384 @@ struct GoalCreationView: View {
         }
         .padding()
         .goalCard()
+    }
+}
+
+private struct GoalExercisePickerSheet:
+    View {
+    @Environment(\.dismiss)
+    private var dismiss
+    @EnvironmentObject
+    private var library: ExerciseLibraryStore
+
+    let currentName: String
+    let onSelect: (String) -> Void
+
+    @State private var query = ""
+    @State private var customName = ""
+
+    private var results:
+        [ExerciseLibraryEntry] {
+        Array(
+            library
+                .search(query: query)
+                .prefix(80)
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                VStack(spacing: 10) {
+                    HStack(spacing: 9) {
+                        Image(
+                            systemName:
+                                "magnifyingglass"
+                        )
+                        .foregroundStyle(.secondary)
+
+                        TextField(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Search exercises",
+                                norwegian:
+                                    "Søk etter øvelse"
+                            ),
+                            text: $query
+                        )
+                        .textInputAutocapitalization(
+                            .never
+                        )
+                        .autocorrectionDisabled()
+
+                        if !query.isEmpty {
+                            Button {
+                                query = ""
+                            } label: {
+                                Image(
+                                    systemName:
+                                        "xmark.circle.fill"
+                                )
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 44)
+                    .background(
+                        Color(
+                            .secondarySystemGroupedBackground
+                        ),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+
+                    HStack(spacing: 8) {
+                        TextField(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Or enter your own exercise",
+                                norwegian:
+                                    "Eller skriv inn egen øvelse"
+                            ),
+                            text: $customName
+                        )
+                        .textInputAutocapitalization(
+                            .words
+                        )
+                        .padding(.horizontal, 12)
+                        .frame(height: 42)
+                        .background(
+                            Color(
+                                .secondarySystemGroupedBackground
+                            ),
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                        Button {
+                            choose(customName)
+                        } label: {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Use",
+                                    norwegian: "Bruk"
+                                )
+                            )
+                            .font(
+                                .caption.weight(.bold)
+                            )
+                            .padding(.horizontal, 13)
+                            .frame(height: 42)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accent)
+                        .disabled(
+                            customName
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                                .isEmpty
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
+                Divider()
+
+                if library.isLoading &&
+                    results.isEmpty {
+                    ProgressView(
+                        ATHLTHLocalization.format(
+                            english:
+                                "Loading exercises…",
+                            norwegian:
+                                "Laster øvelser…"
+                        )
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                } else if results.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.format(
+                            english:
+                                "No matching exercises",
+                            norwegian:
+                                "Ingen øvelser funnet"
+                        ),
+                        systemImage: "dumbbell",
+                        description: Text(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Try another search or enter your own exercise above.",
+                                norwegian:
+                                    "Prøv et annet søk eller skriv inn egen øvelse over."
+                            )
+                        )
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(results) {
+                                entry in
+                                Button {
+                                    choose(
+                                        entry.name
+                                    )
+                                } label: {
+                                    HStack(
+                                        spacing: 11
+                                    ) {
+                                        Image(
+                                            systemName:
+                                                "dumbbell.fill"
+                                        )
+                                        .font(
+                                            .system(
+                                                size: 13,
+                                                weight:
+                                                    .semibold
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .accentDeep
+                                        )
+                                        .frame(
+                                            width: 34,
+                                            height: 34
+                                        )
+                                        .background(
+                                            ATHLTHTheme
+                                                .accentSoft,
+                                            in: RoundedRectangle(
+                                                cornerRadius:
+                                                    10,
+                                                style:
+                                                    .continuous
+                                            )
+                                        )
+
+                                        VStack(
+                                            alignment:
+                                                .leading,
+                                            spacing: 2
+                                        ) {
+                                            Text(
+                                                entry.name
+                                            )
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .primary
+                                            )
+                                            .lineLimit(1)
+
+                                            let detail =
+                                                [
+                                                    entry
+                                                        .bodyPart,
+                                                    entry
+                                                        .exercise
+                                                        .equipment
+                                                        .first
+                                                ]
+                                                .compactMap {
+                                                    $0
+                                                }
+                                                .joined(
+                                                    separator:
+                                                        " · "
+                                                )
+
+                                            if !detail.isEmpty {
+                                                Text(
+                                                    detail
+                                                )
+                                                .font(
+                                                    .caption2
+                                                )
+                                                .foregroundStyle(
+                                                    .secondary
+                                                )
+                                                .lineLimit(1)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        if entry.name
+                                            .caseInsensitiveCompare(
+                                                currentName
+                                            ) ==
+                                            .orderedSame {
+                                            Image(
+                                                systemName:
+                                                    "checkmark.circle.fill"
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .accent
+                                            )
+                                        } else {
+                                            Image(
+                                                systemName:
+                                                    "chevron.right"
+                                            )
+                                            .font(
+                                                .caption
+                                            )
+                                            .foregroundStyle(
+                                                .tertiary
+                                            )
+                                        }
+                                    }
+                                    .padding(10)
+                                    .background(
+                                        Color(
+                                            .secondarySystemGroupedBackground
+                                        ),
+                                        in: RoundedRectangle(
+                                            cornerRadius:
+                                                16,
+                                            style:
+                                                .continuous
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if results.count == 80 {
+                                Text(
+                                    ATHLTHLocalization.format(
+                                        english:
+                                            "Showing the first 80 matches. Search to narrow the list.",
+                                        norwegian:
+                                            "Viser de første 80 treffene. Søk for å snevre inn listen."
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                    }
+                }
+            }
+            .background(
+                Color(
+                    .systemGroupedBackground
+                )
+                .ignoresSafeArea()
+            )
+            .navigationTitle(
+                ATHLTHLocalization.format(
+                    english: "Choose exercise",
+                    norwegian: "Velg øvelse"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.format(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+            .task {
+                if customName.isEmpty {
+                    customName =
+                        currentName
+                }
+                await library.refresh()
+            }
+        }
+    }
+
+    private func choose(
+        _ value: String
+    ) {
+        let cleaned =
+            value.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !cleaned.isEmpty else {
+            return
+        }
+
+        onSelect(cleaned)
+        dismiss()
     }
 }
 
