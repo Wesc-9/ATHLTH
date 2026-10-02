@@ -541,6 +541,10 @@ struct WatchActiveWorkoutView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(WatchTheme.green)
+                        .disabled(
+                            workoutManager
+                                .strengthActionPending
+                        )
                     } else {
                         Text(
                             "Use the red stop button below when you're finished."
@@ -644,9 +648,15 @@ struct WatchActiveWorkoutView: View {
                     workoutManager.completeStrengthSet()
                 } label: {
                     Label(
-                        "Complete Set",
+                        workoutManager
+                            .strengthActionPending
+                            ? "Syncing…"
+                            : "Complete Set",
                         systemImage:
-                            "checkmark.circle.fill"
+                            workoutManager
+                                .strengthActionPending
+                                ? "arrow.triangle.2.circlepath"
+                                : "checkmark.circle.fill"
                     )
                     .font(.system(size: 13, weight: .bold))
                     .frame(maxWidth: .infinity)
@@ -654,6 +664,10 @@ struct WatchActiveWorkoutView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(WatchTheme.green)
+                .disabled(
+                    workoutManager
+                        .strengthActionPending
+                )
             } else {
                 VStack(spacing: 7) {
                     Image(systemName: "iphone")
