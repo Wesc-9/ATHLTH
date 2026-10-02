@@ -852,13 +852,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if WCSession.default.isReachable {
             WCSession.default.sendMessage(
                 payload,
-                replyHandler: nil
-            ) { _ in
-                WCSession.default.transferUserInfo(
-                    payload
-                )
-            }
+                replyHandler: nil,
+                errorHandler:
+                    Self.makeStrengthCommandFallbackHandler(
+                        payload: payload
+                    )
+            )
         } else {
+            WCSession.default.transferUserInfo(
+                payload
+            )
+        }
+    }
+
+    nonisolated private static func makeStrengthCommandFallbackHandler(
+        payload: [String: Any]
+    ) -> (Error) -> Void {
+        { _ in
             WCSession.default.transferUserInfo(
                 payload
             )
