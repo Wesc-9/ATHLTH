@@ -78,8 +78,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private var lastProbeID: String?
     private var handledWorkoutResultIDs:
         [UUID] = []
-    private let handledWorkoutResultsKey =
+    private static let handledWorkoutResultsKey =
         "athlth.watch.handledWorkoutResultIDs.v1"
+    private var lastSpotifyCommandSentAt:
+        Date = .distantPast
     private var latestTodaySnapshot =
         WatchTodaySnapshot(
             workout: nil,
@@ -95,7 +97,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 UserDefaults.standard
                     .stringArray(
                         forKey:
-                            handledWorkoutResultsKey
+                            Self.handledWorkoutResultsKey
                     ) {
             handledWorkoutResultIDs =
                 stored
@@ -468,7 +470,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 handledWorkoutResultIDs
                     .map(\.uuidString),
                 forKey:
-                    handledWorkoutResultsKey
+                    Self.handledWorkoutResultsKey
             )
         }
 
@@ -779,6 +781,14 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return false
         }
 
+        guard command.sentAt >
+                lastSpotifyCommandSentAt
+        else {
+            return true
+        }
+
+        lastSpotifyCommandSentAt =
+            command.sentAt
         lastSpotifyCommand = command
         return true
     }
