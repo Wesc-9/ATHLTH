@@ -777,8 +777,8 @@ struct TrophyCabinetSection: View {
                         .font(.title3.weight(.bold))
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "The achievements you choose to display.",
-                            norwegian: "Trofeene du selv velger å vise."
+                            english: "Your hardest-earned gold trophies.",
+                            norwegian: "Gullpokalene du har jobbet hardest for."
                         )
                     )
                         .font(.caption)
@@ -812,7 +812,14 @@ struct TrophyCabinetSection: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Your cabinet is waiting")
                             .font(.subheadline.weight(.semibold))
-                        Text("Unlocked trophies can be pinned here from the collection.")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Earn a qualifying gold trophy and choose it from the trophy hub.",
+                                norwegian:
+                                    "Tjen en kvalifiserende gullpokal og velg den fra pokaloversikten."
+                            )
+                        )
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -851,9 +858,23 @@ struct TrophyProgressCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Trophy Progress")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Achievement Progress",
+                            norwegian:
+                                "Achievement-fremdrift"
+                        )
+                    )
                         .font(.headline)
-                    Text("What your next effort is building toward.")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Progress from Core to Rare, Epic and Signature.",
+                            norwegian:
+                                "Fremdrift fra Core til Rare, Epic og Signature."
+                        )
+                    )
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -869,12 +890,19 @@ struct TrophyProgressCard: View {
                 }
             }
 
-            if trophies.nextTrophies.isEmpty {
-                Text("Your trophy progress will appear here as ATHLTH reads verified activity.")
+            if trophies.nextAchievements.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Achievement progress appears here as ATHLTH reads verified activity.",
+                        norwegian:
+                            "Achievement-fremdrift vises her når ATHLTH leser verifisert aktivitet."
+                    )
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(trophies.nextTrophies.prefix(3))) { trophy in
+                ForEach(Array(trophies.nextAchievements.prefix(3))) { trophy in
                     NavigationLink {
                         TrophyDetailView(trophyID: trophy.id)
                     } label: {
@@ -882,7 +910,7 @@ struct TrophyProgressCard: View {
                     }
                     .buttonStyle(.plain)
 
-                    if trophy.id != trophies.nextTrophies.prefix(3).last?.id {
+                    if trophy.id != trophies.nextAchievements.prefix(3).last?.id {
                         Divider().opacity(0.5)
                     }
                 }
@@ -1372,9 +1400,9 @@ struct TrophyCollectionView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Tap a trophy below to place it in one of four showcase slots.",
+                                    "Choose up to four unlocked gold trophies for your profile.",
                                 norwegian:
-                                    "Trykk på et trofé under for å plassere det i én av fire plasser."
+                                    "Velg opptil fire opplåste gullpokaler som skal vises på profilen."
                             )
                         )
                         .font(.caption)
@@ -1415,6 +1443,72 @@ struct TrophyCollectionView: View {
                 }
             }
 
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Gold trophies",
+                            norwegian:
+                                "Gullpokaler"
+                        )
+                    )
+                    .font(
+                        .headline
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "These are deliberately harder than achievements and are earned only from standout verified performances.",
+                            norwegian:
+                                "Disse er bevisst vanskeligere enn achievements og tjenes kun gjennom større, verifiserte prestasjoner."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(
+                                minimum: 155,
+                                maximum: 240
+                            ),
+                            spacing: 10
+                        )
+                    ],
+                    spacing: 10
+                ) {
+                    ForEach(
+                        prestige
+                    ) { trophy in
+                        NavigationLink {
+                            TrophyDetailView(
+                                trophyID:
+                                    trophy.id
+                            )
+                        } label: {
+                            collectionCard(
+                                trophy
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             cabinetCase
 
             if unlocked.isEmpty {
@@ -1433,9 +1527,9 @@ struct TrophyCollectionView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Train, walk, run, recover and complete goals to build your collection.",
+                                "Complete a qualifying standout performance to earn your first gold trophy.",
                             norwegian:
-                                "Tren, gå, løp, restituer og fullfør mål for å bygge samlingen din."
+                                "Fullfør en kvalifiserende større prestasjon for å tjene din første gullpokal."
                         )
                     )
                 }
@@ -1454,9 +1548,9 @@ struct TrophyCollectionView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Choose from unlocked trophies",
+                                "Choose from unlocked gold trophies",
                             norwegian:
-                                "Velg blant opplåste trofeer"
+                                "Velg blant opplåste gullpokaler"
                         )
                     )
                     .font(
