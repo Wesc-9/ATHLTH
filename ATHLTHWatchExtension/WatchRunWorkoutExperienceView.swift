@@ -122,8 +122,7 @@ struct WatchRunWorkoutExperienceView: View {
                 .monospacedDigit()
             }
             .foregroundStyle(
-                WatchTheme
-                    .textSecondary
+                Color.white.opacity(0.72)
             )
 
             HStack(
@@ -142,7 +141,7 @@ struct WatchRunWorkoutExperienceView: View {
                             )
                         )
                         .foregroundStyle(
-                            WatchTheme.muted
+                            Color.white.opacity(0.55)
                         )
 
                     Text(
@@ -153,7 +152,7 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                     .font(
                         .system(
-                            size: 34,
+                            size: 25,
                             weight: .bold,
                             design: .rounded
                         )
@@ -193,8 +192,7 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                     .monospacedDigit()
                     .foregroundStyle(
-                        WatchTheme
-                            .textSecondary
+                        Color.white.opacity(0.72)
                     )
                 }
             }
@@ -232,6 +230,7 @@ struct WatchRunWorkoutExperienceView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
+        .foregroundStyle(Color.white)
         .background(
             Color.black
                 .ignoresSafeArea()
