@@ -439,7 +439,61 @@ struct WatchActiveWorkoutView: View {
             .padding(10)
             .watchSurface()
 
-            if snapshot.isResting,
+            if snapshot.inputMode == .iPhone {
+                VStack(spacing: 7) {
+                    Image(systemName: "iphone")
+                        .font(.title3)
+                        .foregroundStyle(WatchTheme.green)
+
+                    Text("Log reps and weight on iPhone")
+                        .font(.system(size: 11, weight: .bold))
+                        .multilineTextAlignment(.center)
+
+                    Text(
+                        snapshot.isResting
+                            ? "Rest timer stays synchronized here."
+                            : "Apple Watch continues recording heart rate, calories and duration."
+                    )
+                    .font(.system(size: 8))
+                    .foregroundStyle(WatchTheme.muted)
+                    .multilineTextAlignment(.center)
+
+                    if snapshot.isResting,
+                       let restEndsAt = snapshot.restEndsAt {
+                        TimelineView(
+                            .periodic(
+                                from: .now,
+                                by: 1
+                            )
+                        ) { context in
+                            let remaining =
+                                max(
+                                    Int(
+                                        restEndsAt
+                                            .timeIntervalSince(
+                                                context.date
+                                            )
+                                            .rounded(.up)
+                                    ),
+                                    0
+                                )
+
+                            Text("\(remaining) s")
+                                .font(
+                                    .system(
+                                        size: 18,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity)
+                .watchSurface()
+            } else if snapshot.isResting,
                let restEndsAt = snapshot.restEndsAt {
                 WatchStrengthRestView(
                     restEndsAt: restEndsAt,
