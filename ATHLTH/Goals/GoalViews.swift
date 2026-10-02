@@ -705,6 +705,10 @@ struct GoalCreationView: View {
     @State private var linkActivePlan = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
+    @State private var automaticTracking = true
+    @State private var setupMilestones: [GoalMilestone] = []
+    @State private var newMilestoneTitle = ""
+    @State private var newMilestoneDetail = ""
 
     private var goalFlowBlue: Color {
         Color(
@@ -747,6 +751,10 @@ struct GoalCreationView: View {
             .toolbar(.hidden, for: .tabBar)
             .onChange(of: category) { _, newValue in
                 applyDefaults(for: newValue)
+                automaticTracking = newValue != .custom
+                setupMilestones.removeAll()
+                newMilestoneTitle = ""
+                newMilestoneDetail = ""
             }
             .onChange(of: selectedPhoto) { _, item in
                 Task {
