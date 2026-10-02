@@ -222,7 +222,7 @@ export default {
 
       const { data: current, error: currentError } = await ctx.supabaseAdmin
         .from("subscription_entitlements")
-        .select("last_verified_at")
+        .select("last_verified_at, source")
         .eq("user_id", userID)
         .maybeSingle();
 
@@ -233,8 +233,12 @@ export default {
       const lastVerifiedAt = current?.last_verified_at
         ? new Date(current.last_verified_at)
         : null;
+      const hasAdminOverride = current?.source === "admin";
 
-      if (!lastVerifiedAt || lastVerifiedAt.getTime() <= signedAt.getTime()) {
+      if (
+        !hasAdminOverride &&
+        (!lastVerifiedAt || lastVerifiedAt.getTime() <= signedAt.getTime())
+      ) {
         const entitlementUpdate = {
           tier: "athlth_plus",
           status,
