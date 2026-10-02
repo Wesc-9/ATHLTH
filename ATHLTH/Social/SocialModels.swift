@@ -573,6 +573,7 @@ struct BackendChallengeParticipant: Codable, Hashable {
     let captureDevice: String? = nil
     let workoutStartedAt: Date? = nil
     let workoutFinishedAt: Date? = nil
+    let launchFailedAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
