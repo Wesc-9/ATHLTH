@@ -1934,7 +1934,6 @@ struct WalkQuickStartSheet: View {
         SpotifyPlaylistReference?
     @State private var spotifyAutoplay = false
     @State private var showingSpotifyPicker = false
-    @State private var didLoadSpotifyDefault = false
 
     var body: some View {
         NavigationStack {
