@@ -304,7 +304,13 @@ struct WatchRunWorkoutExperienceView: View {
                 metricTile(
                     title: "CALORIES",
                     value:
-                        "(Int(workoutManager.activeCalories.rounded()))",
+                        String(
+                            Int(
+                                workoutManager
+                                    .activeCalories
+                                    .rounded()
+                            )
+                        ),
                     suffix: "kcal",
                     icon: "flame.fill"
                 )
