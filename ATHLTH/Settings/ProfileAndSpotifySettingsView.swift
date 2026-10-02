@@ -18,7 +18,6 @@ struct ATHLTHEditProfileView: View {
     @State private var checkingUsername = false
     @State private var saving = false
     @State private var errorMessage: String?
-    @State private var showingSaveConfirmation = false
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -90,7 +89,7 @@ struct ATHLTHEditProfileView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingSaveConfirmation = true
+                    Task { await saveProfile() }
                 } label: {
                     Group {
                         if saving {
@@ -151,42 +150,6 @@ struct ATHLTHEditProfileView: View {
         }
         .task(id: username) {
             await checkUsername()
-        }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Save profile changes?",
-                norwegian: "Lagre profilendringene?"
-            ),
-            isPresented: $showingSaveConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(
-                ATHLTHLocalization.choose(
-                    english: "Save changes",
-                    norwegian: "Lagre endringer"
-                )
-            ) {
-                Task {
-                    await saveProfile()
-                }
-            }
-
-            Button(
-                ATHLTHLocalization.choose(
-                    english: "Cancel",
-                    norwegian: "Avbryt"
-                ),
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Your public profile information will be updated with these changes.",
-                    norwegian:
-                        "Profilinformasjonen din oppdateres med disse endringene."
-                )
-            )
         }
         .alert(
             "ATHLTH",
@@ -779,9 +742,6 @@ struct ATHLTHEditProfileView: View {
 
             selectedAvatarData = nil
             hasEditedATHLTHProfile = true
-
-            UINotificationFeedbackGenerator()
-                .notificationOccurred(.success)
         } catch {
             errorMessage = error.localizedDescription
         }
