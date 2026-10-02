@@ -18,7 +18,7 @@ struct ATHLTHEditProfileView: View {
     @State private var checkingUsername = false
     @State private var saving = false
     @State private var errorMessage: String?
-    @State private var saved = false
+    @State private var showingSaveConfirmation = false
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -90,7 +90,7 @@ struct ATHLTHEditProfileView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await saveProfile() }
+                    showingSaveConfirmation = true
                 } label: {
                     Group {
                         if saving {
@@ -152,21 +152,56 @@ struct ATHLTHEditProfileView: View {
         .task(id: username) {
             await checkUsername()
         }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Save profile changes?",
+                norwegian: "Lagre profilendringene?"
+            ),
+            isPresented: $showingSaveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Save changes",
+                    norwegian: "Lagre endringer"
+                )
+            ) {
+                Task {
+                    await saveProfile()
+                }
+            }
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel",
+                    norwegian: "Avbryt"
+                ),
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Your public profile information will be updated with these changes.",
+                    norwegian:
+                        "Profilinformasjonen din oppdateres med disse endringene."
+                )
+            )
+        }
         .alert(
             "ATHLTH",
             isPresented: Binding(
-                get: { errorMessage != nil || saved },
+                get: { errorMessage != nil },
                 set: {
                     if !$0 {
                         errorMessage = nil
-                        saved = false
                     }
                 }
             )
         ) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "Profile updated.")
+            Text(errorMessage ?? "")
         }
     }
 
@@ -744,7 +779,9 @@ struct ATHLTHEditProfileView: View {
 
             selectedAvatarData = nil
             hasEditedATHLTHProfile = true
-            saved = true
+
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
         } catch {
             errorMessage = error.localizedDescription
         }
