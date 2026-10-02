@@ -1968,7 +1968,7 @@ private struct StrengthExerciseGroupBuilderView: View {
         } else {
             _selectedIDs = State(
                 initialValue:
-                    [currentExerciseID]
+                    Set([currentExerciseID])
             )
         }
 
@@ -2522,9 +2522,23 @@ private struct StrengthPlateCalculatorView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Closest load with the available standard plates. Difference: \(abs(plateResult.remainder), specifier: "%.1f") kg.",
+                                    String(
+                                        format:
+                                            "Closest load with the available standard plates. Difference: %.1f kg.",
+                                        abs(
+                                            plateResult
+                                                .remainder
+                                        )
+                                    ),
                                 norwegian:
-                                    "Nærmeste last med tilgjengelige standardskiver. Forskjell: \(abs(plateResult.remainder), specifier: "%.1f") kg."
+                                    String(
+                                        format:
+                                            "Nærmeste last med tilgjengelige standardskiver. Forskjell: %.1f kg.",
+                                        abs(
+                                            plateResult
+                                                .remainder
+                                        )
+                                    )
                             )
                         )
                         .font(.caption)
