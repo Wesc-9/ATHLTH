@@ -283,6 +283,7 @@ struct RunQuickStartConfiguration {
     let routeAlerts: WatchRouteAlertConfiguration
     let ghostTargetDurationSeconds: TimeInterval?
     let ghostUpdates: WatchGhostRaceAudioConfiguration?
+    let autoPauseEnabled: Bool
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
 
@@ -301,8 +302,63 @@ struct RunQuickStartConfiguration {
 struct WalkQuickStartConfiguration {
     let captureDevice: WorkoutCaptureDevice
     let audioCoach: WatchAudioCoachConfiguration
+    let autoPauseEnabled: Bool
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
+}
+
+private struct QuickStartAutoPauseCard: View {
+    @Binding var preference: WorkoutAutoPausePreference
+    let appDefaultEnabled: Bool
+
+    var body: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Auto-pause",
+                            norwegian: "Auto-pause"
+                        ),
+                        systemImage: "pause.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    Text(
+                        appDefaultEnabled
+                            ? ATHLTHLocalization.choose(english: "Default: On", norwegian: "Standard: På")
+                            : ATHLTHLocalization.choose(english: "Default: Off", norwegian: "Standard: Av")
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                }
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Auto-pause",
+                        norwegian: "Auto-pause"
+                    ),
+                    selection: $preference
+                ) {
+                    ForEach(WorkoutAutoPausePreference.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Pauses the workout after sustained stillness and resumes when movement returns. Manual pause always takes priority.",
+                        norwegian: "Pauser økten etter vedvarende stillstand og fortsetter når bevegelsen starter igjen. Manuell pause har alltid prioritet."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
 }
 
 struct QuickStartWorkoutDeviceCard: View {
@@ -484,6 +540,8 @@ struct RunQuickStartSheet: View {
     @State private var didLoadAudioCoachDefaults = false
     @State private var didLoadGuidanceDefaults = false
     @State private var isAdvancedSetup = false
+    @State private var autoPausePreference:
+        WorkoutAutoPausePreference = .appDefault
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
@@ -525,6 +583,12 @@ struct RunQuickStartSheet: View {
 
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
+                            QuickStartAutoPauseCard(
+                                preference: $autoPausePreference,
+                                appDefaultEnabled:
+                                    settings.autoPauseOutdoorWorkouts
+                            )
+
                             NavigationLink {
                                 RunGuidanceSetupView(
                                     audioCoach:
@@ -1176,6 +1240,16 @@ struct RunQuickStartSheet: View {
                             ? settings
                                 .ghostRaceAudioConfiguration
                             : nil,
+                    autoPauseEnabled:
+                        (
+                            isAdvancedSetup
+                                ? autoPausePreference
+                                : .appDefault
+                        )
+                        .resolved(
+                            appDefault:
+                                settings.autoPauseOutdoorWorkouts
+                        ),
                     friends: friends,
                     gearIDs: selectedGearIDs
                 )
@@ -1376,6 +1450,9 @@ struct WalkQuickStartSheet: View {
     @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var didLoadAudioCoachDefaults = false
+    @State private var isAdvancedSetup = false
+    @State private var autoPausePreference:
+        WorkoutAutoPausePreference = .appDefault
 
     var body: some View {
         NavigationStack {
@@ -1406,6 +1483,34 @@ struct WalkQuickStartSheet: View {
                             }
 
                             Spacer()
+
+                            Button {
+                                isAdvancedSetup.toggle()
+                            } label: {
+                                Text(
+                                    isAdvancedSetup
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Advanced",
+                                            norwegian: "Avansert"
+                                        )
+                                        : "Basic"
+                                )
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 11)
+                                .frame(height: 34)
+                                .foregroundStyle(
+                                    isAdvancedSetup
+                                        ? Color.white
+                                        : ATHLTHTheme.accentDeep
+                                )
+                                .background(
+                                    isAdvancedSetup
+                                        ? ATHLTHTheme.accent
+                                        : ATHLTHTheme.accentSoft,
+                                    in: Capsule()
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -1422,81 +1527,89 @@ struct WalkQuickStartSheet: View {
                         activity: .walking
                     )
 
-                    NavigationLink {
-                        PerWorkoutAudioCoachView(
-                            draft:
-                                $audioCoachDraft,
-                            showRouteOptions: false,
-                            showStructuredOptions: false
+                    if isAdvancedSetup {
+                        QuickStartAutoPauseCard(
+                            preference: $autoPausePreference,
+                            appDefaultEnabled:
+                                settings.autoPauseOutdoorWorkouts
                         )
-                    } label: {
-                        ATHLTHCard {
-                            HStack(spacing: 12) {
-                                Image(
-                                    systemName:
-                                        "waveform.and.mic"
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .premiumGold
-                                )
-                                .frame(
-                                    width: 40,
-                                    height: 40
-                                )
-                                .background(
-                                    ATHLTHTheme
-                                        .premiumGoldSoft,
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                12
-                                        )
-                                )
 
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 3
-                                ) {
-                                    Text(
-                                        "Guidance & Alerts"
+                        NavigationLink {
+                            PerWorkoutAudioCoachView(
+                                draft:
+                                    $audioCoachDraft,
+                                showRouteOptions: false,
+                                showStructuredOptions: false
+                            )
+                        } label: {
+                            ATHLTHCard {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            "waveform.and.mic"
                                     )
-                                    .font(
-                                        .subheadline
-                                            .weight(
-                                                .semibold
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .premiumGold
+                                    )
+                                    .frame(
+                                        width: 40,
+                                        height: 40
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .premiumGoldSoft,
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    12
                                             )
                                     )
 
-                                    Text(
-                                        audioCoachDraft
-                                            .enabled
-                                            ? "Audio Coach · tap to adjust"
-                                            : "Tap to configure this walk"
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(
+                                            "Guidance & Alerts"
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+
+                                        Text(
+                                            audioCoachDraft
+                                                .enabled
+                                                ? "Audio Coach · tap to adjust"
+                                                : "Tap to configure this walk"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
                                     )
-                                    .font(.caption)
                                     .foregroundStyle(
                                         .secondary
                                     )
                                 }
-
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .foregroundStyle(
-                                    .secondary
-                                )
                             }
                         }
-                    }
-                    .buttonStyle(.plain)
-                    ATHLTHCard {
-                        WorkoutFriendPicker(
-                            selectedFriendIDs: $selectedFriendIDs
-                        )
+                        .buttonStyle(.plain)
+                        ATHLTHCard {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs: $selectedFriendIDs
+                            )
+                        }
                     }
 
                     Button {
@@ -1508,10 +1621,24 @@ struct WalkQuickStartSheet: View {
                             WalkQuickStartConfiguration(
                                 captureDevice: captureDevice,
                                 audioCoach:
+                                    isAdvancedSetup &&
                                     session.canAccess(.audioCoach)
                                         ? audioCoachDraft.configuration()
                                         : .disabled,
-                                friends: friends,
+                                autoPauseEnabled:
+                                    (
+                                        isAdvancedSetup
+                                            ? autoPausePreference
+                                            : .appDefault
+                                    )
+                                    .resolved(
+                                        appDefault:
+                                            settings.autoPauseOutdoorWorkouts
+                                    ),
+                                friends:
+                                    isAdvancedSetup
+                                        ? friends
+                                        : [],
                                 gearIDs: selectedGearIDs
                             )
                         )
