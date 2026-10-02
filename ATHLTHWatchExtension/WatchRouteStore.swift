@@ -356,11 +356,23 @@ final class WatchRouteStore: NSObject, ObservableObject {
     }
 
     private func applyWorkoutCommand(
-        rawCommand: String
+        rawCommand: String,
+        workoutID: UUID?
     ) {
         guard let command =
                 WatchWorkoutCommand(rawValue: rawCommand)
         else {
+            return
+        }
+
+        if let workoutID,
+           let strengthSession =
+                WatchWorkoutManager.shared
+                    .strengthSession,
+           strengthSession.workoutID !=
+                workoutID {
+            // A durable END from an older iPhone strength workout must never
+            // terminate a newer Watch workout after reconnect.
             return
         }
 
@@ -652,6 +664,14 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 payload[
                     WatchTransferMetadataKey.sentAt
                 ] as? TimeInterval
+            let workoutID =
+                (
+                    payload[
+                        WatchTransferMetadataKey
+                            .workoutID
+                    ] as? String
+                )
+                .flatMap(UUID.init(uuidString:))
 
             Task { @MainActor [weak self] in
                 guard let self,
@@ -664,7 +684,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 }
 
                 self.applyWorkoutCommand(
-                    rawCommand: rawCommand
+                    rawCommand: rawCommand,
+                    workoutID: workoutID
                 )
             }
         }
