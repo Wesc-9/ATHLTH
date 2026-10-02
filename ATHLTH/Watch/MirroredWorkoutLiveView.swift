@@ -12,6 +12,8 @@ struct MirroredWorkoutLiveView: View {
                 VStack(spacing: 18) {
                     header
 
+                    TrainTogetherStatusStrip()
+
                     if let snapshot = mirroring.snapshot {
                         if ghostRace.reference != nil &&
                             snapshot.kind == .running {
