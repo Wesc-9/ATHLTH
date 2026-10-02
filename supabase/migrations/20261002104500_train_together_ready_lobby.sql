@@ -276,3 +276,55 @@ create trigger social_workout_participants_group_done
 after update of workout_finished_at on public.social_workout_participants
 for each row
 execute function private.complete_social_workout_when_group_done();
+
+
+create or replace function public.schedule_social_workout_start(
+  p_session_id uuid,
+  p_countdown_seconds integer default 3
+)
+returns timestamptz
+language plpgsql
+security invoker
+set search_path = pg_catalog, public
+as $$
+declare
+  resolved_start timestamptz;
+begin
+  if p_countdown_seconds < 1 or p_countdown_seconds > 10 then
+    raise exception 'Countdown must be between 1 and 10 seconds';
+  end if;
+
+  update public.social_workout_sessions
+  set
+    coordinated_start_at =
+      now() + make_interval(secs => p_countdown_seconds),
+    updated_at = now()
+  where id = p_session_id
+    and creator_id = (select auth.uid())
+    and status = 'active'
+    and coordinated_start_at is null
+  returning coordinated_start_at
+    into resolved_start;
+
+  if resolved_start is null then
+    select coordinated_start_at
+      into resolved_start
+    from public.social_workout_sessions
+    where id = p_session_id
+      and creator_id = (select auth.uid())
+      and status = 'active';
+  end if;
+
+  if resolved_start is null then
+    raise exception 'Train Together session is not available';
+  end if;
+
+  return resolved_start;
+end;
+$$;
+
+revoke all on function public.schedule_social_workout_start(uuid, integer)
+from public, anon;
+
+grant execute on function public.schedule_social_workout_start(uuid, integer)
+to authenticated;
