@@ -775,6 +775,7 @@ struct AroundYouExploreView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var challenges: ChallengeStore
 
@@ -2481,6 +2482,7 @@ struct AroundYouExploreView: View {
                         phoneWorkout: phoneWorkout,
                         watchConnection:
                             watchConnection,
+                        spotify: spotify,
                         ghostRace: ghostRace
                     )
 
