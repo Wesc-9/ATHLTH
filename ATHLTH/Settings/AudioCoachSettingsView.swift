@@ -29,14 +29,18 @@ private struct ATHLTHAudioCoachVoiceOption:
 
     var displayTitle: String {
         if let qualityTitle {
-            return "\(name) · \(language) · \(qualityTitle)"
+            return "\(name) · \(qualityTitle)"
         }
 
-        return "\(name) · \(language)"
+        return name
     }
 
     var compactTitle: String {
-        name
+        if let qualityTitle {
+            return "\(name) · \(qualityTitle)"
+        }
+
+        return name
     }
 }
 
