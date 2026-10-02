@@ -2113,6 +2113,8 @@ final class SocialStore: ObservableObject {
         workoutInvites = []
         activeWorkoutSession = nil
         activeWorkoutParticipants = []
+        coordinatedLobbySessionID = nil
+        currentJoinedWorkoutSessionID = nil
         privacy = nil
         workoutMedia = []
         profileCache = [:]
