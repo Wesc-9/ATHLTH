@@ -737,6 +737,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var steps: [WatchRunningWorkoutStep]
     var routeAlerts: WatchRouteAlertConfiguration? = nil
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
+    // Optional keeps payloads from older builds decodable. The sender resolves
+    // app default vs per-workout override before launch.
+    var autoPauseEnabled: Bool? = nil
 }
 
 
