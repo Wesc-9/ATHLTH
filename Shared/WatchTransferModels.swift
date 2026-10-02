@@ -888,6 +888,8 @@ struct WatchStrengthCommand: Codable, Hashable {
     var rpe: Double? = nil
     var rir: Double? = nil
     var isWarmUp: Bool? = nil
+    var exerciseIndex: Int? = nil
+    var setIndex: Int? = nil
 }
 
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
