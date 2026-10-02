@@ -3023,7 +3023,7 @@ struct TrophyDetailView: View {
                 return
             }
 
-            let generated =
+            let resolution =
                 await TrophyInscriptionAIService
                     .shared
                     .inscription(
@@ -3039,13 +3039,17 @@ struct TrophyDetailView: View {
                             trophy.unlockedAt
                     )
             inscription =
-                generated
-            trophies
-                .cacheInscription(
-                    generated,
-                    for:
-                        trophy.id
-                )
+                resolution.inscription
+
+            if resolution.isPersisted {
+                trophies
+                    .cacheInscription(
+                        resolution
+                            .inscription,
+                        for:
+                            trophy.id
+                    )
+            }
         }
     }
 
@@ -3534,7 +3538,7 @@ struct TrophyUnlockRevealView: View {
                 return
             }
 
-            let generated =
+            let resolution =
                 await TrophyInscriptionAIService
                     .shared
                     .inscription(
@@ -3550,13 +3554,17 @@ struct TrophyUnlockRevealView: View {
                             unlock.unlockedAt
                     )
             inscription =
-                generated
-            trophies
-                .cacheInscription(
-                    generated,
-                    for:
-                        trophy.id
-                )
+                resolution.inscription
+
+            if resolution.isPersisted {
+                trophies
+                    .cacheInscription(
+                        resolution
+                            .inscription,
+                        for:
+                            trophy.id
+                    )
+            }
         }
 
     }
