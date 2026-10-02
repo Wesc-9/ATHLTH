@@ -3971,6 +3971,8 @@ struct SessionEditorView: View {
     @State private var audioCoachOverride:
         WatchAudioCoachConfiguration? = nil
     @State private var showingAudioCoachEditor = false
+    @State private var autoPausePreference:
+        WorkoutAutoPausePreference = .appDefault
 
     @State private var selectedSpotifyPlaylist:
         SpotifyPlaylistReference? = nil
@@ -4053,6 +4055,13 @@ struct SessionEditorView: View {
         )
         _audioCoachOverride = State(
             initialValue: workout.audioCoachConfiguration
+        )
+        _autoPausePreference = State(
+            initialValue:
+                WorkoutAutoPausePreference(
+                    overrideValue:
+                        workout.autoPauseEnabled
+                )
         )
         _selectedSpotifyPlaylist = State(
             initialValue: workout.spotifyPlaylist
@@ -4647,6 +4656,38 @@ struct SessionEditorView: View {
         }
 
         if kind == .running || kind == .walking {
+            Section(
+                ATHLTHLocalization.choose(
+                    english: "Workout behavior",
+                    norwegian: "Øktoppførsel"
+                )
+            ) {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Auto-pause",
+                        norwegian: "Auto-pause"
+                    ),
+                    selection: $autoPausePreference
+                ) {
+                    ForEach(
+                        WorkoutAutoPausePreference.allCases
+                    ) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Use app default follows Training settings. On or Off overrides it for this workout only.",
+                        norwegian:
+                            "Bruk standard følger innstillingen under Trening. På eller Av overstyrer den kun for denne økten."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
             Section("Live Targets & Alerts") {
                 Toggle(
                     "Heart-rate target",
@@ -6073,6 +6114,11 @@ struct SessionEditorView: View {
         gearSelectionTouched = workout.gearIDs != nil
         audioCoachOverride =
             workout.audioCoachConfiguration
+        autoPausePreference =
+            WorkoutAutoPausePreference(
+                overrideValue:
+                    workout.autoPauseEnabled
+            )
         selectedSpotifyPlaylist =
             workout.spotifyPlaylist
         spotifyAutoplayOnStart =
@@ -6141,6 +6187,10 @@ struct SessionEditorView: View {
             audioCoachConfiguration:
                 (kind == .running || kind == .walking)
                     ? audioCoachOverride
+                    : nil,
+            autoPauseEnabled:
+                (kind == .running || kind == .walking)
+                    ? autoPausePreference.overrideValue
                     : nil,
             spotifyPlaylist:
                 selectedSpotifyPlaylist,
