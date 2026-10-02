@@ -1145,6 +1145,29 @@ final class SocialStore: ObservableObject {
         )
     }
 
+    func withdrawWorkoutParticipant(
+        _ participant: SocialWorkoutParticipantRecord
+    ) async {
+        guard participant.userID != currentUserID,
+              participant.workoutStartedAt == nil
+        else {
+            return
+        }
+
+        do {
+            try await service.withdrawWorkoutParticipant(
+                participantID: participant.id
+            )
+            try await refreshWorkoutLobby(
+                sessionID:
+                    participant.sessionID
+            )
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     func workoutActivity(for workoutID: UUID) async -> SocialActivityRecord? {
         try? await service.workoutActivity(for: workoutID)
     }
@@ -1934,7 +1957,13 @@ final class SocialStore: ObservableObject {
         workoutInvites = participants
             .filter {
                 $0.userID == currentUserID &&
-                $0.state == .invited
+                (
+                    $0.state == .invited ||
+                    (
+                        $0.state == .accepted &&
+                        $0.workoutStartedAt == nil
+                    )
+                )
             }
             .compactMap { participant in
                 guard let session = sessionsByID[participant.sessionID],
@@ -1980,6 +2009,21 @@ final class SocialStore: ObservableObject {
                 }
         } else {
             activeWorkoutParticipants = []
+        }
+
+        if coordinatedLobbySessionID == nil,
+           let activeWorkoutSession,
+           activeWorkoutSession.creatorID == currentUserID,
+           activeWorkoutSession.coordinatedStartAt == nil,
+           let ownParticipant = activeWorkoutParticipants.first(
+                where: {
+                    $0.userID == currentUserID
+                }
+           ),
+           ownParticipant.readyAt != nil,
+           ownParticipant.workoutStartedAt == nil {
+            coordinatedLobbySessionID =
+                activeWorkoutSession.id
         }
     }
 
