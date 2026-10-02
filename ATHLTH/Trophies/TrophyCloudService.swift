@@ -3,6 +3,8 @@ import Supabase
 
 struct TrophyCloudState {
     let unlocks: [TrophyUnlockRecord]
+    let inscriptions:
+        [String: TrophyInscription]
     let showcaseIDs: [String]
     let cabinetUpdatedAt: Date?
 }
@@ -166,6 +168,9 @@ private struct TrophyCloudUnlockRow:
     let category: String
     let verificationSource: String
     let unlockedAt: Date
+    let usernameAtUnlock: String?
+    let engravingAchievement: String?
+    let engravingText: String?
 
     enum CodingKeys:
         String,
@@ -182,6 +187,49 @@ private struct TrophyCloudUnlockRow:
             "verification_source"
         case unlockedAt =
             "unlocked_at"
+        case usernameAtUnlock =
+            "username_at_unlock"
+        case engravingAchievement =
+            "engraving_achievement"
+        case engravingText =
+            "engraving_text"
+    }
+
+    var inscription:
+        TrophyInscription?
+    {
+        guard
+            let athlete =
+                usernameAtUnlock?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !athlete.isEmpty,
+            let achievement =
+                engravingAchievement?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !achievement.isEmpty,
+            let text =
+                engravingText?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+            !text.isEmpty
+        else {
+            return nil
+        }
+
+        return TrophyInscription(
+            athlete: athlete,
+            achievement:
+                achievement,
+            inscription: text
+        )
     }
 
     var localRecord:
@@ -272,14 +320,34 @@ final class TrophyCloudService
                 )
             )
 
+        let rows =
+            response.unlocks ?? []
+        let inscriptions =
+            Dictionary(
+                uniqueKeysWithValues:
+                    rows.compactMap {
+                        row in
+                        guard
+                            let inscription =
+                                row.inscription
+                        else {
+                            return nil
+                        }
+
+                        return (
+                            row.awardID,
+                            inscription
+                        )
+                    }
+            )
+
         return TrophyCloudState(
             unlocks:
-                response
-                    .unlocks?
-                    .compactMap(
-                        \.localRecord
-                    ) ??
-                [],
+                rows.compactMap(
+                    \.localRecord
+                ),
+            inscriptions:
+                inscriptions,
             showcaseIDs:
                 response
                     .showcaseIDs ??
