@@ -171,6 +171,20 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func markWorkoutParticipantLaunchFailed(
+        participantID: UUID
+    ) async throws {
+        try await client
+            .from("social_workout_participants")
+            .update(
+                WorkoutParticipantLaunchFailedWrite(
+                    launchFailedAt: Date()
+                )
+            )
+            .eq("id", value: participantID)
+            .execute()
+    }
+
     func recordWorkoutSessionSource(
         sessionID: UUID,
         sourceWorkoutID: UUID
@@ -541,6 +555,14 @@ private struct WorkoutParticipantFinishedWrite: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case workoutFinishedAt = "workout_finished_at"
+    }
+}
+
+private struct WorkoutParticipantLaunchFailedWrite: Encodable {
+    let launchFailedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case launchFailedAt = "launch_failed_at"
     }
 }
 
