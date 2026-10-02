@@ -975,21 +975,30 @@ struct TrophyCollectionView: View {
         switch filter {
         case .all:
             return trophies.trophies
+                .filter {
+                    !$0.isPrestigeTrophy
+                }
         case .category(
             let category
         ):
             return trophies.trophies
                 .filter {
+                    !$0.isPrestigeTrophy &&
                     $0.category ==
                         category
                 }
         }
     }
 
+    private var prestige:
+        [TrophyProgressItem] {
+        trophies.prestigeTrophies
+    }
+
     private var unlocked:
         [TrophyProgressItem] {
-        trophies.trophies
-            .filter(\.isUnlocked)
+        trophies
+            .unlockedPrestigeTrophies
     }
 
     var body: some View {
@@ -1033,8 +1042,10 @@ struct TrophyCollectionView: View {
         )
         .navigationTitle(
             ATHLTHLocalization.choose(
-                english: "Trophies",
-                norwegian: "Troféer"
+                english:
+                    "Achievements & Trophies",
+                norwegian:
+                    "Achievements & pokaler"
             )
         )
         .navigationBarTitleDisplayMode(
@@ -1136,7 +1147,10 @@ struct TrophyCollectionView: View {
                     spacing: 5
                 ) {
                     Text(
-                        "ATHLTH TROPHIES"
+                        selectedTab ==
+                            .collection
+                            ? "ATHLTH ACHIEVEMENTS"
+                            : "ATHLTH TROPHIES"
                     )
                     .font(
                         .caption2.bold()
@@ -1152,8 +1166,12 @@ struct TrophyCollectionView: View {
                                 "%d unlocked",
                             norwegian:
                                 "%d låst opp",
-                            trophies
-                                .unlockedCount
+                            selectedTab ==
+                                .collection
+                                ? trophies
+                                    .unlockedAchievementCount
+                                : trophies
+                                    .unlockedPrestigeTrophyCount
                         )
                     )
                     .font(
@@ -1170,15 +1188,15 @@ struct TrophyCollectionView: View {
                             .collection
                             ? ATHLTHLocalization.choose(
                                 english:
-                                    "Every milestone becomes part of your ATHLTH story.",
+                                    "Build emblems from Core to Rare, Epic and Signature.",
                                 norwegian:
-                                    "Hver milepæl blir en del av ATHLTH-historien din."
+                                    "Bygg emblemer fra Core til Rare, Epic og Signature."
                             )
                             : ATHLTHLocalization.choose(
                                 english:
-                                    "Curate four trophies for your public showcase.",
+                                    "Gold trophies are reserved for standout verified performances.",
                                 norwegian:
-                                    "Velg fire trofeer som skal vises på profilen din."
+                                    "Gullpokaler er forbeholdt større, verifiserte prestasjoner."
                             )
                     )
                     .font(.caption)
@@ -2107,13 +2125,13 @@ private enum TrophyHubTab:
         switch self {
         case .collection:
             return ATHLTHLocalization.choose(
-                english: "Collection",
-                norwegian: "Samling"
+                english: "Achievements",
+                norwegian: "Achievements"
             )
         case .cabinet:
             return ATHLTHLocalization.choose(
-                english: "Cabinet",
-                norwegian: "Troféskap"
+                english: "Trophies",
+                norwegian: "Pokaler"
             )
         }
     }
