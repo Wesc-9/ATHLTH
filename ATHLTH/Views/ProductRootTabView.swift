@@ -10057,7 +10057,7 @@ struct ATHLTHProfileView: View {
                         )
                     } else {
                         NavigationLink {
-                            PerformanceStatsView(
+                            ProfileRecordShowcasePickerView(
                                 stats:
                                     performanceStats,
                                 healthRecords:
