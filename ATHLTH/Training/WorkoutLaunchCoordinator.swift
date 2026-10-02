@@ -551,6 +551,83 @@ enum WorkoutLaunchCoordinator {
         }
     }
 
+    static func startWalkQuick(
+        configuration: WalkQuickStartConfiguration,
+        settings: AppSettingsStore,
+        gear: ProfileGearStore,
+        phoneWorkout: IPhoneWorkoutStore,
+        watchConnection: AppleWatchConnectionStore
+    ) async throws {
+        if configuration.captureDevice == .iPhone {
+            gear.prepareNextWorkoutGear(
+                configuration.gearIDs
+            )
+            phoneWorkout.start(
+                walking: true,
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Walk",
+                        norwegian: "Gåtur"
+                    ),
+                audioCoach:
+                    configuration.audioCoach,
+                routeAlerts:
+                    settings.routeAlertConfiguration,
+                autoPauseEnabled:
+                    configuration.autoPauseEnabled
+            )
+            return
+        }
+
+        guard watchConnection.isReady else {
+            throw NSError(
+                domain: "ATHLTH.WalkLaunch",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Apple Watch is not ready to start this walk."
+                ]
+            )
+        }
+
+        let watchWorkout =
+            WatchRunningWorkoutTransfer(
+                title: "",
+                steps: [],
+                routeAlerts:
+                    settings.routeAlertConfiguration,
+                autoPauseEnabled:
+                    configuration.autoPauseEnabled
+            )
+
+        watchConnection
+            .sendWorkoutRouteSelection(nil)
+        watchConnection
+            .sendAudioCoachConfiguration(
+                configuration.audioCoach
+            )
+        watchConnection
+            .sendRunningWorkout(
+                watchWorkout
+            )
+
+        try await watchConnection
+            .startWorkoutOnWatch(.walking)
+
+        gear.prepareNextWorkoutGear(
+            configuration.gearIDs
+        )
+
+        watchConnection
+            .sendAudioCoachConfiguration(
+                configuration.audioCoach
+            )
+        watchConnection
+            .sendRunningWorkout(
+                watchWorkout
+            )
+    }
+
     static func startStrength(
         workout: PlannedSession,
         captureDevice: WorkoutCaptureDevice,
