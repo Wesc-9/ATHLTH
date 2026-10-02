@@ -544,9 +544,22 @@ struct AppRootView: View {
                 await submitLatestStoreProofIfPossible()
             }
         }
-        .onChange(of: watchConnection.lastCompletedWorkout) { _, result in
-            guard let result else { return }
-            handleWatchWorkoutCompletion(result)
+        .task(
+            id:
+                watchConnection
+                    .lastCompletedWorkout?
+                    .id
+        ) {
+            guard let result =
+                    watchConnection
+                        .lastCompletedWorkout
+            else {
+                return
+            }
+
+            handleWatchWorkoutCompletion(
+                result
+            )
         }
         .onChange(of: phoneWorkout.completionStartedWorkout?.id) { _, _ in
             guard let workout =
