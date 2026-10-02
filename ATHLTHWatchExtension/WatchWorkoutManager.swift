@@ -118,6 +118,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
+    @Published private(set) var strengthActionPending = false
     @Published private(set) var liveSurfaceConfiguration:
         ATHLTHLiveWorkoutSurfaceConfiguration =
             ATHLTHLiveWorkoutPreferencesStore.load()
@@ -653,6 +654,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         publish {
             self.strengthSession = snapshot
+            self.strengthActionPending = false
         }
 
         handleStrengthCoachTransition(
@@ -1063,35 +1065,59 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 rpe: snapshot.draftRPE,
                 rir: snapshot.draftRIR,
                 isWarmUp:
-                    snapshot.isWarmUp
+                    snapshot.isWarmUp,
+                exerciseIndex:
+                    snapshot.exerciseIndex,
+                setIndex:
+                    snapshot.setIndex
             )
         )
     }
 
     func completeStrengthSet() {
-        guard let snapshot = strengthSession else {
-            requestStrengthSnapshot()
+        guard !strengthActionPending,
+              let snapshot =
+                strengthSession
+        else {
             return
         }
 
-        sendStrengthCommand(
-            WatchStrengthCommand(
-                id: UUID(),
-                workoutID: snapshot.workoutID,
-                kind: .completeSet,
-                reps: snapshot.draftReps,
-                weightKilograms:
-                    snapshot.draftWeightKilograms,
-                restSeconds:
-                    snapshot.draftRestSeconds,
-                addRestSeconds: nil,
-                sentAt: Date(),
-                rpe: snapshot.draftRPE,
-                rir: snapshot.draftRIR,
-                isWarmUp:
-                    snapshot.isWarmUp
+        let sent =
+            sendStrengthCommand(
+                WatchStrengthCommand(
+                    id: UUID(),
+                    workoutID:
+                        snapshot.workoutID,
+                    kind: .completeSet,
+                    reps:
+                        snapshot.draftReps,
+                    weightKilograms:
+                        snapshot
+                            .draftWeightKilograms,
+                    restSeconds:
+                        snapshot
+                            .draftRestSeconds,
+                    addRestSeconds: nil,
+                    sentAt: Date(),
+                    rpe:
+                        snapshot.draftRPE,
+                    rir:
+                        snapshot.draftRIR,
+                    isWarmUp:
+                        snapshot.isWarmUp,
+                    exerciseIndex:
+                        snapshot.exerciseIndex,
+                    setIndex:
+                        snapshot.setIndex
+                )
             )
-        )
+
+        if sent {
+            publish {
+                self.strengthActionPending =
+                    true
+            }
+        }
     }
 
     func skipStrengthRest() {
@@ -1133,22 +1159,38 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func moveToNextStrengthExercise() {
-        guard let snapshot = strengthSession else {
+        guard !strengthActionPending,
+              let snapshot =
+                strengthSession
+        else {
             return
         }
 
-        sendStrengthCommand(
-            WatchStrengthCommand(
-                id: UUID(),
-                workoutID: snapshot.workoutID,
-                kind: .nextExercise,
-                reps: nil,
-                weightKilograms: nil,
-                restSeconds: nil,
-                addRestSeconds: nil,
-                sentAt: Date()
+        let sent =
+            sendStrengthCommand(
+                WatchStrengthCommand(
+                    id: UUID(),
+                    workoutID:
+                        snapshot.workoutID,
+                    kind: .nextExercise,
+                    reps: nil,
+                    weightKilograms: nil,
+                    restSeconds: nil,
+                    addRestSeconds: nil,
+                    sentAt: Date(),
+                    exerciseIndex:
+                        snapshot.exerciseIndex,
+                    setIndex:
+                        snapshot.setIndex
+                )
             )
-        )
+
+        if sent {
+            publish {
+                self.strengthActionPending =
+                    true
+            }
+        }
     }
 
     func requestStrengthSnapshot() {
@@ -1166,21 +1208,30 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    @discardableResult
     private func sendStrengthCommand(
         _ command: WatchStrengthCommand
-    ) {
+    ) -> Bool {
         guard WCSession.isSupported(),
-              WCSession.default.activationState == .activated,
-              let data = try? JSONEncoder().encode(command)
+              WCSession.default.activationState ==
+                .activated,
+              let data =
+                try? JSONEncoder()
+                    .encode(command)
         else {
-            return
+            return false
         }
 
         let payload: [String: Any] = [
             WatchTransferMetadataKey.kind:
-                WatchTransferKind.strengthCommand.rawValue,
+                WatchTransferKind
+                    .strengthCommand
+                    .rawValue,
             WatchTransferMetadataKey.payload:
-                data
+                data,
+            WatchTransferMetadataKey.sentAt:
+                command.sentAt
+                    .timeIntervalSince1970
         ]
 
         if WCSession.default.isReachable {
@@ -1188,24 +1239,25 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 payload,
                 replyHandler: nil,
                 errorHandler:
-                    Self.makeStrengthCommandFallbackHandler(
-                        payload: payload
-                    )
+                    Self
+                        .makeStrengthCommandFallbackHandler(
+                            payload: payload
+                        )
             )
         } else {
-            WCSession.default.transferUserInfo(
-                payload
-            )
+            WCSession.default
+                .transferUserInfo(payload)
         }
+
+        return true
     }
 
     nonisolated private static func makeStrengthCommandFallbackHandler(
         payload: [String: Any]
     ) -> (Error) -> Void {
         { _ in
-            WCSession.default.transferUserInfo(
-                payload
-            )
+            WCSession.default
+                .transferUserInfo(payload)
         }
     }
 
@@ -1679,6 +1731,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.structuredRunningWorkout = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
+            self.strengthActionPending = false
             self.liveSurfaceContext = .empty
             self.completedResult = nil
             self.errorMessage = nil
