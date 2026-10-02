@@ -47,6 +47,7 @@ struct AccountTrainingContent: Codable {
     var scheduledPlans: [TrainingPlan]
     var planTemplates: [TrainingPlan]
     var savedWorkoutTemplates: [PlannedSession]
+    var standalonePlannedSessions: [PlannedSession]? = nil
     var manuallyCompletedPlanSessions: Set<String>
     var skippedPlanSessions: Set<String>? = nil
     var savedRoutes: [TrainingRoute]
@@ -66,6 +67,7 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var scheduledPlans: [TrainingPlan]
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
+    @Published private(set) var standalonePlannedSessions: [PlannedSession]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
     @Published private(set) var skippedPlanSessions: Set<String>
     @Published private(set) var pendingCoachPlanProposal: CoachPlanChangeProposal?
@@ -106,6 +108,7 @@ final class AppSessionStore: ObservableObject {
         self.scheduledPlans = []
         self.planTemplates = []
         self.savedWorkoutTemplates = []
+        self.standalonePlannedSessions = []
         self.manuallyCompletedPlanSessions = []
         self.skippedPlanSessions = []
         self.pendingCoachPlanProposal = nil
@@ -525,6 +528,7 @@ final class AppSessionStore: ObservableObject {
         savedRoutes = []
         planTemplates = []
         savedWorkoutTemplates = []
+        standalonePlannedSessions = []
         manuallyCompletedPlanSessions = []
         skippedPlanSessions = []
         pendingCoachPlanProposal = nil
@@ -2368,6 +2372,83 @@ final class AppSessionStore: ObservableObject {
         replaceTrainingPlan(plan)
     }
 
+    func addStandalonePlannedSession(
+        _ session: PlannedSession
+    ) {
+        guard session.scheduledStart != nil else {
+            return
+        }
+
+        standalonePlannedSessions.removeAll {
+            $0.id == session.id
+        }
+        standalonePlannedSessions.append(session)
+        standalonePlannedSessions.sort {
+            ($0.scheduledStart ?? .distantFuture) <
+            ($1.scheduledStart ?? .distantFuture)
+        }
+        persistAccountContent()
+    }
+
+    func updateStandalonePlannedSession(
+        _ session: PlannedSession
+    ) {
+        guard let index =
+                standalonePlannedSessions
+                    .firstIndex(
+                        where: {
+                            $0.id == session.id
+                        }
+                    )
+        else {
+            addStandalonePlannedSession(
+                session
+            )
+            return
+        }
+
+        standalonePlannedSessions[index] =
+            session
+        standalonePlannedSessions.sort {
+            ($0.scheduledStart ?? .distantFuture) <
+            ($1.scheduledStart ?? .distantFuture)
+        }
+        persistAccountContent()
+    }
+
+    func removeStandalonePlannedSession(
+        _ sessionID: UUID
+    ) {
+        standalonePlannedSessions
+            .removeAll {
+                $0.id == sessionID
+            }
+        persistAccountContent()
+    }
+
+    func standalonePlannedSessions(
+        on date: Date
+    ) -> [PlannedSession] {
+        let calendar = Calendar.current
+        return standalonePlannedSessions
+            .filter {
+                guard let scheduled =
+                        $0.scheduledStart
+                else {
+                    return false
+                }
+
+                return calendar.isDate(
+                    scheduled,
+                    inSameDayAs: date
+                )
+            }
+            .sorted {
+                ($0.scheduledStart ?? .distantFuture) <
+                ($1.scheduledStart ?? .distantFuture)
+            }
+    }
+
     func addSession(
         _ session: PlannedSession,
         toDay dayID: UUID
@@ -3046,6 +3127,7 @@ final class AppSessionStore: ObservableObject {
         let content = AccountTrainingContent(
             activePlan: activePlan, scheduledPlans: scheduledPlans,
             planTemplates: planTemplates, savedWorkoutTemplates: savedWorkoutTemplates,
+            standalonePlannedSessions: standalonePlannedSessions,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
             savedRoutes: savedRoutes,
@@ -3084,6 +3166,12 @@ final class AppSessionStore: ObservableObject {
         planTemplates = stored?.planTemplates ?? (mayMigrate ? Self.loadPlanTemplates(from: defaults).filter { $0.ownerID == userID } : [])
         savedRoutes = stored?.savedRoutes ?? (mayMigrate ? Self.loadSavedRoutes(from: defaults).filter { $0.ownerID == userID } : [])
         savedWorkoutTemplates = stored?.savedWorkoutTemplates ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadSavedWorkoutTemplates(from: defaults) : [])
+        standalonePlannedSessions =
+            (stored?.standalonePlannedSessions ?? [])
+                .sorted {
+                    ($0.scheduledStart ?? .distantFuture) <
+                    ($1.scheduledStart ?? .distantFuture)
+                }
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
         skippedPlanSessions = stored?.skippedPlanSessions ?? []
         pendingCoachPlanProposal = stored?.pendingCoachPlanProposal
