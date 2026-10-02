@@ -423,14 +423,34 @@ struct AchievementParticleBurst:
     View
 {
     let rarity: TrophyRarity
+    var reduced = false
 
     @State private var burst = false
+
+    private var particleCount: Int {
+        reduced
+            ? max(
+                rarity
+                    .unlockParticleCount / 2,
+                8
+            )
+            : rarity
+                .unlockParticleCount
+    }
+
+    private var burstRadius: CGFloat {
+        reduced
+            ? rarity
+                .unlockBurstRadius *
+                0.62
+            : rarity
+                .unlockBurstRadius
+    }
 
     var body: some View {
         ZStack {
             ForEach(
-                0..<rarity
-                    .unlockParticleCount,
+                0..<particleCount,
                 id: \.self
             ) { index in
                 particle(
@@ -454,8 +474,7 @@ struct AchievementParticleBurst:
     ) -> some View {
         let count =
             max(
-                rarity
-                    .unlockParticleCount,
+                particleCount,
                 1
             )
         let angle =
@@ -470,9 +489,12 @@ struct AchievementParticleBurst:
                 index % 5
             ) * 7
         let radius =
-            rarity
-                .unlockBurstRadius +
-            wave
+            burstRadius +
+            (
+                reduced
+                    ? wave * 0.55
+                    : wave
+            )
         let x =
             cos(angle) *
             Double(radius)
@@ -557,6 +579,26 @@ struct AchievementParticleBurst:
 @MainActor
 enum AchievementUnlockFeedback {
     static func play(
+        rarity: TrophyRarity,
+        soundEnabled: Bool,
+        hapticsEnabled: Bool
+    ) {
+        if hapticsEnabled {
+            playHaptics(
+                rarity: rarity
+            )
+        }
+
+        if soundEnabled {
+            AchievementUnlockSoundPlayer
+                .shared
+                .play(
+                    rarity: rarity
+                )
+        }
+    }
+
+    private static func playHaptics(
         rarity: TrophyRarity
     ) {
         switch rarity {
@@ -618,12 +660,6 @@ enum AchievementUnlockFeedback {
                     )
                 }
         }
-
-        AchievementUnlockSoundPlayer
-            .shared
-            .play(
-                rarity: rarity
-            )
     }
 }
 
