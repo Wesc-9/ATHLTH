@@ -201,11 +201,10 @@ extension SupabaseSocialService {
             .execute()
     }
 
-    @discardableResult
     func scheduleWorkoutStart(
         sessionID: UUID,
         countdownSeconds: Int
-    ) async throws -> Date {
+    ) async throws {
         try await client
             .rpc(
                 "schedule_social_workout_start",
@@ -217,7 +216,6 @@ extension SupabaseSocialService {
                     )
             )
             .execute()
-            .value
     }
 
     func respondToWorkoutInvite(
