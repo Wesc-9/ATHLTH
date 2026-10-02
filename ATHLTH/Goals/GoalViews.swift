@@ -2356,36 +2356,140 @@ struct GoalCreationView: View {
                     }
                     .buttonStyle(.plain)
 
-                    HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 9
+                    ) {
                         Text(
                             ATHLTHLocalization.format(
-                                english: "Fallback cover",
-                                norwegian: "Standardbakgrunn"
+                                english: "Choose an ATHLTH cover",
+                                norwegian: "Velg et ATHLTH-bilde"
                             )
                         )
-                        .font(.caption)
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(
                             ATHLTHTheme
                                 .mutedText
                         )
 
-                        Spacer()
-
-                        Picker(
-                            "",
-                            selection:
-                                $coverStyle
+                        ScrollView(
+                            .horizontal,
+                            showsIndicators: false
                         ) {
-                            ForEach(
-                                GoalCoverStyle
-                                    .allCases
-                            ) { style in
-                                Text(style.title)
-                                    .tag(style)
+                            HStack(spacing: 9) {
+                                ForEach(
+                                    GoalCoverStyle.allCases
+                                ) { style in
+                                    let isSelected =
+                                        imageData == nil &&
+                                        coverStyle == style
+
+                                    Button {
+                                        selectedPhoto = nil
+                                        imageData = nil
+                                        coverStyle = style
+                                    } label: {
+                                        ZStack(
+                                            alignment:
+                                                .bottomLeading
+                                        ) {
+                                            Image(
+                                                style.assetName
+                                            )
+                                            .resizable()
+                                            .interpolation(
+                                                .high
+                                            )
+                                            .scaledToFill()
+                                            .frame(
+                                                width: 112,
+                                                height: 72
+                                            )
+                                            .clipped()
+
+                                            LinearGradient(
+                                                colors: [
+                                                    .clear,
+                                                    .black.opacity(
+                                                        0.62
+                                                    )
+                                                ],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
+
+                                            Text(style.title)
+                                                .font(
+                                                    .system(
+                                                        size: 10,
+                                                        weight: .bold
+                                                    )
+                                                )
+                                                .foregroundStyle(
+                                                    .white
+                                                )
+                                                .padding(8)
+
+                                            if isSelected {
+                                                Image(
+                                                    systemName:
+                                                        "checkmark.circle.fill"
+                                                )
+                                                .font(
+                                                    .system(
+                                                        size: 17,
+                                                        weight: .bold
+                                                    )
+                                                )
+                                                .foregroundStyle(
+                                                    .white
+                                                )
+                                                .padding(7)
+                                                .frame(
+                                                    maxWidth:
+                                                        .infinity,
+                                                    maxHeight:
+                                                        .infinity,
+                                                    alignment:
+                                                        .topTrailing
+                                                )
+                                            }
+                                        }
+                                        .frame(
+                                            width: 112,
+                                            height: 72
+                                        )
+                                        .clipShape(
+                                            RoundedRectangle(
+                                                cornerRadius: 14,
+                                                style:
+                                                    .continuous
+                                            )
+                                        )
+                                        .overlay {
+                                            RoundedRectangle(
+                                                cornerRadius: 14,
+                                                style:
+                                                    .continuous
+                                            )
+                                            .stroke(
+                                                isSelected
+                                                    ? goalFlowBlue
+                                                    : Color.black
+                                                        .opacity(
+                                                            0.06
+                                                        ),
+                                                lineWidth:
+                                                    isSelected
+                                                        ? 2
+                                                        : 0.7
+                                            )
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
                     }
                 }
             }
