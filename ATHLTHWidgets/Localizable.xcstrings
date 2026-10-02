@@ -1,0 +1,376 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Ready": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klar"
+          }
+        }
+      }
+    },
+    "Easy run · 32 min": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolig løp · 32 min"
+          }
+        }
+      }
+    },
+    "10K under 45 min": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 km under 45 min"
+          }
+        }
+      }
+    },
+    "ATHLTH": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH"
+          }
+        }
+      }
+    },
+    "Recovery, your next workout and primary goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon, neste økt og primærmål."
+          }
+        }
+      }
+    },
+    "RECOVERY": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RESTITUSJON"
+          }
+        }
+      }
+    },
+    "NEXT": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NESTE"
+          }
+        }
+      }
+    },
+    "No workout planned": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen økt planlagt"
+          }
+        }
+      }
+    },
+    "GOAL": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MÅL"
+          }
+        }
+      }
+    },
+    "ATHLTH Lock Screen": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH låseskjerm"
+          }
+        }
+      }
+    },
+    "Keep recovery and your active workout visible.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold restitusjon og aktiv økt synlig."
+          }
+        }
+      }
+    },
+    "Recovery": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon"
+          }
+        }
+      }
+    },
+    "Return to route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tilbake til ruten"
+          }
+        }
+      }
+    },
+    "Remaining": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gjenstår"
+          }
+        }
+      }
+    },
+    "Heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puls"
+          }
+        }
+      }
+    },
+    "Zone active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sone aktiv"
+          }
+        }
+      }
+    },
+    "Ghost": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost"
+          }
+        }
+      }
+    },
+    "YOU vs GHOST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DU mot GHOST"
+          }
+        }
+      }
+    },
+    "Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utfordring"
+          }
+        }
+      }
+    },
+    "Location sharing active": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posisjonsdeling aktiv"
+          }
+        }
+      }
+    },
+    "KM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KM"
+          }
+        }
+      }
+    },
+    "BPM": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BPM"
+          }
+        }
+      }
+    },
+    "Off Route": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utenfor ruten"
+          }
+        }
+      }
+    },
+    "Route Guardian": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Route Guardian"
+          }
+        }
+      }
+    },
+    "Zone Lock": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonelås"
+          }
+        }
+      }
+    },
+    "Ghost Gap": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghost-avstand"
+          }
+        }
+      }
+    },
+    "Live Challenge": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-utfordring"
+          }
+        }
+      }
+    },
+    "Live Share": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live-deling"
+          }
+        }
+      }
+    },
+    "on target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "på mål"
+          }
+        }
+      }
+    },
+    "in target": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "i målområdet"
+          }
+        }
+      }
+    },
+    "GHOST": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GHOST"
+          }
+        }
+      }
+    },
+    "LIVE": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LIVE"
+          }
+        }
+      }
+    },
+    "Target heart rate": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Målpuls"
+          }
+        }
+      }
+    },
+    "Neck and neck": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helt jevnt"
+          }
+        }
+      }
+    },
+    "Next: %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste: %@"
+          }
+        }
+      }
+    },
+    "Recovery %@": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restitusjon %@"
+          }
+        }
+      }
+    },
+    "Next:": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neste:"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

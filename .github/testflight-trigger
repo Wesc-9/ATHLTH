@@ -1,0 +1,54 @@
+ATHLTH V0.1 TestFlight upload retry 3 - App Store metadata fixed
+retry-watch-bundle-version-19
+align-bundles-21
+final-validated-upload-21
+validated-release-21
+healthkit-entitlements-validated-21
+v1.2.0-build-22-onboarding-release
+v1.3.0-build-24-folded-a-logo
+
+v1.3.1-build-25-final-testflight
+v1.3.2-build-26-workout-history-review
+v1.3.2-build-26-release-archive-fix-upload
+v1.3.3-build-28-selected-pulse-a-testflight
+v1.3.3-build-28-release-fixed-testflight
+v1.3.3-build-28-admin-release-scope-fix
+v1.3.3-build-29-latest-testflight
+v1.3.3-build-29-retry-icon-generator-fix
+v1.3.3-build-29-retry-use-committed-icons
+v1.3.4-build-31-profile-privacy-cleanup
+v1.3.4-build-32-healthkit-crash-hotfix
+ATHLTH 1.3.4 build 33 wearable status + no-watch adaptive UI
+ATHLTH 1.3.4 build 34 latest release/v1.3.4
+ATHLTH 1.3.5 build 35 TestFlight upload
+ATHLTH 1.3.5 build 35 retry after custom workout compile fix
+ATHLTH 1.3.6 build 36 TestFlight upload
+ATHLTH 1.3.7 build 37 TestFlight upload
+ATHLTH 1.3.8 build 38 TestFlight upload
+ATHLTH 1.3.9 build 39 TestFlight upload
+ATHLTH 1.3.9 build 41 latest TestFlight upload
+ATHLTH 1.4.0 build 42 TestFlight upload
+ATHLTH 1.4.0 build 42 retry after group image compile fix
+ATHLTH 1.4.1 build 43 TestFlight upload
+
+upload-build-45-swift6
+ATHLTH 1.4.3 build 46 TestFlight upload
+upload-build-47-healthkit-final
+ATHLTH 1.4.3 build 47 cloud-signing retry
+upload-build-47-cloud-signing
+1.4.4-build-49-search-notifications-insights-2026-09-28
+1.4.4-build-49-retry-notification-background-2026-09-28
+
+v1.4.4-build50-upload-2026-09-29
+ATHLTH 1.4.6 build 51 TestFlight upload 2026-09-29
+upload-v1.5.0-build52-2026-09-29T21-41-CEST
+ATHLTH 1.5.1 build 53 TestFlight upload 2026-09-30
+ATHLTH 1.5.2 build 54 TestFlight upload 2026-10-01
+ATHLTH 1.5.2 build 54 TestFlight retry after green full+iPhone+iPad validation 2026-10-01
+
+1.5.3-build57-2026-10-01-ghost-liveghost-audio-coach
+ATHLTH 1.5.4 build 58 TestFlight upload 2026-10-02
+ATHLTH 1.5.5 build 59 TestFlight upload 2026-10-02
+ATHLTH 1.5.5 build 59 TestFlight retry after Watch init fix 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight upload after pulse icon generator repair 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight retry with user-provided final app icon 2026-10-02

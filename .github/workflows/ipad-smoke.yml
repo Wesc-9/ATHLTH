@@ -1,0 +1,209 @@
+name: ATHLTH iPad Compatibility Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+      - release/v1.4.4
+      - release/v1.4.6
+      - release/v1.5.1
+      - release/v1.5.2
+      - release/v1.5.3
+    paths:
+      - ATHLTH/**/*.swift
+      - ATHLTH/Assets.xcassets/**
+      - Shared/**/*.swift
+      - project.yml
+      - scripts/optimize_hero_assets.sh
+      - .github/workflows/ipad-smoke.yml
+      - .github/ipad-trigger
+
+concurrency:
+  group: athlth-ipad-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ipad-smoke:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install validation tools
+        run: |
+          brew install xcodegen
+          brew install imagemagick
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
+
+      - name: Generate iPad smoke-test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp project.yml project-ipad-smoke.yml
+          python3 - project-ipad-smoke.yml <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
+          path.write_text(text)
+          PY
+          xcodegen generate --spec project-ipad-smoke.yml
+
+      - name: Build simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Launch onboarding and all main tabs on iPad
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)
+          runtimes=[
+              r for r in data["runtimes"]
+              if r.get("isAvailable")
+              and r.get("platform")=="iOS"
+          ]
+          if not runtimes:
+              runtimes=[
+                  r for r in data["runtimes"]
+                  if r.get("isAvailable")
+                  and "iOS" in r.get("name","")
+              ]
+          if not runtimes:
+              raise SystemExit("No iOS runtime is available")
+          print(runtimes[-1]["identifier"])
+          ')
+
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name 'ATHLTH.app' -print -quit)
+          test -n "$APP"
+          test -d "$APP"
+
+          DEVICE_TYPES_JSON="$RUNNER_TEMP/ipad-device-types.json"
+          xcrun simctl list devicetypes -j > "$DEVICE_TYPES_JSON"
+
+          DEVICE_TYPE=$(python3 - "$DEVICE_TYPES_JSON" <<'PY'
+          import json,sys
+
+          with open(sys.argv[1]) as fh:
+              data=json.load(fh)
+
+          ipads=[
+              d for d in data["devicetypes"]
+              if d.get("name","").startswith("iPad")
+          ]
+
+          if not ipads:
+              raise SystemExit("No iPad simulator device type is available")
+
+          preferred_names=[
+              "iPad Pro 11-inch (M5)",
+              "iPad Pro 11-inch (M4)",
+              "iPad Air 11-inch (M3)",
+              "iPad Air 11-inch (M2)",
+              "iPad (A16)",
+              "iPad (10th generation)",
+          ]
+
+          by_name={d["name"]:d for d in ipads}
+
+          for name in preferred_names:
+              if name in by_name:
+                  print(by_name[name]["identifier"])
+                  raise SystemExit(0)
+
+          eleven=[
+              d for d in ipads
+              if "11-inch" in d["name"]
+              or "11 inch" in d["name"]
+          ]
+          chosen=(eleven or ipads)[-1]
+          print(chosen["identifier"])
+          PY
+          )
+
+          UDID=$(xcrun simctl create "ATHLTH-iPad" "$DEVICE_TYPE" "$RUNTIME")
+
+          cleanup() {
+            xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          validate_screen() {
+            local label="$1"
+            local screenshot="$RUNNER_TEMP/athlth-ipad-$label.png"
+
+            sleep 6
+            xcrun simctl io "$UDID" screenshot "$screenshot"
+            test -s "$screenshot"
+
+            local entropy
+            entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
+            echo "iPad $label screenshot entropy: $entropy"
+
+            python3 - "$entropy" "$label" <<'PY'
+          import sys
+          entropy=float(sys.argv[1])
+          label=sys.argv[2]
+          if entropy < 0.025:
+              raise SystemExit(
+                  f"ATHLTH iPad {label} appears visually blank: entropy={entropy:.5f}"
+              )
+          PY
+          }
+
+          LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+          echo "$LAUNCH_OUTPUT"
+          validate_screen "onboarding"
+          xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+
+          for TAB in 0 1 2 3 4; do
+            echo "Rendering ATHLTH iPad tab $TAB"
+
+            TAB_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+              --athlth-compatibility-preview \
+              "--athlth-compatibility-tab=$TAB" 2>&1)
+            echo "$TAB_OUTPUT"
+
+            TAB_PID=$(echo "$TAB_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+            sleep 5
+
+            if [ -z "$TAB_PID" ] || ! kill -0 "$TAB_PID" 2>/dev/null; then
+              echo "::error::ATHLTH iPad tab $TAB exited after launch."
+              xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              exit 1
+            fi
+
+            validate_screen "tab-$TAB"
+            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+          done
+
+          echo "ATHLTH onboarding and all five main tabs rendered on iPad."

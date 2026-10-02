@@ -1,0 +1,176 @@
+name: Diagnose Beta App Review submission
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+    paths:
+      - .github/beta-review-diagnostic-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  submit-beta-review:
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      BUNDLE_ID: com.wesc9.athlth
+      BUILD_NUMBER: "47"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submit build 47 to Beta App Review and capture Apple response
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyjwt cryptography
+
+          python3 - <<'PY'
+          import json, os, time, urllib.parse, urllib.request, urllib.error
+          import jwt
+
+          key = os.environ["ASC_API_KEY_P8"].strip()
+          if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+              if key[0] == '"':
+                  try:
+                      key = json.loads(key)
+                  except json.JSONDecodeError:
+                      key = key[1:-1]
+              else:
+                  key = key[1:-1]
+          key = key.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+          now = int(time.time())
+          token = jwt.encode(
+              {
+                  "iss": os.environ["ASC_ISSUER_ID"],
+                  "iat": now - 30,
+                  "exp": now + 600,
+                  "aud": "appstoreconnect-v1",
+              },
+              key,
+              algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+          )
+
+          def request(method, path, params=None, payload=None):
+              url = "https://api.appstoreconnect.apple.com" + path
+              if params:
+                  url += "?" + urllib.parse.urlencode(params, doseq=True)
+              body = None
+              headers = {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/json",
+              }
+              if payload is not None:
+                  body = json.dumps(payload).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(url, data=body, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      raw = resp.read().decode("utf-8", "replace")
+                      return resp.status, raw
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read().decode("utf-8", "replace")
+                  return exc.code, raw
+
+          status, raw = request("GET", "/v1/apps", {
+              "filter[bundleId]": os.environ["BUNDLE_ID"],
+              "limit": "5",
+          })
+          print(f"APP_LOOKUP_HTTP={status}")
+          if status != 200:
+              print(raw)
+              raise SystemExit(1)
+          apps = json.loads(raw)
+          if not apps.get("data"):
+              raise SystemExit("APP_NOT_FOUND")
+          app_id = apps["data"][0]["id"]
+          print(f"APP_ID={app_id}")
+
+          status, raw = request("GET", "/v1/builds", {
+              "filter[app]": app_id,
+              "filter[version]": os.environ["BUILD_NUMBER"],
+              "sort": "-uploadedDate",
+              "limit": "10",
+              "include": "buildBetaDetail,betaAppReviewSubmission,preReleaseVersion,betaGroups",
+          })
+          print(f"BUILD_LOOKUP_HTTP={status}")
+          if status != 200:
+              print(raw)
+              raise SystemExit(1)
+          builds = json.loads(raw)
+          if not builds.get("data"):
+              raise SystemExit("BUILD_NOT_FOUND")
+
+          build = builds["data"][0]
+          build_id = build["id"]
+          attrs = build.get("attributes", {})
+          print(f"BUILD_ID={build_id}")
+          print(f"BUILD_NUMBER={attrs.get('version')}")
+          print(f"PROCESSING_STATE={attrs.get('processingState')}")
+          print(f"EXPIRED={attrs.get('expired')}")
+
+          included = {
+              (x.get("type"), x.get("id")): x
+              for x in builds.get("included", [])
+          }
+          rels = build.get("relationships", {})
+          bd_ref = rels.get("buildBetaDetail", {}).get("data")
+          if bd_ref:
+              detail = included.get((bd_ref.get("type"), bd_ref.get("id")), {})
+              da = detail.get("attributes", {})
+              print(f"INTERNAL_BUILD_STATE={da.get('internalBuildState')}")
+              print(f"EXTERNAL_BUILD_STATE={da.get('externalBuildState')}")
+
+          existing_ref = rels.get("betaAppReviewSubmission", {}).get("data")
+          if existing_ref:
+              existing = included.get((existing_ref.get("type"), existing_ref.get("id")), {})
+              ea = existing.get("attributes", {})
+              print("EXISTING_BETA_REVIEW_SUBMISSION=true")
+              print(f"EXISTING_SUBMISSION_ID={existing_ref.get('id')}")
+              print(f"EXISTING_BETA_REVIEW_STATE={ea.get('betaReviewState')}")
+              raise SystemExit(0)
+
+          payload = {
+              "data": {
+                  "type": "betaAppReviewSubmissions",
+                  "relationships": {
+                      "build": {
+                          "data": {
+                              "type": "builds",
+                              "id": build_id
+                          }
+                      }
+                  }
+              }
+          }
+
+          status, raw = request(
+              "POST",
+              "/v1/betaAppReviewSubmissions",
+              payload=payload,
+          )
+          print(f"BETA_REVIEW_POST_HTTP={status}")
+
+          # Apple response contains no secrets; pretty-print the API result so
+          # support-relevant error codes, titles, details and IDs are visible.
+          try:
+              obj = json.loads(raw) if raw else {}
+              print("APPLE_RESPONSE_JSON=")
+              print(json.dumps(obj, indent=2, sort_keys=True))
+          except json.JSONDecodeError:
+              print("APPLE_RESPONSE_RAW=")
+              print(raw)
+
+          if status not in (200, 201):
+              # Keep the workflow successful so the diagnostic log remains easy
+              # to find; the HTTP status above is the diagnostic result.
+              raise SystemExit(0)
+
+          print("BETA_REVIEW_SUBMISSION_CREATED=true")
+          PY

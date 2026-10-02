@@ -1,0 +1,333 @@
+name: ATHLTH iPhone Compatibility Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.4.3
+      - release/v1.4.4
+      - release/v1.4.6
+      - release/v1.5.1
+      - release/v1.5.2
+      - release/v1.5.3
+    paths:
+      - ATHLTH/**/*.swift
+      - ATHLTH/Assets.xcassets/**
+      - Shared/**/*.swift
+      - project.yml
+      - scripts/optimize_hero_assets.sh
+      - .github/workflows/launch-smoke.yml
+      - .github/launch-trigger
+
+concurrency:
+  group: athlth-iphone-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  launch-smoke:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install validation tools
+        run: |
+          brew install xcodegen
+          brew install imagemagick
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
+
+      - name: Generate iPhone-only smoke-test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp project.yml project-smoke.yml
+          python3 - project-smoke.yml <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
+          path.write_text(text)
+          PY
+          xcodegen generate --spec project-smoke.yml
+
+      - name: Build simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Launch across SE mini standard and large iPhones
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys
+          data=json.load(sys.stdin)
+          runtimes=[
+              r for r in data["runtimes"]
+              if r.get("isAvailable")
+              and r.get("platform")=="iOS"
+          ]
+          if not runtimes:
+              runtimes=[
+                  r for r in data["runtimes"]
+                  if r.get("isAvailable")
+                  and "iOS" in r.get("name","")
+              ]
+          if not runtimes:
+              raise SystemExit("No iOS runtime is available")
+          print(runtimes[-1]["identifier"])
+          ')
+
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name 'ATHLTH.app' -print -quit)
+          test -n "$APP"
+          test -d "$APP"
+
+          DEVICE_TYPES_JSON="$RUNNER_TEMP/iphone-device-types.json"
+          DEVICE_MATRIX="$RUNNER_TEMP/iphone-device-matrix.txt"
+
+          xcrun simctl list devicetypes -j > "$DEVICE_TYPES_JSON"
+
+          python3 - "$DEVICE_TYPES_JSON" "$DEVICE_MATRIX" <<'PY'
+          import json,sys
+
+          source=sys.argv[1]
+          output=sys.argv[2]
+          with open(source) as fh:
+              data=json.load(fh)
+          phones=[
+              d for d in data["devicetypes"]
+              if d.get("name","").startswith("iPhone")
+          ]
+
+          if not phones:
+              raise SystemExit("No iPhone simulator device types are available")
+
+          by_name={d["name"]:d for d in phones}
+          used=set()
+
+          candidates={
+              "compact":[
+                  "iPhone SE (3rd generation)",
+                  "iPhone SE (2nd generation)",
+              ],
+              "mini":[
+                  "iPhone 13 mini",
+                  "iPhone 12 mini",
+                  "iPhone 14",
+              ],
+              "standard":[
+                  "iPhone 15",
+                  "iPhone 16",
+                  "iPhone 17",
+                  "iPhone 14",
+              ],
+              "large":[
+                  "iPhone 15 Pro Max",
+                  "iPhone 16 Pro Max",
+                  "iPhone 17 Pro Max",
+                  "iPhone 14 Pro Max",
+                  "iPhone 16 Plus",
+                  "iPhone 15 Plus",
+              ],
+          }
+
+          def choose(kind):
+              for name in candidates[kind]:
+                  device=by_name.get(name)
+                  if device and device["identifier"] not in used:
+                      used.add(device["identifier"])
+                      return device
+
+              remaining=[
+                  d for d in phones
+                  if d["identifier"] not in used
+              ]
+
+              if kind=="compact":
+                  preferred=[
+                      d for d in remaining
+                      if "SE" in d["name"]
+                  ]
+              elif kind=="mini":
+                  preferred=[
+                      d for d in remaining
+                      if "mini" in d["name"].lower()
+                  ]
+              elif kind=="large":
+                  preferred=[
+                      d for d in remaining
+                      if "Pro Max" in d["name"] or "Plus" in d["name"]
+                  ]
+              else:
+                  preferred=[
+                      d for d in remaining
+                      if "Pro Max" not in d["name"]
+                      and "Plus" not in d["name"]
+                      and "SE" not in d["name"]
+                      and "mini" not in d["name"].lower()
+                  ]
+
+              pool=preferred or remaining
+              if not pool:
+                  raise SystemExit(f"No unused device type for {kind}")
+
+              device=pool[-1] if kind=="large" else pool[0]
+              used.add(device["identifier"])
+              return device
+
+          with open(output,"w") as fh:
+              for kind in ("compact","mini","standard","large"):
+                  device=choose(kind)
+                  fh.write(
+                      f'{kind}|{device["identifier"]}|{device["name"]}\n'
+                  )
+          PY
+
+          cat "$DEVICE_MATRIX"
+
+          cleanup_device() {
+            local udid="$1"
+            xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+            xcrun simctl delete "$udid" >/dev/null 2>&1 || true
+          }
+
+          validate_nonblank_screen() {
+            local udid="$1"
+            local screenshot="$2"
+            local label="$3"
+            local attempt=1
+            local entropy="0"
+
+            while [ "$attempt" -le 3 ]; do
+              xcrun simctl io "$udid" screenshot "$screenshot"
+              test -s "$screenshot"
+
+              entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
+              echo "$label screenshot entropy (attempt $attempt): $entropy"
+
+              if python3 - "$entropy" <<'PY'
+          import sys
+          raise SystemExit(0 if float(sys.argv[1]) >= 0.025 else 1)
+          PY
+              then
+                return 0
+              fi
+
+              if [ "$attempt" -lt 3 ]; then
+                echo "$label still looks blank; waiting 8 seconds before retry."
+                sleep 8
+              fi
+
+              attempt=$((attempt + 1))
+            done
+
+            echo "::error::$label remained visually blank after three checks (entropy=$entropy)."
+            xcrun simctl spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+            return 1
+          }
+
+          while IFS='|' read -r CLASS DEVICE_TYPE DEVICE_NAME; do
+            echo "Testing $CLASS layout on $DEVICE_NAME"
+
+            UDID=$(xcrun simctl create "ATHLTH-$CLASS" "$DEVICE_TYPE" "$RUNTIME")
+            trap 'cleanup_device "$UDID"' EXIT
+
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl install "$UDID" "$APP"
+
+            set +e
+            LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
+            LAUNCH_STATUS=$?
+            set -e
+
+            echo "$LAUNCH_OUTPUT"
+
+            if [ "$LAUNCH_STATUS" -ne 0 ]; then
+              echo "::error::ATHLTH failed to launch on $DEVICE_NAME."
+              xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "ATHLTH"' || true
+              exit 1
+            fi
+
+            PID=$(echo "$LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+            sleep 8
+
+            if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
+              echo "::error::ATHLTH exited shortly after launch on $DEVICE_NAME."
+              xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              exit 1
+            fi
+
+            SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS.png"
+            validate_nonblank_screen               "$UDID"               "$SCREENSHOT"               "$DEVICE_NAME onboarding"
+
+            echo "ATHLTH remained alive and rendered non-blank onboarding UI on $DEVICE_NAME (PID $PID)."
+
+            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+
+            for TAB in 0 1 2 3 4; do
+              echo "Rendering main tab $TAB on $DEVICE_NAME"
+
+              set +e
+              TAB_LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+                --athlth-compatibility-preview \
+                "--athlth-compatibility-tab=$TAB" 2>&1)
+              TAB_LAUNCH_STATUS=$?
+              set -e
+
+              echo "$TAB_LAUNCH_OUTPUT"
+
+              if [ "$TAB_LAUNCH_STATUS" -ne 0 ]; then
+                echo "::error::ATHLTH tab $TAB failed to launch on $DEVICE_NAME."
+                exit 1
+              fi
+
+              TAB_PID=$(echo "$TAB_LAUNCH_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+              sleep 5
+
+              if [ -z "$TAB_PID" ] || ! kill -0 "$TAB_PID" 2>/dev/null; then
+                echo "::error::ATHLTH tab $TAB exited on $DEVICE_NAME."
+                xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+                exit 1
+              fi
+
+              TAB_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-tab-$TAB.png"
+              validate_nonblank_screen                 "$UDID"                 "$TAB_SCREENSHOT"                 "$DEVICE_NAME tab $TAB"
+
+              xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+            done
+
+            echo "All five main tabs rendered on $DEVICE_NAME."
+
+            cleanup_device "$UDID"
+            trap - EXIT
+          done < "$DEVICE_MATRIX"
+
+      - name: Upload iPhone smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-smoke-screenshots
+          path: ${{ runner.temp }}/athlth-*.png
+          if-no-files-found: warn
+          retention-days: 3

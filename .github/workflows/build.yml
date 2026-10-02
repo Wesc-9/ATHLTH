@@ -1,0 +1,132 @@
+name: Build ATHLTH
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - restore/v1-athlth-plus
+      - release/v1.2
+      - release/v1.3
+      - release/v1.3.1
+      - release/v1.3.2
+      - release/v1.3.3
+      - release/v1.3.4
+      - release/v1.3.8
+      - release/v1.3.9
+      - release/v1.4.0
+      - release/v1.4.1
+      - release/v1.4.3
+      - release/v1.4.4
+      - release/v1.4.6
+      - release/v1.5.1
+      - release/v1.5.2
+      - release/v1.5.3
+      - release/v1.5.4
+      - release/v1.5.6
+      - fix/v1.4.2-swift6-release
+    paths:
+      - .github/build-trigger
+  pull_request:
+    branches:
+      - main
+      - release/v1.4.4
+      - release/v1.4.6
+      - release/v1.5.1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Regenerate and validate approved app icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_app_icons.py
+          python3 - <<'PY'
+          from __future__ import annotations
+          import struct
+          import zlib
+          from pathlib import Path
+
+          icons = [
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon.png"),
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png"),
+              Path("ATHLTH/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png"),
+              Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset/AppIcon.png"),
+          ]
+
+          def validate(path: Path) -> bytes:
+              payload = path.read_bytes()
+              if payload[:8] != b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"{path}: invalid PNG signature")
+              offset = 8
+              width = height = None
+              saw_idat = saw_iend = False
+              while offset + 12 <= len(payload):
+                  length = struct.unpack(">I", payload[offset:offset + 4])[0]
+                  kind = payload[offset + 4:offset + 8]
+                  data_start = offset + 8
+                  data_end = data_start + length
+                  crc_end = data_end + 4
+                  if crc_end > len(payload):
+                      raise SystemExit(f"{path}: truncated PNG chunk {kind!r}")
+                  data = payload[data_start:data_end]
+                  expected_crc = struct.unpack(">I", payload[data_end:crc_end])[0]
+                  if (zlib.crc32(kind + data) & 0xffffffff) != expected_crc:
+                      raise SystemExit(f"{path}: CRC mismatch in {kind!r}")
+                  if kind == b"IHDR":
+                      width, height, bit_depth, color_type, _, _, _ = struct.unpack(">IIBBBBB", data)
+                      if (width, height, bit_depth, color_type) != (1024, 1024, 8, 2):
+                          raise SystemExit(
+                              f"{path}: expected 1024x1024 8-bit RGB, got "
+                              f"{width}x{height}, bit_depth={bit_depth}, color_type={color_type}"
+                          )
+                  elif kind == b"IDAT":
+                      saw_idat = True
+                  elif kind == b"IEND":
+                      saw_iend = True
+                      break
+                  offset = crc_end
+              if not (saw_idat and saw_iend):
+                  raise SystemExit(f"{path}: incomplete PNG structure")
+              return payload
+
+          payloads = [validate(path) for path in icons]
+          if any(payload != payloads[0] for payload in payloads[1:]):
+              raise SystemExit("ATHLTH iPhone/dark/tinted/Watch icons do not match")
+          print("ATHLTH app icons are valid 1024x1024 RGB PNGs.")
+          PY
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Test privacy, plan completion and account storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for k,vs in d["devices"].items() if "iOS" in k for v in vs if v["name"].startswith("iPhone")))')
+          xcodebuild -project ATHLTH.xcodeproj -scheme ATHLTH \
+            -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test

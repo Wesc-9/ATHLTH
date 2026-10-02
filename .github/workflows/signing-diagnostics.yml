@@ -1,0 +1,120 @@
+name: Inspect Apple signing certificates
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - restore/v1-athlth-plus
+      - fix/v1.4.2-swift6-release
+    paths:
+      - .github/workflows/signing-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: macos-26
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: List Apple signing certificates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/asc-venv"
+          source "$RUNNER_TEMP/asc-venv/bin/activate"
+          python -m pip install --quiet pyjwt cryptography
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8" > "$KEY_PATH"
+          export ASC_KEY_PATH="$KEY_PATH"
+          python <<'PY'
+          import json, os, time, urllib.request
+          import jwt
+
+          with open(os.environ["ASC_KEY_PATH"], "r", encoding="utf-8") as f:
+              private_key = f.read()
+
+          now = int(time.time())
+          token = jwt.encode(
+              {"iss": os.environ["ASC_ISSUER_ID"], "iat": now - 30, "exp": now + 600, "aud": "appstoreconnect-v1"},
+              private_key,
+              algorithm="ES256",
+              headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+          )
+
+          req = urllib.request.Request(
+              "https://api.appstoreconnect.apple.com/v1/certificates?limit=200",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              payload = json.load(resp)
+
+          certs = payload.get("data", [])
+          print(f"Certificate count: {len(certs)}")
+          for item in certs:
+              a = item.get("attributes", {})
+              safe = {
+                  "id": item.get("id"),
+                  "name": a.get("name"),
+                  "certificateType": a.get("certificateType"),
+                  "platform": a.get("platform"),
+                  "expirationDate": a.get("expirationDate"),
+              }
+              print(json.dumps(safe, sort_keys=True))
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return json.load(resp)
+              except Exception as e:
+                  body = getattr(e, "read", lambda: b"")()
+                  print("HTTP failure:", url, getattr(e, "code", None), body.decode("utf-8", errors="replace"))
+                  raise
+
+          for identifier in ["com.wesc9.athlth", "com.wesc9.athlth.widgets", "com.wesc9.athlth.watchkitapp"]:
+              from urllib.parse import quote
+              url = (
+                  "https://api.appstoreconnect.apple.com/v1/bundleIds"
+                  "?filter%5Bidentifier%5D=" + quote(identifier) +
+                  "&include=bundleIdCapabilities"
+                  "&fields%5BbundleIds%5D=identifier%2Cname%2Cplatform%2CbundleIdCapabilities"
+                  "&fields%5BbundleIdCapabilities%5D=capabilityType%2Csettings"
+                  "&limit=50"
+              )
+              payload = get_json(url)
+              rows = [r for r in payload.get("data", []) if r.get("attributes", {}).get("identifier") == identifier]
+              included = {x.get("id"): x for x in payload.get("included", []) if x.get("type") == "bundleIdCapabilities"}
+              print(f"Exact bundle {identifier}: {len(rows)} match(es)")
+              for row in rows:
+                  rel = row.get("relationships", {}).get("bundleIdCapabilities", {}).get("data", [])
+                  caps = []
+                  for link in rel:
+                      item = included.get(link.get("id"), {})
+                      cap = item.get("attributes", {}).get("capabilityType")
+                      if cap:
+                          caps.append(cap)
+                  print(json.dumps({
+                      "identifier": identifier,
+                      "bundleIdResourceId": row.get("id"),
+                      "name": row.get("attributes", {}).get("name"),
+                      "platform": row.get("attributes", {}).get("platform"),
+                      "capabilities": sorted(caps)
+                  }, sort_keys=True))
+          PY
