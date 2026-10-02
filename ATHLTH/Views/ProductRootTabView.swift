@@ -9670,95 +9670,153 @@ struct ATHLTHProfileView: View {
             icon: "trophy.fill",
             actionTitle:
                 ATHLTHLocalization.choose(
-                    english: "See all",
-                    norwegian: "Se alle"
+                    english: "Edit",
+                    norwegian: "Rediger"
                 ),
             destination:
                 AnyView(
                     TrophyCollectionView()
                 )
         ) {
-            VStack(spacing: 14) {
-                HStack(spacing: 12) {
-                    Image(
-                        systemName: "trophy.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 30,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.premiumGold
-                    )
-                    .frame(
-                        width: 74,
-                        height: 74
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .champagneSoft
-                            .opacity(0.92),
-                        in: Circle()
-                    )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
+            HStack(
+                alignment: .top,
+                spacing: 8
+            ) {
+                ForEach(
+                    0..<TrophyStore.showcaseLimit,
+                    id: \.self
+                ) { index in
+                    if profileTrophySlots.indices.contains(
+                        index
                     ) {
-                        Text(
-                            "\(trophyStore.unlockedCount)"
-                        )
-                        .font(
-                            .system(
-                                size: 31,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .monospacedDigit()
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
+                        let trophy =
+                            profileTrophySlots[
+                                index
+                            ]
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "trophies",
-                                norwegian: "troféer"
+                        NavigationLink {
+                            TrophyDetailView(
+                                trophyID:
+                                    trophy.id
                             )
-                        )
-                        .font(
-                            .headline.weight(
-                                .bold
+                        } label: {
+                            VStack(
+                                spacing: 5
+                            ) {
+                                ATHLTHTrophyCoreView(
+                                    trophy:
+                                        trophy,
+                                    size: 68
+                                )
+
+                                Text(
+                                    trophy.title
+                                )
+                                .font(
+                                    .system(
+                                        size: 9.5,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.68
+                                )
+                            }
+                            .frame(
+                                maxWidth:
+                                    .infinity
                             )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink {
+                            TrophyCollectionView()
+                        } label: {
+                            VStack(
+                                spacing: 8
+                            ) {
+                                ZStack {
+                                    ATHLTHTrophyPlateShape()
+                                        .fill(
+                                            Color.black
+                                                .opacity(
+                                                    0.035
+                                                )
+                                        )
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Your strongest milestones",
-                                norwegian:
-                                    "Dine sterkeste milepæler"
+                                    Image(
+                                        systemName:
+                                            "plus"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 16,
+                                            weight: .medium
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .premiumGold
+                                            .opacity(
+                                                0.70
+                                            )
+                                    )
+                                }
+                                .frame(
+                                    width: 60,
+                                    height: 66
+                                )
+                                .overlay {
+                                    ATHLTHTrophyPlateShape()
+                                        .stroke(
+                                            Color.black
+                                                .opacity(
+                                                    0.08
+                                                ),
+                                            style:
+                                                StrokeStyle(
+                                                    lineWidth:
+                                                        1,
+                                                    dash:
+                                                        [
+                                                            4,
+                                                            4
+                                                        ]
+                                                )
+                                        )
+                                }
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Choose",
+                                        norwegian:
+                                            "Velg"
+                                    )
+                                )
+                                .font(
+                                    .system(
+                                        size: 9.5,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+                            .frame(
+                                maxWidth:
+                                    .infinity
                             )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                    }
-
-                    Spacer()
-                }
-
-                HStack(spacing: 8) {
-                    ForEach(
-                        profileTrophySlots
-                    ) { trophy in
-                        trophyBadge(trophy)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -10570,60 +10628,13 @@ struct ATHLTHProfileView: View {
 
     private var profileTrophySlots:
         [TrophyProgressItem] {
-        let showcased =
-            trophyStore.showcaseTrophies
-
-        if showcased.count >= 4 {
-            return Array(
-                showcased.prefix(4)
-            )
-        }
-
-        var result = showcased
-        let used =
-            Set(result.map(\.id))
-
-        let extras =
-            trophyStore.trophies
-                .filter {
-                    $0.isUnlocked &&
-                    !used.contains($0.id)
-                }
+        Array(
+            trophyStore
+                .showcaseTrophies
                 .prefix(
-                    max(
-                        0,
-                        4 - result.count
-                    )
+                    TrophyStore
+                        .showcaseLimit
                 )
-
-        result.append(
-            contentsOf: extras
-        )
-
-        if result.count < 4 {
-            let usedAfterUnlocked =
-                Set(result.map(\.id))
-
-            let upcoming =
-                trophyStore.nextTrophies
-                    .filter {
-                        !usedAfterUnlocked
-                            .contains($0.id)
-                    }
-                    .prefix(
-                        max(
-                            0,
-                            4 - result.count
-                        )
-                    )
-
-            result.append(
-                contentsOf: upcoming
-            )
-        }
-
-        return Array(
-            result.prefix(4)
         )
     }
 
