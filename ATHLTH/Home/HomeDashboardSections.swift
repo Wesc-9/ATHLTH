@@ -1570,6 +1570,26 @@ private struct HomeMetricPoint:
     var id: Date { date }
 }
 
+private enum HomeHealthMetricRange:
+    Int,
+    CaseIterable,
+    Identifiable {
+    case week = 7
+    case twoWeeks = 14
+    case month = 30
+    case quarter = 90
+
+    var id: Int { rawValue }
+
+    var compactTitle: String {
+        "\(rawValue)d"
+    }
+
+    var title: String {
+        "\(rawValue) DAGER"
+    }
+}
+
 struct HomeHealthMetricStrip: View {
     let snapshot: RecoveryTrendSnapshot
     let sleepText: String
@@ -1756,7 +1776,9 @@ struct HomeHealthMetricStrip: View {
                         )
                         .suffix(7)
                         .map(\.value),
-                    tint: kind.tint
+                    tint: kind.tint,
+                    zeroIsEmpty:
+                        kind == .load
                 )
                 .frame(height: 24)
             }
@@ -1918,6 +1940,7 @@ private struct HomeMetricMiniBars:
     View {
     let values: [Double?]
     let tint: Color
+    let zeroIsEmpty: Bool
 
     var body: some View {
         GeometryReader { proxy in
@@ -1995,6 +2018,11 @@ private struct HomeMetricMiniBars:
             return 4
         }
 
+        if zeroIsEmpty &&
+            value <= 0 {
+            return 0
+        }
+
         return max(
             4,
             availableHeight *
@@ -2010,9 +2038,18 @@ private struct HomeMetricMiniBars:
 
 struct HomeHealthMetricDetailView:
     View {
+    @EnvironmentObject private var health:
+        HealthKitManager
+
     let kind: HomeHealthMetricKind
     let snapshot:
         RecoveryTrendSnapshot
+
+    @State private var selectedRange:
+        HomeHealthMetricRange = .week
+    @State private var loadedSnapshot:
+        RecoveryTrendSnapshot?
+    @State private var isLoadingRange = false
 
     var body: some View {
         ScrollView {
@@ -2111,7 +2148,7 @@ struct HomeHealthMetricDetailView:
 
                         Spacer()
 
-                        Text("14 DAGER")
+                        Text(selectedRange.title)
                             .font(
                                 .system(
                                     size: 9,
@@ -2125,9 +2162,43 @@ struct HomeHealthMetricDetailView:
                             )
                     }
 
+                    Picker(
+                        "Periode",
+                        selection:
+                            $selectedRange
+                    ) {
+                        ForEach(
+                            HomeHealthMetricRange
+                                .allCases
+                        ) { range in
+                            Text(
+                                range.compactTitle
+                            )
+                            .tag(range)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.top, 12)
+
+                    if isLoadingRange {
+                        ProgressView(
+                            "Henter \(selectedRange.rawValue) dager…"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .padding(.top, 6)
+                    }
+
                     detailChart
                         .frame(height: 210)
-                        .padding(.top, 12)
+                        .padding(.top, 10)
                 }
 
                 ATHLTHCard {
@@ -2165,6 +2236,9 @@ struct HomeHealthMetricDetailView:
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .task(id: selectedRange) {
+            await loadSelectedRange()
+        }
     }
 
     @ViewBuilder
@@ -2253,33 +2327,81 @@ struct HomeHealthMetricDetailView:
         }
     }
 
+    private var activeSnapshot:
+        RecoveryTrendSnapshot {
+        if let loadedSnapshot,
+           loadedSnapshot.days.count >=
+            selectedRange.rawValue {
+            return loadedSnapshot
+        }
+
+        return snapshot
+    }
+
     private var points:
         [HomeMetricPoint] {
-        snapshot.days.map { day in
-            let value: Double?
+        activeSnapshot.days
+            .suffix(selectedRange.rawValue)
+            .map { day in
+                let value: Double?
 
-            switch kind {
-            case .sleep:
-                value =
-                    day.sleepDuration.map {
-                        $0 / 3_600
-                    }
-            case .restingHeartRate:
-                value =
-                    day.restingHeartRate
-            case .hrv:
-                value =
-                    day.hrvMilliseconds
-            case .load:
-                value =
-                    day.trainingMinutes
+                switch kind {
+                case .sleep:
+                    value =
+                        day.sleepDuration.map {
+                            $0 / 3_600
+                        }
+                case .restingHeartRate:
+                    value =
+                        day.restingHeartRate
+                case .hrv:
+                    value =
+                        day.hrvMilliseconds
+                case .load:
+                    value =
+                        day.trainingMinutes
+                }
+
+                return HomeMetricPoint(
+                    date: day.date,
+                    value: value
+                )
             }
+    }
 
-            return HomeMetricPoint(
-                date: day.date,
-                value: value
-            )
+    @MainActor
+    private func loadSelectedRange()
+        async {
+        let requestedDays =
+            selectedRange.rawValue
+
+        if requestedDays <=
+            snapshot.days.count {
+            isLoadingRange = false
+            return
         }
+
+        if let loadedSnapshot,
+           loadedSnapshot.days.count >=
+            requestedDays {
+            isLoadingRange = false
+            return
+        }
+
+        isLoadingRange = true
+
+        let fetched =
+            await health
+                .recoveryTrendSnapshot(
+                    days: requestedDays
+                )
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        loadedSnapshot = fetched
+        isLoadingRange = false
     }
 
     private var latestValueText:

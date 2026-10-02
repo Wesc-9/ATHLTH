@@ -1113,7 +1113,7 @@ final class HealthKitManager: ObservableObject {
     func recoveryTrendSnapshot(
         days: Int = 14
     ) async -> RecoveryTrendSnapshot {
-        let resolvedDays = min(max(days, 7), 14)
+        let resolvedDays = min(max(days, 7), 90)
 
         if let cached = recoveryTrendCache[resolvedDays],
            Date().timeIntervalSince(cached.generatedAt) < 120 {
