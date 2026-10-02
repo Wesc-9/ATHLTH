@@ -1,5 +1,325 @@
 import SwiftUI
 
+enum ProfileFeaturedRecordKind:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case fastest1K
+    case fastestMile
+    case fastest5K
+    case fastest10K
+    case fastestHalfMarathon
+    case fastestMarathon
+    case longestRun
+    case longestRide
+    case longestWalkOrHike
+    case longestWorkout
+    case mostActiveCalories
+
+    static let showcaseLimit = 4
+    static let storageKey =
+        "athlth.profile.featuredPersonalRecords.v1"
+
+    static let defaultSelection:
+        [ProfileFeaturedRecordKind] = [
+            .fastest5K,
+            .fastest10K,
+            .fastestHalfMarathon,
+            .longestRun
+        ]
+
+    var id: String { rawValue }
+
+    var healthKind: HealthPersonalRecordKind {
+        switch self {
+        case .fastest1K:
+            return .fastest1K
+        case .fastestMile:
+            return .fastestMile
+        case .fastest5K:
+            return .fastest5K
+        case .fastest10K:
+            return .fastest10K
+        case .fastestHalfMarathon:
+            return .fastestHalfMarathon
+        case .fastestMarathon:
+            return .fastestMarathon
+        case .longestRun:
+            return .longestRun
+        case .longestRide:
+            return .longestRide
+        case .longestWalkOrHike:
+            return .longestWalkOrHike
+        case .longestWorkout:
+            return .longestWorkout
+        case .mostActiveCalories:
+            return .mostActiveCalories
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .fastest1K:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 1K",
+                norwegian: "Raskeste 1 km"
+            )
+        case .fastestMile:
+            return ATHLTHLocalization.choose(
+                english: "Fastest mile",
+                norwegian: "Raskeste mile"
+            )
+        case .fastest5K:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 5K",
+                norwegian: "Raskeste 5 km"
+            )
+        case .fastest10K:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 10K",
+                norwegian: "Raskeste 10 km"
+            )
+        case .fastestHalfMarathon:
+            return ATHLTHLocalization.choose(
+                english: "Half marathon",
+                norwegian: "Halvmaraton"
+            )
+        case .fastestMarathon:
+            return ATHLTHLocalization.choose(
+                english: "Marathon",
+                norwegian: "Maraton"
+            )
+        case .longestRun:
+            return ATHLTHLocalization.choose(
+                english: "Longest run",
+                norwegian: "Lengste løpetur"
+            )
+        case .longestRide:
+            return ATHLTHLocalization.choose(
+                english: "Longest ride",
+                norwegian: "Lengste sykkeltur"
+            )
+        case .longestWalkOrHike:
+            return ATHLTHLocalization.choose(
+                english: "Longest walk / hike",
+                norwegian: "Lengste gåtur / fjelltur"
+            )
+        case .longestWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest workout",
+                norwegian: "Lengste økt"
+            )
+        case .mostActiveCalories:
+            return ATHLTHLocalization.choose(
+                english: "Most active calories",
+                norwegian: "Flest aktive kalorier"
+            )
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .fastest1K:
+            return "1 km"
+        case .fastestMile:
+            return ATHLTHLocalization.choose(
+                english: "Mile",
+                norwegian: "Mile"
+            )
+        case .fastest5K:
+            return "5 km"
+        case .fastest10K:
+            return "10 km"
+        case .fastestHalfMarathon:
+            return ATHLTHLocalization.choose(
+                english: "Half",
+                norwegian: "Halv"
+            )
+        case .fastestMarathon:
+            return ATHLTHLocalization.choose(
+                english: "Marathon",
+                norwegian: "Maraton"
+            )
+        case .longestRun:
+            return ATHLTHLocalization.choose(
+                english: "Run",
+                norwegian: "Løp"
+            )
+        case .longestRide:
+            return ATHLTHLocalization.choose(
+                english: "Ride",
+                norwegian: "Sykkel"
+            )
+        case .longestWalkOrHike:
+            return ATHLTHLocalization.choose(
+                english: "Walk / hike",
+                norwegian: "Tur"
+            )
+        case .longestWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Workout",
+                norwegian: "Økt"
+            )
+        case .mostActiveCalories:
+            return ATHLTHLocalization.choose(
+                english: "Calories",
+                norwegian: "Kalorier"
+            )
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .fastest1K:
+            return "1.circle.fill"
+        case .fastestMile:
+            return "m.circle.fill"
+        case .fastest5K:
+            return "5.circle.fill"
+        case .fastest10K:
+            return "10.circle.fill"
+        case .fastestHalfMarathon:
+            return "figure.run"
+        case .fastestMarathon:
+            return "flag.checkered"
+        case .longestRun:
+            return "point.topleft.down.to.point.bottomright.curvepath"
+        case .longestRide:
+            return "figure.outdoor.cycle"
+        case .longestWalkOrHike:
+            return "figure.hiking"
+        case .longestWorkout:
+            return "clock.fill"
+        case .mostActiveCalories:
+            return "flame.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .fastest1K:
+            return .blue
+        case .fastestMile:
+            return .cyan
+        case .fastest5K:
+            return .green
+        case .fastest10K:
+            return .orange
+        case .fastestHalfMarathon:
+            return .indigo
+        case .fastestMarathon:
+            return ATHLTHTheme.premiumGold
+        case .longestRun:
+            return .purple
+        case .longestRide:
+            return .green
+        case .longestWalkOrHike:
+            return .brown
+        case .longestWorkout:
+            return .indigo
+        case .mostActiveCalories:
+            return .orange
+        }
+    }
+
+    func displayValue(
+        healthRecords: [HealthPersonalRecord],
+        stats: ProfilePerformanceStats?
+    ) -> String {
+        if let record = healthRecords.first(
+            where: { $0.kind == healthKind }
+        ) {
+            return record.formattedValue
+        }
+
+        switch self {
+        case .fastest1K:
+            return stats?
+                .fastestOneKilometer?
+                .formattedTime ?? "—"
+        case .fastest5K:
+            return stats?
+                .fastestFiveKilometers?
+                .formattedTime ?? "—"
+        case .fastestMarathon:
+            return stats?
+                .fastestMarathon?
+                .formattedTime ?? "—"
+        case .longestRun:
+            guard let meters =
+                    stats?
+                        .longestRunMeters,
+                  meters > 0
+            else {
+                return "—"
+            }
+
+            let kilometers =
+                meters / 1_000
+
+            return kilometers >= 100
+                ? String(
+                    format: "%.1f km",
+                    kilometers
+                )
+                : String(
+                    format: "%.2f km",
+                    kilometers
+                )
+        default:
+            return "—"
+        }
+    }
+
+    static func decodedSelection(
+        from raw: String
+    ) -> [ProfileFeaturedRecordKind] {
+        if raw == "-" {
+            return []
+        }
+
+        let decoded =
+            raw
+                .split(separator: ",")
+                .compactMap {
+                    ProfileFeaturedRecordKind(
+                        rawValue: String($0)
+                    )
+                }
+
+        let source =
+            decoded.isEmpty
+                ? defaultSelection
+                : decoded
+
+        var seen:
+            Set<ProfileFeaturedRecordKind> = []
+        return Array(
+            source
+                .filter {
+                    seen.insert($0).inserted
+                }
+                .prefix(showcaseLimit)
+        )
+    }
+
+    static func encodedSelection(
+        _ selection:
+            [ProfileFeaturedRecordKind]
+    ) -> String {
+        guard !selection.isEmpty else {
+            return "-"
+        }
+
+        return selection
+            .prefix(showcaseLimit)
+            .map(\.rawValue)
+            .joined(separator: ",")
+    }
+}
+
+
 struct ProfilePerformanceSection: View {
     let stats: ProfilePerformanceStats?
     let isLoading: Bool
@@ -208,6 +528,8 @@ struct PerformanceStatsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @State private var fetchedHealthRecords: [HealthPersonalRecord] = []
+    @AppStorage(ProfileFeaturedRecordKind.storageKey)
+    private var featuredRecordSelectionRaw = ""
 
     private let gridColumns = [
         GridItem(
@@ -221,7 +543,7 @@ struct PerformanceStatsView: View {
         ScrollView {
             VStack(spacing: 14) {
                 passportHero
-                privacyCard
+                featuredRecordsCard
 
                 if stats != nil ||
                     !resolvedHealthRecords.isEmpty ||
@@ -469,66 +791,139 @@ struct PerformanceStatsView: View {
         )
     }
 
-    private var privacyCard: some View {
+    private var featuredRecordsCard:
+        some View {
         NavigationLink {
-            ATHLTHPrivacyCenterView()
+            ProfileRecordShowcasePickerView(
+                stats: stats,
+                healthRecords:
+                    resolvedHealthRecords
+            )
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 14, weight: .bold))
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack(spacing: 11) {
+                    Image(
+                        systemName:
+                            "sparkles.rectangle.stack.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .bold
+                        )
+                    )
                     .foregroundStyle(
                         ATHLTHTheme.premiumGold
                     )
-                    .frame(width: 40, height: 40)
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
                     .background(
-                        ATHLTHTheme.premiumGold.opacity(0.10),
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.10),
                         in: Circle()
                     )
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(
-                        text(
-                            "Personal by default",
-                            "Personlig som standard"
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            text(
+                                "Show on profile",
+                                "Vis på profil"
+                            )
                         )
-                    )
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                        .font(
+                            .subheadline
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
 
-                    Text(
-                        text(
-                            "Choose which results, if any, others can see.",
-                            "Velg hvilke resultater andre eventuelt kan se."
+                        Text(
+                            text(
+                                "Choose up to four personal records to feature.",
+                                "Velg opptil fire personlige rekorder du vil vise frem."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 6)
+
+                    HStack(spacing: 4) {
+                        Text(
+                            text(
+                                "Edit",
+                                "Rediger"
+                            )
+                        )
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
                         )
                     )
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(2)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
                 }
 
-                Spacer(minLength: 8)
+                HStack(spacing: 7) {
+                    ForEach(
+                        0..<ProfileFeaturedRecordKind
+                            .showcaseLimit,
+                        id: \.self
+                    ) { index in
+                        if featuredRecordKinds
+                            .indices
+                            .contains(index) {
+                            let kind =
+                                featuredRecordKinds[
+                                    index
+                                ]
 
-                HStack(spacing: 5) {
-                    Text(
-                        text(
-                            "Choose",
-                            "Velg"
-                        )
-                    )
-                    Image(systemName: "chevron.right")
+                            featuredRecordSlot(
+                                kind
+                            )
+                        } else {
+                            emptyFeaturedRecordSlot
+                        }
+                    }
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
             }
             .padding(14)
             .background(
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.premiumGold.opacity(0.08),
-                        Color(.secondarySystemGroupedBackground)
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.07),
+                        Color(
+                            .secondarySystemGroupedBackground
+                        )
                     ],
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
                 ),
                 in: RoundedRectangle(
                     cornerRadius: 22,
@@ -541,12 +936,146 @@ struct PerformanceStatsView: View {
                     style: .continuous
                 )
                 .stroke(
-                    ATHLTHTheme.premiumGold.opacity(0.12),
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.12),
                     lineWidth: 1
                 )
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var featuredRecordKinds:
+        [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind
+            .decodedSelection(
+                from:
+                    featuredRecordSelectionRaw
+            )
+    }
+
+    private func featuredRecordSlot(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) -> some View {
+        VStack(spacing: 4) {
+            Image(
+                systemName: kind.icon
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(kind.tint)
+
+            Text(
+                kind.displayValue(
+                    healthRecords:
+                        resolvedHealthRecords,
+                    stats: stats
+                )
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.62)
+
+            Text(kind.shortTitle)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 70
+        )
+        .background(
+            Color.white.opacity(0.72),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+    }
+
+    private var emptyFeaturedRecordSlot:
+        some View {
+        VStack(spacing: 5) {
+            Image(systemName: "plus")
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .premiumGold
+                )
+
+            Text(
+                text(
+                    "Choose",
+                    "Velg"
+                )
+            )
+            .font(
+                .system(
+                    size: 8.5,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 70
+        )
+        .background(
+            Color.black.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.16),
+                style:
+                    StrokeStyle(
+                        lineWidth: 1,
+                        dash: [4, 4]
+                    )
+            )
+        }
     }
 
     private func metricSection(
@@ -1400,6 +1929,354 @@ struct PerformanceStatsView: View {
                 "%.1f kg",
             kilograms
         )
+    }
+}
+
+struct ProfileRecordShowcasePickerView:
+    View {
+    let stats: ProfilePerformanceStats?
+    var healthRecords:
+        [HealthPersonalRecord] = []
+
+    @EnvironmentObject private var health:
+        HealthKitManager
+    @State private var fetchedHealthRecords:
+        [HealthPersonalRecord] = []
+    @AppStorage(ProfileFeaturedRecordKind.storageKey)
+    private var featuredRecordSelectionRaw = ""
+
+    private var resolvedHealthRecords:
+        [HealthPersonalRecord] {
+        healthRecords.isEmpty
+            ? fetchedHealthRecords
+            : healthRecords
+    }
+
+    private var selection:
+        [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind
+            .decodedSelection(
+                from:
+                    featuredRecordSelectionRaw
+            )
+    }
+
+    private var candidates:
+        [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind
+            .allCases
+            .filter { kind in
+                selection.contains(kind) ||
+                kind.displayValue(
+                    healthRecords:
+                        resolvedHealthRecords,
+                    stats: stats
+                ) != "—"
+            }
+    }
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.24)
+            )
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Your record showcase",
+                                norwegian:
+                                    "Dine utvalgte rekorder"
+                            )
+                        )
+                        .font(
+                            .title2.weight(
+                                .bold
+                            )
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose up to four verified records to feature on your profile.",
+                                norwegian:
+                                    "Velg opptil fire verifiserte rekorder som skal vises på profilen din."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(
+                            "\(selection.count)/\(ProfileFeaturedRecordKind.showcaseLimit)"
+                        )
+                        .font(
+                            .caption.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .padding(
+                            .horizontal,
+                            9
+                        )
+                        .frame(height: 26)
+                        .background(
+                            ATHLTHTheme
+                                .accentSoft,
+                            in: Capsule()
+                        )
+                        .padding(.top, 3)
+                    }
+
+                    if candidates.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No records yet",
+                                norwegian:
+                                    "Ingen rekorder ennå"
+                            ),
+                            systemImage:
+                                "chart.bar.xaxis",
+                            description: Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Complete workouts to build records you can feature here.",
+                                    norwegian:
+                                        "Fullfør økter for å bygge rekorder du kan vise frem her."
+                                )
+                            )
+                        )
+                        .padding(.top, 34)
+                    } else {
+                        VStack(spacing: 9) {
+                            ForEach(
+                                candidates
+                            ) { kind in
+                                showcaseRow(kind)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 40)
+                .frame(maxWidth: 700)
+                .frame(
+                    maxWidth: .infinity
+                )
+            }
+            .scrollIndicators(.hidden)
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Profile records",
+                norwegian:
+                    "Rekorder på profil"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .task {
+            guard healthRecords.isEmpty,
+                  fetchedHealthRecords
+                    .isEmpty,
+                  health
+                    .hasRequestedAuthorization
+            else {
+                return
+            }
+
+            fetchedHealthRecords =
+                (
+                    try? await health
+                        .personalRecords()
+                ) ?? []
+        }
+    }
+
+    private func showcaseRow(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) -> some View {
+        let isSelected =
+            selection.contains(kind)
+        let selectionIsFull =
+            selection.count >=
+                ProfileFeaturedRecordKind
+                    .showcaseLimit
+
+        return Button {
+            toggle(kind)
+        } label: {
+            HStack(spacing: 12) {
+                Image(
+                    systemName: kind.icon
+                )
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(kind.tint)
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    kind.tint.opacity(
+                        0.10
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style:
+                                .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(kind.title)
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Text(
+                        kind.displayValue(
+                            healthRecords:
+                                resolvedHealthRecords,
+                            stats: stats
+                        )
+                    )
+                    .font(
+                        .caption
+                            .monospacedDigit()
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        isSelected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    isSelected
+                        ? ATHLTHTheme
+                            .accentDeep
+                        : ATHLTHTheme
+                            .mutedText
+                            .opacity(0.42)
+                )
+            }
+            .padding(12)
+            .background(
+                Color.white.opacity(
+                    isSelected
+                        ? 0.96
+                        : 0.84
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    isSelected
+                        ? ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.22)
+                        : Color.black
+                            .opacity(0.04),
+                    lineWidth: 1
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            !isSelected &&
+            selectionIsFull
+        )
+        .opacity(
+            !isSelected &&
+            selectionIsFull
+                ? 0.48
+                : 1
+        )
+    }
+
+    private func toggle(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) {
+        var updated = selection
+
+        if let index =
+            updated.firstIndex(
+                of: kind
+            ) {
+            updated.remove(
+                at: index
+            )
+        } else {
+            guard updated.count <
+                    ProfileFeaturedRecordKind
+                        .showcaseLimit
+            else {
+                return
+            }
+
+            updated.append(kind)
+        }
+
+        featuredRecordSelectionRaw =
+            ProfileFeaturedRecordKind
+                .encodedSelection(updated)
     }
 }
 
