@@ -75,6 +75,13 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return
         }
 
+        if workout
+            .advancedConfiguration?
+            .inputMode == .iPhone {
+            sendSnapshotNow()
+            return
+        }
+
         if let workoutID = command.workoutID,
            workoutID != workout.id {
             sendSnapshotNow()
