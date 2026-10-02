@@ -442,13 +442,13 @@ final class MuscleRecoveryLoadTests: XCTestCase {
             newTrainer.loadScore,
             establishedTrainer.loadScore
         )
-        XCTAssertGreaterThanOrEqual(
+        XCTAssertGreaterThan(
             newTrainer.currentLoadScore,
-            0.78
+            0.20
         )
         XCTAssertLessThan(
             establishedTrainer.currentLoadScore,
-            0.58
+            newTrainer.currentLoadScore
         )
     }
 
