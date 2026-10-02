@@ -4,7 +4,6 @@ import CoreMotion
 import SwiftUI
 import UIKit
 
-@MainActor
 final class AchievementTiltMotionStore:
     ObservableObject
 {
@@ -519,11 +518,11 @@ struct AchievementParticleBurst:
         .offset(
             x:
                 burst
-                    ? x
+                    ? CGFloat(x)
                     : 0,
             y:
                 burst
-                    ? y
+                    ? CGFloat(y)
                     : 0
         )
         .scaleEffect(
