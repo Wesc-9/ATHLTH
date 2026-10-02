@@ -557,6 +557,8 @@ enum WorkoutLaunchCoordinator {
         trackingMode: StrengthTrackingMode,
         selectedFriends: [SocialProfileCard],
         audioCoach: WatchAudioCoachConfiguration,
+        advancedConfiguration:
+            StrengthAdvancedConfiguration,
         session: AppSessionStore,
         settings: AppSettingsStore,
         social: SocialStore,
@@ -603,14 +605,34 @@ enum WorkoutLaunchCoordinator {
             session: workout,
             watchSessionID: watchSessionID,
             trackingMode: trackingMode,
-            captureDevice: captureDevice
+            captureDevice: captureDevice,
+            advancedConfiguration:
+                trackingMode == .advanced
+                    ? advancedConfiguration
+                    : nil
         )
 
-        startLinkedSpotifyIfNeeded(
-            workout: workout,
-            session: session,
-            settings: settings,
-            spotify: spotify
-        )
+        if trackingMode == .advanced {
+            if advancedConfiguration
+                .spotifyAutoplay,
+               let playlist =
+                    advancedConfiguration
+                        .spotifyPlaylist {
+                Task { @MainActor in
+                    await spotify.startLinkedPlaylist(
+                        playlist,
+                        settings: settings,
+                        respectGlobalAutoplay: false
+                    )
+                }
+            }
+        } else {
+            startLinkedSpotifyIfNeeded(
+                workout: workout,
+                session: session,
+                settings: settings,
+                spotify: spotify
+            )
+        }
     }
 }
