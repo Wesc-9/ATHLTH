@@ -5,6 +5,7 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -162,6 +163,36 @@ struct MirroredWorkoutLiveView: View {
         ) {
             await syncLivePosition()
         }
+        .onAppear {
+            updateScreenAwakeState()
+        }
+        .onDisappear {
+            ATHLTHWorkoutScreenAwake.set(
+                false,
+                reason: "watch-mirrored-workout"
+            )
+        }
+        .onChange(
+            of:
+                mirroring
+                    .hasActiveMirroredWorkout
+        ) { _, _ in
+            updateScreenAwakeState()
+        }
+        .onChange(
+            of: scenePhase
+        ) { _, _ in
+            updateScreenAwakeState()
+        }
+    }
+
+    private func updateScreenAwakeState() {
+        ATHLTHWorkoutScreenAwake.set(
+            mirroring
+                .hasActiveMirroredWorkout &&
+                scenePhase == .active,
+            reason: "watch-mirrored-workout"
+        )
     }
 
     @ViewBuilder
