@@ -302,6 +302,17 @@ struct ATHLTHHomeDashboardHero: View {
                         width: proxy.size.width,
                         height: proxy.size.height
                     )
+                    // Keep the Home hero frame unchanged, but bias the
+                    // artwork focus slightly downward so the people / focal
+                    // objects sit more comfortably below the status bar.
+                    // The top-anchored crop avoids introducing a blank strip.
+                    .scaleEffect(
+                        1.065,
+                        anchor: UnitPoint(
+                            x: 0.72,
+                            y: 0
+                        )
+                    )
                     .clipped()
                     .accessibilityHidden(true)
 
