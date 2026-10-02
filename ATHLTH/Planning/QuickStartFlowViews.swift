@@ -284,6 +284,8 @@ struct RunQuickStartConfiguration {
     let ghostTargetDurationSeconds: TimeInterval?
     let ghostUpdates: WatchGhostRaceAudioConfiguration?
     let autoPauseEnabled: Bool
+    let spotifyPlaylist: SpotifyPlaylistReference?
+    let spotifyAutoplay: Bool
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
 
@@ -303,6 +305,8 @@ struct WalkQuickStartConfiguration {
     let captureDevice: WorkoutCaptureDevice
     let audioCoach: WatchAudioCoachConfiguration
     let autoPauseEnabled: Bool
+    let spotifyPlaylist: SpotifyPlaylistReference?
+    let spotifyAutoplay: Bool
     let friends: [SocialProfileCard]
     let gearIDs: Set<UUID>
 }
@@ -384,6 +388,116 @@ extension WalkQuickStartConfiguration {
         return SocialWorkoutInvitePayload(
             workout: snapshot
         )
+    }
+}
+
+private struct QuickStartSpotifyCard: View {
+    @EnvironmentObject private var spotify:
+        SpotifyPlaybackStore
+
+    @Binding var playlist:
+        SpotifyPlaylistReference?
+    @Binding var autoplay: Bool
+    let onChoose: () -> Void
+
+    var body: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Spotify", systemImage: "music.note.list")
+                        .font(.subheadline.weight(.semibold))
+
+                    Spacer()
+
+                    if spotify.isRefreshingPlaylists {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                if spotify.isConnected {
+                    Button(action: onChoose) {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Playlist",
+                                        norwegian: "Spilleliste"
+                                    )
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                                Text(
+                                    playlist?.name ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Choose playlist",
+                                        norwegian: "Velg spilleliste"
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.primaryText
+                                )
+                                .lineLimit(1)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Start playlist with workout",
+                            norwegian: "Start spilleliste med økten"
+                        ),
+                        isOn: $autoplay
+                    )
+                    .disabled(playlist == nil)
+                } else if spotify.isConfigured {
+                    Button {
+                        spotify.connect()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Connect Spotify",
+                                norwegian: "Koble til Spotify"
+                            ),
+                            systemImage: "link"
+                        )
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Connect Spotify to choose music for this workout.",
+                            norwegian: "Koble til Spotify for å velge musikk til denne økten."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Spotify is not configured in this build.",
+                            norwegian: "Spotify er ikke konfigurert i denne versjonen."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .onChange(of: playlist?.id) { _, playlistID in
+            if playlistID == nil {
+                autoplay = false
+            }
+        }
     }
 }
 
@@ -558,6 +672,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -622,6 +737,11 @@ struct RunQuickStartSheet: View {
     @State private var isAdvancedSetup = false
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
+    @State private var selectedSpotifyPlaylist:
+        SpotifyPlaylistReference?
+    @State private var spotifyAutoplay = false
+    @State private var showingSpotifyPicker = false
+    @State private var didLoadSpotifyDefault = false
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
@@ -662,6 +782,15 @@ struct RunQuickStartSheet: View {
                                 appDefaultEnabled:
                                     settings.autoPauseOutdoorWorkouts
                             )
+
+                            QuickStartSpotifyCard(
+                                playlist:
+                                    $selectedSpotifyPlaylist,
+                                autoplay:
+                                    $spotifyAutoplay
+                            ) {
+                                showingSpotifyPicker = true
+                            }
 
                             NavigationLink {
                                 RunGuidanceSetupView(
@@ -834,10 +963,39 @@ struct RunQuickStartSheet: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingSpotifyPicker) {
+                SpotifyPlaylistPickerView(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Run Playlist",
+                            norwegian: "Spilleliste for løping"
+                        ),
+                    selection:
+                        $selectedSpotifyPlaylist
+                )
+                .onDisappear {
+                    spotifyAutoplay =
+                        selectedSpotifyPlaylist != nil
+                }
+            }
             .task {
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
+                }
+
+                if !didLoadSpotifyDefault {
+                    selectedSpotifyPlaylist =
+                        settings.spotifyDefaultPlaylist
+                    spotifyAutoplay =
+                        settings.spotifyAutoplayLinkedPlaylists &&
+                        selectedSpotifyPlaylist != nil
+                    didLoadSpotifyDefault = true
+                }
+
+                if spotify.isConnected &&
+                    spotify.playlists.isEmpty {
+                    await spotify.refreshPlaylists()
                 }
 
                 if !didLoadGuidanceDefaults {
@@ -1559,6 +1717,15 @@ struct RunQuickStartSheet: View {
                             appDefault:
                                 settings.autoPauseOutdoorWorkouts
                         ),
+                    spotifyPlaylist:
+                        isAdvancedSetup &&
+                        spotifyAutoplay
+                            ? selectedSpotifyPlaylist
+                            : nil,
+                    spotifyAutoplay:
+                        isAdvancedSetup &&
+                        spotifyAutoplay &&
+                        selectedSpotifyPlaylist != nil,
                     friends: friends,
                     gearIDs: selectedGearIDs
                 )
@@ -1749,6 +1916,7 @@ struct WalkQuickStartSheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -1762,6 +1930,11 @@ struct WalkQuickStartSheet: View {
     @State private var isAdvancedSetup = false
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
+    @State private var selectedSpotifyPlaylist:
+        SpotifyPlaylistReference?
+    @State private var spotifyAutoplay = false
+    @State private var showingSpotifyPicker = false
+    @State private var didLoadSpotifyDefault = false
 
     var body: some View {
         NavigationStack {
@@ -1842,6 +2015,15 @@ struct WalkQuickStartSheet: View {
                             appDefaultEnabled:
                                 settings.autoPauseOutdoorWorkouts
                         )
+
+                        QuickStartSpotifyCard(
+                            playlist:
+                                $selectedSpotifyPlaylist,
+                            autoplay:
+                                $spotifyAutoplay
+                        ) {
+                            showingSpotifyPicker = true
+                        }
 
                         NavigationLink {
                             PerWorkoutAudioCoachView(
@@ -1944,6 +2126,15 @@ struct WalkQuickStartSheet: View {
                                         appDefault:
                                             settings.autoPauseOutdoorWorkouts
                                     ),
+                                spotifyPlaylist:
+                                    isAdvancedSetup &&
+                                    spotifyAutoplay
+                                        ? selectedSpotifyPlaylist
+                                        : nil,
+                                spotifyAutoplay:
+                                    isAdvancedSetup &&
+                                    spotifyAutoplay &&
+                                    selectedSpotifyPlaylist != nil,
                                 friends:
                                     isAdvancedSetup
                                         ? friends
@@ -1985,10 +2176,39 @@ struct WalkQuickStartSheet: View {
                     }
                 }
             }
+            .sheet(isPresented: $showingSpotifyPicker) {
+                SpotifyPlaylistPickerView(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Walk Playlist",
+                            norwegian: "Spilleliste for gåtur"
+                        ),
+                    selection:
+                        $selectedSpotifyPlaylist
+                )
+                .onDisappear {
+                    spotifyAutoplay =
+                        selectedSpotifyPlaylist != nil
+                }
+            }
             .task {
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
+                }
+
+                if !didLoadSpotifyDefault {
+                    selectedSpotifyPlaylist =
+                        settings.spotifyDefaultPlaylist
+                    spotifyAutoplay =
+                        settings.spotifyAutoplayLinkedPlaylists &&
+                        selectedSpotifyPlaylist != nil
+                    didLoadSpotifyDefault = true
+                }
+
+                if spotify.isConnected &&
+                    spotify.playlists.isEmpty {
+                    await spotify.refreshPlaylists()
                 }
 
                 if social.trainingPartners.isEmpty {
