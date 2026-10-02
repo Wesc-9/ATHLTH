@@ -3119,17 +3119,29 @@ struct GoalCreationView: View {
 
             goalTrackingNote(
                 icon:
-                    "checkmark.shield.fill",
+                    effectiveDataSource == .manual
+                        ? "hand.tap.fill"
+                        : "checkmark.shield.fill",
                 title:
-                    ATHLTHLocalization.format(
-                        english: "Safe automation",
-                        norwegian: "Trygg automatikk"
-                    ),
+                    effectiveDataSource == .manual
+                        ? ATHLTHLocalization.format(
+                            english: "Manual tracking",
+                            norwegian: "Manuell sporing"
+                        )
+                        : ATHLTHLocalization.format(
+                            english: "Automatic + manual control",
+                            norwegian: "Automatisk + manuell kontroll"
+                        ),
                 detail:
-                    ATHLTHLocalization.format(
-                        english: "Automatic milestones only use qualifying data recorded after this goal is created. You can always override a milestone manually.",
-                        norwegian: "Automatiske delmål bruker bare kvalifiserende data registrert etter at målet er opprettet. Du kan alltid overstyre et delmål manuelt."
-                    )
+                    effectiveDataSource == .manual
+                        ? ATHLTHLocalization.format(
+                            english: "Nothing is completed automatically. You decide when each milestone is done.",
+                            norwegian: "Ingenting fullføres automatisk. Du bestemmer selv når hvert delmål er utført."
+                        )
+                        : ATHLTHLocalization.format(
+                            english: "ATHLTH can complete qualifying milestones automatically, but you can always mark or override them manually.",
+                            norwegian: "ATHLTH kan fullføre kvalifiserende delmål automatisk, men du kan alltid markere eller overstyre dem manuelt."
+                        )
             )
         }
     }
