@@ -3,7 +3,8 @@ import SwiftUI
 enum ProfileFeaturedRecordKind:
     String,
     CaseIterable,
-    Identifiable
+    Identifiable,
+    Hashable
 {
     case fastest1K
     case fastestMile
