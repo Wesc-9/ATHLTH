@@ -556,7 +556,8 @@ final class StrengthWorkoutStore: ObservableObject {
         sets: Int = 3,
         reps: Int? = 8,
         targetWeightKilograms: Double? = nil,
-        restSeconds: Int? = 90
+        restSeconds: Int? = 90,
+        warmUpSets: Int = 0
     ) {
         guard var workout = activeWorkout else { return }
 
@@ -575,7 +576,17 @@ final class StrengthWorkoutStore: ObservableObject {
                     completedWeightKilograms: nil,
                     rpe: nil,
                     completedAt: nil,
-                    restSeconds: restSeconds
+                    restSeconds: restSeconds,
+                    isWarmUp:
+                        number <= max(
+                            min(
+                                warmUpSets,
+                                setCount
+                            ),
+                            0
+                        )
+                            ? true
+                            : nil
                 )
             },
             completedAt: nil
