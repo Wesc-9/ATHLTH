@@ -257,7 +257,6 @@ struct ATHLTHHomeView: View {
 
     @State private var homeStreakDays: [Date]?
     @State private var showingGlobalSearch = false
-    @State private var showingWeeklyWorkouts = false
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
     @State private var showingHomeStrengthWorkout = false
@@ -474,9 +473,7 @@ struct ATHLTHHomeView: View {
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,
                         workouts: health.workouts
-                    ) {
-                        showingWeeklyWorkouts = true
-                    }
+                    )
 
                     homeGoalAndCalendarRow
 
@@ -511,17 +508,6 @@ struct ATHLTHHomeView: View {
                     hasEditedProfile:
                         hasCompletedProfileSetup
                 )
-            }
-            .sheet(isPresented: $showingWeeklyWorkouts) {
-                NavigationStack {
-                    WorkoutHistoryView(
-                        startDate: homeWeekInterval.start,
-                        endDate: homeWeekInterval.end.addingTimeInterval(-1)
-                    )
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
             }
             .sheet(isPresented: $showingGlobalSearch) {
                 ATHLTHGlobalSearchView()
