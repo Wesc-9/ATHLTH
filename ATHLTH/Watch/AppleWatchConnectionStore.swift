@@ -58,6 +58,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
     @Published private(set) var lastStrengthCommand: WatchStrengthCommand?
+    @Published private(set) var pendingStrengthCommands:
+        [WatchStrengthCommand] = []
     @Published private(set) var lastSpotifyCommand: WatchSpotifyCommand?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
@@ -78,8 +80,14 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private var lastProbeID: String?
     private var handledWorkoutResultIDs:
         [UUID] = []
+    private var handledStrengthCommandIDs:
+        [UUID] = []
     private static let handledWorkoutResultsKey =
         "athlth.watch.handledWorkoutResultIDs.v1"
+    private static let handledStrengthCommandsKey =
+        "athlth.watch.handledStrengthCommandIDs.v1"
+    private static let pendingStrengthCommandsKey =
+        "athlth.watch.pendingStrengthCommands.v1"
     private var lastSpotifyCommandSentAt:
         Date = .distantPast
     private var latestTodaySnapshot =
@@ -104,6 +112,42 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                     .compactMap(
                         UUID.init(uuidString:)
                     )
+        }
+
+        if let stored =
+                UserDefaults.standard
+                    .stringArray(
+                        forKey:
+                            Self.handledStrengthCommandsKey
+                    ) {
+            handledStrengthCommandIDs =
+                stored
+                    .compactMap(
+                        UUID.init(uuidString:)
+                    )
+        }
+
+        if let data =
+                UserDefaults.standard.data(
+                    forKey:
+                        Self.pendingStrengthCommandsKey
+                ),
+           let pending =
+                try? JSONDecoder().decode(
+                    [WatchStrengthCommand].self,
+                    from: data
+                ) {
+            pendingStrengthCommands =
+                pending
+                    .filter {
+                        !handledStrengthCommandIDs
+                            .contains($0.id)
+                    }
+                    .sorted {
+                        $0.sentAt < $1.sentAt
+                    }
+            lastStrengthCommand =
+                pendingStrengthCommands.first
         }
 
         super.init()
@@ -409,7 +453,63 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func clearStrengthCommand() {
-        lastStrengthCommand = nil
+        guard let command =
+                lastStrengthCommand
+        else {
+            return
+        }
+
+        consumeStrengthCommand(
+            command.id
+        )
+    }
+
+    func consumeStrengthCommand(
+        _ id: UUID
+    ) {
+        pendingStrengthCommands
+            .removeAll {
+                $0.id == id
+            }
+
+        if !handledStrengthCommandIDs
+            .contains(id) {
+            handledStrengthCommandIDs
+                .append(id)
+
+            if handledStrengthCommandIDs
+                .count > 256 {
+                handledStrengthCommandIDs =
+                    Array(
+                        handledStrengthCommandIDs
+                            .suffix(128)
+                    )
+            }
+        }
+
+        persistStrengthCommandState()
+        lastStrengthCommand =
+            pendingStrengthCommands.first
+    }
+
+    private func persistStrengthCommandState() {
+        UserDefaults.standard.set(
+            handledStrengthCommandIDs
+                .map(\.uuidString),
+            forKey:
+                Self.handledStrengthCommandsKey
+        )
+
+        if let data =
+                try? JSONEncoder().encode(
+                    pendingStrengthCommands
+                ) {
+            UserDefaults.standard.set(
+                data,
+                forKey:
+                    Self.pendingStrengthCommandsKey
+            )
+        }
     }
 
     func clearSpotifyCommand() {
@@ -763,7 +863,35 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return false
         }
 
-        lastStrengthCommand = command
+        guard !handledStrengthCommandIDs
+                .contains(command.id),
+              !pendingStrengthCommands
+                .contains(
+                    where: {
+                        $0.id == command.id
+                    }
+                )
+        else {
+            return true
+        }
+
+        pendingStrengthCommands
+            .append(command)
+        pendingStrengthCommands.sort {
+            $0.sentAt < $1.sentAt
+        }
+
+        if pendingStrengthCommands.count > 256 {
+            pendingStrengthCommands =
+                Array(
+                    pendingStrengthCommands
+                        .suffix(256)
+                )
+        }
+
+        persistStrengthCommandState()
+        lastStrengthCommand =
+            pendingStrengthCommands.first
         return true
     }
 
