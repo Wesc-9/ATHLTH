@@ -824,7 +824,8 @@ final class SocialStore: ObservableObject {
                         $0.userID == currentUserID
                     }
 
-                if ownParticipant?.workoutFinishedAt == nil {
+                if ownParticipant?.workoutFinishedAt == nil &&
+                    ownParticipant?.launchFailedAt == nil {
                     try? await service.cancelWorkoutSession(
                         activeWorkoutSession.id
                     )
@@ -1019,20 +1020,12 @@ final class SocialStore: ObservableObject {
                         return false
                     }
 
-                    try await service
-                        .markWorkoutParticipantStarted(
-                            participantID:
-                                currentParticipant.id
-                        )
                     currentJoinedWorkoutSessionID =
                         sessionID
 
                     if coordinatedLobbySessionID == sessionID {
                         coordinatedLobbySessionID = nil
                     }
-                    try? await refreshWorkoutLobby(
-                        sessionID: sessionID
-                    )
                     return true
                 }
 
@@ -1053,6 +1046,95 @@ final class SocialStore: ObservableObject {
         }
 
         return false
+    }
+
+    @discardableResult
+    func confirmCurrentJoinedWorkoutStarted() async -> Bool {
+        guard let sessionID =
+                currentJoinedWorkoutSessionID,
+              let currentUserID
+        else {
+            return true
+        }
+
+        do {
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+
+            guard let participant =
+                    workoutParticipants.first(
+                        where: {
+                            $0.sessionID == sessionID &&
+                            $0.userID == currentUserID
+                        }
+                    ),
+                  participant.launchFailedAt == nil
+            else {
+                return false
+            }
+
+            if participant.workoutStartedAt == nil {
+                try await service
+                    .markWorkoutParticipantStarted(
+                        participantID:
+                            participant.id
+                    )
+            }
+
+            try? await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
+    func markCurrentJoinedWorkoutLaunchFailed() async {
+        guard let sessionID =
+                currentJoinedWorkoutSessionID,
+              let currentUserID
+        else {
+            return
+        }
+
+        do {
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+
+            guard let participant =
+                    workoutParticipants.first(
+                        where: {
+                            $0.sessionID == sessionID &&
+                            $0.userID == currentUserID
+                        }
+                    ),
+                  participant.workoutStartedAt == nil,
+                  participant.launchFailedAt == nil
+            else {
+                currentJoinedWorkoutSessionID =
+                    nil
+                return
+            }
+
+            try await service
+                .markWorkoutParticipantLaunchFailed(
+                    participantID:
+                        participant.id
+                )
+            try? await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+
+        currentJoinedWorkoutSessionID = nil
     }
 
     func cancelActiveWorkout() async {
@@ -2013,7 +2095,8 @@ final class SocialStore: ObservableObject {
                         $0.userID == currentUserID
                     }
 
-                return ownParticipant?.workoutFinishedAt == nil
+                return ownParticipant?.workoutFinishedAt == nil &&
+                    ownParticipant?.launchFailedAt == nil
             }
             .sorted { $0.createdAt > $1.createdAt }
             .first
