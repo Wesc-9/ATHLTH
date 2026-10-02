@@ -1637,7 +1637,13 @@ struct HomeHealthMetricStrip: View {
                     Text(kind.title)
                         .font(
                             .system(
-                                size: 8.8,
+                                size:
+                                    kind ==
+                                        .restingHeartRate ||
+                                    kind ==
+                                        .load
+                                        ? 8.6
+                                        : 10,
                                 weight: .semibold
                             )
                         )
