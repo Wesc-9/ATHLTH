@@ -1149,6 +1149,7 @@ enum WatchTransferMetadataKey {
     static let payload = "payload"
     static let command = "command"
     static let workoutID = "workoutID"
+    static let workoutStartedAt = "workoutStartedAt"
     static let probeID = "probeID"
     static let sentAt = "sentAt"
 }
