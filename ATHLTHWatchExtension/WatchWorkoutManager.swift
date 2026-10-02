@@ -61,6 +61,7 @@ private struct WatchPersistedWorkoutState: Codable {
     var lastLapElapsedTime: TimeInterval
     var lastLapDistanceMeters: Double
     var automaticPauseCount: Int
+    var automaticPauseEnabled: Bool? = nil
 }
 
 enum WatchWorkoutState: Equatable {
@@ -1068,7 +1069,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 lastLapDistanceMeters:
                     lastLapDistanceMeters,
                 automaticPauseCount:
-                    automaticPauseCount
+                    automaticPauseCount,
+                automaticPauseEnabled:
+                    automaticPauseEnabled
             )
 
         guard let data =
@@ -1139,10 +1142,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.automaticPauseCount =
                 snapshot
                     .automaticPauseCount
+            self.automaticPauseEnabled =
+                snapshot
+                    .automaticPauseEnabled ??
+                false
             self.ghostRaceTitle =
                 snapshot.ghostRace?.title
         }
 
+        autoPauseDetector.reset(
+            enabled:
+                snapshot
+                    .automaticPauseEnabled ??
+                false,
+            paused:
+                automaticPauseActive
+        )
         resetAudioCoachThresholds()
         resetGhostAnnouncementThresholds(
             audio:
