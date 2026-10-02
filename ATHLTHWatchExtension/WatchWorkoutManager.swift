@@ -980,7 +980,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func updateStrengthDraft(
         reps: Int? = nil,
         weightKilograms: Double? = nil,
-        restSeconds: Int? = nil
+        restSeconds: Int? = nil,
+        rpe: Double? = nil,
+        rir: Double? = nil,
+        isWarmUp: Bool? = nil
     ) {
         guard var snapshot = strengthSession else {
             requestStrengthSnapshot()
@@ -997,6 +1000,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let restSeconds {
             snapshot.draftRestSeconds =
                 min(max(restSeconds, 0), 600)
+        }
+        if let rpe {
+            snapshot.draftRPE =
+                min(max(rpe, 1), 10)
+        }
+        if let rir {
+            snapshot.draftRIR =
+                min(max(rir, 0), 10)
+        }
+        if let isWarmUp {
+            snapshot.isWarmUp =
+                isWarmUp
         }
         snapshot.updatedAt = Date()
 
@@ -1015,7 +1030,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 restSeconds:
                     snapshot.draftRestSeconds,
                 addRestSeconds: nil,
-                sentAt: Date()
+                sentAt: Date(),
+                rpe: snapshot.draftRPE,
+                rir: snapshot.draftRIR,
+                isWarmUp:
+                    snapshot.isWarmUp
             )
         )
     }
@@ -1037,7 +1056,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 restSeconds:
                     snapshot.draftRestSeconds,
                 addRestSeconds: nil,
-                sentAt: Date()
+                sentAt: Date(),
+                rpe: snapshot.draftRPE,
+                rir: snapshot.draftRIR,
+                isWarmUp:
+                    snapshot.isWarmUp
             )
         )
     }
