@@ -941,12 +941,19 @@ final class SocialStore: ObservableObject {
         }
 
         do {
-            let startAt = Date().addingTimeInterval(
-                max(countdownSeconds, 1)
-            )
-            try await service.scheduleWorkoutStart(
+            _ = try await service.scheduleWorkoutStart(
                 sessionID: sessionID,
-                startAt: startAt
+                countdownSeconds:
+                    min(
+                        max(
+                            Int(
+                                countdownSeconds
+                                    .rounded()
+                            ),
+                            1
+                        ),
+                        10
+                    )
             )
             try await refreshWorkoutLobby(
                 sessionID: sessionID
