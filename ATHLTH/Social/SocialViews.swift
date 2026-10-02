@@ -3410,6 +3410,8 @@ private struct WorkoutInviteLaunchSheet: View {
                             ghostRace:
                                 ghostRace
                         )
+                    _ = await social
+                        .confirmCurrentJoinedWorkoutStarted()
                     dismiss()
 
                 case .walking:
@@ -3438,6 +3440,8 @@ private struct WorkoutInviteLaunchSheet: View {
                             watchConnection:
                                 watchConnection
                         )
+                    _ = await social
+                        .confirmCurrentJoinedWorkoutStarted()
                     dismiss()
 
                 case .mobility,
@@ -3459,6 +3463,8 @@ private struct WorkoutInviteLaunchSheet: View {
                     )
                 }
             } catch {
+                await social
+                    .markCurrentJoinedWorkoutLaunchFailed()
                 launchError =
                     error.localizedDescription
             }
