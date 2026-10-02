@@ -26,7 +26,7 @@ private func recoveryMuscleName(
     case "Shoulders": return "Skuldre"
     case "Arms": return "Armer"
     case "Core": return "Kjerne"
-    case "Glutes": return "Sete"
+    case "Glutes": return "Setemuskler"
     case "Quads": return "Forside lår"
     case "Hamstrings": return "Bakside lår"
     case "Calves": return "Legger"
@@ -335,11 +335,13 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
     let muscleGroup: String
     let lastTrainedAt: Date?
     let completedSets: Int
+    let strengthMinutes: Double
     let runningMinutes: Double
     let walkingMinutes: Double
     let estimatedRecoveryHours: Double
     let soreness: RecoverySorenessLevel
     let baselineWeeklyStrengthSets: Double?
+    let baselineWeeklyStrengthMinutes: Double?
     let chronicWeeklyTrainingMinutes: Double?
     let acuteToChronicRatio: Double?
 
@@ -347,22 +349,26 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         muscleGroup: String,
         lastTrainedAt: Date?,
         completedSets: Int,
+        strengthMinutes: Double = 0,
         runningMinutes: Double = 0,
         walkingMinutes: Double = 0,
         estimatedRecoveryHours: Double,
         soreness: RecoverySorenessLevel,
         baselineWeeklyStrengthSets: Double? = nil,
+        baselineWeeklyStrengthMinutes: Double? = nil,
         chronicWeeklyTrainingMinutes: Double? = nil,
         acuteToChronicRatio: Double? = nil
     ) {
         self.muscleGroup = muscleGroup
         self.lastTrainedAt = lastTrainedAt
         self.completedSets = completedSets
+        self.strengthMinutes = strengthMinutes
         self.runningMinutes = runningMinutes
         self.walkingMinutes = walkingMinutes
         self.estimatedRecoveryHours = estimatedRecoveryHours
         self.soreness = soreness
         self.baselineWeeklyStrengthSets = baselineWeeklyStrengthSets
+        self.baselineWeeklyStrengthMinutes = baselineWeeklyStrengthMinutes
         self.chronicWeeklyTrainingMinutes = chronicWeeklyTrainingMinutes
         self.acuteToChronicRatio = acuteToChronicRatio
     }
@@ -383,23 +389,46 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         )
     }
 
-    /// Acute muscle load normalized against the user's recent training capacity.
-    /// New or infrequent users therefore reach higher load states sooner than
-    /// users who have built a stable training baseline.
+    var trainingMinutes: Double {
+        strengthMinutes + runningMinutes + walkingMinutes
+    }
+
+    /// A minute-weighted load score with a deliberate low-load dead zone.
+    /// Short or easy sessions should stay neutral instead of looking alarming.
     var loadScore: Double {
-        let learnedStrengthCapacity =
+        let learnedStrengthSetCapacity =
             max(
-                (baselineWeeklyStrengthSets ?? 0) * 1.5,
-                6
+                (baselineWeeklyStrengthSets ?? 0) * 1.6,
+                10
             )
-        let strengthLoad =
-            completedSets > 0
+        let strengthSetLoad =
+            completedSets > 1
                 ? min(
-                    Double(completedSets) /
-                        learnedStrengthCapacity,
+                    Double(completedSets - 1) /
+                        learnedStrengthSetCapacity,
                     1
                 )
                 : 0
+
+        let learnedStrengthMinuteCapacity =
+            max(
+                (baselineWeeklyStrengthMinutes ?? 0) * 1.5,
+                75
+            )
+        let strengthMinuteDose =
+            max(strengthMinutes - 6, 0)
+        let strengthMinuteLoad =
+            min(
+                strengthMinuteDose /
+                    learnedStrengthMinuteCapacity,
+                1
+            )
+        let strengthLoad =
+            min(
+                strengthMinuteLoad * 0.62 +
+                strengthSetLoad * 0.38,
+                1
+            )
 
         let movementMinutes =
             runningMinutes +
@@ -407,34 +436,47 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         let learnedMovementCapacity =
             max(
                 (chronicWeeklyTrainingMinutes ?? 0) *
-                    0.60,
-                60
+                    0.75,
+                180
             )
+        let movementDose =
+            max(movementMinutes - 12, 0)
         let movementLoad =
-            movementMinutes > 0
-                ? min(
-                    movementMinutes /
-                        learnedMovementCapacity,
-                    1
-                )
-                : 0
+            min(
+                movementDose /
+                    learnedMovementCapacity,
+                1
+            )
 
-        let combined =
+        var combined =
             1 -
             (
                 (1 - strengthLoad) *
                 (1 - movementLoad)
             )
 
+        // Tiny sessions should register as activity without creating a
+        // "high load" visual state.
+        if trainingMinutes < 10 &&
+            completedSets <= 1 &&
+            soreness == .none {
+            combined *= 0.20
+        }
+
         let spikeMultiplier: Double
-        switch acuteToChronicRatio {
-        case let ratio? where ratio > 1.50:
-            spikeMultiplier = 1.25
-        case let ratio? where ratio > 1.25:
-            spikeMultiplier = 1.15
-        case let ratio? where ratio > 1.00:
-            spikeMultiplier = 1.07
-        default:
+        if combined >= 0.35 &&
+            trainingMinutes >= 30 {
+            switch acuteToChronicRatio {
+            case let ratio? where ratio > 1.50:
+                spikeMultiplier = 1.18
+            case let ratio? where ratio > 1.25:
+                spikeMultiplier = 1.10
+            case let ratio? where ratio > 1.00:
+                spikeMultiplier = 1.04
+            default:
+                spikeMultiplier = 1
+            }
+        } else {
             spikeMultiplier = 1
         }
 
@@ -447,13 +489,14 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         )
     }
 
-    /// What the user should see right now. Recent load fades as the estimated
-    /// recovery window progresses, while soreness can keep an area elevated.
+    /// Current load fades as the recovery window progresses. Manual soreness
+    /// can still keep an area elevated, but normal low-volume training stays
+    /// green or neutral.
     var currentLoadScore: Double {
         let remainingLoad =
             max(
-                1 - (progress * 0.85),
-                0.08
+                1 - (progress * 0.88),
+                0.05
             )
         var score =
             loadScore *
@@ -464,11 +507,11 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         case .none:
             sorenessFloor = 0
         case .mild:
-            sorenessFloor = 0.28
+            sorenessFloor = 0.24
         case .moderate:
-            sorenessFloor = 0.55
+            sorenessFloor = 0.52
         case .high:
-            sorenessFloor = 0.80
+            sorenessFloor = 0.84
         }
 
         score = max(
@@ -482,14 +525,23 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
         )
     }
 
+    var readinessScore: Double {
+        min(
+            max(1 - currentLoadScore, 0),
+            1
+        )
+    }
+
     var loadTitle: String {
         switch currentLoadScore {
-        case 0.78...:
+        case 0.84...:
             return recoveryText("Needs rest", "Trenger pause")
-        case 0.58..<0.78:
+        case 0.65..<0.84:
             return recoveryText("High", "Høy")
-        case 0.32..<0.58:
+        case 0.44..<0.65:
             return recoveryText("Moderate", "Moderat")
+        case 0.20..<0.44:
+            return recoveryText("Light", "Lett")
         default:
             return recoveryText("Ready", "Klar")
         }
@@ -498,14 +550,44 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
     var sourceSummary: String {
         var sources: [String] = []
 
-        if completedSets > 0 {
-            sources.append(recoveryText("Strength", "Styrke"))
+        if completedSets > 0 || strengthMinutes >= 1 {
+            let minutes =
+                Int(strengthMinutes.rounded())
+            if minutes > 0 {
+                sources.append(
+                    recoveryText(
+                        "Strength · \(minutes) min",
+                        "Styrke · \(minutes) min"
+                    )
+                )
+            } else {
+                sources.append(
+                    recoveryText(
+                        "Strength · \(completedSets) sets",
+                        "Styrke · \(completedSets) sett"
+                    )
+                )
+            }
         }
         if runningMinutes >= 1 {
-            sources.append(recoveryText("Run", "Løp"))
+            let minutes =
+                Int(runningMinutes.rounded())
+            sources.append(
+                recoveryText(
+                    "Run · \(minutes) min",
+                    "Løp · \(minutes) min"
+                )
+            )
         }
         if walkingMinutes >= 1 {
-            sources.append(recoveryText("Walk", "Gange"))
+            let minutes =
+                Int(walkingMinutes.rounded())
+            sources.append(
+                recoveryText(
+                    "Walk · \(minutes) min",
+                    "Gange · \(minutes) min"
+                )
+            )
         }
 
         return sources.isEmpty ? recoveryText("Check-in", "Innsjekk") : sources.joined(separator: " + ")
@@ -520,20 +602,28 @@ struct MuscleRecoveryStatus: Identifiable, Equatable {
             return recoveryText("Sore", "Øm")
         }
 
-        if currentLoadScore >= 0.78 {
-            return recoveryText("Short break suggested", "Liten pause anbefales")
+        switch currentLoadScore {
+        case 0.84...:
+            return recoveryText(
+                "Short break suggested",
+                "Liten pause anbefales"
+            )
+        case 0.65..<0.84:
+            return recoveryText("High load", "Høy belastning")
+        case 0.44..<0.65:
+            return recoveryText(
+                "Moderate load",
+                "Moderat belastning"
+            )
+        case 0.20..<0.44:
+            return recoveryText("Light load", "Lett belastning")
+        default:
+            return soreness == .mild
+                ? recoveryText("Mild soreness", "Lett ømhet")
+                : recoveryText("Ready", "Klar")
         }
-
-        if progress >= 0.95 {
-            return soreness == .mild ? recoveryText("Mild soreness", "Lett ømhet") : recoveryText("Ready", "Klar")
-        }
-
-        if progress >= 0.55 {
-            return recoveryText("Recovering", "Restituerer")
-        }
-
-        return recoveryText("Recently trained", "Nylig trent")
     }
+
 }
 
 enum MuscleRecoveryEngine {
@@ -547,38 +637,121 @@ enum MuscleRecoveryEngine {
         let baselineStart =
             now.addingTimeInterval(-35 * 86_400)
 
+        struct StrengthContribution {
+            let group: String
+            let completedSets: Int
+            let minutes: Double
+        }
+
+        func contributions(
+            for workout: StrengthWorkoutLog
+        ) -> [StrengthContribution] {
+            let exerciseLoads =
+                workout.exercises.compactMap {
+                    exercise
+                    -> (
+                        groups: [String],
+                        sets: Int
+                    )? in
+                    let completedSets =
+                        exercise.sets
+                            .filter(
+                                \.countsTowardTrainingLoad
+                            )
+                            .count
+                    guard completedSets > 0 else {
+                        return nil
+                    }
+
+                    let groups =
+                        Array(
+                            Set(
+                                exercise.exercise
+                                    .primaryMuscles
+                                    .compactMap(
+                                        normalizedMuscleGroup
+                                    )
+                            )
+                        )
+
+                    guard !groups.isEmpty else {
+                        return nil
+                    }
+
+                    return (
+                        groups,
+                        completedSets
+                    )
+                }
+
+            let totalSets =
+                exerciseLoads.reduce(0) {
+                    $0 + $1.sets
+                }
+
+            guard totalSets > 0 else {
+                return []
+            }
+
+            let workoutMinutes =
+                max(
+                    (
+                        workout.endedAt ??
+                        workout.startedAt
+                    )
+                    .timeIntervalSince(
+                        workout.startedAt
+                    ) / 60,
+                    0
+                )
+
+            var result:
+                [StrengthContribution] = []
+
+            for load in exerciseLoads {
+                let exerciseMinutes =
+                    workoutMinutes *
+                    Double(load.sets) /
+                    Double(totalSets)
+                let minutesPerGroup =
+                    exerciseMinutes /
+                    Double(load.groups.count)
+
+                for group in load.groups {
+                    result.append(
+                        StrengthContribution(
+                            group: group,
+                            completedSets:
+                                load.sets,
+                            minutes:
+                                minutesPerGroup
+                        )
+                    )
+                }
+            }
+
+            return result
+        }
+
         var baselineSetTotals:
             [String: Int] = [:]
+        var baselineMinuteTotals:
+            [String: Double] = [:]
 
         for workout in history
         where workout.isFinished &&
             workout.startedAt >= baselineStart &&
             workout.startedAt < cutoff {
-            for exercise in workout.exercises {
-                let completedSets =
-                    exercise.sets
-                        .filter(\.countsTowardTrainingLoad)
-                        .count
-
-                guard completedSets > 0 else {
-                    continue
-                }
-
-                let primary =
-                    Set(
-                        exercise.exercise
-                            .primaryMuscles
-                            .compactMap(
-                                normalizedMuscleGroup
-                            )
-                    )
-
-                for group in primary {
-                    baselineSetTotals[
-                        group,
-                        default: 0
-                    ] += completedSets
-                }
+            for contribution in
+                contributions(for: workout) {
+                baselineSetTotals[
+                    contribution.group,
+                    default: 0
+                ] += contribution.completedSets
+                baselineMinuteTotals[
+                    contribution.group,
+                    default: 0
+                ] += contribution.minutes
             }
         }
 
@@ -587,10 +760,16 @@ enum MuscleRecoveryEngine {
                 .mapValues {
                     Double($0) / 4
                 }
+        let baselineWeeklyStrengthMinutes =
+            baselineMinuteTotals
+                .mapValues {
+                    $0 / 4
+                }
 
         struct Accumulator {
             var lastTrainedAt: Date?
             var completedSets = 0
+            var strengthMinutes: Double = 0
             var runningMinutes: Double = 0
             var walkingMinutes: Double = 0
         }
@@ -598,32 +777,32 @@ enum MuscleRecoveryEngine {
         var values: [String: Accumulator] = [:]
 
         for workout in history
-        where workout.isFinished && workout.startedAt >= cutoff {
-            let workoutDate = workout.endedAt ?? workout.startedAt
+        where workout.isFinished &&
+            workout.startedAt >= cutoff {
+            let workoutDate =
+                workout.endedAt ??
+                workout.startedAt
 
-            for exercise in workout.exercises {
-                let completedSets = exercise.sets.filter(\.countsTowardTrainingLoad).count
+            for contribution in
+                contributions(for: workout) {
+                var item =
+                    values[contribution.group] ??
+                    Accumulator()
 
-                guard completedSets > 0 else {
-                    continue
+                item.completedSets +=
+                    contribution.completedSets
+                item.strengthMinutes +=
+                    contribution.minutes
+
+                if item.lastTrainedAt.map({
+                    workoutDate > $0
+                }) ?? true {
+                    item.lastTrainedAt =
+                        workoutDate
                 }
 
-                let primary = Set(
-                    exercise.exercise.primaryMuscles.compactMap(
-                        normalizedMuscleGroup
-                    )
-                )
-
-                for group in primary {
-                    var item = values[group] ?? Accumulator()
-                    item.completedSets += completedSets
-
-                    if item.lastTrainedAt.map({ workoutDate > $0 }) ?? true {
-                        item.lastTrainedAt = workoutDate
-                    }
-
-                    values[group] = item
-                }
+                values[contribution.group] =
+                    item
             }
         }
 
@@ -633,132 +812,214 @@ enum MuscleRecoveryEngine {
             walkingMinutes: Double = 0,
             date: Date?
         ) {
-            guard runningMinutes > 0 || walkingMinutes > 0 else {
+            guard runningMinutes > 0 ||
+                    walkingMinutes > 0
+            else {
                 return
             }
 
-            var item = values[group] ?? Accumulator()
-            item.runningMinutes += runningMinutes
-            item.walkingMinutes += walkingMinutes
+            var item =
+                values[group] ??
+                Accumulator()
+            item.runningMinutes +=
+                runningMinutes
+            item.walkingMinutes +=
+                walkingMinutes
 
             if let date,
-               item.lastTrainedAt.map({ date > $0 }) ?? true {
-                item.lastTrainedAt = date
+               item.lastTrainedAt.map({
+                   date > $0
+               }) ?? true {
+                item.lastTrainedAt =
+                    date
             }
 
-            values[group] = item
+            values[group] =
+                item
         }
 
-        let run = activityLoad.runningMinutes
-        let walk = activityLoad.walkingMinutes
+        let run =
+            activityLoad.runningMinutes
+        let walk =
+            activityLoad.walkingMinutes
 
         addMovement(
             group: "Quads",
             runningMinutes: run,
             walkingMinutes: walk * 0.48,
-            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+            date: maxDate(
+                activityLoad.latestRunningAt,
+                activityLoad.latestWalkingAt
+            )
         )
         addMovement(
             group: "Calves",
             runningMinutes: run,
             walkingMinutes: walk * 0.58,
-            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+            date: maxDate(
+                activityLoad.latestRunningAt,
+                activityLoad.latestWalkingAt
+            )
         )
         addMovement(
             group: "Hamstrings",
             runningMinutes: run * 0.82,
             walkingMinutes: walk * 0.28,
-            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+            date: maxDate(
+                activityLoad.latestRunningAt,
+                activityLoad.latestWalkingAt
+            )
         )
         addMovement(
             group: "Glutes",
             runningMinutes: run * 0.88,
             walkingMinutes: walk * 0.42,
-            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+            date: maxDate(
+                activityLoad.latestRunningAt,
+                activityLoad.latestWalkingAt
+            )
         )
         addMovement(
             group: "Core",
             runningMinutes: run * 0.34,
             walkingMinutes: walk * 0.16,
-            date: maxDate(activityLoad.latestRunningAt, activityLoad.latestWalkingAt)
+            date: maxDate(
+                activityLoad.latestRunningAt,
+                activityLoad.latestWalkingAt
+            )
         )
 
-        let allGroups = Set(values.keys)
-            .union(soreness.todayRatings.keys)
+        let allGroups =
+            Set(values.keys)
+                .union(
+                    soreness.todayRatings.keys
+                )
 
         return allGroups
             .map { group in
-                let item = values[group] ?? Accumulator()
-                let sorenessLevel = soreness.level(for: group)
+                let item =
+                    values[group] ??
+                    Accumulator()
+                let sorenessLevel =
+                    soreness.level(for: group)
 
-                let strengthRecoveryHours: Double
-                switch item.completedSets {
+                let strengthDoseMinutes =
+                    max(
+                        item.strengthMinutes,
+                        Double(item.completedSets) *
+                            3.5
+                    )
+                let strengthRecoveryHours:
+                    Double
+                switch strengthDoseMinutes {
                 case 0:
                     strengthRecoveryHours = 0
-                case 1...2:
-                    strengthRecoveryHours = 36
-                case 3...7:
-                    strengthRecoveryHours = 48
+                case 0..<10:
+                    strengthRecoveryHours = 8
+                case 10..<30:
+                    strengthRecoveryHours = 18
+                case 30..<60:
+                    strengthRecoveryHours = 30
+                case 60..<90:
+                    strengthRecoveryHours = 42
                 default:
-                    strengthRecoveryHours = 60
+                    strengthRecoveryHours = 54
                 }
 
                 let movementMinutes =
-                    item.runningMinutes + item.walkingMinutes
-                let movementRecoveryHours: Double
+                    item.runningMinutes +
+                    item.walkingMinutes
+                let movementRecoveryHours:
+                    Double
                 switch movementMinutes {
                 case 0:
                     movementRecoveryHours = 0
-                case 0..<25:
-                    movementRecoveryHours = 24
-                case 25..<70:
-                    movementRecoveryHours = 36
-                case 70..<140:
-                    movementRecoveryHours = 48
+                case 0..<15:
+                    movementRecoveryHours = 8
+                case 15..<35:
+                    movementRecoveryHours = 16
+                case 35..<75:
+                    movementRecoveryHours = 28
+                case 75..<140:
+                    movementRecoveryHours = 40
                 default:
-                    movementRecoveryHours = 60
+                    movementRecoveryHours = 52
                 }
 
-                let baseRecoveryHours = max(
-                    max(strengthRecoveryHours, movementRecoveryHours),
-                    24
-                )
+                var baseRecoveryHours =
+                    max(
+                        strengthRecoveryHours,
+                        movementRecoveryHours
+                    )
 
-                let sorenessAdjustment: Double
+                if baseRecoveryHours == 0 &&
+                    sorenessLevel != .none {
+                    baseRecoveryHours = 12
+                }
+
+                let sorenessAdjustment:
+                    Double
                 switch sorenessLevel {
-                case .none: sorenessAdjustment = 0
-                case .mild: sorenessAdjustment = 8
-                case .moderate: sorenessAdjustment = 16
-                case .high: sorenessAdjustment = 24
+                case .none:
+                    sorenessAdjustment = 0
+                case .mild:
+                    sorenessAdjustment = 6
+                case .moderate:
+                    sorenessAdjustment = 12
+                case .high:
+                    sorenessAdjustment = 24
                 }
 
                 return MuscleRecoveryStatus(
                     muscleGroup: group,
-                    lastTrainedAt: item.lastTrainedAt,
-                    completedSets: item.completedSets,
-                    runningMinutes: item.runningMinutes,
-                    walkingMinutes: item.walkingMinutes,
+                    lastTrainedAt:
+                        item.lastTrainedAt,
+                    completedSets:
+                        item.completedSets,
+                    strengthMinutes:
+                        item.strengthMinutes,
+                    runningMinutes:
+                        item.runningMinutes,
+                    walkingMinutes:
+                        item.walkingMinutes,
                     estimatedRecoveryHours:
-                        baseRecoveryHours + sorenessAdjustment,
-                    soreness: sorenessLevel,
+                        max(
+                            baseRecoveryHours +
+                                sorenessAdjustment,
+                            1
+                        ),
+                    soreness:
+                        sorenessLevel,
                     baselineWeeklyStrengthSets:
-                        baselineWeeklyStrengthSets[group],
+                        baselineWeeklyStrengthSets[
+                            group
+                        ],
+                    baselineWeeklyStrengthMinutes:
+                        baselineWeeklyStrengthMinutes[
+                            group
+                        ],
                     chronicWeeklyTrainingMinutes:
-                        activityLoad.chronicWeeklyAverageMinutes,
+                        activityLoad
+                            .chronicWeeklyAverageMinutes,
                     acuteToChronicRatio:
                         activityLoad.ratio
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.currentLoadScore != rhs.currentLoadScore {
-                    return lhs.currentLoadScore > rhs.currentLoadScore
+                if lhs.currentLoadScore !=
+                    rhs.currentLoadScore {
+                    return lhs.currentLoadScore >
+                        rhs.currentLoadScore
                 }
 
-                if lhs.soreness.rawValue != rhs.soreness.rawValue {
-                    return lhs.soreness.rawValue > rhs.soreness.rawValue
+                if lhs.soreness.rawValue !=
+                    rhs.soreness.rawValue {
+                    return lhs.soreness.rawValue >
+                        rhs.soreness.rawValue
                 }
 
-                return lhs.progress < rhs.progress
+                return lhs.readinessScore <
+                    rhs.readinessScore
             }
     }
 
@@ -1703,7 +1964,10 @@ struct MuscleRecoveryCard: View {
                         .font(.title3.weight(.bold))
 
                     Text(
-                        recoveryText("Last 7 days · strength, running and walking all contribute.", "Siste 7 dager · styrke, løping og gange teller med.")
+                        recoveryText(
+                            "Last 7 days · minutes and actual training volume determine the load.",
+                            "Siste 7 dager · minutter og faktisk treningsmengde avgjør belastningen."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1831,8 +2095,8 @@ struct MuscleRecoveryCard: View {
 
             Text(
                 recoveryText(
-                    "Colors compare recent muscle load with your personal training baseline. Green = ready; red = this area may benefit from a short break. ATHLTH estimate only.",
-                    "Fargene sammenligner nyere muskelbelastning med ditt personlige treningsnivå. Grønt = klar; rødt = området kan ha godt av en liten pause. Kun ATHLTH-estimat."
+                    "Colors reflect minute-weighted recent load against your training baseline. Neutral/green = low load; red is reserved for genuinely high recent load or marked soreness. ATHLTH estimate only.",
+                    "Fargene bygger på minuttvektet nyere belastning mot treningsgrunnlaget ditt. Nøytral/grønn = lav belastning; rødt brukes kun ved reelt høy belastning eller tydelig ømhet. Kun ATHLTH-estimat."
                 )
             )
             .font(.system(size: 8.5, weight: .regular))
@@ -1918,7 +2182,12 @@ struct MuscleRecoveryCard: View {
 
             HStack(spacing: 4) {
                 Text(
-                    ATHLTHLocalization.choose(english: "\(Int((status.progress * 100).rounded()))% recovered", norwegian: "\(Int((status.progress * 100).rounded()))% restituert")
+                    ATHLTHLocalization.choose(
+                        english:
+                            "\(Int((status.readinessScore * 100).rounded()))% ready",
+                        norwegian:
+                            "\(Int((status.readinessScore * 100).rounded()))% klar"
+                    )
                 )
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(statusTint(status))
@@ -2020,37 +2289,37 @@ struct MuscleRecoveryCard: View {
         _ status: MuscleRecoveryStatus
     ) -> Color {
         switch status.currentLoadScore {
-        case 0.78...:
+        case 0.84...:
             return .red
-        case 0.58..<0.78:
+        case 0.65..<0.84:
             return .orange
-        case 0.32..<0.58:
+        case 0.44..<0.65:
             return Color(
                 red: 0.78,
                 green: 0.58,
                 blue: 0.05
             )
-        default:
+        case 0.20..<0.44:
             return .green
+        default:
+            return ATHLTHTheme.mutedText
         }
     }
 
     private func statusTint(
         _ status: MuscleRecoveryStatus
     ) -> Color {
-        if status.currentLoadScore >= 0.78 ||
+        if status.currentLoadScore >= 0.84 ||
             status.soreness == .high {
             return .red
         }
 
-        if status.currentLoadScore >= 0.58 ||
-            status.soreness == .moderate ||
-            status.progress < 0.45 {
+        if status.currentLoadScore >= 0.65 ||
+            status.soreness == .moderate {
             return .orange
         }
 
-        if status.currentLoadScore >= 0.32 ||
-            status.progress < 0.85 {
+        if status.currentLoadScore >= 0.44 {
             return Color(
                 red: 0.78,
                 green: 0.58,
