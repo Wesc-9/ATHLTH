@@ -2066,7 +2066,7 @@ struct ATHLTHHomeView: View {
                                 alignment: .leading
                             )
                         } else {
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
                                 Image(
                                     systemName:
                                         "checkmark.circle.fill"
@@ -9605,7 +9605,7 @@ struct ATHLTHProfileView: View {
 
                 VStack(
                     alignment: .leading,
-                    spacing: 16
+                    spacing: 12
                 ) {
                     Spacer()
 
@@ -9706,7 +9706,7 @@ struct ATHLTHProfileView: View {
                     heroStatRow
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 40)
+                .padding(.bottom, 26)
                 .shadow(
                     color:
                         Color.black.opacity(0.28),
@@ -9715,7 +9715,7 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .frame(height: 492)
+        .frame(height: 440)
         .clipped()
     }
 
@@ -9775,52 +9775,61 @@ struct ATHLTHProfileView: View {
         title: String,
         icon: String
     ) -> some View {
-        VStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(
                     .system(
-                        size: 15,
+                        size: 13,
                         weight: .semibold
                     )
                 )
+                .frame(width: 15)
 
-            Text(value)
-                .font(
-                    .system(
-                        size: 15,
-                        weight: .bold,
-                        design: .rounded
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(value)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold,
+                            design: .rounded
+                        )
                     )
-                )
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.70)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
 
-            Text(title)
-                .font(
-                    .system(
-                        size: 9.5,
-                        weight: .medium
+                Text(title)
+                    .font(
+                        .system(
+                            size: 8.5,
+                            weight: .medium
+                        )
                     )
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+            }
+
+            Spacer(minLength: 0)
         }
         .foregroundStyle(.white)
+        .padding(.horizontal, 9)
         .frame(
             maxWidth: .infinity
         )
-        .frame(height: 82)
+        .frame(height: 60)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 18,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 18,
                 style: .continuous
             )
             .stroke(
