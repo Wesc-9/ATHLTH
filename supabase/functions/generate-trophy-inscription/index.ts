@@ -14,6 +14,8 @@ const ALLOWED_TROPHIES = new Set([
   "signature.marathon",
 ]);
 
+const ENGRAVING_VERSION = 1;
+
 const json = (
   body: Record<string, unknown>,
   status = 200,
@@ -342,14 +344,103 @@ Deno.serve(
       );
     }
 
+    const {
+      data: award,
+      error: awardError,
+    } =
+      await admin
+        .from(
+          "athlth_award_unlocks",
+        )
+        .select(
+          "stage_key,title,unlocked_at,username_at_unlock,engraving_achievement,engraving_text,engraving_generated_at,engraving_version",
+        )
+        .eq(
+          "user_id",
+          user.id,
+        )
+        .eq(
+          "award_id",
+          trophyID,
+        )
+        .eq(
+          "award_class",
+          "trophy",
+        )
+        .order(
+          "unlocked_at",
+          {
+            ascending: true,
+          },
+        )
+        .limit(1)
+        .maybeSingle();
+
+    if (
+      awardError ||
+      !award
+    ) {
+      return json(
+        {
+          error:
+            "This trophy has not been verified for the signed-in athlete.",
+        },
+        409,
+      );
+    }
+
+    if (
+      award.engraving_achievement &&
+      award.engraving_text &&
+      Number(
+        award.engraving_version ??
+          0,
+      ) >= ENGRAVING_VERSION
+    ) {
+      return json({
+        athlete:
+          cleanText(
+            award.username_at_unlock,
+            24,
+          ) ||
+          "ATHLTH ATHLETE",
+        achievement:
+          cleanText(
+            award.engraving_achievement,
+            28,
+          ),
+        inscription:
+          cleanText(
+            award.engraving_text,
+            48,
+          ),
+      });
+    }
+
+    const {
+      data: profile,
+    } =
+      await admin
+        .from("profiles")
+        .select(
+          "username,display_name",
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+
     const username =
       cleanText(
-        body.username,
+        award.username_at_unlock ||
+          profile?.username ||
+          profile?.display_name ||
+          body.username ||
+          "ATHLTH ATHLETE",
         24,
       );
     const achievementTitle =
       cleanText(
-        body.achievementTitle,
+        award.title ||
+          body.achievementTitle,
         80,
       );
     const achievementDetail =
@@ -359,26 +450,14 @@ Deno.serve(
       );
     const unlockedAt =
       cleanText(
-        body.unlockedAt,
+        award.unlocked_at ||
+          body.unlockedAt,
         64,
       );
     const language =
       body.language === "nb"
         ? "Norwegian Bokmål"
         : "English";
-
-    if (
-      !username ||
-      !achievementTitle
-    ) {
-      return json(
-        {
-          error:
-            "Username and achievement are required.",
-        },
-        400,
-      );
-    }
 
     const instructions = `
 You write the engraving for a premium gold ATHLTH sports trophy.
@@ -512,6 +591,56 @@ Rules:
       ) {
         throw new Error(
           "Empty engraving field.",
+        );
+      }
+
+      const generatedAt =
+        new Date()
+          .toISOString();
+
+      const {
+        error: persistError,
+      } =
+        await admin
+          .from(
+            "athlth_award_unlocks",
+          )
+          .update({
+            engraving_achievement:
+              achievement,
+            engraving_text:
+              inscription,
+            engraving_generated_at:
+              generatedAt,
+            engraving_version:
+              ENGRAVING_VERSION,
+          })
+          .eq(
+            "user_id",
+            user.id,
+          )
+          .eq(
+            "stage_key",
+            award.stage_key,
+          );
+
+      if (persistError) {
+        console.error(
+          "Unable to persist trophy engraving",
+          {
+            userID: user.id,
+            trophyID,
+            message:
+              persistError.message,
+          },
+        );
+
+        return json(
+          {
+            error:
+              "Trophy engraving could not be saved.",
+          },
+          502,
         );
       }
 
