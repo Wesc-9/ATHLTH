@@ -3854,6 +3854,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
