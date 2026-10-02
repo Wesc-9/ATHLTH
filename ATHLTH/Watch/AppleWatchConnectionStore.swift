@@ -33,17 +33,32 @@ enum AppleWatchConnectionState: Equatable {
 enum AppleWatchWorkoutLaunchError: LocalizedError {
     case watchUnavailable
     case launchAlreadyInProgress
+    case watchLockedOrPasscodeRequired
 
     var errorDescription: String? {
         switch self {
         case .watchUnavailable:
-            return "Apple Watch is not ready to start an ATHLTH workout."
+            return ATHLTHLocalization.choose(
+                english:
+                    "Apple Watch is not ready to start an ATHLTH workout.",
+                norwegian:
+                    "Apple Watch er ikke klar til å starte en ATHLTH-økt."
+            )
+
         case .launchAlreadyInProgress:
             return ATHLTHLocalization.choose(
                 english:
                     "ATHLTH is already starting a workout on Apple Watch.",
                 norwegian:
                     "ATHLTH starter allerede en økt på Apple Watch."
+            )
+
+        case .watchLockedOrPasscodeRequired:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Apple Watch is locked. Unlock your watch with your passcode, then try starting the workout again.",
+                norwegian:
+                    "Apple Watch er låst. Lås opp klokken med koden din, og prøv å starte økten på nytt."
             )
         }
     }
@@ -336,9 +351,39 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         do {
             try await healthStore.startWatchApp(toHandle: configuration)
         } catch {
-            workoutLaunchError = error.localizedDescription
-            throw error
+            let resolvedError =
+                Self.friendlyWorkoutLaunchError(
+                    for: error
+                )
+
+            workoutLaunchError =
+                resolvedError.localizedDescription
+            throw resolvedError
         }
+    }
+
+    private static func friendlyWorkoutLaunchError(
+        for error: Error
+    ) -> Error {
+        let message =
+            error.localizedDescription
+                .lowercased()
+
+        if message.contains(
+            "open urls while locked"
+        ) ||
+            message.contains(
+                "passcode compliance"
+            ) ||
+            (
+                message.contains("locked") &&
+                message.contains("passcode")
+            ) {
+            return AppleWatchWorkoutLaunchError
+                .watchLockedOrPasscodeRequired
+        }
+
+        return error
     }
 
     func sendWorkoutRouteSelection(
