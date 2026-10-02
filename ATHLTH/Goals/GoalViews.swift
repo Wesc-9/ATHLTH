@@ -3333,10 +3333,10 @@ struct GoalCreationView: View {
                 minHeight: 58
             )
             .background(
-                Group {
-                    if canContinue {
-                        LinearGradient(
-                            colors: [
+                LinearGradient(
+                    colors:
+                        canContinue
+                            ? [
                                 Color(
                                     red: 0.20,
                                     green: 0.60,
@@ -3347,21 +3347,14 @@ struct GoalCreationView: View {
                                     green: 0.46,
                                     blue: 0.95
                                 )
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    } else {
-                        LinearGradient(
-                            colors: [
+                            ]
+                            : [
                                 Color.secondary.opacity(0.28),
                                 Color.secondary.opacity(0.28)
                             ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    }
-                },
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
                 in: RoundedRectangle(
                     cornerRadius: 22,
                     style: .continuous
