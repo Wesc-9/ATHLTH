@@ -2620,8 +2620,10 @@ private struct WorkoutInviteLaunchSheet: View {
                         )
                         devicePicker
 
+                        lobbyStatusCard
+
                         Button {
-                            start(
+                            readyAndWait(
                                 copiedWorkout
                             )
                         } label: {
@@ -2991,16 +2993,144 @@ private struct WorkoutInviteLaunchSheet: View {
 
     private var startButtonTitle:
         String {
-        ATHLTHLocalization.choose(
+        if isStarting {
+            return ATHLTHLocalization.choose(
+                english: "Waiting for shared start…",
+                norwegian: "Venter på felles start…"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
             english:
                 captureDevice == .appleWatch
-                    ? "Start on Apple Watch"
-                    : "Start on iPhone",
+                    ? "Ready on Apple Watch"
+                    : "Ready on iPhone",
             norwegian:
                 captureDevice == .appleWatch
-                    ? "Start på Apple Watch"
-                    : "Start på iPhone"
+                    ? "Klar på Apple Watch"
+                    : "Klar på iPhone"
         )
+    }
+
+    private var lobbyStatusCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Shared start",
+                        norwegian: "Felles start"
+                    )
+                )
+                .font(.subheadline.weight(.semibold))
+
+                let participants =
+                    social.workoutParticipants
+                        .filter {
+                            $0.sessionID ==
+                                invite.session.id
+                        }
+
+                ForEach(participants) { participant in
+                    HStack(spacing: 9) {
+                        Circle()
+                            .fill(
+                                participant.workoutStartedAt != nil
+                                    ? ATHLTHTheme.accent
+                                    : participant.readyAt != nil
+                                        ? Color.green
+                                        : Color.orange
+                            )
+                            .frame(width: 8, height: 8)
+
+                        Text(participant.displayNameSnapshot)
+                            .font(.caption.weight(.semibold))
+
+                        Spacer()
+
+                        Text(
+                            participant.workoutStartedAt != nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Training",
+                                    norwegian: "Trener"
+                                )
+                                : participant.readyAt != nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Ready",
+                                        norwegian: "Klar"
+                                    )
+                                    : participant.state == .accepted
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Accepted",
+                                            norwegian: "Godtatt"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Invited",
+                                            norwegian: "Invitert"
+                                        )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "When the sender starts the group, ATHLTH counts down 3–2–1 and starts your copied workout on your chosen device.",
+                        norwegian:
+                            "Når avsender starter gruppen, teller ATHLTH ned 3–2–1 og starter øktkopien på enheten du valgte."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .task {
+            try? await social.refreshWorkoutLobby(
+                sessionID: invite.session.id
+            )
+        }
+    }
+
+    private func readyAndWait(
+        _ workout: PlannedSession
+    ) {
+        guard !isStarting else { return }
+
+        isStarting = true
+        launchError = nil
+
+        Task { @MainActor in
+            guard await social.markCurrentUserReady(
+                sessionID: invite.session.id,
+                captureDevice: captureDevice
+            ) else {
+                launchError =
+                    social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not mark you as ready.",
+                        norwegian: "Kunne ikke markere deg som klar."
+                    )
+                isStarting = false
+                return
+            }
+
+            guard await social.waitForCoordinatedWorkoutStart(
+                sessionID: invite.session.id
+            ) else {
+                launchError =
+                    social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "The shared workout was cancelled.",
+                        norwegian: "Fellesøkten ble avbrutt."
+                    )
+                isStarting = false
+                return
+            }
+
+            isStarting = false
+            start(workout)
+        }
     }
 
     private func start(
@@ -3039,8 +3169,9 @@ private struct WorkoutInviteLaunchSheet: View {
                             .audioCoach
                             .watchConfiguration
 
-                    try await WorkoutLaunchCoordinator
-                        .startStrength(
+                    let didStart =
+                        try await WorkoutLaunchCoordinator
+                            .startStrength(
                             workout: workout,
                             captureDevice:
                                 captureDevice,
@@ -3060,6 +3191,11 @@ private struct WorkoutInviteLaunchSheet: View {
                                 watchConnection,
                             spotify: spotify
                         )
+
+                    guard didStart else {
+                        isStarting = false
+                        return
+                    }
 
                     showingStrengthWorkout =
                         true
