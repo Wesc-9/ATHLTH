@@ -746,37 +746,41 @@ struct GoalCreationView: View {
     }
 
     private var goalTypeScreen: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    goalTypeHero
+        ZStack(alignment: .top) {
+            goalStaticHeroBackdrop(height: 344)
 
+            ZStack(alignment: .bottom) {
+                ScrollView {
                     VStack(spacing: 0) {
-                        categoryStep
-                            .padding(.horizontal, 16)
-                            .padding(.top, 22)
-                            .padding(.bottom, 122)
+                        goalTypeHero
+
+                        VStack(spacing: 0) {
+                            categoryStep
+                                .padding(.horizontal, 16)
+                                .padding(.top, 22)
+                                .padding(.bottom, 122)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            goalFlowCanvas,
+                            in: UnevenRoundedRectangle(
+                                topLeadingRadius: 30,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 30,
+                                style: .continuous
+                            )
+                        )
+                        .offset(y: -28)
                     }
                     .frame(maxWidth: .infinity)
-                    .background(
-                        goalFlowCanvas,
-                        in: UnevenRoundedRectangle(
-                            topLeadingRadius: 30,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 30,
-                            style: .continuous
-                        )
-                    )
-                    .offset(y: -28)
                 }
-                .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
-            .background(goalFlowCanvas)
-            .clipped()
+                .scrollIndicators(.hidden)
+                .background(Color.clear)
+                .clipped()
 
-            footer
+                footer
+            }
         }
         .background(goalFlowCanvas)
         .clipped()
@@ -784,59 +788,67 @@ struct GoalCreationView: View {
     }
 
     private var goalStepScreen: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    goalStepHero
+        ZStack(alignment: .top) {
+            goalStaticHeroBackdrop(height: 286)
 
-                    VStack(spacing: 14) {
-                        goalSelectedCategoryCard
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        goalStepHero
 
-                        Group {
-                            switch step {
-                            case 1:
-                                targetStep
-                            case 2:
-                                identityStep
-                            case 3:
-                                milestoneStep
-                            default:
-                                reviewStep
+                        VStack(spacing: 14) {
+                            goalSelectedCategoryCard
+
+                            Group {
+                                switch step {
+                                case 1:
+                                    targetStep
+                                case 2:
+                                    identityStep
+                                case 3:
+                                    milestoneStep
+                                default:
+                                    reviewStep
+                                }
                             }
                         }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 16)
-                    .padding(.bottom, 112)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        goalFlowCanvas,
-                        in: UnevenRoundedRectangle(
-                            topLeadingRadius: 28,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 28,
-                            style: .continuous
+                        .padding(.horizontal, 14)
+                        .padding(.top, 16)
+                        .padding(.bottom, 112)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            goalFlowCanvas,
+                            in: UnevenRoundedRectangle(
+                                topLeadingRadius: 28,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 28,
+                                style: .continuous
+                            )
                         )
-                    )
-                    .offset(y: -18)
+                        .offset(y: -18)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
-            .background(goalFlowCanvas)
-            .clipped()
+                .scrollIndicators(.hidden)
+                .background(Color.clear)
+                .clipped()
 
-            footer
+                footer
+            }
         }
         .background(goalFlowCanvas)
         .clipped()
         .ignoresSafeArea(edges: .top)
     }
 
-    private var goalStepHero: some View {
+    private func goalStaticHeroBackdrop(
+        height: CGFloat
+    ) -> some View {
         GeometryReader { proxy in
             ZStack {
+                Color.black
+
                 Image("OnboardingHero")
                     .resizable()
                     .interpolation(.high)
@@ -844,11 +856,43 @@ struct GoalCreationView: View {
                     .scaledToFill()
                     .frame(
                         width: proxy.size.width,
-                        height: 286
+                        height: height
                     )
                     .clipped()
-                    .accessibilityHidden(true)
 
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color: Color.black.opacity(0.10),
+                            location: 0
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.02),
+                            location: 0.48
+                        ),
+                        .init(
+                            color: Color.black.opacity(0.18),
+                            location: 1
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .frame(
+                width: proxy.size.width,
+                height: height
+            )
+            .clipped()
+        }
+        .frame(height: height)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var goalStepHero: some View {
+        GeometryReader { proxy in
+            ZStack {
                 LinearGradient(
                     stops: [
                         .init(
@@ -1236,18 +1280,6 @@ struct GoalCreationView: View {
     private var goalTypeHero: some View {
         GeometryReader { proxy in
             ZStack {
-                Image("OnboardingHero")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: 344
-                    )
-                    .clipped()
-                    .accessibilityHidden(true)
-
                 LinearGradient(
                     stops: [
                         .init(
