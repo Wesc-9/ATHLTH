@@ -1710,6 +1710,841 @@ private struct FreestyleExercisePrescriptionView: View {
     }
 }
 
+
+private struct StrengthExerciseSwapView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let current: StrengthExerciseLog
+    let entries: [ExerciseLibraryEntry]
+    let onSelect: (ExerciseLibraryEntry) -> Void
+
+    @State private var searchText = ""
+
+    private var currentMuscles: Set<String> {
+        Set(
+            current.exercise.primaryMuscles
+                .map {
+                    $0.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .lowercased()
+                }
+                .filter { !$0.isEmpty }
+        )
+    }
+
+    private var candidates: [ExerciseLibraryEntry] {
+        entries
+            .filter { entry in
+                guard entry.name
+                    .localizedCaseInsensitiveCompare(
+                        current.exercise.name
+                    ) != .orderedSame
+                else {
+                    return false
+                }
+
+                let muscles =
+                    Set(
+                        entry.exercise.primaryMuscles
+                            .map {
+                                $0.trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                )
+                                .lowercased()
+                            }
+                    )
+
+                let muscleMatch =
+                    currentMuscles.isEmpty ||
+                    !currentMuscles
+                        .isDisjoint(with: muscles)
+
+                let searchMatch =
+                    searchText.isEmpty ||
+                    entry.name.localizedCaseInsensitiveContains(
+                        searchText
+                    ) ||
+                    entry.exercise.primaryMuscles
+                        .contains {
+                            $0.localizedCaseInsensitiveContains(
+                                searchText
+                            )
+                        }
+
+                return muscleMatch &&
+                    searchMatch
+            }
+            .sorted { lhs, rhs in
+                let lhsOverlap =
+                    Set(
+                        lhs.exercise.primaryMuscles
+                            .map {
+                                $0.lowercased()
+                            }
+                    )
+                    .intersection(currentMuscles)
+                    .count
+                let rhsOverlap =
+                    Set(
+                        rhs.exercise.primaryMuscles
+                            .map {
+                                $0.lowercased()
+                            }
+                    )
+                    .intersection(currentMuscles)
+                    .count
+
+                if lhsOverlap == rhsOverlap {
+                    return lhs.name
+                        .localizedCaseInsensitiveCompare(
+                            rhs.name
+                        ) == .orderedAscending
+                }
+
+                return lhsOverlap > rhsOverlap
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if candidates.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No matching exercises",
+                            norwegian: "Ingen passende øvelser"
+                        ),
+                        systemImage:
+                            "arrow.triangle.2.circlepath",
+                        description: Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH could not find another exercise for the same primary muscle groups.",
+                                norwegian:
+                                    "ATHLTH fant ingen annen øvelse for de samme primære muskelgruppene."
+                            )
+                        )
+                    )
+                } else {
+                    List {
+                        Section(
+                            ATHLTHLocalization.choose(
+                                english: "Same muscle groups",
+                                norwegian: "Samme muskelgrupper"
+                            )
+                        ) {
+                            ForEach(candidates) { entry in
+                                Button {
+                                    onSelect(entry)
+                                } label: {
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(entry.name)
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .foregroundStyle(
+                                                .primary
+                                            )
+
+                                        Text(
+                                            entry.exercise
+                                                .primaryMuscles
+                                                .prefix(3)
+                                                .joined(
+                                                    separator:
+                                                        " · "
+                                                )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .searchable(
+                text: $searchText,
+                prompt:
+                    ATHLTHLocalization.choose(
+                        english: "Search alternatives",
+                        norwegian: "Søk etter alternativer"
+                    )
+            )
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Swap Exercise",
+                    norwegian: "Bytt øvelse"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StrengthExerciseGroupBuilderView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let workout: StrengthWorkoutLog
+    let currentExerciseID: UUID
+    let onSave:
+        ([UUID], StrengthExerciseGroupStyle) -> Void
+    let onUngroup: () -> Void
+
+    @State private var selectedIDs: Set<UUID>
+    @State private var style:
+        StrengthExerciseGroupStyle
+
+    init(
+        workout: StrengthWorkoutLog,
+        currentExerciseID: UUID,
+        onSave: @escaping (
+            [UUID],
+            StrengthExerciseGroupStyle
+        ) -> Void,
+        onUngroup: @escaping () -> Void
+    ) {
+        self.workout = workout
+        self.currentExerciseID =
+            currentExerciseID
+        self.onSave = onSave
+        self.onUngroup = onUngroup
+
+        let current =
+            workout.exercises.first {
+                $0.id ==
+                currentExerciseID
+            }
+
+        if let groupID = current?.groupID {
+            _selectedIDs = State(
+                initialValue:
+                    Set(
+                        workout.exercises
+                            .filter {
+                                $0.groupID ==
+                                groupID
+                            }
+                            .map(\.id)
+                    )
+            )
+        } else {
+            _selectedIDs = State(
+                initialValue:
+                    [currentExerciseID]
+            )
+        }
+
+        _style = State(
+            initialValue:
+                current?.groupStyle ??
+                .superset
+        )
+    }
+
+    private var currentIsGrouped: Bool {
+        workout.exercises
+            .first {
+                $0.id ==
+                currentExerciseID
+            }?
+            .groupID != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Style",
+                            norwegian: "Type"
+                        ),
+                        selection: $style
+                    ) {
+                        ForEach(
+                            StrengthExerciseGroupStyle
+                                .allCases
+                        ) { option in
+                            Text(option.title)
+                                .tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Exercises",
+                        norwegian: "Øvelser"
+                    )
+                ) {
+                    ForEach(
+                        workout.exercises.filter {
+                            !$0.isCompleted ||
+                            $0.id ==
+                            currentExerciseID
+                        }
+                    ) { exercise in
+                        Button {
+                            if exercise.id ==
+                                currentExerciseID {
+                                return
+                            }
+
+                            if selectedIDs
+                                .contains(
+                                    exercise.id
+                                ) {
+                                selectedIDs.remove(
+                                    exercise.id
+                                )
+                            } else {
+                                selectedIDs.insert(
+                                    exercise.id
+                                )
+                            }
+                        } label: {
+                            HStack {
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        exercise
+                                            .exercise
+                                            .name
+                                    )
+                                    .foregroundStyle(
+                                        .primary
+                                    )
+
+                                    Text(
+                                        exercise.exercise
+                                            .primaryMuscles
+                                            .prefix(2)
+                                            .joined(
+                                                separator:
+                                                    " · "
+                                            )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        selectedIDs
+                                            .contains(
+                                                exercise.id
+                                            )
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                )
+                                .foregroundStyle(
+                                    selectedIDs
+                                        .contains(
+                                            exercise.id
+                                        )
+                                        ? ATHLTHTheme
+                                            .accent
+                                        : .secondary
+                                )
+                            }
+                        }
+                        .disabled(
+                            exercise.id ==
+                            currentExerciseID
+                        )
+                    }
+                }
+
+                Section {
+                    Text(
+                        style == .superset
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH moves between the linked exercises before starting the rest timer.",
+                                norwegian:
+                                    "ATHLTH går mellom de koblede øvelsene før hviletimeren starter."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Circuit mode rotates through all selected exercises, then rests before the next round.",
+                                norwegian:
+                                    "Sirkelmodus går gjennom alle valgte øvelser og tar deretter pause før neste runde."
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if currentIsGrouped {
+                    Section {
+                        Button(
+                            role: .destructive
+                        ) {
+                            onUngroup()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Remove from group",
+                                    norwegian:
+                                        "Fjern øvelsesgruppe"
+                                ),
+                                systemImage:
+                                    "link.badge.minus"
+                            )
+                        }
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Superset / Circuit",
+                    norwegian:
+                        "Supersett / sirkel"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        onSave(
+                            Array(selectedIDs),
+                            style
+                        )
+                    }
+                    .disabled(
+                        selectedIDs.count < 2
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct StrengthExerciseRestEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let exercise: StrengthExerciseLog
+    let fallbackSeconds: Int
+    let onSave: (Int) -> Void
+
+    @State private var seconds: Int
+
+    init(
+        exercise: StrengthExerciseLog,
+        fallbackSeconds: Int,
+        onSave: @escaping (Int) -> Void
+    ) {
+        self.exercise = exercise
+        self.fallbackSeconds =
+            fallbackSeconds
+        self.onSave = onSave
+
+        _seconds = State(
+            initialValue:
+                exercise.restSecondsOverride ??
+                exercise.sets.first(
+                    where: {
+                        !$0.isCompleted
+                    }
+                )?.restSeconds ??
+                fallbackSeconds
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    exercise.exercise.name
+                ) {
+                    Stepper(
+                        value: $seconds,
+                        in: 0...600,
+                        step: 15
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Rest",
+                                    norwegian: "Hvile"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                seconds == 0
+                                    ? ATHLTHLocalization.choose(
+                                        english: "None",
+                                        norwegian: "Ingen"
+                                    )
+                                    : "\(seconds) s"
+                            )
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "This overrides the workout default for the remaining sets of this exercise.",
+                            norwegian:
+                                "Dette overstyrer standard hviletid for de resterende settene i denne øvelsen."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Exercise Rest",
+                    norwegian: "Hvile for øvelsen"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        onSave(seconds)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StrengthPlateCalculatorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var targetWeight:
+        Double
+    @State private var barWeight:
+        Double = 20
+
+    private let plates:
+        [Double] = [
+            25,
+            20,
+            15,
+            10,
+            5,
+            2.5,
+            1.25,
+            0.5
+        ]
+
+    init(
+        targetWeightKilograms:
+            Double
+    ) {
+        _targetWeight = State(
+            initialValue:
+                max(
+                    targetWeightKilograms,
+                    0
+                )
+        )
+    }
+
+    private var plateResult:
+        (
+            plates:
+                [(Double, Int)],
+            loaded: Double,
+            remainder: Double
+        ) {
+        guard targetWeight >=
+                barWeight
+        else {
+            return (
+                [],
+                barWeight,
+                targetWeight -
+                    barWeight
+            )
+        }
+
+        var remaining =
+            (targetWeight - barWeight) /
+            2
+        var result:
+            [(Double, Int)] = []
+
+        for plate in plates {
+            let count =
+                Int(
+                    floor(
+                        (
+                            remaining +
+                            0.0001
+                        ) / plate
+                    )
+                )
+
+            if count > 0 {
+                result.append(
+                    (plate, count)
+                )
+                remaining -=
+                    Double(count) *
+                    plate
+            }
+        }
+
+        let perSide =
+            result.reduce(0.0) {
+                partial,
+                item in
+                partial +
+                    item.0 *
+                    Double(item.1)
+            }
+
+        return (
+            result,
+            barWeight +
+                perSide * 2,
+            remaining * 2
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Target",
+                        norwegian: "Mål"
+                    )
+                ) {
+                    Stepper(
+                        value: $targetWeight,
+                        in: 0...500,
+                        step: 2.5
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Total weight",
+                                    norwegian: "Totalvekt"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "\(targetWeight, specifier: "%.1f") kg"
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Bar",
+                            norwegian: "Stang"
+                        ),
+                        selection: $barWeight
+                    ) {
+                        Text("20 kg")
+                            .tag(20.0)
+                        Text("15 kg")
+                            .tag(15.0)
+                        Text("10 kg")
+                            .tag(10.0)
+                    }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Load each side",
+                        norwegian: "Legg på hver side"
+                    )
+                ) {
+                    if targetWeight <
+                        barWeight {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Target is lighter than the selected bar.",
+                                norwegian:
+                                    "Målvekten er lavere enn valgt stang."
+                            )
+                        )
+                        .foregroundStyle(.secondary)
+                    } else if
+                        plateResult.plates
+                            .isEmpty {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Bar only",
+                                norwegian:
+                                    "Kun stang"
+                            )
+                        )
+                    } else {
+                        ForEach(
+                            Array(
+                                plateResult.plates
+                                    .enumerated()
+                            ),
+                            id: \.offset
+                        ) { _, item in
+                            HStack {
+                                Text(
+                                    "\(item.0, specifier: "%g") kg"
+                                )
+                                Spacer()
+                                Text(
+                                    "× \(item.1)"
+                                )
+                                .font(
+                                    .headline
+                                        .monospacedDigit()
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Loaded weight",
+                                norwegian: "Lastet vekt"
+                            )
+                        )
+                        Spacer()
+                        Text(
+                            "\(plateResult.loaded, specifier: "%.1f") kg"
+                        )
+                        .font(
+                            .headline
+                                .monospacedDigit()
+                        )
+                    }
+
+                    if abs(
+                        plateResult.remainder
+                    ) > 0.01 {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Closest load with the available standard plates. Difference: \(abs(plateResult.remainder), specifier: "%.1f") kg.",
+                                norwegian:
+                                    "Nærmeste last med tilgjengelige standardskiver. Forskjell: \(abs(plateResult.remainder), specifier: "%.1f") kg."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Plate Calculator",
+                    norwegian: "Skivekalkulator"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
 private extension TimeInterval {
     var clockDuration: String {
         let totalSeconds = max(Int(self.rounded(.down)), 0)
