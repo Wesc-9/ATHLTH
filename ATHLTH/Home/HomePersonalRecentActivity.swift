@@ -270,6 +270,7 @@ private enum HomePersonalWorkoutCatalog {
     }
 }
 
+@MainActor
 private enum HomeActivityStreamBuilder {
     static func make(
         mine:
@@ -1206,6 +1207,21 @@ private struct HomeFollowingFeaturedWorkoutCard:
                         )
                         .lineLimit(2)
                 }
+
+                if activity == .strength,
+                   let strengthText =
+                        HomeFollowingWorkoutPresentation
+                            .strengthDetailText(
+                                for: item
+                            ) {
+                    Text(strengthText)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                }
             }
             .padding(15)
         }
@@ -1316,10 +1332,23 @@ private struct HomeFollowingCompactWorkoutCard:
                 )
                 .lineLimit(1)
 
-                if let subtitle =
-                        item.activity
-                            .subtitle,
-                   !subtitle.isEmpty {
+                if activity == .strength,
+                   let strengthText =
+                        HomeFollowingWorkoutPresentation
+                            .strengthDetailText(
+                                for: item
+                            ) {
+                    Text(strengthText)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                } else if let subtitle =
+                                item.activity
+                                    .subtitle,
+                          !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.caption2)
                         .foregroundStyle(
@@ -1945,11 +1974,7 @@ struct HomePersonalActivityHistoryView:
                 HomeActivityScopeFilter
                     .allCases
             ) { option in
-                filterButton(
-                    option.title,
-                    selected:
-                        scope == option
-                ) {
+                Button {
                     withAnimation(
                         .snappy(
                             duration: 0.22
@@ -1957,7 +1982,36 @@ struct HomePersonalActivityHistoryView:
                     ) {
                         scope = option
                     }
+                } label: {
+                    Text(option.title)
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            scope == option
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .primaryText
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 36)
+                        .background(
+                            scope == option
+                                ? ATHLTHTheme
+                                    .accentDeep
+                                : Color.white
+                                    .opacity(
+                                        0.88
+                                    ),
+                            in: Capsule()
+                        )
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1973,11 +2027,7 @@ struct HomePersonalActivityHistoryView:
                     HomeActivityTypeFilter
                         .allCases
                 ) { option in
-                    filterButton(
-                        option.title,
-                        selected:
-                            type == option
-                    ) {
+                    Button {
                         withAnimation(
                             .snappy(
                                 duration: 0.22
@@ -1985,65 +2035,39 @@ struct HomePersonalActivityHistoryView:
                         ) {
                             type = option
                         }
+                    } label: {
+                        Text(option.title)
+                            .font(
+                                .caption.weight(
+                                    .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                type == option
+                                    ? Color.white
+                                    : ATHLTHTheme
+                                        .primaryText
+                            )
+                            .padding(
+                                .horizontal,
+                                13
+                            )
+                            .frame(height: 34)
+                            .background(
+                                type == option
+                                    ? ATHLTHTheme
+                                        .accentDeep
+                                    : Color.white
+                                        .opacity(
+                                            0.88
+                                        ),
+                                in: Capsule()
+                            )
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
-    }
-
-    private func filterButton(
-        _ title: String,
-        selected: Bool,
-        action:
-            @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(
-                    .caption.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    selected
-                        ? Color.white
-                        : ATHLTHTheme
-                            .primaryText
-                )
-                .padding(
-                    .horizontal,
-                    13
-                )
-                .frame(height: 34)
-                .frame(
-                    maxWidth:
-                        selected &&
-                        scopeBarShouldExpand(
-                            title
-                        )
-                            ? .infinity
-                            : nil
-                )
-                .background(
-                    selected
-                        ? ATHLTHTheme
-                            .accentDeep
-                        : Color.white
-                            .opacity(0.88),
-                    in: Capsule()
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func scopeBarShouldExpand(
-        _ title: String
-    ) -> Bool {
-        HomeActivityScopeFilter
-            .allCases
-            .contains {
-                $0.title == title
-            }
     }
 
     private var emptyHistory:
