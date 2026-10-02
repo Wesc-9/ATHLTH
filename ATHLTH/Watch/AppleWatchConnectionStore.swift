@@ -58,6 +58,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var state: AppleWatchConnectionState = .checking
     @Published private(set) var lastCompletedWorkout: WatchWorkoutResult?
     @Published private(set) var lastStrengthCommand: WatchStrengthCommand?
+    @Published private(set) var lastSpotifyCommand: WatchSpotifyCommand?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
 
@@ -332,6 +333,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         )
     }
 
+    func sendSpotifyPlaybackState(
+        _ playbackState: WatchSpotifyPlaybackState
+    ) {
+        sendWatchPayload(
+            playbackState,
+            kind: .spotifyPlaybackState
+        )
+    }
+
     func clearGhostRace() {
         sendGhostRace(
             WatchGhostRaceTransfer(
@@ -377,6 +387,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     func clearStrengthCommand() {
         lastStrengthCommand = nil
+    }
+
+    func clearSpotifyCommand() {
+        lastSpotifyCommand = nil
     }
 
     private func sendWatchPayload<T: Encodable>(
@@ -681,6 +695,24 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         return true
     }
 
+    private func receiveSpotifyCommand(
+        from payload: IncomingWatchPayload
+    ) -> Bool {
+        guard
+            payload.kind == WatchTransferKind.spotifyCommand.rawValue,
+            let data = payload.data,
+            let command = try? JSONDecoder().decode(
+                WatchSpotifyCommand.self,
+                from: data
+            )
+        else {
+            return false
+        }
+
+        lastSpotifyCommand = command
+        return true
+    }
+
     private func receiveWorkoutResult(
         from payload: IncomingWatchPayload
     ) {
@@ -714,6 +746,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         if receiveStrengthCommand(from: payload) {
+            return
+        }
+
+        if receiveSpotifyCommand(from: payload) {
             return
         }
 
