@@ -32,6 +32,8 @@ struct WorkoutStartOptionsView: View {
     @State private var keepScreenAwake = false
     @State private var inputMode:
         WatchStrengthInputMode = .both
+    @State private var effortMetric:
+        StrengthEffortMetric = .off
 
     @State private var showingSpotifyPicker = false
     @State private var showingAudioCoachSettings = false
@@ -64,18 +66,48 @@ struct WorkoutStartOptionsView: View {
         let initialDevice: WorkoutCaptureDevice =
             .iPhone
 
+        let savedAdvanced =
+            StrengthAdvancedConfiguration
+                .savedDefaults()
+
         _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
             initialValue: defaultTracking == .advanced ? .advanced : .simple
         )
         _selectedSpotifyPlaylist = State(
             initialValue:
-                session.spotifyPlaylist
+                session.spotifyPlaylist ??
+                savedAdvanced.spotifyPlaylist
         )
         _spotifyAutoplay = State(
             initialValue:
                 session.spotifyAutoplayOnStart ??
-                (session.spotifyPlaylist != nil)
+                (
+                    session.spotifyPlaylist != nil
+                        ? true
+                        : savedAdvanced.spotifyAutoplay
+                )
+        )
+        _strengthAudioCoach = State(
+            initialValue:
+                savedAdvanced.audioCoach
+        )
+        _restCues = State(
+            initialValue:
+                savedAdvanced.restCues
+        )
+        _keepScreenAwake = State(
+            initialValue:
+                savedAdvanced.keepScreenAwake
+        )
+        _inputMode = State(
+            initialValue:
+                savedAdvanced.inputMode
+        )
+        _effortMetric = State(
+            initialValue:
+                savedAdvanced.effortMetric ??
+                .off
         )
     }
 
@@ -276,8 +308,15 @@ struct WorkoutStartOptionsView: View {
                                 inputMode:
                                     captureDevice == .appleWatch
                                         ? inputMode
-                                        : .iPhone
+                                        : .iPhone,
+                                effortMetric:
+                                    effortMetric
                             )
+
+                        if trackingMode == .advanced {
+                            advancedConfiguration
+                                .saveAsDefaults()
+                        }
 
                         var watchAudioCoach =
                             trackingMode == .advanced
@@ -448,6 +487,8 @@ struct WorkoutStartOptionsView: View {
                         $keepScreenAwake,
                     inputMode:
                         $inputMode,
+                    effortMetric:
+                        $effortMetric,
                     watchAvailable:
                         captureDevice == .appleWatch
                 )
@@ -1098,6 +1139,8 @@ private struct StrengthDisplayControlSettingsView: View {
     @Binding var keepScreenAwake: Bool
     @Binding var inputMode:
         WatchStrengthInputMode
+    @Binding var effortMetric:
+        StrengthEffortMetric
     let watchAvailable: Bool
 
     var body: some View {
@@ -1149,6 +1192,41 @@ private struct StrengthDisplayControlSettingsView: View {
                                 )
                         }
                     }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Effort after each set",
+                        norwegian: "Anstrengelse etter hvert sett"
+                    )
+                ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Effort metric",
+                            norwegian: "Anstrengelsesmåling"
+                        ),
+                        selection:
+                            $effortMetric
+                    ) {
+                        ForEach(
+                            StrengthEffortMetric.allCases
+                        ) { metric in
+                            Text(metric.title)
+                                .tag(metric)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "RPE rates overall effort from 1–10. RIR records how many repetitions you felt you had left. Off keeps set logging faster.",
+                            norwegian:
+                                "RPE angir total anstrengelse fra 1–10. RIR registrerer hvor mange repetisjoner du følte du hadde igjen. Av gjør settregistreringen raskere."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section {
