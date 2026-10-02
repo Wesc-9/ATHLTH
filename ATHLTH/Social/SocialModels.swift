@@ -578,6 +578,10 @@ struct BackendChallengeParticipant: Codable, Hashable {
         case invitedBy = "invited_by"
         case invitedAt = "invited_at"
         case respondedAt = "responded_at"
+        case readyAt = "ready_at"
+        case captureDevice = "capture_device"
+        case workoutStartedAt = "workout_started_at"
+        case workoutFinishedAt = "workout_finished_at"
     }
 }
 
@@ -701,6 +705,7 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
     let createdAt: Date
     var updatedAt: Date?
     var invitePayload: SocialWorkoutInvitePayload? = nil
+    var coordinatedStartAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -714,6 +719,7 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case invitePayload = "invite_payload"
+        case coordinatedStartAt = "coordinated_start_at"
     }
 }
 
@@ -727,6 +733,19 @@ struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
     let usernameSnapshot: String?
     let invitedAt: Date
     var respondedAt: Date?
+    var readyAt: Date? = nil
+    var captureDevice: String? = nil
+    var workoutStartedAt: Date? = nil
+    var workoutFinishedAt: Date? = nil
+
+    var isReady: Bool {
+        readyAt != nil
+    }
+
+    var isTraining: Bool {
+        workoutStartedAt != nil &&
+        workoutFinishedAt == nil
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
