@@ -93,6 +93,7 @@ final class TrophyInscriptionAIService {
             [
                 "athlth",
                 "trophyInscription",
+                "v2",
                 userScope,
                 trophyID,
                 language
@@ -107,7 +108,6 @@ final class TrophyInscriptionAIService {
                 TrophyInscriptionCacheEntry.self,
                 from: data
             ),
-        cached.username == cleanUsername,
         cached.achievementTitle ==
             achievementTitle {
             return cached.inscription
@@ -148,8 +148,12 @@ final class TrophyInscriptionAIService {
             let normalized =
                 TrophyInscription(
                     athlete:
-                        cleanUsername
-                            .uppercased(),
+                        clipped(
+                            generated
+                                .athlete,
+                            maximum: 24
+                        )
+                        .uppercased(),
                     achievement:
                         clipped(
                             generated
@@ -171,7 +175,8 @@ final class TrophyInscriptionAIService {
                     .encode(
                         TrophyInscriptionCacheEntry(
                             username:
-                                cleanUsername,
+                                normalized
+                                    .athlete,
                             achievementTitle:
                                 achievementTitle,
                             inscription:
