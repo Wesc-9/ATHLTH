@@ -40,31 +40,78 @@ enum ATHLTHBrandSize {
 
 struct ATHLTHMarkShape: Shape {
     func path(in rect: CGRect) -> Path {
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        func p(
+            _ x: CGFloat,
+            _ y: CGFloat
+        ) -> CGPoint {
             CGPoint(
-                x: rect.minX + rect.width * x,
-                y: rect.minY + rect.height * y
+                x:
+                    rect.minX +
+                    rect.width * x,
+                y:
+                    rect.minY +
+                    rect.height * y
             )
         }
 
-        var path = Path()
+        let lineWidth =
+            min(
+                rect.width,
+                rect.height
+            ) * 0.155
 
-        // Left ribbon.
-        path.move(to: p(0.04, 1.00))
-        path.addLine(to: p(0.50, 0.00))
-        path.addLine(to: p(0.61, 0.24))
-        path.addLine(to: p(0.27, 1.00))
-        path.closeSubpath()
+        var centerline =
+            Path()
 
-        // Right ribbon with the slightly inset top edge that gives the
-        // ATHLTH mark its folded-paper construction.
-        path.move(to: p(0.50, 0.00))
-        path.addLine(to: p(0.96, 1.00))
-        path.addLine(to: p(0.73, 1.00))
-        path.addLine(to: p(0.43, 0.34))
-        path.closeSubpath()
+        // 2026 pulse-A mark.
+        centerline.move(
+            to: p(0.08, 0.67)
+        )
+        centerline.addLine(
+            to: p(0.28, 0.67)
+        )
+        centerline.addCurve(
+            to: p(0.50, 0.08),
+            control1:
+                p(0.34, 0.67),
+            control2:
+                p(0.43, 0.20)
+        )
+        centerline.addCurve(
+            to: p(0.72, 0.58),
+            control1:
+                p(0.57, 0.11),
+            control2:
+                p(0.64, 0.55)
+        )
+        centerline.addLine(
+            to: p(0.84, 0.58)
+        )
 
-        return path
+        centerline.move(
+            to: p(0.49, 0.49)
+        )
+        centerline.addLine(
+            to: p(0.59, 0.88)
+        )
+        centerline.addLine(
+            to: p(0.69, 0.65)
+        )
+        centerline.addLine(
+            to: p(0.92, 0.65)
+        )
+
+        return centerline
+            .strokedPath(
+                StrokeStyle(
+                    lineWidth:
+                        lineWidth,
+                    lineCap:
+                        .round,
+                    lineJoin:
+                        .round
+                )
+            )
     }
 }
 
@@ -93,14 +140,14 @@ struct ATHLTHBrandMark: View {
 
     var body: some View {
         VStack(spacing: size == .watch ? 2 : 3) {
-            ZStack {
-                ATHLTHMarkShape()
-                    .fill(Color.primary)
-
-                ATHLTHFoldShape()
-                    .fill(Color.black.opacity(0.34))
-            }
-            .frame(width: size.markWidth, height: size.markHeight)
+            ATHLTHMarkShape()
+                .fill(Color.primary)
+                .frame(
+                    width:
+                        size.markWidth,
+                    height:
+                        size.markHeight
+                )
             .accessibilityHidden(true)
 
             Text("ATHLTH")

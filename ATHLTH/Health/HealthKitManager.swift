@@ -1292,7 +1292,7 @@ final class HealthKitManager: ObservableObject {
         let workouts = try await fetchAllWorkoutsCached()
             .sorted { $0.startDate < $1.startDate }
 
-        let workoutThresholds = [10, 50, 100, 500]
+        let workoutThresholds = [10, 50, 100, 500, 1_000]
         var workoutCountReachedAt: [Int: Date] = [:]
 
         for (index, workout) in workouts.enumerated() {
@@ -1313,6 +1313,10 @@ final class HealthKitManager: ObservableObject {
         var firstHalfMarathonEvidence:
             PrestigeRunEvidence?
         var firstMarathonEvidence:
+            PrestigeRunEvidence?
+        var firstThirtyKRunEvidence:
+            PrestigeRunEvidence?
+        var firstFiftyKRunEvidence:
             PrestigeRunEvidence?
 
         for workout in workouts where workout.workoutActivityType == .running {
@@ -1429,12 +1433,26 @@ final class HealthKitManager: ObservableObject {
                     prestigeEvidence
             }
 
+            if firstThirtyKRunEvidence == nil,
+               distance >= 30_000,
+               prestigeEligible {
+                firstThirtyKRunEvidence =
+                    prestigeEvidence
+            }
+
             if firstMarathonDate == nil,
                distance >= 42_195,
                prestigeEligible {
                 firstMarathonDate =
                     workout.endDate
                 firstMarathonEvidence =
+                    prestigeEvidence
+            }
+
+            if firstFiftyKRunEvidence == nil,
+               distance >= 50_000,
+               prestigeEligible {
+                firstFiftyKRunEvidence =
                     prestigeEvidence
             }
 
@@ -1581,6 +1599,10 @@ final class HealthKitManager: ObservableObject {
                 firstHalfMarathonEvidence,
             firstMarathonEvidence:
                 firstMarathonEvidence,
+            firstThirtyKRunEvidence:
+                firstThirtyKRunEvidence,
+            firstFiftyKRunEvidence:
+                firstFiftyKRunEvidence,
             walkingWorkoutCount: walkingWorkoutCount,
             walkingWorkoutCountReachedAt:
                 walkingWorkoutCountReachedAt,

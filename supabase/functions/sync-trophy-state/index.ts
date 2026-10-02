@@ -47,10 +47,20 @@ const PRESTIGE = {
     threshold: 21_097.5,
     icon: "figure.run",
   },
+  "signature.long-run-30k": {
+    title: "Long Run 30K",
+    threshold: 30_000,
+    icon: "road.lanes",
+  },
   "signature.marathon": {
     title: "Marathon",
     threshold: 42_195,
     icon: "flag.checkered",
+  },
+  "signature.ultra-50k": {
+    title: "Ultra 50K",
+    threshold: 50_000,
+    icon: "mountain.2.fill",
   },
 } as const;
 

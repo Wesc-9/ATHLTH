@@ -14,9 +14,17 @@ const TROPHY_FACTS = {
     detail:
       "A verified single running workout of at least 21.0975 kilometres.",
   },
+  "signature.long-run-30k": {
+    detail:
+      "A verified single running workout of at least 30 kilometres.",
+  },
   "signature.marathon": {
     detail:
       "A verified single running workout of at least 42.195 kilometres.",
+  },
+  "signature.ultra-50k": {
+    detail:
+      "A verified single running workout of at least 50 kilometres.",
   },
 } as const;
 

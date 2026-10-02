@@ -439,9 +439,11 @@ final class TrophyStore: ObservableObject {
 
             resolved.append(
                 signature(
-                    id: "signature.half-marathon",
+                    id:
+                        PrestigeTrophyCatalog
+                            .halfMarathonID,
                     title: "Half Marathon",
-                    subtitle: "A recorded run reaching 21.1 kilometres.",
+                    subtitle: "A verified single run reaching 21.1 kilometres.",
                     icon: "figure.run",
                     source: .appleHealth,
                     rarity: .signature,
@@ -456,9 +458,30 @@ final class TrophyStore: ObservableObject {
 
             resolved.append(
                 signature(
-                    id: "signature.marathon",
+                    id:
+                        PrestigeTrophyCatalog
+                            .longRun30KID,
+                    title: "Long Run 30K",
+                    subtitle: "A verified single running workout of at least 30 kilometres.",
+                    icon: "road.lanes",
+                    source: .appleHealth,
+                    rarity: .signature,
+                    unlockedAt:
+                        historicalUnlockDate(
+                            for:
+                                PrestigeTrophyCatalog
+                                    .longRun30KID
+                        )
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .marathonID,
                     title: "Marathon",
-                    subtitle: "42.195 kilometres recorded in a single run.",
+                    subtitle: "A verified 42.195 kilometre run in one recorded workout.",
                     icon: "flag.checkered",
                     source: .appleHealth,
                     rarity: .signature,
@@ -467,6 +490,25 @@ final class TrophyStore: ObservableObject {
                             for:
                                 PrestigeTrophyCatalog
                                     .marathonID
+                        )
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .ultra50KID,
+                    title: "Ultra 50K",
+                    subtitle: "A verified single running workout of at least 50 kilometres.",
+                    icon: "mountain.2.fill",
+                    source: .appleHealth,
+                    rarity: .signature,
+                    unlockedAt:
+                        historicalUnlockDate(
+                            for:
+                                PrestigeTrophyCatalog
+                                    .ultra50KID
                         )
                 )
             )
@@ -862,31 +904,25 @@ final class TrophyStore: ObservableObject {
             }
         }
 
-        let historical =
+        let historicalStage =
             unlocks
                 .filter {
                     $0.trophyID ==
                     definition.id
                 }
-                .max {
-                    if $0.rarity !=
-                        $1.rarity {
-                        return $0.rarity <
-                            $1.rarity
+                .compactMap {
+                    record in
+                    stages.first {
+                        stage in
+                        record.stageKey ==
+                            "\(definition.id).stage.\(stage.id)"
                     }
-
-                    return $0.unlockedAt <
-                        $1.unlockedAt
+                }
+                .max {
+                    $0.threshold <
+                        $1.threshold
                 }
 
-        let historicalStage =
-            historical.flatMap {
-                record in
-                stages.last {
-                    $0.rarity <=
-                        record.rarity
-                }
-            }
         let liveStage =
             completed.last
         let current:
@@ -898,8 +934,8 @@ final class TrophyStore: ObservableObject {
         ) {
         case let (live?, old?):
             current =
-                live.rarity >=
-                    old.rarity
+                live.threshold >=
+                    old.threshold
                     ? live
                     : old
         case let (live?, nil):
@@ -914,8 +950,8 @@ final class TrophyStore: ObservableObject {
             current.flatMap {
                 current in
                 stages.first {
-                    $0.rarity >
-                        current.rarity
+                    $0.threshold >
+                        current.threshold
                 }
             } ??
             stages.first {
@@ -1031,14 +1067,16 @@ final class TrophyStore: ObservableObject {
                     ? nil
                     : unlockedAt
             )
-        let resolvedRarity =
-            historical.map {
-                max(
-                    $0.rarity,
+        let resolvedRarity:
+            TrophyRarity =
+            PrestigeTrophyCatalog
+                .isPrestigeTrophy(id)
+                ? (
+                    historical?
+                        .rarity ??
                     rarity
                 )
-            } ??
-            rarity
+                : rarity
         let stage =
             resolvedUnlockedAt.map {
                 _ in
@@ -1140,9 +1178,21 @@ final class TrophyStore: ObservableObject {
                 ),
                 (
                     PrestigeTrophyCatalog
+                        .longRun30KID,
+                    snapshot
+                        .firstThirtyKRunEvidence
+                ),
+                (
+                    PrestigeTrophyCatalog
                         .marathonID,
                     snapshot
                         .firstMarathonEvidence
+                ),
+                (
+                    PrestigeTrophyCatalog
+                        .ultra50KID,
+                    snapshot
+                        .firstFiftyKRunEvidence
                 )
             ]
 

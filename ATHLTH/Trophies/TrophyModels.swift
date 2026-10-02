@@ -90,12 +90,18 @@ enum ATHLTHAwardClass: String, Codable, Hashable {
 enum PrestigeTrophyCatalog {
     static let halfMarathonID =
         "signature.half-marathon"
+    static let longRun30KID =
+        "signature.long-run-30k"
     static let marathonID =
         "signature.marathon"
+    static let ultra50KID =
+        "signature.ultra-50k"
 
     static let ids: Set<String> = [
         halfMarathonID,
-        marathonID
+        longRun30KID,
+        marathonID,
+        ultra50KID
     ]
 
     static func isPrestigeTrophy(
@@ -180,6 +186,8 @@ struct TrophyHealthSnapshot: Hashable, Codable {
     let firstMarathonDate: Date?
     let firstHalfMarathonEvidence: PrestigeRunEvidence?
     let firstMarathonEvidence: PrestigeRunEvidence?
+    let firstThirtyKRunEvidence: PrestigeRunEvidence?
+    let firstFiftyKRunEvidence: PrestigeRunEvidence?
 
     // Optional so an existing on-device trophy cache from an older ATHLTH
     // build remains decodable after the walking trophy expansion.
@@ -445,7 +453,8 @@ enum TrophyCatalog {
             .init(id: "10", title: "Ignition", threshold: 10, displayTarget: "10 workouts", rarity: .core),
             .init(id: "50", title: "Momentum", threshold: 50, displayTarget: "50 workouts", rarity: .rare),
             .init(id: "100", title: "Committed", threshold: 100, displayTarget: "100 workouts", rarity: .epic),
-            .init(id: "500", title: "Relentless", threshold: 500, displayTarget: "500 workouts", rarity: .signature)
+            .init(id: "500", title: "Relentless", threshold: 500, displayTarget: "500 workouts", rarity: .epic),
+            .init(id: "1000", title: "Lifetime Motion", threshold: 1_000, displayTarget: "1,000 workouts", rarity: .signature)
         ]
     )
 
