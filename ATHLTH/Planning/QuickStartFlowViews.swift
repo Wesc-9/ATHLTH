@@ -646,13 +646,7 @@ struct RunQuickStartSheet: View {
                     introCard
                     modeCard
 
-                    QuickStartWorkoutDeviceCard(
-                        selection: $captureDevice,
-                        watchConnected: watchConnected,
-                        iPhoneEnabled: true,
-                        iPhoneSubtitle:
-                            "Record the run with iPhone GPS. Selected routes stay attached to the workout."
-                    )
+                    runDeviceCard
 
                     selectionCard
 
@@ -794,7 +788,10 @@ struct RunQuickStartSheet: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
                     Button(
                         ATHLTHLocalization.choose(
                             english: "Cancel",
@@ -803,6 +800,13 @@ struct RunQuickStartSheet: View {
                     ) {
                         dismiss()
                     }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    runSetupModeButton
                 }
             }
             .sheet(isPresented: $showingRoutes) {
@@ -880,68 +884,96 @@ struct RunQuickStartSheet: View {
     }
 
     private var introCard: some View {
-        ATHLTHCard {
-            HStack(
-                alignment: .top,
-                spacing: 12
+        ZStack {
+            Image(
+                "StrengthPostWorkoutHero"
+            )
+            .resizable()
+            .scaledToFill()
+            .frame(height: 118)
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.68),
+                    Color.black.opacity(0.28),
+                    Color.black.opacity(0.08)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
             ) {
-                Image(systemName: "figure.run")
-                    .font(
-                        .system(
-                            size: 25,
-                            weight: .semibold
-                        )
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Start Run",
+                        norwegian: "Start løpeøkt"
                     )
-                    .foregroundStyle(
-                        ATHLTHTheme.accent
+                )
+                .font(
+                    .title2.weight(
+                        .bold
                     )
-                    .frame(
-                        width: 50,
-                        height: 50
-                    )
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 15
-                        )
-                    )
+                )
+                .foregroundStyle(.white)
+                .lineLimit(1)
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 4
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Start Run",
-                            norwegian: "Start løpeøkt"
-                        )
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            isAdvancedSetup
+                                ? "Routes, guidance and social options."
+                                : "Fast setup with the essentials.",
+                        norwegian:
+                            isAdvancedSetup
+                                ? "Ruter, veiledning og sosiale valg."
+                                : "Raskt oppsett med det viktigste."
                     )
-                    .font(
-                        .title3
-                            .weight(.bold)
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.84
                     )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                isAdvancedSetup
-                                    ? "Advanced guidance and social options."
-                                    : "A fast setup with the essentials.",
-                            norwegian:
-                                isAdvancedSetup
-                                    ? "Avansert veiledning og sosiale valg."
-                                    : "Raskt oppsett med det viktigste."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 6)
-
-                runSetupModeButton
+                )
+                .lineLimit(2)
             }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .padding(16)
         }
+        .frame(height: 118)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(
+                    0.22
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    0.08
+                ),
+            radius: 16,
+            y: 8
+        )
     }
 
     private var runSetupModeButton: some View {
@@ -978,16 +1010,27 @@ struct RunQuickStartSheet: View {
             .foregroundStyle(
                 isAdvancedSetup
                     ? Color.white
-                    : ATHLTHTheme.accentDeep
+                    : ATHLTHTheme.primaryText
             )
             .padding(.horizontal, 11)
             .frame(height: 34)
             .background(
                 isAdvancedSetup
-                    ? ATHLTHTheme.accent
-                    : ATHLTHTheme.accentSoft,
+                    ? ATHLTHTheme.vitality
+                    : Color.primary.opacity(
+                        0.055
+                    ),
                 in: Capsule()
             )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.black.opacity(
+                            0.045
+                        ),
+                        lineWidth: 0.7
+                    )
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
@@ -997,6 +1040,171 @@ struct RunQuickStartSheet: View {
                 norwegian:
                     "Bytt oppsettsmodus for løpeøkt"
             )
+        )
+    }
+
+    private var runDeviceCard: some View {
+        ATHLTHCard {
+            HStack(spacing: 8) {
+                RoundedRectangle(
+                    cornerRadius: 2,
+                    style: .continuous
+                )
+                .fill(
+                    ATHLTHTheme.premiumGold
+                )
+                .frame(
+                    width: 4,
+                    height: 26
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Workout device",
+                        norwegian: "Treningsenhet"
+                    )
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                runDeviceTile(
+                    title: "iPhone",
+                    icon: "iphone",
+                    selected:
+                        captureDevice == .iPhone,
+                    disabled: false
+                ) {
+                    captureDevice = .iPhone
+                }
+
+                runDeviceTile(
+                    title: "Apple Watch",
+                    icon: "applewatch",
+                    selected:
+                        captureDevice ==
+                            .appleWatch,
+                    disabled:
+                        !watchConnected
+                ) {
+                    captureDevice =
+                        .appleWatch
+                }
+            }
+            .padding(.top, 10)
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "This choice applies only to this workout.",
+                    norwegian:
+                        "Valget gjelder bare denne økten."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.top, 8)
+        }
+    }
+
+    private func runDeviceTile(
+        title: String,
+        icon: String,
+        selected: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 22,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        selected
+                            ? Color.white
+                            : disabled
+                                ? Color.secondary
+                                : ATHLTHTheme
+                                    .primaryText
+                    )
+
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        selected
+                            ? Color.white
+                            : disabled
+                                ? ATHLTHTheme
+                                    .mutedText
+                                : ATHLTHTheme
+                                    .primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.82
+                    )
+
+                Image(
+                    systemName:
+                        selected
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    selected
+                        ? Color.white
+                        : Color.secondary
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 118
+            )
+            .background(
+                selected
+                    ? ATHLTHTheme
+                        .accentDeep
+                    : Color.primary
+                        .opacity(0.025),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    selected
+                        ? ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.20)
+                        : Color.black
+                            .opacity(0.045),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(
+            disabled
+                ? 0.60
+                : 1
         )
     }
 
@@ -1345,7 +1553,7 @@ struct RunQuickStartSheet: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .tint(ATHLTHTheme.accent)
+        .tint(ATHLTHTheme.vitality)
         .disabled(!canStart)
     }
 
