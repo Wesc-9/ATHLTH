@@ -504,15 +504,21 @@ struct ATHLTHTrophyCoreView: View {
     }
 
     private var prestigeTrophyArtwork: some View {
-        let athlete =
-            inscription?.athlete ??
+        let fallbackAthlete =
             athleteName?
                 .trimmingCharacters(
                     in:
                         .whitespacesAndNewlines
-                )
-                .uppercased() ??
-            "ATHLTH"
+                ) ??
+            ""
+        let athlete =
+            inscription?.athlete ??
+            (
+                fallbackAthlete.isEmpty
+                    ? "ATHLTH"
+                    : fallbackAthlete
+                        .uppercased()
+            )
         let achievement =
             inscription?.achievement ??
             trophy.title.uppercased()
