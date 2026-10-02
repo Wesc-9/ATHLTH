@@ -4443,31 +4443,34 @@ struct GoalCreationView: View {
         case .event:
             targetValue = 42.195
             hasDeadline = true
-            coverStyle = .summit
+            coverStyle = .event
         case .endurance:
             targetValue = 5
             hasDeadline = true
-            coverStyle = .track
+            coverStyle = .running
         case .strength:
             targetValue = 100
             hasDeadline = true
             coverStyle = .strength
         case .body:
-            targetValue = max((health.personalDetails.weightKilograms ?? 84) - 4, 1)
+            targetValue = max(
+                (health.personalDetails.weightKilograms ?? 84) - 4,
+                1
+            )
             hasDeadline = true
-            coverStyle = .forest
+            coverStyle = .progress
         case .consistency:
             targetValue = 12
             hasDeadline = true
-            coverStyle = .forest
+            coverStyle = .consistency
         case .recovery:
             targetValue = 8
             hasDeadline = false
-            coverStyle = .calm
+            coverStyle = .relax
         case .custom:
             targetValue = 1
             hasDeadline = false
-            coverStyle = .forest
+            coverStyle = .adventure
         }
     }
 
