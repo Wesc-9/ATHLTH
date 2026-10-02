@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkoutStartOptionsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
@@ -36,6 +37,7 @@ struct WorkoutStartOptionsView: View {
         StrengthEffortMetric = .off
 
     @State private var showingSpotifyPicker = false
+    @State private var didLoadSpotifySelection = false
     @State private var showingAudioCoachSettings = false
     @State private var showingRestCueSettings = false
     @State private var showingTrainingPartners = false
@@ -315,6 +317,32 @@ struct WorkoutStartOptionsView: View {
                     strengthAudioCoach.duckOtherAudio =
                         settings.audioCoachDuckOtherAudio
                     audioCoachLoaded = true
+                }
+
+                if !didLoadSpotifySelection {
+                    if session.spotifyAutoplayOnStart == nil,
+                       selectedSpotifyPlaylist == nil,
+                       let inherited =
+                            WorkoutLaunchCoordinator
+                                .resolvedSpotifyPlaylist(
+                                    workout: session,
+                                    session: appSession
+                                ) {
+                        selectedSpotifyPlaylist =
+                            inherited
+                        spotifyAutoplay = true
+                    } else if
+                        session.spotifyAutoplayOnStart == nil,
+                        selectedSpotifyPlaylist == nil,
+                        let defaultPlaylist =
+                            settings.spotifyDefaultPlaylist {
+                        selectedSpotifyPlaylist =
+                            defaultPlaylist
+                        spotifyAutoplay =
+                            settings
+                                .spotifyAutoplayLinkedPlaylists
+                    }
+                    didLoadSpotifySelection = true
                 }
 
                 if spotify.isConnected &&
