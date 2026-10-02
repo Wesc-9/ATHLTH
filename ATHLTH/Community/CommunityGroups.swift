@@ -11081,6 +11081,378 @@ struct CommunityGroupEventCreateView: View {
     }
 }
 
+private struct CommunityGroupChallengeTemplate:
+    Identifiable,
+    Hashable
+{
+    enum Category:
+        String,
+        CaseIterable,
+        Identifiable
+    {
+        case running
+        case movement
+        case strength
+        case consistency
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .running:
+                return ATHLTHLocalization.choose(
+                    english: "Running",
+                    norwegian: "Løping"
+                )
+            case .movement:
+                return ATHLTHLocalization.choose(
+                    english: "Walk & Ride",
+                    norwegian: "Gåtur & sykkel"
+                )
+            case .strength:
+                return ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                )
+            case .consistency:
+                return ATHLTHLocalization.choose(
+                    english: "Club consistency",
+                    norwegian: "Club-konsistens"
+                )
+            }
+        }
+    }
+
+    let id: String
+    let category: Category
+    let titleEnglish: String
+    let titleNorwegian: String
+    let subtitleEnglish: String
+    let subtitleNorwegian: String
+    let icon: String
+    let activityType: String
+    let distanceKilometers: Double?
+    let strengthDurationMinutes: Int?
+    let goalPreset:
+        CommunityGroupChallengeGoalPreset
+    let target: Double
+    let durationDays: Int
+    let artwork: ATHLTHStandardArtwork
+
+    var title: String {
+        ATHLTHLocalization.choose(
+            english: titleEnglish,
+            norwegian: titleNorwegian
+        )
+    }
+
+    var subtitle: String {
+        ATHLTHLocalization.choose(
+            english: subtitleEnglish,
+            norwegian: subtitleNorwegian
+        )
+    }
+
+    var durationLabel: String {
+        ATHLTHLocalization.format(
+            english:
+                durationDays == 1
+                    ? "%d day"
+                    : "%d days",
+            norwegian:
+                durationDays == 1
+                    ? "%d dag"
+                    : "%d dager",
+            durationDays
+        )
+    }
+
+    var activityLabel: String {
+        switch activityType {
+        case "walking":
+            return ATHLTHLocalization.choose(
+                english: "Walk",
+                norwegian: "Gåtur"
+            )
+        case "cycling":
+            return ATHLTHLocalization.choose(
+                english: "Cycling",
+                norwegian: "Sykkel"
+            )
+        case "strength":
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Run",
+                norwegian: "Løping"
+            )
+        }
+    }
+
+    static let clubTemplates:
+        [CommunityGroupChallengeTemplate] = [
+        .init(id: "club-distance-week", category: .running, titleEnglish: "Club Distance Week", titleNorwegian: "Club Distance Week", subtitleEnglish: "Add every qualifying run and see how far the Club can go together.", subtitleNorwegian: "Legg sammen alle løpeøktene og se hvor langt Club-en kommer.", icon: "figure.run", activityType: "running", distanceKilometers: 3, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 75, durationDays: 7, artwork: .running),
+        .init(id: "relay-100", category: .running, titleEnglish: "100K Relay", titleNorwegian: "100K stafett", subtitleEnglish: "A social relay where every run moves the Club toward 100 km.", subtitleNorwegian: "En sosial stafett der hver løpetur flytter Club-en mot 100 km.", icon: "person.3.fill", activityType: "running", distanceKilometers: 2, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 100, durationDays: 7, artwork: .endurance),
+        .init(id: "fastest-5k", category: .running, titleEnglish: "5K Speed Hunt", titleNorwegian: "5K Speed Hunt", subtitleEnglish: "Best verified 5 km attempt during the challenge window.", subtitleNorwegian: "Beste godkjente 5 km-forsøk i challenge-perioden.", icon: "timer", activityType: "running", distanceKilometers: 5, strengthDurationMinutes: nil, goalPreset: .fastestTime, target: 1, durationDays: 10, artwork: .sprint),
+        .init(id: "fastest-10k", category: .running, titleEnglish: "10K Club Chase", titleNorwegian: "10K Club Chase", subtitleEnglish: "Give everyone time to put down their best 10 km effort.", subtitleNorwegian: "Gi alle tid til å sette sitt beste 10 km-forsøk.", icon: "stopwatch.fill", activityType: "running", distanceKilometers: 10, strengthDurationMinutes: nil, goalPreset: .fastestTime, target: 1, durationDays: 14, artwork: .progress),
+        .init(id: "run-streak", category: .running, titleEnglish: "Run Streak League", titleNorwegian: "Løpestreak-liga", subtitleEnglish: "Most qualifying runs wins — short runs count too.", subtitleNorwegian: "Flest godkjente løpeturer vinner – korte turer teller også.", icon: "flame.fill", activityType: "running", distanceKilometers: 2, strengthDurationMinutes: nil, goalPreset: .mostCompletions, target: 1, durationDays: 14, artwork: .consistency),
+        .init(id: "active-run-minutes", category: .running, titleEnglish: "Running Minutes Cup", titleNorwegian: "Løpeminutter-cup", subtitleEnglish: "A Club leaderboard based on active running minutes.", subtitleNorwegian: "Club-toppliste basert på aktive løpeminutter.", icon: "clock.fill", activityType: "running", distanceKilometers: 1, strengthDurationMinutes: nil, goalPreset: .mostActiveMinutes, target: 300, durationDays: 7, artwork: .endurance),
+        .init(id: "walk-50", category: .movement, titleEnglish: "Walk Together 50K", titleNorwegian: "Walk Together 50K", subtitleEnglish: "A low-threshold Club challenge built around shared walking distance.", subtitleNorwegian: "En lavterskel Club-challenge med felles gådistanse.", icon: "figure.walk", activityType: "walking", distanceKilometers: 2, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 50, durationDays: 7, artwork: .walking),
+        .init(id: "walking-streak", category: .movement, titleEnglish: "Daily Walk Crew", titleNorwegian: "Daily Walk Crew", subtitleEnglish: "Keep the group moving with as many qualifying walks as possible.", subtitleNorwegian: "Hold gruppen i bevegelse med flest mulig godkjente gåturer.", icon: "figure.walk.motion", activityType: "walking", distanceKilometers: 1.5, strengthDurationMinutes: nil, goalPreset: .mostCompletions, target: 1, durationDays: 7, artwork: .consistency),
+        .init(id: "walk-active-minutes", category: .movement, titleEnglish: "Outdoor Minutes", titleNorwegian: "Utendørsminutter", subtitleEnglish: "Collect active walking minutes across the whole Club.", subtitleNorwegian: "Samle aktive gåminutter på tvers av hele Club-en.", icon: "sun.max.fill", activityType: "walking", distanceKilometers: 1, strengthDurationMinutes: nil, goalPreset: .mostActiveMinutes, target: 600, durationDays: 14, artwork: .adventure),
+        .init(id: "ride-300", category: .movement, titleEnglish: "Ride 300", titleNorwegian: "Ride 300", subtitleEnglish: "A longer Club cycling challenge with cumulative distance.", subtitleNorwegian: "En lengre sykkelchallenge med samlet distanse.", icon: "bicycle", activityType: "cycling", distanceKilometers: 10, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 300, durationDays: 21, artwork: .adventure),
+        .init(id: "weekend-ride", category: .movement, titleEnglish: "Weekend Ride-Off", titleNorwegian: "Weekend Ride-Off", subtitleEnglish: "Three days, one Club leaderboard, every kilometer counts.", subtitleNorwegian: "Tre dager, én Club-toppliste – hver kilometer teller.", icon: "bolt.fill", activityType: "cycling", distanceKilometers: 10, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 120, durationDays: 3, artwork: .sprint),
+        .init(id: "strength-volume", category: .strength, titleEnglish: "Volume League", titleNorwegian: "Volumliga", subtitleEnglish: "Total completed strength volume across qualifying workouts.", subtitleNorwegian: "Samlet styrkevolum fra godkjente styrkeøkter.", icon: "dumbbell.fill", activityType: "strength", distanceKilometers: nil, strengthDurationMinutes: 35, goalPreset: .strengthVolume, target: 50000, durationDays: 7, artwork: .strength),
+        .init(id: "rep-race", category: .strength, titleEnglish: "Rep Race", titleNorwegian: "Rep Race", subtitleEnglish: "Build Club energy around total completed repetitions.", subtitleNorwegian: "Bygg Club-energi rundt totalt antall gjennomførte repetisjoner.", icon: "repeat", activityType: "strength", distanceKilometers: nil, strengthDurationMinutes: 30, goalPreset: .strengthReps, target: 750, durationDays: 7, artwork: .strength),
+        .init(id: "heavy-hitters", category: .strength, titleEnglish: "Heavy Hitters", titleNorwegian: "Heavy Hitters", subtitleEnglish: "Best qualifying lift wins — ideal for a Club strength week.", subtitleNorwegian: "Beste godkjente løft vinner – perfekt for en styrkeuke i Club-en.", icon: "scalemass.fill", activityType: "strength", distanceKilometers: nil, strengthDurationMinutes: 30, goalPreset: .heaviestWeight, target: 100, durationDays: 7, artwork: .progress),
+        .init(id: "strength-attendance", category: .strength, titleEnglish: "Gym Attendance Cup", titleNorwegian: "Gym Attendance Cup", subtitleEnglish: "Most completed strength sessions takes the Club crown.", subtitleNorwegian: "Flest gjennomførte styrkeøkter tar Club-kronen.", icon: "checkmark.seal.fill", activityType: "strength", distanceKilometers: nil, strengthDurationMinutes: 25, goalPreset: .mostCompletions, target: 1, durationDays: 14, artwork: .consistency),
+        .init(id: "strength-minutes", category: .strength, titleEnglish: "Iron Minutes", titleNorwegian: "Iron Minutes", subtitleEnglish: "Compete on active strength-training time instead of kilos.", subtitleNorwegian: "Konkurrer på aktiv styrketid i stedet for kilo.", icon: "clock.fill", activityType: "strength", distanceKilometers: nil, strengthDurationMinutes: 20, goalPreset: .mostActiveMinutes, target: 300, durationDays: 7, artwork: .endurance),
+        .init(id: "seven-day-consistency", category: .consistency, titleEnglish: "7-Day Consistency", titleNorwegian: "7-dagers konsistens", subtitleEnglish: "A simple run-based attendance challenge for the whole Club.", subtitleNorwegian: "En enkel løpebasert oppmøte-challenge for hele Club-en.", icon: "calendar.badge.checkmark", activityType: "running", distanceKilometers: 1, strengthDurationMinutes: nil, goalPreset: .mostCompletions, target: 1, durationDays: 7, artwork: .consistency),
+        .init(id: "fourteen-day-consistency", category: .consistency, titleEnglish: "14-Day Crew", titleNorwegian: "14-Day Crew", subtitleEnglish: "A longer consistency battle where repeated participation matters.", subtitleNorwegian: "En lengre konsistenskamp der jevn deltakelse teller.", icon: "person.3.fill", activityType: "walking", distanceKilometers: 1, strengthDurationMinutes: nil, goalPreset: .mostCompletions, target: 1, durationDays: 14, artwork: .walking),
+        .init(id: "club-endurance-month", category: .consistency, titleEnglish: "Club Endurance Month", titleNorwegian: "Club Endurance Month", subtitleEnglish: "A month-long cumulative running distance challenge.", subtitleNorwegian: "En månedslang challenge med samlet løpedistanse.", icon: "calendar", activityType: "running", distanceKilometers: 2, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 250, durationDays: 30, artwork: .endurance),
+        .init(id: "mountain-movement", category: .consistency, titleEnglish: "Adventure Crew", titleNorwegian: "Adventure Crew", subtitleEnglish: "Use walking sessions to create a social outdoor distance league.", subtitleNorwegian: "Bruk gåturer til å lage en sosial utendørs distanseliga.", icon: "mountain.2.fill", activityType: "walking", distanceKilometers: 3, strengthDurationMinutes: nil, goalPreset: .mostDistance, target: 80, durationDays: 14, artwork: .mountain)
+    ]
+}
+
+private struct CommunityGroupChallengeTemplatePicker:
+    View
+{
+    @Environment(\.dismiss) private var dismiss
+
+    let selectedID: String?
+    let onSelect:
+        (CommunityGroupChallengeTemplate) -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.18)
+                )
+
+                ScrollView {
+                    LazyVStack(
+                        alignment: .leading,
+                        spacing: 18
+                    ) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 6
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Built for Clubs",
+                                    norwegian: "Laget for Club"
+                                )
+                            )
+                            .font(.title2.weight(.bold))
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "These are Club-only templates focused on participation, leaderboards and shared momentum — separate from ATHLTH's general challenges.",
+                                    norwegian:
+                                        "Dette er egne Club-maler for deltakelse, topplister og felles momentum – adskilt fra de generelle ATHLTH-challengene."
+                                )
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                        }
+
+                        ForEach(
+                            CommunityGroupChallengeTemplate
+                                .Category.allCases
+                        ) { category in
+                            let templates =
+                                CommunityGroupChallengeTemplate
+                                    .clubTemplates
+                                    .filter {
+                                        $0.category == category
+                                    }
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 10
+                            ) {
+                                Text(category.title)
+                                    .font(.headline.weight(.bold))
+
+                                ForEach(templates) {
+                                    template in
+                                    Button {
+                                        onSelect(template)
+                                        dismiss()
+                                    } label: {
+                                        HStack(spacing: 13) {
+                                            Image(
+                                                systemName:
+                                                    template.icon
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 18,
+                                                    weight: .semibold
+                                                )
+                                            )
+                                            .foregroundStyle(.white)
+                                            .frame(
+                                                width: 42,
+                                                height: 42
+                                            )
+                                            .background(
+                                                LinearGradient(
+                                                    colors: [
+                                                        ATHLTHTheme
+                                                            .accentDeep,
+                                                        ATHLTHTheme
+                                                            .premiumGold
+                                                    ],
+                                                    startPoint:
+                                                        .topLeading,
+                                                    endPoint:
+                                                        .bottomTrailing
+                                                ),
+                                                in:
+                                                    RoundedRectangle(
+                                                        cornerRadius: 13,
+                                                        style: .continuous
+                                                    )
+                                            )
+
+                                            VStack(
+                                                alignment: .leading,
+                                                spacing: 3
+                                            ) {
+                                                Text(template.title)
+                                                    .font(
+                                                        .subheadline
+                                                            .weight(.bold)
+                                                    )
+                                                    .foregroundStyle(
+                                                        ATHLTHTheme
+                                                            .primaryText
+                                                    )
+
+                                                Text(template.subtitle)
+                                                    .font(.caption)
+                                                    .foregroundStyle(
+                                                        ATHLTHTheme
+                                                            .mutedText
+                                                    )
+                                                    .lineLimit(2)
+
+                                                HStack(spacing: 8) {
+                                                    Text(
+                                                        template
+                                                            .activityLabel
+                                                    )
+                                                    Text(
+                                                        template
+                                                            .durationLabel
+                                                    )
+                                                }
+                                                .font(
+                                                    .caption2
+                                                        .weight(.semibold)
+                                                )
+                                                .foregroundStyle(
+                                                    ATHLTHTheme
+                                                        .accentDeep
+                                                )
+                                            }
+
+                                            Spacer()
+
+                                            Image(
+                                                systemName:
+                                                    selectedID ==
+                                                        template.id
+                                                        ? "checkmark.circle.fill"
+                                                        : "chevron.right"
+                                            )
+                                            .foregroundStyle(
+                                                selectedID ==
+                                                    template.id
+                                                    ? ATHLTHTheme
+                                                        .premiumGold
+                                                    : Color.secondary
+                                            )
+                                        }
+                                        .padding(13)
+                                        .background(
+                                            ATHLTHTheme.card,
+                                            in:
+                                                RoundedRectangle(
+                                                    cornerRadius: 18,
+                                                    style: .continuous
+                                                )
+                                        )
+                                        .overlay {
+                                            RoundedRectangle(
+                                                cornerRadius: 18,
+                                                style: .continuous
+                                            )
+                                            .stroke(
+                                                selectedID ==
+                                                    template.id
+                                                    ? ATHLTHTheme
+                                                        .premiumGold
+                                                        .opacity(0.48)
+                                                    : ATHLTHTheme
+                                                        .premiumGold
+                                                        .opacity(0.12),
+                                                lineWidth:
+                                                    selectedID ==
+                                                        template.id
+                                                        ? 1.3
+                                                        : 0.8
+                                            )
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club Challenge Templates",
+                    norwegian:
+                        "Club-maler"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct CommunityGroupChallengeCreateView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var groups:
@@ -11114,6 +11486,9 @@ struct CommunityGroupChallengeCreateView: View {
     @State private var imageData: Data?
     @State private var selectedArtwork:
         ATHLTHStandardArtwork?
+    @State private var selectedTemplateID:
+        String?
+    @State private var showingTemplatePicker = false
     @State private var saving = false
     @State private var creationError: String?
 
@@ -11133,6 +11508,125 @@ struct CommunityGroupChallengeCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if groups.canManage(group) {
+                    Section {
+                        Button {
+                            showingTemplatePicker = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "rectangle.stack.badge.plus"
+                                )
+                                .font(
+                                    .system(
+                                        size: 18,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(.white)
+                                .frame(
+                                    width: 40,
+                                    height: 40
+                                )
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme
+                                                .accentDeep,
+                                            ATHLTHTheme
+                                                .premiumGold
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
+                                    ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius: 12,
+                                            style: .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        selectedTemplateID
+                                            .flatMap {
+                                                id in
+                                                CommunityGroupChallengeTemplate
+                                                    .clubTemplates
+                                                    .first {
+                                                        $0.id == id
+                                                    }?
+                                                    .title
+                                            } ??
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Choose a Club template",
+                                                norwegian:
+                                                    "Velg en Club-mal"
+                                            )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "20 ready-made Club challenges",
+                                            norwegian:
+                                                "20 ferdige Club-challenges"
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName: "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(
+                                    ATHLTHTheme.premiumGold
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Club templates are separate from ATHLTH's general challenges. Selecting one fills in activity, scoring, target, duration and artwork — and everything stays editable.",
+                                norwegian:
+                                    "Club-malene er adskilt fra de generelle ATHLTH-challengene. En mal fyller inn aktivitet, poengberegning, mål, varighet og bilde – og alt kan fortsatt redigeres."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    } header: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Start from Club template",
+                                norwegian:
+                                    "Start fra Club-mal"
+                            )
+                        )
+                    }
+                }
+
                 Section("Cover image") {
                     CommunityContentCoverPicker(
                         selectedPhoto: $selectedPhoto,
@@ -11297,6 +11791,17 @@ struct CommunityGroupChallengeCreateView: View {
                     .disabled(!canCreate)
                 }
             }
+            .sheet(
+                isPresented:
+                    $showingTemplatePicker
+            ) {
+                CommunityGroupChallengeTemplatePicker(
+                    selectedID:
+                        selectedTemplateID
+                ) { template in
+                    applyTemplate(template)
+                }
+            }
             .alert(
                 "Could Not Create Challenge",
                 isPresented: Binding(
@@ -11318,6 +11823,68 @@ struct CommunityGroupChallengeCreateView: View {
                 Text(creationError ?? "")
             }
         }
+    }
+
+    private func applyTemplate(
+        _ template:
+            CommunityGroupChallengeTemplate
+    ) {
+        selectedTemplateID = template.id
+        title = template.title
+        summary = template.subtitle
+
+        var draft =
+            CommunityGroupActivityDraft()
+        draft.activityType =
+            template.activityType
+        draft.mode =
+            template.activityType == "strength"
+                ? .strength
+                : .free
+
+        if let distance =
+                template.distanceKilometers {
+            draft.distanceText =
+                String(
+                    format: "%.1f",
+                    distance
+                )
+        }
+
+        if let minutes =
+                template
+                    .strengthDurationMinutes {
+            draft.strengthDurationText =
+                String(minutes)
+        }
+
+        activityDraft = draft
+        goalPreset = template.goalPreset
+        metric = template.goalPreset.metric
+        target =
+            String(
+                format: "%.1f",
+                template.target
+            )
+        challengeOptions.scoringMode =
+            template.goalPreset.scoringMode
+
+        startsAt = Date()
+        endsAt =
+            Calendar.current.date(
+                byAdding: .day,
+                value: template.durationDays,
+                to: startsAt
+            ) ??
+            startsAt.addingTimeInterval(
+                TimeInterval(
+                    template.durationDays
+                ) * 86_400
+            )
+
+        selectedArtwork = template.artwork
+        selectedPhoto = nil
+        imageData = nil
     }
 
     private var canCreate: Bool {
