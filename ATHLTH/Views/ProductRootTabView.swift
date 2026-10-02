@@ -29,6 +29,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
 }
 
 struct ProductRootTabView: View {
+    @EnvironmentObject private var social: SocialStore
 
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
@@ -130,6 +131,22 @@ struct ProductRootTabView: View {
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: {
+                    social.coordinatedLobbySessionID != nil
+                },
+                set: { _ in }
+            )
+        ) {
+            if let sessionID =
+                    social.coordinatedLobbySessionID {
+                TrainTogetherCreatorLobbyView(
+                    sessionID: sessionID
+                )
+                .environmentObject(social)
+            }
         }
     }
 }
@@ -511,7 +528,8 @@ struct ATHLTHHomeView: View {
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
-                            try await WorkoutLaunchCoordinator.startStrength(
+                            let didStart =
+                                try await WorkoutLaunchCoordinator.startStrength(
                                 workout: workout,
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
@@ -526,7 +544,9 @@ struct ATHLTHHomeView: View {
                                 watchConnection: watchConnection,
                                 spotify: spotifyPlayback
                             )
-                            showingHomeStrengthWorkout = true
+                            if didStart {
+                                showingHomeStrengthWorkout = true
+                            }
                         } catch {
                             homeWatchTransferError =
                                 error.localizedDescription
@@ -543,7 +563,7 @@ struct ATHLTHHomeView: View {
                             watchConnection.isReady
                     ) { configuration in
                         Task { @MainActor in
-                            await social.beginWorkoutWithFriends(
+                            guard await social.beginWorkoutWithFriends(
                                 title:
                                     configuration.title,
                                 kind: .running,
@@ -558,8 +578,12 @@ struct ATHLTHHomeView: View {
                                         .trainTogetherInvitePayload(
                                             savedRoutes:
                                                 session.savedRoutes
-                                        )
-                            )
+                                        ),
+                                creatorCaptureDevice:
+                                    configuration.captureDevice
+                            ) else {
+                                return
+                            }
 
                             do {
                                 try await WorkoutLaunchCoordinator
@@ -613,7 +637,7 @@ struct ATHLTHHomeView: View {
                                 .audioCoachConfiguration =
                                 audioCoach
 
-                            await social.beginWorkoutWithFriends(
+                            guard await social.beginWorkoutWithFriends(
                                 title: kind.title,
                                 kind: kind,
                                 friends: selectedFriends,
@@ -623,8 +647,12 @@ struct ATHLTHHomeView: View {
                                     SocialWorkoutInvitePayload(
                                         workout:
                                             inviteWorkout
-                                    )
-                            )
+                                    ),
+                                creatorCaptureDevice:
+                                    .appleWatch
+                            ) else {
+                                return
+                            }
 
                             startHomeQuickWorkoutOnWatch(
                                 kind,
@@ -3962,7 +3990,8 @@ struct ATHLTHTrainView: View {
                 ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
-                            try await WorkoutLaunchCoordinator.startStrength(
+                            let didStart =
+                                try await WorkoutLaunchCoordinator.startStrength(
                                 workout: workout,
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
@@ -3977,7 +4006,9 @@ struct ATHLTHTrainView: View {
                                 watchConnection: watchConnection,
                                 spotify: spotifyPlayback
                             )
-                            showingStrengthWorkout = true
+                            if didStart {
+                                showingStrengthWorkout = true
+                            }
                         } catch {
                             watchTransferError =
                                 error.localizedDescription
@@ -3992,7 +4023,7 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
+                        guard await social.beginWorkoutWithFriends(
                             title: configuration.title,
                             kind: .running,
                             friends: configuration.friends,
@@ -4003,8 +4034,12 @@ struct ATHLTHTrainView: View {
                                     .trainTogetherInvitePayload(
                                         savedRoutes:
                                             session.savedRoutes
-                                    )
-                        )
+                                    ),
+                            creatorCaptureDevice:
+                                configuration.captureDevice
+                        ) else {
+                            return
+                        }
                         startRunQuickWorkout(configuration)
                     }
                 }
@@ -4016,7 +4051,7 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady
                 ) { configuration in
                     Task { @MainActor in
-                        await social.beginWorkoutWithFriends(
+                        guard await social.beginWorkoutWithFriends(
                             title: "Walk",
                             kind: .walking,
                             friends: configuration.friends,
@@ -4024,8 +4059,12 @@ struct ATHLTHTrainView: View {
                             creatorUsername: session.profile.username,
                             invitePayload:
                                 configuration
-                                    .trainTogetherInvitePayload
-                        )
+                                    .trainTogetherInvitePayload,
+                            creatorCaptureDevice:
+                                configuration.captureDevice
+                        ) else {
+                            return
+                        }
                         startWalkQuickWorkout(configuration)
                     }
                 }
@@ -4055,7 +4094,7 @@ struct ATHLTHTrainView: View {
                     initialWorkout: workout
                 ) { configuration in
                     Task { @MainActor in
-                        await social
+                        guard await social
                             .beginWorkoutWithFriends(
                                 title:
                                     configuration
@@ -4077,8 +4116,13 @@ struct ATHLTHTrainView: View {
                                         .trainTogetherInvitePayload(
                                             savedRoutes:
                                                 session.savedRoutes
-                                        )
+                                        ),
+                                creatorCaptureDevice:
+                                    configuration.captureDevice
                             )
+                        else {
+                            return
+                        }
                         startRunQuickWorkout(
                             configuration
                         )
