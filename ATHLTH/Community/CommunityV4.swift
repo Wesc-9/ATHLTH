@@ -1079,21 +1079,24 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                 challenge: challenge
             )
 
+            // Keep the artwork in full colour. Only a very light scrim is
+            // used near the text so the image stays vivid while labels remain
+            // readable on bright photos.
             LinearGradient(
                 stops: [
                     .init(
                         color:
-                            Color.black.opacity(0.10),
+                            Color.black.opacity(0.01),
                         location: 0
                     ),
                     .init(
                         color:
-                            Color.black.opacity(0.25),
-                        location: 0.48
+                            Color.black.opacity(0.04),
+                        location: 0.58
                     ),
                     .init(
                         color:
-                            Color.black.opacity(0.70),
+                            Color.black.opacity(0.30),
                         location: 1
                     )
                 ],
@@ -1103,7 +1106,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.20),
+                    Color.black.opacity(0.07),
                     Color.clear
                 ],
                 startPoint: .leading,
@@ -1149,32 +1152,38 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                 Text(challenge.title)
                     .font(
                         .system(
-                            size: 20,
+                            size: 18,
                             weight: .bold
                         )
                     )
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .minimumScaleFactor(0.76)
                     .shadow(
-                        color: .black.opacity(0.22),
-                        radius: 4,
+                        color: .black.opacity(0.46),
+                        radius: 5,
                         y: 1
                     )
 
                 Text(challenge.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .white.opacity(0.92)
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium
+                        )
                     )
-                    .lineLimit(2)
+                    .foregroundStyle(
+                        .white.opacity(0.96)
+                    )
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .frame(
-                        maxWidth: 285,
+                        maxWidth: 260,
                         alignment: .leading
                     )
                     .shadow(
-                        color: .black.opacity(0.24),
-                        radius: 3,
+                        color: .black.opacity(0.50),
+                        radius: 4,
                         y: 1
                     )
 
