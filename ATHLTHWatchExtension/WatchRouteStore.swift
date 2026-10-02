@@ -49,6 +49,16 @@ final class WatchRouteStore: NSObject, ObservableObject {
         ]
     }
 
+    nonisolated private static func makeTransferFallbackErrorHandler(
+        payload: [String: Any]
+    ) -> (Error) -> Void {
+        { _ in
+            WCSession.default.transferUserInfo(
+                payload
+            )
+        }
+    }
+
     private func markCompanionConnected() {
         companionLinked = true
         connectionText = "Connected to iPhone"
@@ -147,11 +157,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WCSession.default.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler: { _ in
-                    WCSession.default.transferUserInfo(
-                        payload
+                errorHandler:
+                    Self.makeTransferFallbackErrorHandler(
+                        payload: payload
                     )
-                }
             )
         } else {
             WCSession.default.transferUserInfo(
