@@ -12,6 +12,7 @@ struct RouteDetailView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var publicTrailDiscovery:
         PublicTrailDiscoveryStore
 
@@ -2014,6 +2015,7 @@ struct RouteDetailView: View {
                         phoneWorkout: phoneWorkout,
                         watchConnection:
                             watchConnection,
+                        spotify: spotify,
                         ghostRace: ghostRace
                     )
 
