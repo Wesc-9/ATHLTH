@@ -17,6 +17,7 @@ final class TrophyStore: ObservableObject {
         TrophyCloudService()
     private var activeUserID: UUID?
     private var activeUsername: String?
+    private var stateOwnerUserID: UUID?
     private var showcaseUpdatedAt: Date?
 
     init() {
@@ -28,6 +29,8 @@ final class TrophyStore: ObservableObject {
         )
         hasInitializedShowcase =
             persisted.hasInitializedShowcase
+        stateOwnerUserID =
+            persisted.ownerUserID
         showcaseUpdatedAt =
             persisted.showcaseUpdatedAt
         activationDate = Self.loadOrCreateActivationDate()
@@ -131,6 +134,22 @@ final class TrophyStore: ObservableObject {
                         .whitespacesAndNewlines
                 )
 
+        if let currentUserID {
+            if let owner =
+                    stateOwnerUserID,
+               owner != currentUserID {
+                unlocks = []
+                showcaseIDs = []
+                revealQueue = []
+                pendingReveal = nil
+                hasInitializedShowcase = false
+                showcaseUpdatedAt = nil
+            }
+
+            stateOwnerUserID =
+                currentUserID
+        }
+
         if currentUserID != nil,
            let remote =
                 try? await cloud
@@ -161,6 +180,10 @@ final class TrophyStore: ObservableObject {
                     remoteUpdated
                 hasInitializedShowcase =
                     true
+            } else if !showcaseIDs.isEmpty &&
+                      showcaseUpdatedAt == nil {
+                showcaseUpdatedAt =
+                    Date()
             }
         }
 
@@ -988,11 +1011,7 @@ final class TrophyStore: ObservableObject {
             ]
 
         for claim in claims {
-            guard
-                historicalUnlockDate(
-                    for: claim.id
-                ) == nil,
-                let evidence =
+            guard let evidence =
                     claim.evidence
             else {
                 continue
@@ -1115,6 +1134,7 @@ final class TrophyStore: ObservableObject {
             unlocks: unlocks,
             showcaseIDs: showcaseIDs,
             hasInitializedShowcase: hasInitializedShowcase,
+            ownerUserID: stateOwnerUserID,
             showcaseUpdatedAt: showcaseUpdatedAt
         )
 
@@ -1172,12 +1192,14 @@ private struct TrophyPersistedState: Codable {
     let unlocks: [TrophyUnlockRecord]
     let showcaseIDs: [String]
     let hasInitializedShowcase: Bool
+    let ownerUserID: UUID?
     let showcaseUpdatedAt: Date?
 
     static let empty = TrophyPersistedState(
         unlocks: [],
         showcaseIDs: [],
         hasInitializedShowcase: false,
+        ownerUserID: nil,
         showcaseUpdatedAt: nil
     )
 }
