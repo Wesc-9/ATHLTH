@@ -30,13 +30,54 @@ final class TrophyStore: ObservableObject {
         trophies.filter(\.isUnlocked).count
     }
 
+    var unlockedAchievementCount: Int {
+        trophies.filter {
+            $0.isUnlocked &&
+            !$0.isPrestigeTrophy
+        }.count
+    }
+
+    var unlockedPrestigeTrophyCount: Int {
+        trophies.filter {
+            $0.isUnlocked &&
+            $0.isPrestigeTrophy
+        }.count
+    }
+
+    var prestigeTrophies: [TrophyProgressItem] {
+        trophies.filter(\.isPrestigeTrophy)
+    }
+
+    var unlockedPrestigeTrophies: [TrophyProgressItem] {
+        prestigeTrophies.filter(\.isUnlocked)
+    }
+
     var showcaseTrophies: [TrophyProgressItem] {
-        showcaseIDs.compactMap { id in trophies.first(where: { $0.id == id }) }
+        showcaseIDs.compactMap { id in
+            trophies.first {
+                $0.id == id &&
+                $0.isPrestigeTrophy
+            }
+        }
     }
 
     var nextTrophies: [TrophyProgressItem] {
         trophies
             .filter { !$0.isComplete }
+            .sorted {
+                if $0.progress == $1.progress {
+                    return $0.displayRarity > $1.displayRarity
+                }
+                return $0.progress > $1.progress
+            }
+    }
+
+    var nextAchievements: [TrophyProgressItem] {
+        trophies
+            .filter {
+                !$0.isPrestigeTrophy &&
+                !$0.isComplete
+            }
             .sorted {
                 if $0.progress == $1.progress {
                     return $0.displayRarity > $1.displayRarity
@@ -432,7 +473,8 @@ final class TrophyStore: ObservableObject {
                         trophies.contains(
                             where: {
                                 $0.id == id &&
-                                $0.isUnlocked
+                                $0.isUnlocked &&
+                                $0.isPrestigeTrophy
                             }
                         )
                     }
@@ -448,7 +490,11 @@ final class TrophyStore: ObservableObject {
     }
 
     func toggleShowcase(_ trophyID: String) {
-        guard trophies.contains(where: { $0.id == trophyID && $0.isUnlocked }) else {
+        guard trophies.contains(where: {
+            $0.id == trophyID &&
+            $0.isUnlocked &&
+            $0.isPrestigeTrophy
+        }) else {
             return
         }
 
