@@ -555,6 +555,157 @@ private struct QuickStartAutoPauseCard: View {
     }
 }
 
+private struct QuickTrainingHeroCard: View {
+    let imageName: String
+    let title: String
+    let subtitle: String
+    let icon: String
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+                .clipped()
+
+            LinearGradient(
+                stops: [
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.12),
+                        location: 0
+                    ),
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.28),
+                        location: 0.50
+                    ),
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.72),
+                        location: 1
+                    )
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.34),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            HStack(
+                alignment: .bottom,
+                spacing: 12
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    HStack(spacing: 7) {
+                        Image(systemName: icon)
+                            .font(
+                                .system(
+                                    size: 12,
+                                    weight: .bold
+                                )
+                            )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "QUICK TRAIN",
+                                norwegian:
+                                    "QUICK TRAIN"
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                        .tracking(1.4)
+                    }
+                    .foregroundStyle(
+                        Color.white
+                            .opacity(0.86)
+                    )
+
+                    Text(title)
+                        .font(
+                            .system(
+                                size: 25,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text(subtitle)
+                        .font(
+                            .subheadline
+                                .weight(.medium)
+                        )
+                        .foregroundStyle(
+                            Color.white
+                                .opacity(0.86)
+                        )
+                        .lineLimit(2)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(17)
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+        .frame(height: 148)
+        .background(Color.black)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.18),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.10),
+            radius: 18,
+            y: 8
+        )
+    }
+}
+
 struct QuickStartWorkoutDeviceCard: View {
     @Binding var selection: WorkoutCaptureDevice
     let watchConnected: Bool
@@ -1047,95 +1198,25 @@ struct RunQuickStartSheet: View {
     }
 
     private var introCard: some View {
-        ZStack {
-            Image(
-                "StrengthPostWorkoutHero"
-            )
-            .resizable()
-            .scaledToFill()
-            .frame(height: 118)
-            .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.68),
-                    Color.black.opacity(0.28),
-                    Color.black.opacity(0.08)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Start Run",
-                        norwegian: "Start løpeøkt"
-                    )
-                )
-                .font(
-                    .title2.weight(
-                        .bold
-                    )
-                )
-                .foregroundStyle(.white)
-                .lineLimit(1)
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            isAdvancedSetup
-                                ? "Routes, guidance and social options."
-                                : "Fast setup with the essentials.",
-                        norwegian:
-                            isAdvancedSetup
-                                ? "Ruter, veiledning og sosiale valg."
-                                : "Raskt oppsett med det viktigste."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    Color.white.opacity(
-                        0.84
-                    )
-                )
-                .lineLimit(2)
-            }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .padding(16)
-        }
-        .frame(height: 118)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(
-                    0.22
+        QuickTrainingHeroCard(
+            imageName: "GoalRunning",
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Start Run",
+                    norwegian: "Start løpeøkt"
                 ),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(
-                    0.08
+            subtitle:
+                ATHLTHLocalization.choose(
+                    english:
+                        isAdvancedSetup
+                            ? "Routes, guidance and social options."
+                            : "Fast setup with the essentials.",
+                    norwegian:
+                        isAdvancedSetup
+                            ? "Ruter, veiledning og sosiale valg."
+                            : "Raskt oppsett med det viktigste."
                 ),
-            radius: 16,
-            y: 8
+            icon: "figure.run"
         )
     }
 
@@ -2232,30 +2313,26 @@ struct StrengthQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    ATHLTHCard {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Start Strength",
-                                    norwegian:
-                                        "Start styrkeøkt"
-                                )
-                            )
-                            .font(.title2.weight(.bold))
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "For a focused workout, add exercises before pressing Start. Choose no-plan mode only when you want a completely open session.",
-                                    norwegian:
-                                        "For en fokusert økt legger du inn øvelser før du trykker Start. Velg uten plan kun når du ønsker en helt åpen økt."
-                                )
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
+                    QuickTrainingHeroCard(
+                        imageName:
+                            "StrengthQuickStartHero",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Start Strength",
+                                norwegian:
+                                    "Start styrkeøkt"
+                            ),
+                        subtitle:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Add exercises first for a focused session, or choose a completely open workout.",
+                                norwegian:
+                                    "Legg inn øvelser først for en fokusert økt, eller velg en helt åpen økt."
+                            ),
+                        icon:
+                            "figure.strengthtraining.traditional"
+                    )
 
                     NavigationLink {
                         StrengthQuickBuilderView { workout in
