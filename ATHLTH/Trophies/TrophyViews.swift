@@ -61,15 +61,66 @@ struct ATHLTHTrophyCoreView: View {
     }
 
     private var artworkGradient: LinearGradient {
-        LinearGradient(
-            colors:
-                trophy.isUnlocked
-                    ? trophy.category.trophyGradient
-                    : [
-                        Color(.systemGray5),
-                        Color(.systemGray4),
-                        Color(.systemGray3)
-                    ],
+        let colors: [Color]
+
+        if !trophy.isUnlocked {
+            colors = [
+                Color(.systemGray5),
+                Color(.systemGray4),
+                Color(.systemGray3)
+            ]
+        } else {
+            switch trophy.displayRarity {
+            case .core:
+                colors = [
+                    trophy.category
+                        .trophyAccent
+                        .opacity(0.72),
+                    trophy.category
+                        .trophyAccent
+                        .opacity(0.34),
+                    Color.black.opacity(0.78)
+                ]
+            case .rare:
+                colors = [
+                    Color.white.opacity(0.82),
+                    trophy.category
+                        .trophyAccent
+                        .opacity(0.92),
+                    Color(
+                        red: 0.16,
+                        green: 0.18,
+                        blue: 0.22
+                    )
+                ]
+            case .epic:
+                colors = [
+                    trophy.category
+                        .trophyAccent,
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.84),
+                    Color.black.opacity(0.90)
+                ]
+            case .signature:
+                colors = [
+                    Color(
+                        red: 0.08,
+                        green: 0.08,
+                        blue: 0.10
+                    ),
+                    ATHLTHTheme
+                        .premiumGold,
+                    trophy.category
+                        .trophyAccent
+                        .opacity(0.86),
+                    Color.black
+                ]
+            }
+        }
+
+        return LinearGradient(
+            colors: colors,
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -504,7 +555,9 @@ struct TrophyCabinetSection: View {
                 Spacer()
 
                 NavigationLink {
-                    TrophyCollectionView()
+                    TrophyCollectionView(
+                        startInCabinet: true
+                    )
                 } label: {
                     Text(
                         ATHLTHLocalization.choose(
@@ -669,9 +722,20 @@ struct TrophyCollectionView: View {
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var selectedTab:
-        TrophyHubTab = .collection
+        TrophyHubTab
     @State private var filter:
         TrophyCollectionFilter = .all
+
+    init(
+        startInCabinet: Bool = false
+    ) {
+        _selectedTab = State(
+            initialValue:
+                startInCabinet
+                    ? .cabinet
+                    : .collection
+        )
+    }
 
     private var filtered:
         [TrophyProgressItem] {
