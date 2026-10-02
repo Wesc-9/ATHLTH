@@ -508,7 +508,7 @@ struct ATHLTHHomeView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends, audioCoach in
+                ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             try await WorkoutLaunchCoordinator.startStrength(
@@ -517,6 +517,8 @@ struct ATHLTHHomeView: View {
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
                                 audioCoach: audioCoach,
+                                advancedConfiguration:
+                                    advancedConfiguration,
                                 session: session,
                                 settings: settings,
                                 social: social,
@@ -3929,7 +3931,7 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends, audioCoach in
+                ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             try await WorkoutLaunchCoordinator.startStrength(
@@ -3938,6 +3940,8 @@ struct ATHLTHTrainView: View {
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
                                 audioCoach: audioCoach,
+                                advancedConfiguration:
+                                    advancedConfiguration,
                                 session: session,
                                 settings: settings,
                                 social: social,
