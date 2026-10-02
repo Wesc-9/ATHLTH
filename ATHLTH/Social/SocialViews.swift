@@ -337,33 +337,88 @@ struct SocialHubView: View {
                             }
 
                             HStack(spacing: 8) {
-                                Button("Decline") {
-                                    Task {
-                                        await social.declineWorkoutInvite(invite)
+                                if invite.participant.state == .accepted {
+                                    Button(
+                                        role: .destructive
+                                    ) {
+                                        Task {
+                                            await social
+                                                .declineWorkoutInvite(
+                                                    invite
+                                                )
+                                        }
+                                    } label: {
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english: "Leave",
+                                                norwegian: "Forlat"
+                                            )
+                                        )
                                     }
-                                }
-                                .buttonStyle(.bordered)
-                                .frame(maxWidth: .infinity)
+                                    .buttonStyle(.bordered)
+                                    .frame(maxWidth: .infinity)
 
-                                Button(
-                                    ATHLTHLocalization.choose(
-                                        english: "Join",
-                                        norwegian: "Godta"
+                                    Button(
+                                        ATHLTHLocalization.choose(
+                                            english: "Continue",
+                                            norwegian: "Fortsett"
+                                        )
+                                    ) {
+                                        acceptedWorkoutInvite =
+                                            invite
+                                    }
+                                    .buttonStyle(
+                                        .borderedProminent
                                     )
-                                ) {
-                                    Task {
-                                        if await social
-                                            .acceptWorkoutInvite(
-                                                invite
-                                            ) {
-                                            acceptedWorkoutInvite =
-                                                invite
+                                    .tint(
+                                        ATHLTHTheme.accent
+                                    )
+                                    .frame(
+                                        maxWidth: .infinity
+                                    )
+                                } else {
+                                    Button(
+                                        ATHLTHLocalization.choose(
+                                            english: "Decline",
+                                            norwegian: "Avslå"
+                                        )
+                                    ) {
+                                        Task {
+                                            await social
+                                                .declineWorkoutInvite(
+                                                    invite
+                                                )
                                         }
                                     }
+                                    .buttonStyle(.bordered)
+                                    .frame(maxWidth: .infinity)
+
+                                    Button(
+                                        ATHLTHLocalization.choose(
+                                            english: "Join",
+                                            norwegian: "Godta"
+                                        )
+                                    ) {
+                                        Task {
+                                            if await social
+                                                .acceptWorkoutInvite(
+                                                    invite
+                                                ) {
+                                                acceptedWorkoutInvite =
+                                                    invite
+                                            }
+                                        }
+                                    }
+                                    .buttonStyle(
+                                        .borderedProminent
+                                    )
+                                    .tint(
+                                        ATHLTHTheme.accent
+                                    )
+                                    .frame(
+                                        maxWidth: .infinity
+                                    )
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .tint(ATHLTHTheme.accent)
-                                .frame(maxWidth: .infinity)
                             }
                         }
                         .padding(12)
@@ -2584,7 +2639,18 @@ private struct WorkoutInviteLaunchSheet: View {
     let invite: SocialWorkoutInviteDisplay
 
     @State private var captureDevice:
-        WorkoutCaptureDevice = .iPhone
+        WorkoutCaptureDevice
+
+    init(invite: SocialWorkoutInviteDisplay) {
+        self.invite = invite
+        _captureDevice = State(
+            initialValue:
+                invite.participant.captureDevice ==
+                    "apple_watch"
+                    ? .appleWatch
+                    : .iPhone
+        )
+    }
     @State private var isStarting = false
     @State private var launchError: String?
     @State private var showingStrengthWorkout = false
