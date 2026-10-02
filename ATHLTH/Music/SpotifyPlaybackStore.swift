@@ -505,6 +505,12 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     }
 
     func pause() {
+        // A manual pause is authoritative. If Spotify was still completing an
+        // app-switch/reconnect from workout autoplay, do not let that deferred
+        // request restart playback after the user has paused it.
+        pendingPlaybackURI = nil
+        pendingPlaybackPlaylist = nil
+
         appRemote?.playerAPI?.pause { [weak self] _, error in
             Task { @MainActor in
                 if let error {
@@ -514,6 +520,14 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                 }
             }
         }
+    }
+
+    func endLinkedWorkoutPlaybackSession() {
+        // Ending a workout should only disarm ATHLTH's automatic start intent.
+        // Do not pause Spotify here: the athlete may want the music to continue
+        // after finishing the workout.
+        pendingPlaybackURI = nil
+        pendingPlaybackPlaylist = nil
     }
 
     func resume() {
@@ -1506,9 +1520,12 @@ extension SpotifyPlaybackStore: SPTAppRemoteDelegate {
             self.connectionState = .connected
             self.lastErrorMessage = nil
 
+            // Reconnecting App Remote is transport recovery, not playback
+            // intent. Only a playlist that is explicitly pending from a fresh
+            // autoplay request may start here. activePlaylist is display/state
+            // metadata and must never cause playback to restart by itself.
             guard let playlist =
-                    self.pendingPlaybackPlaylist ??
-                    self.activePlaylist
+                    self.pendingPlaybackPlaylist
             else {
                 return
             }
