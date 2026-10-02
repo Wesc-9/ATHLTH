@@ -561,6 +561,59 @@ struct ATHLTHSettingsView: View {
                                 }
                             }
                             .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                ATHLTHAchievementSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "medal.fill",
+                                    iconTint: ATHLTHTheme.premiumGold,
+                                    iconBackground:
+                                        ATHLTHTheme.premiumGoldSoft,
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Achievements",
+                                            norwegian:
+                                                "Achievements"
+                                        ),
+                                    subtitle:
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Unlock effects, sound and haptics",
+                                            norwegian:
+                                                "Unlock-effekter, lyd og haptikk"
+                                        )
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text(
+                                            settings
+                                                .achievementEffects
+                                                .title
+                                        )
+                                        .font(.subheadline)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+
+                                        Image(
+                                            systemName:
+                                                "chevron.right"
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                                .opacity(
+                                                    0.72
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -2642,6 +2695,162 @@ private struct ATHLTHTrainingSettingsView: View {
                 norwegian: "Avansert gir full styrkeflyt med mer detaljert treningsregistrering."
             )
         }
+    }
+}
+
+private struct ATHLTHAchievementSettingsView:
+    View
+{
+    @EnvironmentObject private var settings:
+        AppSettingsStore
+    @Environment(
+        \.accessibilityReduceMotion
+    ) private var reduceMotion
+    @Environment(
+        \.accessibilityReduceTransparency
+    ) private var reduceTransparency
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Visual effects",
+                        norwegian:
+                            "Visuelle effekter"
+                    ),
+                    selection:
+                        $settings
+                            .achievementEffects
+                ) {
+                    ForEach(
+                        AchievementEffectPreference
+                            .allCases
+                    ) {
+                        preference in
+                        Text(
+                            preference.title
+                        )
+                        .tag(preference)
+                    }
+                }
+                .pickerStyle(
+                    .segmented
+                )
+
+                Text(
+                    settings
+                        .achievementEffects
+                        .subtitle
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Achievement effects",
+                        norwegian:
+                            "Achievement-effekter"
+                    )
+                )
+            } footer: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "iOS Reduce Motion and Reduce Transparency always take priority over this setting.",
+                        norwegian:
+                            "iOS Reduser bevegelse og Reduser gjennomsiktighet har alltid prioritet over denne innstillingen."
+                    )
+                )
+            }
+
+            Section(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Unlock feedback",
+                    norwegian:
+                        "Unlock-feedback"
+                )
+            ) {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Unlock sounds",
+                        norwegian:
+                            "Unlock-lyder"
+                    ),
+                    isOn:
+                        $settings
+                            .achievementUnlockSoundsEnabled
+                )
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Unlock haptics",
+                        norwegian:
+                            "Unlock-haptikk"
+                    ),
+                    isOn:
+                        $settings
+                            .achievementUnlockHapticsEnabled
+                )
+            }
+
+            if reduceMotion ||
+               reduceTransparency {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Accessibility",
+                        norwegian:
+                            "Tilgjengelighet"
+                    )
+                ) {
+                    if reduceMotion {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Reduce Motion is active. Tilt, particle movement and large reveal transitions are reduced.",
+                                norwegian:
+                                    "Reduser bevegelse er aktivert. Tilt, partikkelbevegelse og store reveal-animasjoner reduseres."
+                            ),
+                            systemImage:
+                                "figure.walk.motion"
+                        )
+                    }
+
+                    if reduceTransparency {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Reduce Transparency is active. Holographic and glass effects use solid alternatives.",
+                                norwegian:
+                                    "Reduser gjennomsiktighet er aktivert. Holografiske effekter og glassflater bruker solide alternativer."
+                            ),
+                            systemImage:
+                                "circle.lefthalf.filled"
+                        )
+                    }
+                }
+                .font(.caption)
+            }
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Achievements",
+                norwegian:
+                    "Achievements"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
     }
 }
 
