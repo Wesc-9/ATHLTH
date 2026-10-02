@@ -73,18 +73,11 @@ struct ProductRootTabView: View {
                 },
                 onOpenTrain: { request in
                     trainNavigationRequest = request
-                    selectedTab = 1
+                    selectedTab = 2
                 }
             )
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
-
-            ATHLTHTrainView(
-                navigationRequest:
-                    $trainNavigationRequest
-            )
-                .tabItem { Label("Train", systemImage: "dumbbell.fill") }
-                .tag(1)
 
             ATHLTHRecoveryView { tab in
                 selectedTab = tab
@@ -95,6 +88,13 @@ struct ProductRootTabView: View {
                         systemImage: "sparkles"
                     )
                 }
+                .tag(1)
+
+            ATHLTHTrainView(
+                navigationRequest:
+                    $trainNavigationRequest
+            )
+                .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(2)
 
             ATHLTHExploreView()
@@ -2305,7 +2305,7 @@ struct ATHLTHHomeView: View {
 
                 if session.activePlan != nil {
                     Button("Train") {
-                        onSelectTab(1)
+                        onSelectTab(2)
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
@@ -5951,7 +5951,7 @@ struct ATHLTHRecoveryView: View {
                                     showingRecoveryInfo = true
                                 },
                                 onAdjustTraining: {
-                                    onSelectTab(1)
+                                    onSelectTab(2)
                                 },
                                 onAskATHLTH: {
                                     showingRecoveryCoach = true
@@ -6017,7 +6017,7 @@ struct ATHLTHRecoveryView: View {
                                         fallbackRecoveryAIInsight)
                                         .suggestion
                             ) {
-                                onSelectTab(1)
+                                onSelectTab(2)
                             }
                         } else {
                             todaysGuidanceCard
@@ -6483,7 +6483,7 @@ struct ATHLTHRecoveryView: View {
             }
 
             Button {
-                onSelectTab(1)
+                onSelectTab(2)
             } label: {
                 HStack {
                     Label(
@@ -7647,7 +7647,7 @@ struct ATHLTHRecoveryView: View {
 
             HStack(spacing: 9) {
                 Button {
-                    onSelectTab(1)
+                    onSelectTab(2)
                 } label: {
                     Label(
                         guidanceTrainActionTitle,
