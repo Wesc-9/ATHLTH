@@ -64,8 +64,27 @@ struct SpotifyPlaylistPickerView: View {
                                             )
                                         )
 
-                                    Text("No linked playlist")
+                                    VStack(
+                                        alignment: .leading,
+                                        spacing: 2
+                                    ) {
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english: "Don't link a playlist",
+                                                norwegian: "Ikke koble spilleliste"
+                                            )
+                                        )
                                         .foregroundStyle(.primary)
+
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english: "Spotify stays off for this choice",
+                                                norwegian: "Spotify forblir av for dette valget"
+                                            )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
 
                                     Spacer()
 
