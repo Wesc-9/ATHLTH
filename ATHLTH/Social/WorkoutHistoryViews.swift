@@ -973,6 +973,9 @@ struct PostWorkoutReviewView: View {
     @State private var saving = false
     @State private var alreadyPublished = false
     @State private var replayContext: WorkoutAIInsightContext?
+    @State private var completionRoute: [CLLocation] = []
+    @State private var isAdvancedReview = false
+    @State private var showingTrainingPartners = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var selectedPhotoPreviews: [Data] = []
     @State private var mediaErrorMessage: String?
@@ -980,25 +983,20 @@ struct PostWorkoutReviewView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 14) {
                     summaryCard
                     resultStrip
-
-                    if let impact = workoutCompletion.impact(
-                        for: workout.id
-                    ),
-                    !impact.items.isEmpty {
-                        impactCard(impact)
-                    }
-
                     reflectionCard
-
-                    workoutPhotoCard
 
                     sectionLabel(
                         "ATHLTH REPLAY",
                         subtitle:
-                            "A quick look back at how the session unfolded."
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "A quick look back at how the session unfolded.",
+                                norwegian:
+                                    "Et raskt tilbakeblikk på hvordan økten utviklet seg."
+                            )
                     )
 
                     ATHLTHWorkoutReplayCard(
@@ -1006,21 +1004,37 @@ struct PostWorkoutReviewView: View {
                         context: replayContext
                     )
 
-                    sectionLabel(
-                        "DETAILS & SHARING",
-                        subtitle:
-                            "Optional details for your training history and activity."
-                    )
+                    if isAdvancedReview {
+                        if let impact =
+                                workoutCompletion.impact(
+                                    for: workout.id
+                                ),
+                           !impact.items.isEmpty {
+                            impactCard(impact)
+                        }
 
-                    WorkoutGearSelectionCard(
-                        selectedGearIDs: $selectedGearIDs,
-                        activity: workout.activity
-                    )
+                        workoutPhotoCard
 
-                    ATHLTHCard {
-                        WorkoutFriendPicker(
-                            selectedFriendIDs: $selectedFriendIDs
+                        sectionLabel(
+                            ATHLTHLocalization.choose(
+                                english: "DETAILS & SHARING",
+                                norwegian: "DETALJER & DELING"
+                            ),
+                            subtitle:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Optional details for your training history and activity.",
+                                    norwegian:
+                                        "Valgfrie detaljer for treningshistorikken og aktiviteten din."
+                                )
                         )
+
+                        WorkoutGearSelectionCard(
+                            selectedGearIDs: $selectedGearIDs,
+                            activity: workout.activity
+                        )
+
+                        compactTrainTogetherButton
                     }
 
                     visibilityCard
@@ -1038,14 +1052,130 @@ struct PostWorkoutReviewView: View {
                         completionAccent.opacity(0.12)
                 )
             )
-            .navigationTitle("Workout Complete")
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Workout Complete",
+                    norwegian: "Økt fullført"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Later") {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Later",
+                            norwegian: "Senere"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            isAdvancedReview
+                                .toggle()
+                        }
+                    } label: {
+                        Text(
+                            isAdvancedReview
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Advanced",
+                                        norwegian:
+                                            "Avansert"
+                                    )
+                                : "Basic"
+                        )
+                        .font(
+                            .caption.weight(
+                                .bold
+                            )
+                        )
+                        .padding(
+                            .horizontal,
+                            10
+                        )
+                        .frame(height: 32)
+                        .foregroundStyle(
+                            isAdvancedReview
+                                ? Color.white
+                                : completionAccent
+                        )
+                        .background(
+                            isAdvancedReview
+                                ? completionAccent
+                                : completionAccent
+                                    .opacity(0.10),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingTrainingPartners
+            ) {
+                NavigationStack {
+                    ScrollView {
+                        ATHLTHCard {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs:
+                                    $selectedFriendIDs
+                            )
+                        }
+                        .padding(16)
+                    }
+                    .navigationTitle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Train Together",
+                            norwegian:
+                                "Tren sammen"
+                        )
+                    )
+                    .navigationBarTitleDisplayMode(
+                        .inline
+                    )
+                    .toolbar {
+                        ToolbarItem(
+                            placement:
+                                .confirmationAction
+                        ) {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english: "Done",
+                                    norwegian: "Ferdig"
+                                )
+                            ) {
+                                showingTrainingPartners =
+                                    false
+                            }
+                        }
+                    }
+                    .task {
+                        if social
+                            .trainingPartners
+                            .isEmpty {
+                            await social.refresh()
+                        }
+                    }
+                }
+                .presentationDetents([
+                    .medium,
+                    .large
+                ])
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
@@ -1055,12 +1185,15 @@ struct PostWorkoutReviewView: View {
                     loadExistingReview()
                 async let replayLoad: Void =
                     loadReplayContext()
+                async let routeLoad: Void =
+                    loadCompletionRoute()
                 async let mediaLoad: Void =
                     social.refreshWorkoutMedia()
 
                 _ = await (
                     reviewLoad,
                     replayLoad,
+                    routeLoad,
                     mediaLoad
                 )
             }
@@ -1177,7 +1310,69 @@ struct PostWorkoutReviewView: View {
 
     @ViewBuilder
     private var summaryBackground: some View {
-        if workout.activity == .strength {
+        if (workout.activity == .running ||
+                workout.activity == .walking),
+           completionRoute.count >= 2 {
+            Map(
+                initialPosition:
+                    .region(
+                        completionRouteRegion
+                    )
+            ) {
+                MapPolyline(
+                    coordinates:
+                        completionRoute.map(
+                            \.coordinate
+                        )
+                )
+                .stroke(
+                    completionAccent,
+                    lineWidth: 5
+                )
+            }
+            .id(completionRoute.count)
+            .allowsHitTesting(false)
+
+        } else if
+            workout.activity == .strength,
+            !completionMuscleProfile
+                .activations.isEmpty {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.07,
+                            green: 0.22,
+                            blue: 0.17
+                        ),
+                        Color(
+                            red: 0.06,
+                            green: 0.08,
+                            blue: 0.10
+                        )
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                HStack {
+                    Spacer()
+
+                    StrengthMuscleMapView(
+                        profile:
+                            completionMuscleProfile,
+                        compact: true
+                    )
+                    .frame(
+                        width: 190,
+                        height: 172
+                    )
+                    .padding(.trailing, 10)
+                    .opacity(0.92)
+                }
+            }
+
+        } else if workout.activity == .strength {
             Image("StrengthPostWorkoutHero")
                 .resizable()
                 .scaledToFill()
@@ -1186,6 +1381,7 @@ struct PostWorkoutReviewView: View {
                     maxHeight: .infinity
                 )
                 .clipped()
+
         } else {
             LinearGradient(
                 colors: [
@@ -1200,19 +1396,167 @@ struct PostWorkoutReviewView: View {
                 endPoint: .bottomTrailing
             )
 
-            Image(systemName: workout.activity.icon)
-                .font(
-                    .system(
-                        size: 132,
-                        weight: .medium
-                    )
+            Image(
+                systemName:
+                    workout.activity.icon
+            )
+            .font(
+                .system(
+                    size: 132,
+                    weight: .medium
                 )
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(
-                    Color.white.opacity(0.10)
-                )
-                .offset(x: 118, y: -4)
+            )
+            .symbolRenderingMode(
+                .hierarchical
+            )
+            .foregroundStyle(
+                Color.white.opacity(0.10)
+            )
+            .offset(x: 118, y: -4)
         }
+    }
+
+    private var completionMuscleProfile:
+        StrengthMuscleProfile {
+        var scores:
+            [StrengthMuscleRegion: Double] =
+                [:]
+
+        for muscle in
+            workout.strengthMuscleGroups ??
+            [] {
+            for region in
+                StrengthMuscleResolver
+                    .regions(
+                        for: muscle
+                    ) {
+                scores[
+                    region,
+                    default: 0
+                ] += 1
+            }
+        }
+
+        return StrengthMuscleProfile(
+            activations:
+                StrengthMuscleRegion
+                    .allCases
+                    .compactMap {
+                        region in
+
+                        guard let score =
+                                scores[
+                                    region
+                                ],
+                              score > 0
+                        else {
+                            return nil
+                        }
+
+                        return StrengthMuscleActivation(
+                            region: region,
+                            score: score
+                        )
+                    }
+        )
+    }
+
+    private var completionRouteRegion:
+        MKCoordinateRegion {
+        let coordinates =
+            completionRoute.map(
+                \.coordinate
+            )
+
+        guard let first =
+                coordinates.first
+        else {
+            return MKCoordinateRegion(
+                center:
+                    CLLocationCoordinate2D(
+                        latitude: 63.4305,
+                        longitude: 10.3951
+                    ),
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta: 0.02,
+                        longitudeDelta: 0.02
+                    )
+            )
+        }
+
+        var minLatitude =
+            first.latitude
+        var maxLatitude =
+            first.latitude
+        var minLongitude =
+            first.longitude
+        var maxLongitude =
+            first.longitude
+
+        for coordinate in
+            coordinates.dropFirst() {
+            minLatitude =
+                min(
+                    minLatitude,
+                    coordinate.latitude
+                )
+            maxLatitude =
+                max(
+                    maxLatitude,
+                    coordinate.latitude
+                )
+            minLongitude =
+                min(
+                    minLongitude,
+                    coordinate.longitude
+                )
+            maxLongitude =
+                max(
+                    maxLongitude,
+                    coordinate.longitude
+                )
+        }
+
+        let latitudeDelta =
+            max(
+                (
+                    maxLatitude -
+                    minLatitude
+                ) * 1.35,
+                0.004
+            )
+        let longitudeDelta =
+            max(
+                (
+                    maxLongitude -
+                    minLongitude
+                ) * 1.35,
+                0.004
+            )
+
+        return MKCoordinateRegion(
+            center:
+                CLLocationCoordinate2D(
+                    latitude:
+                        (
+                            minLatitude +
+                            maxLatitude
+                        ) / 2,
+                    longitude:
+                        (
+                            minLongitude +
+                            maxLongitude
+                        ) / 2
+                ),
+            span:
+                MKCoordinateSpan(
+                    latitudeDelta:
+                        latitudeDelta,
+                    longitudeDelta:
+                        longitudeDelta
+                )
+        )
     }
 
     private var resultStrip: some View {
@@ -1601,34 +1945,50 @@ struct PostWorkoutReviewView: View {
             )
             .padding(.top, -8)
 
-            Divider()
-                .opacity(0.65)
+            if isAdvancedReview {
+                Divider()
+                    .opacity(0.65)
 
-            VStack(
-                alignment: .leading,
-                spacing: 9
-            ) {
-                Text("Quick note")
+                VStack(
+                    alignment: .leading,
+                    spacing: 9
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Quick note",
+                            norwegian: "Kort notat"
+                        )
+                    )
                     .font(
                         .subheadline.weight(
                             .semibold
                         )
                     )
 
-                TextField(
-                    "What stood out about this workout?",
-                    text: $descriptionText,
-                    axis: .vertical
-                )
-                .lineLimit(2...5)
-                .padding(13)
-                .background(
-                    Color.black.opacity(0.035),
-                    in: RoundedRectangle(
-                        cornerRadius: 15,
-                        style: .continuous
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "What stood out about this workout?",
+                            norwegian:
+                                "Hva skilte seg ut med denne økten?"
+                        ),
+                        text: $descriptionText,
+                        axis: .vertical
                     )
-                )
+                    .lineLimit(2...5)
+                    .padding(13)
+                    .background(
+                        Color.black.opacity(
+                            0.035
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
             }
         }
         .padding(18)
@@ -1919,6 +2279,146 @@ struct PostWorkoutReviewView: View {
         social.workoutMedia.filter {
             $0.workoutID == workout.id
         }
+    }
+
+    private var compactTrainTogetherButton:
+        some View {
+        Button {
+            showingTrainingPartners = true
+        } label: {
+            HStack(spacing: 11) {
+                Image(
+                    systemName:
+                        "person.2.fill"
+                )
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    completionAccent
+                )
+                .frame(
+                    width: 34,
+                    height: 34
+                )
+                .background(
+                    completionAccent
+                        .opacity(0.09),
+                    in: Circle()
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Train Together",
+                            norwegian:
+                                "Tren sammen"
+                        )
+                    )
+                    .font(
+                        .subheadline.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                    Text(
+                        selectedFriendIDs
+                            .isEmpty
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Add training partners",
+                                    norwegian:
+                                        "Legg til treningspartnere"
+                                )
+                            : ATHLTHLocalization
+                                .format(
+                                    english:
+                                        "%d selected",
+                                    norwegian:
+                                        "%d valgt",
+                                    selectedFriendIDs
+                                        .count
+                                )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+
+                if !selectedFriendIDs
+                    .isEmpty {
+                    Text(
+                        "\(selectedFriendIDs.count)"
+                    )
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        completionAccent
+                    )
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .frame(height: 26)
+                    .background(
+                        completionAccent
+                            .opacity(0.09),
+                        in: Capsule()
+                    )
+                }
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+            }
+            .padding(
+                .horizontal,
+                14
+            )
+            .frame(height: 58)
+            .background(
+                Color.white.opacity(
+                    0.90
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(
+                        0.045
+                    ),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var visibilityCard: some View {
@@ -2235,10 +2735,36 @@ struct PostWorkoutReviewView: View {
         )
     }
 
+    @MainActor
+    private func loadCompletionRoute() async {
+        guard workout.activity == .running ||
+                workout.activity == .walking
+        else {
+            completionRoute = []
+            return
+        }
+
+        let detail =
+            await health.workoutDetail(
+                for: workout.id
+            )
+
+        completionRoute =
+            detail.route
+                .filter {
+                    $0.horizontalAccuracy >= 0 &&
+                    $0.horizontalAccuracy <= 65
+                }
+                .sorted {
+                    $0.timestamp <
+                    $1.timestamp
+                }
+    }
+
     private func loadExistingReview() async {
         visibility =
             initialVisibilityOverride ??
-            settings.defaultActivityVisibility
+            .friends
         selectedFriendIDs =
             social.workoutAssociatedFriendIDs(
                 for: workout.id
