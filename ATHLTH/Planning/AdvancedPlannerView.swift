@@ -10,6 +10,7 @@ struct AdvancedPlannerView: View {
     @State private var selectedDayID: UUID?
     @State private var selectedWorkout: PlannedSession?
     @State private var showingSessionEditor = false
+    @State private var showingStandaloneSessionEditor = false
     @State private var showingPlanEditor = false
     @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
@@ -33,6 +34,8 @@ struct AdvancedPlannerView: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            standaloneScheduleCard
+
             if let plan = displayedPlan {
                 planOverview(plan)
 
@@ -72,6 +75,14 @@ struct AdvancedPlannerView: View {
                     dayID: selectedDayID
                 )
             }
+        }
+        .sheet(
+            isPresented:
+                $showingStandaloneSessionEditor
+        ) {
+            SessionEditorView(
+                standaloneDate: Date()
+            )
         }
         .sheet(isPresented: $showingPlanEditor) {
             if let plan = displayedPlan {
@@ -135,6 +146,279 @@ struct AdvancedPlannerView: View {
                 )
             }
         }
+    }
+
+    private var standaloneScheduleCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack(
+                    alignment: .top,
+                    spacing: 12
+                ) {
+                    Image(
+                        systemName:
+                            "calendar.badge.plus"
+                    )
+                    .font(.title3)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Extra planned workouts",
+                                norwegian:
+                                    "Ekstra planlagte økter"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.bold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Plan a workout without changing your active training plan.",
+                                norwegian:
+                                    "Planlegg en økt uten å endre den aktive treningsplanen."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        showingStandaloneSessionEditor =
+                            true
+                    } label: {
+                        Image(
+                            systemName: "plus"
+                        )
+                        .font(
+                            .system(
+                                size: 13,
+                                weight: .bold
+                            )
+                        )
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .buttonBorderShape(.circle)
+                    .tint(
+                        ATHLTHTheme.accent
+                    )
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Plan extra workout",
+                            norwegian:
+                                "Planlegg ekstra økt"
+                        )
+                    )
+                }
+
+                if !upcomingStandaloneSessions
+                    .isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(
+                            upcomingStandaloneSessions
+                                .prefix(4)
+                        ) { workout in
+                            standaloneSessionRow(
+                                workout
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "These workouts are kept separate from your training plan and never replace, move or complete plan sessions.",
+                        norwegian:
+                            "Disse øktene holdes separat og vil aldri erstatte, flytte eller fullføre økter i treningsplanen."
+                    )
+                )
+                .font(.system(size: 9.5))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+        }
+    }
+
+    private var upcomingStandaloneSessions:
+        [PlannedSession] {
+        let cutoff =
+            Calendar.current
+                .startOfDay(
+                    for: Date()
+                )
+
+        return session
+            .standalonePlannedSessions
+            .filter {
+                guard let date =
+                        $0.scheduledStart
+                else {
+                    return false
+                }
+
+                return date >= cutoff
+            }
+            .sorted {
+                ($0.scheduledStart ??
+                    .distantFuture) <
+                ($1.scheduledStart ??
+                    .distantFuture)
+            }
+    }
+
+    private func standaloneSessionRow(
+        _ workout: PlannedSession
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    workout.kind.systemImage
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(workout.title)
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+
+                if let date =
+                        workout.scheduledStart {
+                    Text(
+                        date.formatted(
+                            .dateTime
+                                .weekday(
+                                    .abbreviated
+                                )
+                                .day()
+                                .month(
+                                    .abbreviated
+                                )
+                                .hour()
+                                .minute()
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+            }
+
+            Spacer()
+
+            Menu {
+                Button(
+                    role: .destructive
+                ) {
+                    session
+                        .removeStandalonePlannedSession(
+                            workout.id
+                        )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Delete",
+                            norwegian: "Slett"
+                        ),
+                        systemImage: "trash"
+                    )
+                }
+            } label: {
+                Image(
+                    systemName: "ellipsis"
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .frame(
+                    width: 30,
+                    height: 34
+                )
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: 48)
+        .background(
+            Color.primary.opacity(0.025),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
     }
 
     private func planOverview(_ plan: TrainingPlan) -> some View {
@@ -3943,6 +4227,7 @@ struct SessionEditorView: View {
     let dayID: UUID?
     let planID: UUID?
     let existingWorkout: PlannedSession?
+    let isStandalone: Bool
 
     @State private var title = "New Workout"
     @State private var kind: WorkoutKind = .strength
@@ -4002,6 +4287,7 @@ struct SessionEditorView: View {
         self.dayID = dayID
         self.planID = nil
         self.existingWorkout = nil
+        self.isStandalone = false
     }
 
     init(
@@ -4011,6 +4297,38 @@ struct SessionEditorView: View {
         self.dayID = dayID
         self.planID = planID
         self.existingWorkout = nil
+        self.isStandalone = false
+    }
+
+    init(
+        standaloneDate: Date
+    ) {
+        self.dayID = nil
+        self.planID = nil
+        self.existingWorkout = nil
+        self.isStandalone = true
+
+        let calendar =
+            Calendar.current
+        let day =
+            calendar.startOfDay(
+                for: standaloneDate
+            )
+        let defaultTime =
+            calendar.date(
+                bySettingHour: 18,
+                minute: 0,
+                second: 0,
+                of: day
+            ) ?? day
+
+        _scheduledTimeEnabled =
+            State(initialValue: true)
+        _scheduledTime =
+            State(
+                initialValue:
+                    defaultTime
+            )
     }
 
     init(
@@ -4020,6 +4338,7 @@ struct SessionEditorView: View {
         self.dayID = nil
         self.planID = planID
         self.existingWorkout = workout
+        self.isStandalone = false
 
         _title = State(initialValue: workout.title)
         _kind = State(initialValue: workout.kind)
@@ -4226,6 +4545,24 @@ struct SessionEditorView: View {
                         }
                     }
 
+                    if isStandalone {
+                        DatePicker(
+                            ATHLTHLocalization.choose(
+                                english: "Date",
+                                norwegian: "Dato"
+                            ),
+                            selection:
+                                $scheduledTime,
+                            in:
+                                Calendar.current
+                                    .startOfDay(
+                                        for: Date()
+                                    )...,
+                            displayedComponents:
+                                .date
+                        )
+                    }
+
                     HStack {
                         Label("Time", systemImage: "clock")
                             .foregroundStyle(
@@ -4242,14 +4579,16 @@ struct SessionEditorView: View {
                             )
                             .labelsHidden()
 
-                            Button {
-                                scheduledTimeEnabled = false
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
+                            if !isStandalone {
+                                Button {
+                                    scheduledTimeEnabled = false
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Clear workout time")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Clear workout time")
                         } else {
                             Button("–") {
                                 scheduledTime = Date()
@@ -4505,7 +4844,18 @@ struct SessionEditorView: View {
                     }
                 }
             }
-            .navigationTitle(existingWorkout == nil ? "Add Session" : "Edit Workout")
+            .navigationTitle(
+                isStandalone
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Plan Extra Workout",
+                        norwegian:
+                            "Planlegg ekstra økt"
+                    )
+                    : existingWorkout == nil
+                        ? "Add Session"
+                        : "Edit Workout"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -4515,7 +4865,16 @@ struct SessionEditorView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(existingWorkout == nil ? "Add" : "Save") {
+                    Button(
+                        isStandalone
+                            ? ATHLTHLocalization.choose(
+                                english: "Plan",
+                                norwegian: "Planlegg"
+                            )
+                            : existingWorkout == nil
+                                ? "Add"
+                                : "Save"
+                    ) {
                         saveSession()
                     }
                     .disabled(!canAdd)
@@ -6156,9 +6515,12 @@ struct SessionEditorView: View {
             id: existingWorkout?.id ?? UUID(),
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             kind: kind,
-            scheduledStart: scheduledTimeEnabled
-                ? scheduledTime
-                : nil,
+            scheduledStart:
+                isStandalone
+                    ? scheduledTime
+                    : scheduledTimeEnabled
+                        ? scheduledTime
+                        : nil,
             durationMinutes: durationMinutes,
             targetDistanceKilometers:
                 (kind == .walking || kind == .running)
@@ -6210,8 +6572,13 @@ struct SessionEditorView: View {
                 workoutCategory
         )
 
-        if existingWorkout != nil,
-           let planID {
+        if isStandalone {
+            session
+                .addStandalonePlannedSession(
+                    workout
+                )
+        } else if existingWorkout != nil,
+                  let planID {
             session.updateSession(
                 workout,
                 inPlan: planID
