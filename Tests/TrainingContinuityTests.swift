@@ -46,6 +46,108 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertEqual(finished.workoutHistory.first?.id, id)
     }
 
+    @MainActor
+    func testBasicStrengthKeepsBasicModeWhenAddingExercise() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(
+            watchSessionID: nil,
+            trackingMode: .simple,
+            captureDevice: .iPhone
+        )
+
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Goblet Squat",
+            instructions: [],
+            primaryMuscles: ["Quads"],
+            secondaryMuscles: ["Glutes"],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+
+        store.appendExercise(exercise)
+
+        XCTAssertEqual(
+            store.activeWorkout?.trackingMode,
+            .simple
+        )
+        XCTAssertEqual(
+            store.activeWorkout?.exercises.count,
+            1
+        )
+    }
+
+    @MainActor
+    func testAdvancedStrengthConfigurationPersistsAndCanDisableAutoRest() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        var configuration =
+            StrengthAdvancedConfiguration.standard
+        configuration.keepScreenAwake = true
+        configuration.inputMode = .iPhone
+        configuration.restCues.automaticRestTimer = false
+        configuration.audioCoach.enabled = true
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(
+            watchSessionID: nil,
+            trackingMode: .advanced,
+            captureDevice: .iPhone,
+            advancedConfiguration:
+                configuration
+        )
+
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: ["Triceps"],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+
+        store.appendExercise(
+            exercise,
+            sets: 2,
+            reps: 8,
+            restSeconds: 90
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 60,
+            rpe: 7
+        )
+
+        XCTAssertNil(store.restEndsAt)
+        XCTAssertEqual(
+            store.activeWorkout?
+                .advancedConfiguration,
+            configuration
+        )
+
+        let reopened = StrengthWorkoutStore()
+        reopened.switchAccount(owner)
+
+        XCTAssertEqual(
+            reopened.activeWorkout?
+                .advancedConfiguration,
+            configuration
+        )
+    }
+
     func testBackupRejectsWrongOwnerUnknownVersionAndMalformedData() throws {
         let owner = UUID()
         let valid = TrainingBackupPayload(version: 1, ownerID: owner, records: ["goals": Data("[]".utf8)])
