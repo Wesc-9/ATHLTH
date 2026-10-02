@@ -175,8 +175,10 @@ struct GoalCoverView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-            } else {
-                Image(goal.coverStyle.assetName)
+            } else if let image =
+                        goal.coverStyle
+                            .resolvedUIImage {
+                Image(uiImage: image)
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
@@ -2530,7 +2532,7 @@ struct GoalCreationView: View {
                         ) {
                             HStack(spacing: 9) {
                                 ForEach(
-                                    GoalCoverStyle.allCases
+                                    GoalCoverStyle.selectableCases
                                 ) { style in
                                     let isSelected =
                                         imageData == nil &&
@@ -2545,14 +2547,24 @@ struct GoalCreationView: View {
                                             alignment:
                                                 .bottomLeading
                                         ) {
-                                            Image(
-                                                style.assetName
-                                            )
-                                            .resizable()
-                                            .interpolation(
-                                                .high
-                                            )
-                                            .scaledToFill()
+                                            Group {
+                                                if let image =
+                                                        style
+                                                            .resolvedUIImage {
+                                                    Image(
+                                                        uiImage:
+                                                            image
+                                                    )
+                                                    .resizable()
+                                                    .interpolation(
+                                                        .high
+                                                    )
+                                                    .scaledToFill()
+                                                } else {
+                                                    ATHLTHTheme
+                                                        .accentSoft
+                                                }
+                                            }
                                             .frame(
                                                 width: 112,
                                                 height: 72
@@ -4914,7 +4926,7 @@ struct GoalEditView: View {
                     }
 
                     Picker("Fallback cover", selection: $coverStyle) {
-                        ForEach(GoalCoverStyle.allCases) { style in
+                        ForEach(GoalCoverStyle.selectableCases) { style in
                             Text(style.title).tag(style)
                         }
                     }
@@ -5030,12 +5042,16 @@ private struct GoalPreviewCard: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                } else {
-                    Image(coverStyle.assetName)
+                } else if let image =
+                            coverStyle
+                                .resolvedUIImage {
+                    Image(uiImage: image)
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
                         .scaledToFill()
+                } else {
+                    ATHLTHTheme.accentSoft
                 }
             }
             .frame(height: 158)
