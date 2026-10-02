@@ -25,6 +25,11 @@ struct TrophyInscription: Codable, Hashable {
     }
 }
 
+struct TrophyInscriptionResolution {
+    let inscription: TrophyInscription
+    let isPersisted: Bool
+}
+
 private struct TrophyInscriptionRequest:
     Encodable
 {
@@ -67,7 +72,7 @@ final class TrophyInscriptionAIService {
         achievementTitle: String,
         achievementDetail: String,
         unlockedAt: Date?
-    ) async -> TrophyInscription {
+    ) async -> TrophyInscriptionResolution {
         let cleanUsername =
             sanitizedUsername(username)
         let fallback =
@@ -80,7 +85,10 @@ final class TrophyInscriptionAIService {
         guard PrestigeTrophyCatalog
             .isPrestigeTrophy(trophyID)
         else {
-            return fallback
+            return TrophyInscriptionResolution(
+                inscription: fallback,
+                isPersisted: false
+            )
         }
 
         let language =
@@ -112,7 +120,10 @@ final class TrophyInscriptionAIService {
             ),
         cached.achievementTitle ==
             achievementTitle {
-            return cached.inscription
+            return TrophyInscriptionResolution(
+                inscription: cached.inscription,
+                isPersisted: true
+            )
         }
 
         let formatter =
@@ -191,11 +202,17 @@ final class TrophyInscriptionAIService {
                 )
             }
 
-            return normalized
+            return TrophyInscriptionResolution(
+                inscription: normalized,
+                isPersisted: true
+            )
         } catch {
             // The trophy must always render even if AI is offline.
             // A later visit can retry because fallbacks are not cached.
-            return fallback
+            return TrophyInscriptionResolution(
+                inscription: fallback,
+                isPersisted: false
+            )
         }
     }
 
