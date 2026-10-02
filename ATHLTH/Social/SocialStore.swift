@@ -2062,7 +2062,8 @@ final class SocialStore: ObservableObject {
                     $0.state == .invited ||
                     (
                         $0.state == .accepted &&
-                        $0.workoutStartedAt == nil
+                        $0.workoutStartedAt == nil &&
+                        $0.launchFailedAt == nil
                     )
                 )
             }
