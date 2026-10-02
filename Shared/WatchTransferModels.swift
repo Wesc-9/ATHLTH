@@ -1004,6 +1004,33 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case resume
 }
 
+enum WatchSpotifyCommandKind: String, Codable, Hashable {
+    case requestState
+    case pause
+    case resume
+    case next
+}
+
+struct WatchSpotifyCommand: Codable, Hashable {
+    var kind: WatchSpotifyCommandKind
+    var sentAt: Date = Date()
+}
+
+struct WatchSpotifyPlaybackState: Codable, Hashable {
+    var isConfigured: Bool
+    var isConnected: Bool
+    var isPlaying: Bool
+    var playlistName: String?
+    var updatedAt: Date = Date()
+
+    static let unavailable = WatchSpotifyPlaybackState(
+        isConfigured: false,
+        isConnected: false,
+        isPlaying: false,
+        playlistName: nil
+    )
+}
+
 enum WatchTransferKind: String {
     case route
     case workoutResult
@@ -1018,6 +1045,8 @@ enum WatchTransferKind: String {
     case todayWorkoutRequest
     case strengthSnapshot
     case strengthCommand
+    case spotifyCommand
+    case spotifyPlaybackState
     case connectivityProbe
     case connectivityAck
 }
