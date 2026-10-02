@@ -237,6 +237,11 @@ struct AppRootView: View {
             watchConnection.connect()
             syncSpotifyPlaybackToWatch()
 
+            // If Apple Watch already owns a workout, HealthKit may deliver the
+            // mirroring callback just after app activation. Give that callback
+            // first priority before any later Health refresh decisions.
+            await allowWatchMirroringToAttachIfNeeded()
+
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             await submitLatestStoreProofIfPossible()
@@ -284,8 +289,6 @@ struct AppRootView: View {
             // without presenting the Health permission sheet.
             _ = await health.restoreAuthorizationStateFromSystem()
 
-            await allowWatchMirroringToAttachIfNeeded()
-
             if health.needsHealthRefreshRecovery {
                 // Give the UI a stable launch first. Clearing the recovery
                 // latch here only affects future launches because this
@@ -308,7 +311,10 @@ struct AppRootView: View {
             // prioritize the mirroring session. A full Health refresh can
             // wait until the workout finishes; the completion path refreshes
             // Health immediately afterwards.
-            guard !workoutMirroring.hasActiveMirroredWorkout else {
+            guard !workoutMirroring.hasActiveMirroredWorkout,
+                  !ATHLTHWatchWorkoutRuntime
+                    .isMirroredWorkoutActive
+            else {
                 return
             }
 
@@ -418,62 +424,17 @@ struct AppRootView: View {
             // This is connection state, not a global workout-device choice.
             watchConnection.connect()
 
-            if workoutMirroring.hasActiveMirroredWorkout {
-                return
-            }
-
-            let now = Date()
-            if let lastFullLifecycleRefreshAt,
-               now.timeIntervalSince(lastFullLifecycleRefreshAt) <
-                    minimumLifecycleRefreshInterval {
-                return
-            }
-            lastFullLifecycleRefreshAt = now
-
             Task {
-                if appSession.signedIn {
-                    async let socialHome: Void =
-                        refreshSocialHomeCore()
-                    async let messages: Void =
-                        messaging.refresh()
-                    async let calendarRefresh: Void =
-                        syncCalendarIfAllowed()
-
-                    _ = await (
-                        socialHome,
-                        messages,
-                        calendarRefresh
-                    )
-                }
-
                 await allowWatchMirroringToAttachIfNeeded()
 
-                guard health.hasRequestedAuthorization,
-                      !health.shouldDeferAutomaticHealthWork,
-                      !workoutMirroring.hasActiveMirroredWorkout
+                guard !workoutMirroring.hasActiveMirroredWorkout,
+                      !ATHLTHWatchWorkoutRuntime
+                        .isMirroredWorkoutActive
                 else {
                     return
                 }
 
-                await health.refreshIfStale(
-                    maxAge: minimumLifecycleRefreshInterval
-                )
-                await officialWeeklyChallenges.syncCompletionState(
-                    workouts: health.workouts
-                )
-                syncAppleHealthProfileDetailsIfNeeded()
-                await goals.refreshAutomaticMilestones(
-                    health: health,
-                    strength: strengthWorkout
-                )
-                notifications.syncGoalEvents(from: goals.goals)
-                challengeStore.refreshStatuses()
-                notifications.syncChallengeEvents(
-                    from: challengeStore.challenges,
-                    currentUserID: appSession.profile.userID
-                )
-                await refreshTrophiesAndNotifications()
-                await syncSocialOwnedData()
+                await resumeForegroundRefreshIfNeeded()
             }
         }
         .onReceive(
@@ -1043,6 +1004,71 @@ struct AppRootView: View {
                     userID: userID
                 )
         }
+    }
+
+    @MainActor
+    private func resumeForegroundRefreshIfNeeded()
+        async {
+        let now = Date()
+
+        if let lastFullLifecycleRefreshAt,
+           now.timeIntervalSince(
+                lastFullLifecycleRefreshAt
+           ) < minimumLifecycleRefreshInterval {
+            return
+        }
+
+        lastFullLifecycleRefreshAt = now
+
+        if appSession.signedIn {
+            async let socialHome: Void =
+                refreshSocialHomeCore()
+            async let messages: Void =
+                messaging.refresh()
+            async let calendarRefresh: Void =
+                syncCalendarIfAllowed()
+
+            _ = await (
+                socialHome,
+                messages,
+                calendarRefresh
+            )
+        }
+
+        guard health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork,
+              !workoutMirroring.hasActiveMirroredWorkout,
+              !ATHLTHWatchWorkoutRuntime
+                .isMirroredWorkoutActive
+        else {
+            return
+        }
+
+        await health.refreshIfStale(
+            maxAge:
+                minimumLifecycleRefreshInterval
+        )
+        await officialWeeklyChallenges
+            .syncCompletionState(
+                workouts: health.workouts
+            )
+        syncAppleHealthProfileDetailsIfNeeded()
+        await goals.refreshAutomaticMilestones(
+            health: health,
+            strength: strengthWorkout
+        )
+        notifications.syncGoalEvents(
+            from: goals.goals
+        )
+        challengeStore.refreshStatuses()
+        notifications.syncChallengeEvents(
+            from:
+                challengeStore.challenges,
+            currentUserID:
+                appSession.profile.userID
+        )
+        await refreshTrophiesAndNotifications()
+        await syncSocialOwnedData()
     }
 
     @MainActor
