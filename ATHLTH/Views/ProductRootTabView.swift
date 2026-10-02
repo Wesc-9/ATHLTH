@@ -2658,7 +2658,10 @@ struct ATHLTHHomeView: View {
                 PlannedWorkoutWatchBuilder
                     .runningTransfer(
                         from: workout,
-                        routeAlerts: .standard
+                        routeAlerts: .standard,
+                        autoPauseEnabled:
+                            workout.autoPauseEnabled ??
+                            settings.autoPauseOutdoorWorkouts
                     )
         } else {
             runningWorkout = nil
@@ -2978,7 +2981,10 @@ struct ATHLTHHomeView: View {
                         PlannedWorkoutWatchBuilder.runningTransfer(
                             from: workout,
                             routeAlerts:
-                                settings.routeAlertConfiguration
+                                settings.routeAlertConfiguration,
+                            autoPauseEnabled:
+                                workout.autoPauseEnabled ??
+                                settings.autoPauseOutdoorWorkouts
                         )
                     )
                 } else {
@@ -2992,7 +2998,10 @@ struct ATHLTHHomeView: View {
                                     .routeAlertConfiguration,
                             targetAlerts:
                                 workout
-                                    .targetAlertConfiguration
+                                    .targetAlertConfiguration,
+                            autoPauseEnabled:
+                                workout.autoPauseEnabled ??
+                                settings.autoPauseOutdoorWorkouts
                         )
                     )
                 }
@@ -4939,7 +4948,11 @@ struct ATHLTHTrainView: View {
         if configuration.captureDevice == .iPhone {
             guard configuration.mode == .free else { return }
             gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(walking: false)
+            phoneWorkout.start(
+                walking: false,
+                autoPauseEnabled:
+                    configuration.autoPauseEnabled
+            )
             return
         }
 
@@ -4992,6 +5005,8 @@ struct ATHLTHTrainView: View {
                     watchTransfer.routeAlerts =
                         settings
                             .routeAlertConfiguration
+                    watchTransfer.autoPauseEnabled =
+                        configuration.autoPauseEnabled
                     watchConnection.sendRunningWorkout(
                         watchTransfer
                     )
@@ -5002,7 +5017,9 @@ struct ATHLTHTrainView: View {
                             steps: [],
                             routeAlerts:
                                 settings
-                                    .routeAlertConfiguration
+                                    .routeAlertConfiguration,
+                            autoPauseEnabled:
+                                configuration.autoPauseEnabled
                         )
                     )
                 }
@@ -5021,7 +5038,11 @@ struct ATHLTHTrainView: View {
     ) {
         if configuration.captureDevice == .iPhone {
             gear.prepareNextWorkoutGear(configuration.gearIDs)
-            phoneWorkout.start(walking: true)
+            phoneWorkout.start(
+                walking: true,
+                autoPauseEnabled:
+                    configuration.autoPauseEnabled
+            )
             return
         }
 
@@ -5037,7 +5058,9 @@ struct ATHLTHTrainView: View {
                 title: "",
                 steps: [],
                 routeAlerts:
-                    settings.routeAlertConfiguration
+                    settings.routeAlertConfiguration,
+                autoPauseEnabled:
+                    configuration.autoPauseEnabled
             )
         )
 
