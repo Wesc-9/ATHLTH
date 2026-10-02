@@ -19,6 +19,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var coordinatedLobbySessionID: UUID?
+    @Published private(set) var currentJoinedWorkoutSessionID: UUID?
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
@@ -808,6 +809,7 @@ final class SocialStore: ObservableObject {
             activeWorkoutSession = nil
             activeWorkoutParticipants = []
             coordinatedLobbySessionID = nil
+            currentJoinedWorkoutSessionID = nil
             return true
         }
 
@@ -817,7 +819,16 @@ final class SocialStore: ObservableObject {
             if let activeWorkoutSession,
                activeWorkoutSession.status == .active,
                activeWorkoutSession.creatorID == currentUserID {
-                try? await service.cancelWorkoutSession(activeWorkoutSession.id)
+                let ownParticipant =
+                    activeWorkoutParticipants.first {
+                        $0.userID == currentUserID
+                    }
+
+                if ownParticipant?.workoutFinishedAt == nil {
+                    try? await service.cancelWorkoutSession(
+                        activeWorkoutSession.id
+                    )
+                }
             }
 
             let session = try await service.createWorkoutSession(
@@ -994,6 +1005,8 @@ final class SocialStore: ObservableObject {
                             participantID:
                                 participant.id
                         )
+                    currentJoinedWorkoutSessionID =
+                        sessionID
 
                     if coordinatedLobbySessionID == sessionID {
                         coordinatedLobbySessionID = nil
@@ -1053,20 +1066,61 @@ final class SocialStore: ObservableObject {
         sourceWorkoutID: UUID,
         endedAt: Date
     ) async {
-        guard let activeWorkoutSession,
-              activeWorkoutSession.creatorID == currentUserID,
-              activeWorkoutSession.status == .active
+        let sessionID =
+            currentJoinedWorkoutSessionID ??
+            activeWorkoutSession?.id
+
+        guard let sessionID,
+              let currentUserID
         else {
             return
         }
 
         do {
-            try await service.completeWorkoutSession(
-                sessionID: activeWorkoutSession.id,
-                sourceWorkoutID: sourceWorkoutID,
-                endedAt: endedAt
+            try await refreshWorkoutLobby(
+                sessionID: sessionID
             )
-            await refresh()
+
+            guard let session = workoutSessions.first(
+                where: { $0.id == sessionID }
+            ),
+            session.status == .active,
+            let participant = workoutParticipants.first(
+                where: {
+                    $0.sessionID == sessionID &&
+                    $0.userID == currentUserID
+                }
+            ),
+            participant.workoutStartedAt != nil
+            else {
+                currentJoinedWorkoutSessionID = nil
+                return
+            }
+
+            if session.creatorID == currentUserID {
+                try await service.recordWorkoutSessionSource(
+                    sessionID: sessionID,
+                    sourceWorkoutID: sourceWorkoutID
+                )
+            }
+
+            try await service.markWorkoutParticipantFinished(
+                participantID: participant.id
+            )
+
+            try? await refreshWorkoutLobby(
+                sessionID: sessionID
+            )
+
+            currentJoinedWorkoutSessionID = nil
+
+            if activeWorkoutSession?.id == sessionID,
+               workoutSessions.first(
+                    where: { $0.id == sessionID }
+               )?.status != .active {
+                activeWorkoutSession = nil
+                activeWorkoutParticipants = []
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1898,9 +1952,20 @@ final class SocialStore: ObservableObject {
             .sorted { $0.session.createdAt > $1.session.createdAt }
 
         activeWorkoutSession = sessions
-            .filter {
-                $0.creatorID == currentUserID &&
-                $0.status == .active
+            .filter { candidate in
+                guard candidate.creatorID == currentUserID,
+                      candidate.status == .active
+                else {
+                    return false
+                }
+
+                let ownParticipant =
+                    participants.first {
+                        $0.sessionID == candidate.id &&
+                        $0.userID == currentUserID
+                    }
+
+                return ownParticipant?.workoutFinishedAt == nil
             }
             .sorted { $0.createdAt > $1.createdAt }
             .first
