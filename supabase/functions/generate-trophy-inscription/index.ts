@@ -9,10 +9,20 @@ type TrophyRequest = {
   language?: "en" | "nb";
 };
 
-const ALLOWED_TROPHIES = new Set([
-  "signature.half-marathon",
-  "signature.marathon",
-]);
+const TROPHY_FACTS = {
+  "signature.half-marathon": {
+    detail:
+      "A verified single running workout of at least 21.0975 kilometres.",
+  },
+  "signature.marathon": {
+    detail:
+      "A verified single running workout of at least 42.195 kilometres.",
+  },
+} as const;
+
+const ALLOWED_TROPHIES = new Set(
+  Object.keys(TROPHY_FACTS),
+);
 
 const ENGRAVING_VERSION = 1;
 
@@ -444,10 +454,11 @@ Deno.serve(
         80,
       );
     const achievementDetail =
-      cleanText(
-        body.achievementDetail,
-        240,
-      );
+      TROPHY_FACTS[
+        trophyID as
+          keyof typeof TROPHY_FACTS
+      ]?.detail ??
+      "";
     const unlockedAt =
       cleanText(
         award.unlocked_at ||
