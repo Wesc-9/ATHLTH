@@ -171,21 +171,32 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             )
 
         case .completeSet:
-            strengthWorkout.setDraft(
-                reps: command.reps,
-                weightKilograms: command.weightKilograms,
-                restSeconds: command.restSeconds,
-                rpe: command.rpe,
-                rir: command.rir,
-                warmUp: command.isWarmUp,
-                origin: .watch
-            )
+            // Completing on Watch is an explicit action, but a payload that
+            // predates a newer iPhone edit must not overwrite the iPhone's
+            // current reps/weight. In that case complete the authoritative
+            // iPhone draft instead.
+            if command.sentAt >=
+                strengthWorkout
+                    .lastPhoneDraftMutationAt {
+                strengthWorkout.setDraft(
+                    reps: command.reps,
+                    weightKilograms:
+                        command.weightKilograms,
+                    restSeconds:
+                        command.restSeconds,
+                    rpe: command.rpe,
+                    rir: command.rir,
+                    warmUp: command.isWarmUp,
+                    origin: .watch
+                )
+            }
             strengthWorkout.completeCurrentDraftSet()
 
         case .completeSetWithoutDetails:
             if let restSeconds = command.restSeconds {
                 strengthWorkout.setDraft(
-                    restSeconds: restSeconds
+                    restSeconds: restSeconds,
+                    origin: .watch
                 )
             }
             strengthWorkout.completeCurrentSetWithoutDetails(
