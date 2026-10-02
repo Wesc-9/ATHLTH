@@ -938,14 +938,6 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             $0.sentAt < $1.sentAt
         }
 
-        if pendingStrengthCommands.count > 256 {
-            pendingStrengthCommands =
-                Array(
-                    pendingStrengthCommands
-                        .suffix(256)
-                )
-        }
-
         persistStrengthCommandState()
         lastStrengthCommand =
             pendingStrengthCommands.first
@@ -1008,14 +1000,6 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             .append(result)
         pendingWorkoutResults.sort {
             $0.endedAt < $1.endedAt
-        }
-
-        if pendingWorkoutResults.count > 32 {
-            pendingWorkoutResults =
-                Array(
-                    pendingWorkoutResults
-                        .suffix(32)
-                )
         }
 
         persistWorkoutResultState()
