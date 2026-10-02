@@ -3129,11 +3129,13 @@ private struct WorkoutInviteLaunchSheet: View {
                     HStack(spacing: 9) {
                         Circle()
                             .fill(
-                                participant.workoutStartedAt != nil
-                                    ? ATHLTHTheme.accent
-                                    : participant.readyAt != nil
-                                        ? Color.green
-                                        : Color.orange
+                                participant.launchFailedAt != nil
+                                    ? Color.red
+                                    : participant.workoutStartedAt != nil
+                                        ? ATHLTHTheme.accent
+                                        : participant.readyAt != nil
+                                            ? Color.green
+                                            : Color.orange
                             )
                             .frame(width: 8, height: 8)
 
@@ -3143,25 +3145,30 @@ private struct WorkoutInviteLaunchSheet: View {
                         Spacer()
 
                         Text(
-                            participant.workoutStartedAt != nil
+                            participant.launchFailedAt != nil
                                 ? ATHLTHLocalization.choose(
-                                    english: "Training",
-                                    norwegian: "Trener"
+                                    english: "Couldn’t start",
+                                    norwegian: "Kunne ikke starte"
                                 )
-                                : participant.readyAt != nil
+                                : participant.workoutStartedAt != nil
                                     ? ATHLTHLocalization.choose(
-                                        english: "Ready",
-                                        norwegian: "Klar"
+                                        english: "Training",
+                                        norwegian: "Trener"
                                     )
-                                    : participant.state == .accepted
+                                    : participant.readyAt != nil
                                         ? ATHLTHLocalization.choose(
-                                            english: "Accepted",
-                                            norwegian: "Godtatt"
+                                            english: "Ready",
+                                            norwegian: "Klar"
                                         )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Invited",
-                                            norwegian: "Invitert"
-                                        )
+                                        : participant.state == .accepted
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Accepted",
+                                                norwegian: "Godtatt"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english: "Invited",
+                                                norwegian: "Invitert"
+                                            )
                         )
                         .font(.caption2)
                         .foregroundStyle(.secondary)
