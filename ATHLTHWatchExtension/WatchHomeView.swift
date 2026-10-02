@@ -143,7 +143,7 @@ struct WatchHomeView: View {
                 break
             }
         }
-        .sheet(
+        .fullScreenCover(
             isPresented: Binding(
                 get: {
                     workoutManager
@@ -161,6 +161,9 @@ struct WatchHomeView: View {
             WatchActiveWorkoutView()
                 .environmentObject(
                     workoutManager
+                )
+                .environmentObject(
+                    routeStore
                 )
         }
     }
