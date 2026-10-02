@@ -28,6 +28,8 @@ struct ATHLTHTrophyCoreView: View {
     let trophy: TrophyProgressItem
     var size: CGFloat = 112
     var showLabel = false
+    var inscription: TrophyInscription? = nil
+    var athleteName: String? = nil
 
     private var visualForm: TrophyVisualForm {
         if trophy.category == .challenges {
@@ -175,15 +177,12 @@ struct ATHLTHTrophyCoreView: View {
 
     @ViewBuilder
     private var artwork: some View {
-        switch visualForm {
-        case .emblem:
+        if trophy.isPrestigeTrophy {
+            prestigeTrophyArtwork
+        } else {
+            // Achievements always remain ATHLTH emblems. Their rarity evolves
+            // Core → Rare → Epic → Signature without turning into a trophy.
             emblemArtwork
-        case .medal:
-            medalArtwork
-        case .shield:
-            shieldArtwork
-        case .cup:
-            cupArtwork
         }
     }
 
@@ -501,6 +500,240 @@ struct ATHLTHTrophyCoreView: View {
                     : .clear,
             radius: 18,
             y: 9
+        )
+    }
+
+    private var prestigeTrophyArtwork: some View {
+        let athlete =
+            inscription?.athlete ??
+            athleteName?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .uppercased() ??
+            "ATHLTH"
+        let achievement =
+            inscription?.achievement ??
+            trophy.title.uppercased()
+        let engraving =
+            inscription?.inscription ??
+            ATHLTHLocalization.choose(
+                english:
+                    "VERIFIED PERFORMANCE",
+                norwegian:
+                    "VERIFISERT PRESTASJON"
+            )
+            .uppercased()
+
+        return ZStack {
+            Image(
+                systemName: "trophy.fill"
+            )
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(
+                trophy.isUnlocked
+                    ? LinearGradient(
+                        colors: [
+                            Color(
+                                red: 1.0,
+                                green: 0.88,
+                                blue: 0.46
+                            ),
+                            ATHLTHTheme
+                                .premiumGold,
+                            Color(
+                                red: 0.58,
+                                green: 0.36,
+                                blue: 0.08
+                            )
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    )
+                    : LinearGradient(
+                        colors: [
+                            Color(
+                                .systemGray4
+                            ),
+                            Color(
+                                .systemGray3
+                            )
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    )
+            )
+            .padding(
+                .horizontal,
+                size * 0.035
+            )
+            .padding(
+                .vertical,
+                size * 0.01
+            )
+
+            if trophy.isUnlocked {
+                VStack(
+                    spacing:
+                        size >= 150
+                            ? size * 0.017
+                            : 0
+                ) {
+                    Text(athlete)
+                        .font(
+                            .system(
+                                size:
+                                    max(
+                                        5.5,
+                                        size * 0.043
+                                    ),
+                                weight:
+                                    .bold
+                            )
+                        )
+                        .tracking(
+                            size * 0.006
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.58
+                        )
+
+                    Text(achievement)
+                        .font(
+                            .system(
+                                size:
+                                    max(
+                                        6,
+                                        size * 0.048
+                                    ),
+                                weight:
+                                    .heavy
+                            )
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.52
+                        )
+
+                    if size >= 150 {
+                        Text(engraving)
+                            .font(
+                                .system(
+                                    size:
+                                        max(
+                                            5.5,
+                                            size *
+                                            0.032
+                                        ),
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                            .tracking(
+                                size * 0.003
+                            )
+                            .lineLimit(2)
+                            .minimumScaleFactor(
+                                0.55
+                            )
+                    }
+                }
+                .multilineTextAlignment(
+                    .center
+                )
+                .foregroundStyle(
+                    Color(
+                        red: 0.98,
+                        green: 0.89,
+                        blue: 0.62
+                    )
+                )
+                .padding(
+                    .horizontal,
+                    size * 0.045
+                )
+                .padding(
+                    .vertical,
+                    size * 0.035
+                )
+                .frame(
+                    width: size * 0.56,
+                    height:
+                        size >= 150
+                            ? size * 0.29
+                            : size * 0.16
+                )
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.black
+                                .opacity(
+                                    0.86
+                                ),
+                            Color(
+                                red: 0.20,
+                                green: 0.14,
+                                blue: 0.07
+                            )
+                            .opacity(0.92)
+                        ],
+                        startPoint:
+                            .top,
+                        endPoint:
+                            .bottom
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius:
+                                size * 0.035,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius:
+                            size * 0.035,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.62),
+                        lineWidth:
+                            max(
+                                0.7,
+                                size * 0.006
+                            )
+                    )
+                }
+                .offset(
+                    y:
+                        size >= 150
+                            ? -size * 0.015
+                            : -size * 0.025
+                )
+            }
+
+            lockedOverlay
+        }
+        .shadow(
+            color:
+                trophy.isUnlocked
+                    ? ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.34)
+                    : .clear,
+            radius: 20,
+            y: 10
         )
     }
 
