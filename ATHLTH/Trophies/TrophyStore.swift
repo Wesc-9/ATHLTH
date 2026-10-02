@@ -416,6 +416,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "Your first recorded running workout of at least 5 kilometres.",
                     icon: "5.circle.fill",
                     source: .appleHealth,
+                    category: .endurance,
                     rarity: .core,
                     unlockedAt: healthSnapshot.firstFiveKDate
                 )
@@ -428,6 +429,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "Your first recorded running workout of at least 10 kilometres.",
                     icon: "figure.run",
                     source: .appleHealth,
+                    category: .endurance,
                     rarity: .rare,
                     unlockedAt:
                         healthSnapshot
@@ -476,6 +478,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "A single recorded walking workout reaching 5 kilometres.",
                     icon: "figure.walk",
                     source: .appleHealth,
+                    category: .walking,
                     rarity: .core,
                     unlockedAt:
                         healthSnapshot
@@ -490,6 +493,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "A single recorded walking workout reaching 10 kilometres.",
                     icon: "shoeprints.fill",
                     source: .appleHealth,
+                    category: .walking,
                     rarity: .rare,
                     unlockedAt:
                         healthSnapshot
@@ -505,6 +509,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Your first weighted set logged in ATHLTH.",
                 icon: "dumbbell.fill",
                 source: .athlth,
+                category: .strength,
                 rarity: .core,
                 unlockedAt: strengthSnapshot.firstWeightedSetDate
             )
@@ -517,6 +522,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Win an ATHLTH Challenge on a specific verified route.",
                 icon: "point.topleft.down.to.point.bottomright.curvepath",
                 source: .challenge,
+                category: .challenges,
                 rarity: .rare,
                 unlockedAt: routeWinDates.first
             )
@@ -529,6 +535,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Win a strength challenge against your competition.",
                 icon: "dumbbell.fill",
                 source: .challenge,
+                category: .challenges,
                 rarity: .rare,
                 unlockedAt: strengthWinDates.first
             )
@@ -978,6 +985,7 @@ final class TrophyStore: ObservableObject {
         subtitle: String,
         icon: String,
         source: TrophyVerificationSource,
+        category: TrophyCategory = .signature,
         rarity: TrophyRarity = .signature,
         unlockedAt: Date?
     ) -> TrophyProgressItem {
@@ -992,7 +1000,7 @@ final class TrophyStore: ObservableObject {
                     rarity.title,
                 title: title,
                 rarity: rarity,
-                category: .signature,
+                category: category,
                 source: source,
                 unlockedAt:
                     unlockedAt
@@ -1056,7 +1064,7 @@ final class TrophyStore: ObservableObject {
             id: id,
             title: title,
             subtitle: subtitle,
-            category: .signature,
+            category: category,
             verificationSource:
                 source,
             systemImage: icon,
