@@ -424,7 +424,10 @@ enum WorkoutLaunchCoordinator {
                         from: $0,
                         routeAlerts:
                             configuration
-                                .routeAlerts
+                                .routeAlerts,
+                        autoPauseEnabled:
+                            configuration
+                                .autoPauseEnabled
                     )
             }
 
@@ -445,7 +448,10 @@ enum WorkoutLaunchCoordinator {
                         .routeAlerts,
                 ghostUpdates:
                     configuration
-                        .ghostUpdates
+                        .ghostUpdates,
+                autoPauseEnabled:
+                    configuration
+                        .autoPauseEnabled
             )
             return
         }
@@ -497,7 +503,10 @@ enum WorkoutLaunchCoordinator {
                 steps: [],
                 routeAlerts:
                     configuration
-                        .routeAlerts
+                        .routeAlerts,
+                autoPauseEnabled:
+                    configuration
+                        .autoPauseEnabled
             )
 
         // Deliver ATHLTH-specific run state before asking HealthKit to launch
