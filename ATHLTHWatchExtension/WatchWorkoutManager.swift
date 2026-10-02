@@ -189,6 +189,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private let recoveryDefaultsKey =
         "athlth.watch.activeWorkoutRecovery.v1"
     private var recoveryInProgress = false
+    private var workoutInitiatedLocallyOnWatch = false
 
     private override init() {
         super.init()
@@ -1384,7 +1385,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 weightKilograms: nil,
                 restSeconds: nil,
                 addRestSeconds: nil,
-                sentAt: Date()
+                sentAt: Date(),
+                initiatedOnWatch:
+                    workoutInitiatedLocallyOnWatch
             )
         )
     }
@@ -1477,6 +1480,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         recoveryInProgress = true
         defer {
             recoveryInProgress = false
+        workoutInitiatedLocallyOnWatch = false
         }
 
         do {
@@ -1598,6 +1602,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
+        workoutInitiatedLocallyOnWatch = true
         let configuration =
             HKWorkoutConfiguration()
         configuration.activityType =
@@ -1756,6 +1761,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
+        workoutInitiatedLocallyOnWatch = true
         prepareForLocalWorkoutStart()
 
         let configuration = HKWorkoutConfiguration()
@@ -1797,6 +1803,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func start(configuration: HKWorkoutConfiguration) async {
+        workoutInitiatedLocallyOnWatch = false
         let resolvedKind = kind(for: configuration.activityType)
         await start(
             configuration: configuration,
