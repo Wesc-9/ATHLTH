@@ -1446,6 +1446,73 @@ private enum HomeFollowingWorkoutPresentation {
 
         return "\(minutes) min"
     }
+
+    static func strengthDetailText(
+        for item: SocialFeedItem
+    ) -> String? {
+        let metadata =
+            item.activity.metadata
+
+        if let groups =
+                metadata?["muscle_groups"],
+           !groups.isEmpty {
+            return groups
+                .split(separator: "|")
+                .prefix(4)
+                .map(String.init)
+                .joined(
+                    separator: " · "
+                )
+        }
+
+        if let raw =
+                metadata?["exercise_count"],
+           let count = Int(raw),
+           count > 0 {
+            return ATHLTHLocalization
+                .counted(
+                    count,
+                    englishSingular:
+                        "exercise",
+                    englishPlural:
+                        "exercises",
+                    norwegianSingular:
+                        "øvelse",
+                    norwegianPlural:
+                        "øvelser"
+                )
+        }
+
+        return nil
+    }
+
+    static func volumeText(
+        for item: SocialFeedItem
+    ) -> String? {
+        guard let raw =
+                item.activity
+                    .metadata?[
+                        "volume_kg"
+                    ],
+              let value =
+                Double(raw),
+              value > 0
+        else {
+            return nil
+        }
+
+        if value >= 1_000 {
+            return String(
+                format: "%.1f t",
+                value / 1_000
+            )
+        }
+
+        return String(
+            format: "%.0f kg",
+            value
+        )
+    }
 }
 
 private struct HomeFollowingWorkoutArtwork:
@@ -2584,20 +2651,46 @@ private struct HomeFollowingHistoryCard:
                         )
                     }
 
-                    if let subtitle =
-                            item.activity
-                                .subtitle,
-                       !subtitle.isEmpty,
-                       HomeFollowingWorkoutPresentation
-                        .distanceText(
-                            for: item
-                        ) == nil {
+                    if activity == .strength,
+                       let volume =
+                            HomeFollowingWorkoutPresentation
+                                .volumeText(
+                                    for: item
+                                ) {
+                        socialMetric(
+                            volume,
+                            icon:
+                                "scalemass.fill"
+                        )
+                    } else if let subtitle =
+                                item.activity
+                                    .subtitle,
+                              !subtitle.isEmpty,
+                              HomeFollowingWorkoutPresentation
+                                .distanceText(
+                                    for: item
+                                ) == nil {
                         socialMetric(
                             subtitle,
                             icon:
                                 activity.icon
                         )
                     }
+                }
+
+                if activity == .strength,
+                   let strengthText =
+                        HomeFollowingWorkoutPresentation
+                            .strengthDetailText(
+                                for: item
+                            ) {
+                    Text(strengthText)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
                 }
             }
             .padding(16)
@@ -3306,6 +3399,39 @@ private struct HomeFollowingWorkoutDetailView:
                                             "clock"
                                     )
                                 }
+
+                                if activity == .strength,
+                                   let volume =
+                                        HomeFollowingWorkoutPresentation
+                                            .volumeText(
+                                                for:
+                                                    item
+                                            ) {
+                                    detailMetric(
+                                        volume,
+                                        icon:
+                                            "scalemass.fill"
+                                    )
+                                }
+                            }
+
+                            if activity == .strength,
+                               let strengthText =
+                                    HomeFollowingWorkoutPresentation
+                                        .strengthDetailText(
+                                            for: item
+                                        ) {
+                                Text(strengthText)
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .medium
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
                             }
                         }
                     }
