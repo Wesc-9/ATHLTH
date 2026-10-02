@@ -606,7 +606,7 @@ struct WatchRunWorkoutExperienceView: View {
             }
 
             Text(
-                "Swipe for route, Ghost and controls"
+                "Swipe for route, Spotify and controls"
             )
             .font(
                 .system(size: 8)
