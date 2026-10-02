@@ -63,6 +63,7 @@ struct PhoneWorkout: Codable, Identifiable {
     // Optional keeps workouts written by older TestFlight builds decodable.
     // New recordings use this to preserve pause/resume timing in HKWorkoutBuilder.
     var pauses: [PhoneWorkoutPauseInterval]? = nil
+    var autoPauseEnabled: Bool? = nil
     var distanceMeters: Double = 0
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
@@ -135,6 +136,7 @@ final class IPhoneWorkoutStore:
     @Published var showingWorkout = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
+    @Published private(set) var automaticPauseActive = false
     @Published private(set) var completionStartedWorkout: PhoneWorkout?
     @Published private(set) var lastCompletedWorkout: PhoneWorkout?
     @Published private(set)
@@ -151,8 +153,11 @@ final class IPhoneWorkoutStore:
         WatchRouteAlertConfiguration?
     private var pendingGhostAudio:
         WatchGhostRaceAudioConfiguration?
+    private var pendingAutoPauseEnabled: Bool = false
 
     private var lastLocation: CLLocation?
+    private var autoPauseDetector =
+        OutdoorAutoPauseDetector()
     private var plannedRouteLocations: [CLLocation] = []
     private var plannedRouteCumulativeMeters: [Double] = []
     private var plannedRouteGeometryMeters: Double = 0
@@ -300,7 +305,8 @@ final class IPhoneWorkoutStore:
         routeAlerts:
             WatchRouteAlertConfiguration? = nil,
         ghostUpdates:
-            WatchGhostRaceAudioConfiguration? = nil
+            WatchGhostRaceAudioConfiguration? = nil,
+        autoPauseEnabled: Bool = false
     ) {
         guard accountID != nil, !saving else { return }
         showingWorkout = true
@@ -313,6 +319,8 @@ final class IPhoneWorkoutStore:
         pendingStructuredWorkout = structuredWorkout
         pendingRouteAlerts = routeAlerts
         pendingGhostAudio = ghostUpdates
+        pendingAutoPauseEnabled =
+            autoPauseEnabled
 
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
@@ -336,6 +344,8 @@ final class IPhoneWorkoutStore:
             pendingRouteAlerts ?? .standard
         let ghostUpdates =
             pendingGhostAudio
+        let autoPauseEnabled =
+            pendingAutoPauseEnabled
 
         pendingWalking = nil
         pendingRoute = nil
@@ -344,6 +354,7 @@ final class IPhoneWorkoutStore:
         pendingStructuredWorkout = nil
         pendingRouteAlerts = nil
         pendingGhostAudio = nil
+        pendingAutoPauseEnabled = false
 
         cachePlannedRouteGeometry(route)
         resetCoachThresholds(
@@ -363,6 +374,8 @@ final class IPhoneWorkoutStore:
             resumedAt: now,
             lastCheckpoint: now,
             pauses: [],
+            autoPauseEnabled:
+                autoPauseEnabled,
             plannedRouteID: route?.id,
             plannedComparisonRouteID:
                 route?.sharedSourceRouteID ??
@@ -391,6 +404,12 @@ final class IPhoneWorkoutStore:
         )
         message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
+        automaticPauseActive = false
+        autoPauseDetector.reset(
+            enabled: autoPauseEnabled
+        )
+        manager.distanceFilter =
+            autoPauseEnabled ? 1 : 5
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
         persistActiveCheckpoint(force: true)
@@ -415,14 +434,45 @@ final class IPhoneWorkoutStore:
     }
 
     func pause() {
-        guard var workout = active, workout.resumedAt != nil else { return }
+        guard var workout = active else {
+            return
+        }
+
         let now = Date()
-        workout.accumulatedSeconds = workout.elapsed(at: now)
+
+        if automaticPauseActive {
+            // Turning an automatic pause into a manual pause must prevent the
+            // motion detector from resuming the workout behind the user's back.
+            automaticPauseActive = false
+            autoPauseDetector.reset(
+                enabled: false
+            )
+            active = workout
+            manager.stopUpdatingLocation()
+            lastLocation = nil
+            message = ATHLTHLocalization.choose(
+                english: "Workout paused.",
+                norwegian: "Økten er satt på pause."
+            )
+            persistActiveCheckpoint(
+                force: true
+            )
+            syncLiveActivity()
+            return
+        }
+
+        guard workout.resumedAt != nil else {
+            return
+        }
+
+        workout.accumulatedSeconds =
+            workout.elapsed(at: now)
         workout.resumedAt = nil
         workout.lastCheckpoint = now
 
         if var pauses = workout.pauses,
-           pauses.isEmpty || pauses.last?.endedAt != nil {
+           pauses.isEmpty ||
+            pauses.last?.endedAt != nil {
             pauses.append(
                 PhoneWorkoutPauseInterval(
                     startedAt: now,
@@ -433,6 +483,9 @@ final class IPhoneWorkoutStore:
         }
 
         active = workout
+        autoPauseDetector.reset(
+            enabled: false
+        )
         manager.stopUpdatingLocation()
         lastLocation = nil
         persistActiveCheckpoint(force: true)
@@ -462,9 +515,21 @@ final class IPhoneWorkoutStore:
     }
 
     func resume() {
-        guard var workout = active, workout.resumedAt == nil, !saving else { return }
-        guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
-            message = "Allow location access in iPhone Settings before resuming."
+        guard var workout = active,
+              workout.resumedAt == nil,
+              !saving
+        else {
+            return
+        }
+
+        guard
+            manager.authorizationStatus ==
+                .authorizedAlways ||
+            manager.authorizationStatus ==
+                .authorizedWhenInUse
+        else {
+            message =
+                "Allow location access in iPhone Settings before resuming."
             return
         }
 
@@ -480,9 +545,20 @@ final class IPhoneWorkoutStore:
         workout.resumedAt = now
         workout.lastCheckpoint = now
         active = workout
+        automaticPauseActive = false
+        autoPauseDetector.reset(
+            enabled:
+                workout.autoPauseEnabled ??
+                false
+        )
+        manager.distanceFilter =
+            (workout.autoPauseEnabled ?? false)
+                ? 1
+                : 5
         lastLocation = nil
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
+        message = nil
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -507,6 +583,61 @@ final class IPhoneWorkoutStore:
                     .structuredStep
             )
         }
+    }
+
+    private func applyAutomaticPause(
+        workout: inout PhoneWorkout,
+        at date: Date
+    ) {
+        guard workout.resumedAt != nil else {
+            return
+        }
+
+        workout.accumulatedSeconds =
+            workout.elapsed(at: date)
+        workout.resumedAt = nil
+        workout.lastCheckpoint = date
+
+        if var pauses = workout.pauses,
+           pauses.isEmpty ||
+            pauses.last?.endedAt != nil {
+            pauses.append(
+                PhoneWorkoutPauseInterval(
+                    startedAt: date,
+                    endedAt: nil
+                )
+            )
+            workout.pauses = pauses
+        }
+
+        automaticPauseActive = true
+        lastLocation = nil
+        message = ATHLTHLocalization.choose(
+            english: "Auto-pause · waiting for movement",
+            norwegian: "Auto-pause · venter på bevegelse"
+        )
+    }
+
+    private func applyAutomaticResume(
+        workout: inout PhoneWorkout,
+        at date: Date
+    ) {
+        guard automaticPauseActive else {
+            return
+        }
+
+        if var pauses = workout.pauses,
+           let lastIndex = pauses.indices.last,
+           pauses[lastIndex].endedAt == nil {
+            pauses[lastIndex].endedAt = date
+            workout.pauses = pauses
+        }
+
+        workout.resumedAt = date
+        workout.lastCheckpoint = date
+        automaticPauseActive = false
+        lastLocation = nil
+        message = nil
     }
 
     func finish() async {
@@ -3046,24 +3177,57 @@ final class IPhoneWorkoutStore:
     private func accept(
         _ locations: [CLLocation]
     ) {
-        guard var workout = active,
-              let resumedAt =
-                workout.resumedAt
-        else {
+        guard var workout = active else {
             return
         }
 
         var accepted = false
+        var stateChanged = false
 
         for location in locations {
             guard
-                location.timestamp >= resumedAt,
                 abs(
                     location.timestamp
                         .timeIntervalSinceNow
                 ) < 15,
                 location.horizontalAccuracy >= 0,
                 location.horizontalAccuracy <= 30
+            else {
+                continue
+            }
+
+            if workout.autoPauseEnabled == true {
+                if let action =
+                        autoPauseDetector.evaluate(
+                            location,
+                            walking:
+                                workout.walking
+                        ) {
+                    switch action {
+                    case .pause:
+                        applyAutomaticPause(
+                            workout: &workout,
+                            at:
+                                location.timestamp
+                        )
+                        stateChanged = true
+                        continue
+
+                    case .resume:
+                        applyAutomaticResume(
+                            workout: &workout,
+                            at:
+                                location.timestamp
+                        )
+                        stateChanged = true
+                        continue
+                    }
+                }
+            }
+
+            guard let resumedAt =
+                    workout.resumedAt,
+                  location.timestamp >= resumedAt
             else {
                 continue
             }
@@ -3107,22 +3271,30 @@ final class IPhoneWorkoutStore:
                 location: location
             )
             accepted = true
-            message = nil
+
+            if !automaticPauseActive {
+                message = nil
+            }
         }
 
-        guard accepted else {
+        guard accepted || stateChanged else {
             return
         }
 
-        evaluateStructuredWorkout(
-            &workout
-        )
-        evaluateCoachAnnouncements(
-            workout
-        )
+        if accepted {
+            evaluateStructuredWorkout(
+                &workout
+            )
+            evaluateCoachAnnouncements(
+                workout
+            )
+        }
 
         active = workout
-        persistActiveCheckpoint()
+        persistActiveCheckpoint(
+            force: stateChanged
+        )
         syncLiveActivity()
     }
+
 }
