@@ -1401,13 +1401,28 @@ final class HealthKitManager: ObservableObject {
                         wasUserEntered
                 )
 
+            let prestigeAverageSpeed =
+                workout.duration > 0
+                    ? distance /
+                        workout.duration
+                    : .infinity
+            let prestigeEligible =
+                !wasUserEntered &&
+                workout.duration >= 20 * 60 &&
+                prestigeAverageSpeed >= 0.4 &&
+                prestigeAverageSpeed <= 8.0 &&
+                !sourceBundleIdentifier
+                    .isEmpty &&
+                workout.endDate <=
+                    Date().addingTimeInterval(
+                        5 * 60
+                    )
+
             // Gold running trophies require one real HealthKit workout.
-            // Manually entered Health records are intentionally excluded.
+            // Manually entered or implausible workout records are excluded.
             if firstHalfMarathonDate == nil,
                distance >= 21_097.5,
-               !wasUserEntered,
-               workout.duration > 0,
-               !sourceBundleIdentifier.isEmpty {
+               prestigeEligible {
                 firstHalfMarathonDate =
                     workout.endDate
                 firstHalfMarathonEvidence =
@@ -1416,9 +1431,7 @@ final class HealthKitManager: ObservableObject {
 
             if firstMarathonDate == nil,
                distance >= 42_195,
-               !wasUserEntered,
-               workout.duration > 0,
-               !sourceBundleIdentifier.isEmpty {
+               prestigeEligible {
                 firstMarathonDate =
                     workout.endDate
                 firstMarathonEvidence =
