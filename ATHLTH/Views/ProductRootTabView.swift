@@ -4044,7 +4044,29 @@ struct ATHLTHTrainView: View {
                         ) else {
                             return
                         }
-                        startRunQuickWorkout(configuration)
+                        do {
+                            try await WorkoutLaunchCoordinator
+                                .startRunQuick(
+                                    configuration:
+                                        configuration,
+                                    session: session,
+                                    settings: settings,
+                                    gear: gear,
+                                    phoneWorkout:
+                                        phoneWorkout,
+                                    watchConnection:
+                                        watchConnection,
+                                    ghostRace:
+                                        ghostRace
+                                )
+                            _ = await social
+                                .confirmCurrentJoinedWorkoutStarted()
+                        } catch {
+                            await social
+                                .markCurrentJoinedWorkoutLaunchFailed()
+                            watchTransferError =
+                                error.localizedDescription
+                        }
                     }
                 }
             }
@@ -4069,7 +4091,26 @@ struct ATHLTHTrainView: View {
                         ) else {
                             return
                         }
-                        startWalkQuickWorkout(configuration)
+                        do {
+                            try await WorkoutLaunchCoordinator
+                                .startWalkQuick(
+                                    configuration:
+                                        configuration,
+                                    settings: settings,
+                                    gear: gear,
+                                    phoneWorkout:
+                                        phoneWorkout,
+                                    watchConnection:
+                                        watchConnection
+                                )
+                            _ = await social
+                                .confirmCurrentJoinedWorkoutStarted()
+                        } catch {
+                            await social
+                                .markCurrentJoinedWorkoutLaunchFailed()
+                            watchTransferError =
+                                error.localizedDescription
+                        }
                     }
                 }
             }
@@ -4127,9 +4168,29 @@ struct ATHLTHTrainView: View {
                         else {
                             return
                         }
-                        startRunQuickWorkout(
-                            configuration
-                        )
+                        do {
+                            try await WorkoutLaunchCoordinator
+                                .startRunQuick(
+                                    configuration:
+                                        configuration,
+                                    session: session,
+                                    settings: settings,
+                                    gear: gear,
+                                    phoneWorkout:
+                                        phoneWorkout,
+                                    watchConnection:
+                                        watchConnection,
+                                    ghostRace:
+                                        ghostRace
+                                )
+                            _ = await social
+                                .confirmCurrentJoinedWorkoutStarted()
+                        } catch {
+                            await social
+                                .markCurrentJoinedWorkoutLaunchFailed()
+                            watchTransferError =
+                                error.localizedDescription
+                        }
                     }
                 }
             }
