@@ -8401,6 +8401,10 @@ struct CommunityGroupCreateView: View {
     @State private var membersCanCreateContent = true
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var selectedHeaderPhoto: PhotosPickerItem?
+    @State private var selectedHeaderImageData: Data?
+    @State private var selectedHeaderArtwork:
+        ATHLTHStandardArtwork?
     @State private var saving = false
 
     var body: some View {
@@ -8452,6 +8456,27 @@ struct CommunityGroupCreateView: View {
                     .padding(.vertical, 6)
                 } header: {
                     Text("Club photo")
+                }
+
+                Section("Club header") {
+                    CommunityContentCoverPicker(
+                        selectedPhoto:
+                            $selectedHeaderPhoto,
+                        imageData:
+                            $selectedHeaderImageData,
+                        selectedArtwork:
+                            $selectedHeaderArtwork,
+                        placeholderIcon:
+                            "photo.on.rectangle.angled"
+                    )
+
+                    Text(
+                        "Optional. This wide image is used behind the Club identity. If you leave it empty, the Club photo remains the fallback."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
                 Section("Club") {
@@ -8569,7 +8594,12 @@ struct CommunityGroupCreateView: View {
                                 membersCanCreateContent:
                                     membersCanCreateContent,
                                 imageJPEGData:
-                                    selectedImageData
+                                    selectedImageData,
+                                headerImageJPEGData:
+                                    selectedHeaderImageData,
+                                headerArtworkReference:
+                                    selectedHeaderArtwork?
+                                        .reference
                             )
                             saving = false
 
