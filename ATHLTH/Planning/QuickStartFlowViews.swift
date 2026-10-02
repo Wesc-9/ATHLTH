@@ -431,8 +431,8 @@ private struct QuickStartSpotifyCard: View {
                                 Text(
                                     playlist?.name ??
                                     ATHLTHLocalization.choose(
-                                        english: "Choose playlist",
-                                        norwegian: "Velg spilleliste"
+                                        english: "No playlist",
+                                        norwegian: "Ingen spilleliste"
                                     )
                                 )
                                 .font(.subheadline.weight(.semibold))
@@ -741,7 +741,6 @@ struct RunQuickStartSheet: View {
         SpotifyPlaylistReference?
     @State private var spotifyAutoplay = false
     @State private var showingSpotifyPicker = false
-    @State private var didLoadSpotifyDefault = false
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
@@ -984,14 +983,15 @@ struct RunQuickStartSheet: View {
                     didLoadAudioCoachDefaults = true
                 }
 
-                if !didLoadSpotifyDefault {
-                    selectedSpotifyPlaylist =
-                        settings.spotifyDefaultPlaylist
-                    spotifyAutoplay =
-                        settings.spotifyAutoplayLinkedPlaylists &&
-                        selectedSpotifyPlaylist != nil
-                    didLoadSpotifyDefault = true
-                }
+                // Quick workouts are session-local. Re-read the
+                // Settings default every time this sheet is presented so a
+                // playlist chosen for the previous workout is never carried
+                // into a new one unless it is explicitly the global default.
+                selectedSpotifyPlaylist =
+                    settings.spotifyDefaultPlaylist
+                spotifyAutoplay =
+                    settings.spotifyAutoplayLinkedPlaylists &&
+                    selectedSpotifyPlaylist != nil
 
                 if spotify.isConnected &&
                     spotify.playlists.isEmpty {
@@ -2197,14 +2197,14 @@ struct WalkQuickStartSheet: View {
                     didLoadAudioCoachDefaults = true
                 }
 
-                if !didLoadSpotifyDefault {
-                    selectedSpotifyPlaylist =
-                        settings.spotifyDefaultPlaylist
-                    spotifyAutoplay =
-                        settings.spotifyAutoplayLinkedPlaylists &&
-                        selectedSpotifyPlaylist != nil
-                    didLoadSpotifyDefault = true
-                }
+                // Use only the explicit Settings default for a
+                // fresh quick walk; never inherit the previous workout's
+                // temporary playlist selection.
+                selectedSpotifyPlaylist =
+                    settings.spotifyDefaultPlaylist
+                spotifyAutoplay =
+                    settings.spotifyAutoplayLinkedPlaylists &&
+                    selectedSpotifyPlaylist != nil
 
                 if spotify.isConnected &&
                     spotify.playlists.isEmpty {
