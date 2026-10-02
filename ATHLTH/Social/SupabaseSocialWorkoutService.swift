@@ -26,7 +26,8 @@ extension SupabaseSocialService {
             sourceWorkoutID: nil,
             createdAt: now,
             updatedAt: now,
-            invitePayload: invitePayload
+            invitePayload: invitePayload,
+            coordinatedStartAt: nil
         )
 
         try await client
@@ -90,6 +91,99 @@ extension SupabaseSocialService {
             .limit(300)
             .execute()
             .value
+    }
+
+    func loadWorkoutLobby(
+        sessionID: UUID
+    ) async throws -> (
+        SocialWorkoutSessionRecord,
+        [SocialWorkoutParticipantRecord]
+    ) {
+        let sessions: [SocialWorkoutSessionRecord] =
+            try await client
+                .from("social_workout_sessions")
+                .select()
+                .eq("id", value: sessionID)
+                .limit(1)
+                .execute()
+                .value
+
+        guard let session = sessions.first else {
+            throw SocialWorkoutServiceError.workoutSessionUnavailable
+        }
+
+        let participants: [SocialWorkoutParticipantRecord] =
+            try await client
+                .from("social_workout_participants")
+                .select()
+                .eq("session_id", value: sessionID)
+                .order("invited_at", ascending: true)
+                .execute()
+                .value
+
+        return (session, participants)
+    }
+
+    func setWorkoutReady(
+        participantID: UUID,
+        captureDevice: WorkoutCaptureDevice
+    ) async throws {
+        try await client
+            .from("social_workout_participants")
+            .update(
+                WorkoutParticipantReadinessWrite(
+                    readyAt: Date(),
+                    captureDevice:
+                        captureDevice == .appleWatch
+                            ? "apple_watch"
+                            : "iphone"
+                )
+            )
+            .eq("id", value: participantID)
+            .execute()
+    }
+
+    func markWorkoutParticipantStarted(
+        participantID: UUID
+    ) async throws {
+        try await client
+            .from("social_workout_participants")
+            .update(
+                WorkoutParticipantStartedWrite(
+                    workoutStartedAt: Date()
+                )
+            )
+            .eq("id", value: participantID)
+            .execute()
+    }
+
+    func markWorkoutParticipantFinished(
+        participantID: UUID
+    ) async throws {
+        try await client
+            .from("social_workout_participants")
+            .update(
+                WorkoutParticipantFinishedWrite(
+                    workoutFinishedAt: Date()
+                )
+            )
+            .eq("id", value: participantID)
+            .execute()
+    }
+
+    func scheduleWorkoutStart(
+        sessionID: UUID,
+        startAt: Date
+    ) async throws {
+        try await client
+            .from("social_workout_sessions")
+            .update(
+                WorkoutSessionStartWrite(
+                    coordinatedStartAt: startAt
+                )
+            )
+            .eq("id", value: sessionID)
+            .execute()
     }
 
     func respondToWorkoutInvite(
@@ -309,11 +403,14 @@ extension SupabaseSocialService {
 
 enum SocialWorkoutServiceError: LocalizedError {
     case invalidInviteTransition
+    case workoutSessionUnavailable
 
     var errorDescription: String? {
         switch self {
         case .invalidInviteTransition:
             return "That workout invite action is not available."
+        case .workoutSessionUnavailable:
+            return "That Train Together session is no longer available."
         }
     }
 }
@@ -330,6 +427,7 @@ private struct WorkoutSessionWrite: Encodable {
     let createdAt: Date
     let updatedAt: Date?
     let invitePayload: SocialWorkoutInvitePayload?
+    let coordinatedStartAt: Date?
 
     init(record: SocialWorkoutSessionRecord) {
         id = record.id
@@ -343,6 +441,7 @@ private struct WorkoutSessionWrite: Encodable {
         createdAt = record.createdAt
         updatedAt = record.updatedAt
         invitePayload = record.invitePayload
+        coordinatedStartAt = record.coordinatedStartAt
     }
 
     enum CodingKeys: String, CodingKey {
@@ -357,6 +456,7 @@ private struct WorkoutSessionWrite: Encodable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case invitePayload = "invite_payload"
+        case coordinatedStartAt = "coordinated_start_at"
     }
 }
 
@@ -381,6 +481,40 @@ private struct WorkoutParticipantWrite: Encodable {
         case usernameSnapshot = "username_snapshot"
         case invitedAt = "invited_at"
         case respondedAt = "responded_at"
+    }
+}
+
+private struct WorkoutParticipantReadinessWrite: Encodable {
+    let readyAt: Date
+    let captureDevice: String
+
+    enum CodingKeys: String, CodingKey {
+        case readyAt = "ready_at"
+        case captureDevice = "capture_device"
+    }
+}
+
+private struct WorkoutParticipantStartedWrite: Encodable {
+    let workoutStartedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case workoutStartedAt = "workout_started_at"
+    }
+}
+
+private struct WorkoutParticipantFinishedWrite: Encodable {
+    let workoutFinishedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case workoutFinishedAt = "workout_finished_at"
+    }
+}
+
+private struct WorkoutSessionStartWrite: Encodable {
+    let coordinatedStartAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case coordinatedStartAt = "coordinated_start_at"
     }
 }
 
