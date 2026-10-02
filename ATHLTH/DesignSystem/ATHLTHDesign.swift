@@ -1006,3 +1006,303 @@ struct ATHLTHPremiumCanvas: View {
         .ignoresSafeArea()
     }
 }
+
+
+enum ATHLTHStandardArtwork: String, CaseIterable, Identifiable, Codable, Hashable {
+    case sprint
+    case walking
+    case mountain
+    case progress
+    case relax
+    case running
+    case strength
+    case endurance
+    case recovery
+    case consistency
+    case event
+    case adventure
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .sprint: return "Sprint"
+        case .walking: return "Walking"
+        case .mountain: return "Mountain"
+        case .progress: return "Progress"
+        case .relax: return "Relax"
+        case .running: return "Running"
+        case .strength: return "Strength"
+        case .endurance: return "Endurance"
+        case .recovery: return "Recovery"
+        case .consistency: return "Consistency"
+        case .event: return "Event"
+        case .adventure: return "Adventure"
+        }
+    }
+
+    var assetName: String {
+        switch self {
+        case .sprint: return "GoalSprint"
+        case .walking: return "GoalWalking"
+        case .mountain: return "GoalMountain"
+        case .progress: return "GoalProgress"
+        case .relax: return "GoalRelax"
+        case .running: return "GoalRunning"
+        case .strength: return "GoalStrength"
+        case .endurance: return "GoalEndurance"
+        case .recovery: return "GoalRecovery"
+        case .consistency: return "GoalConsistency"
+        case .event: return "GoalEvent"
+        case .adventure: return "GoalAdventure"
+        }
+    }
+
+    var fallbackAssetName: String {
+        switch self {
+        case .sprint, .running, .endurance:
+            return "TrainHero"
+        case .walking, .progress, .consistency:
+            return "HomeHero"
+        case .mountain, .adventure, .event:
+            return "OnboardingHero"
+        case .relax, .recovery:
+            return "RecoveryHero"
+        case .strength:
+            return "StrengthPostWorkoutHero"
+        }
+    }
+
+    var reference: String {
+        "athlth-asset://\(assetName)"
+    }
+
+    init?(reference: String?) {
+        guard
+            let reference,
+            reference.hasPrefix("athlth-asset://")
+        else {
+            return nil
+        }
+
+        let assetName =
+            String(
+                reference.dropFirst(
+                    "athlth-asset://".count
+                )
+            )
+
+        guard let match =
+                Self.allCases.first(
+                    where: {
+                        $0.assetName ==
+                            assetName
+                    }
+                )
+        else {
+            return nil
+        }
+
+        self = match
+    }
+
+    var resolvedUIImage: UIImage? {
+        if let image =
+                UIImage(named: assetName),
+           image.size.width > 8,
+           image.size.height > 8 {
+            return image
+        }
+
+        return UIImage(
+            named: fallbackAssetName
+        )
+    }
+}
+
+struct ATHLTHArtworkImage: View {
+    let reference: String?
+    var fallbackAssetName: String = "CommunityHero"
+
+    var body: some View {
+        Group {
+            if let artwork =
+                    ATHLTHStandardArtwork(
+                        reference: reference
+                    ),
+               let image =
+                    artwork.resolvedUIImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let reference,
+                      let url =
+                        URL(string: reference),
+                      ["http", "https"]
+                        .contains(
+                            url.scheme?
+                                .lowercased() ?? ""
+                        ) {
+                AsyncImage(url: url) {
+                    phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        Image(
+                            fallbackAssetName
+                        )
+                        .resizable()
+                        .scaledToFill()
+                    }
+                }
+            } else {
+                Image(fallbackAssetName)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+    }
+}
+
+struct ATHLTHStandardArtworkPicker: View {
+    @Binding var selection:
+        ATHLTHStandardArtwork?
+
+    var body: some View {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 10) {
+                ForEach(
+                    ATHLTHStandardArtwork
+                        .allCases
+                ) { artwork in
+                    let isSelected =
+                        selection == artwork
+
+                    Button {
+                        selection = artwork
+                    } label: {
+                        ZStack(
+                            alignment:
+                                .bottomLeading
+                        ) {
+                            if let image =
+                                    artwork
+                                        .resolvedUIImage {
+                                Image(
+                                    uiImage:
+                                        image
+                                )
+                                .resizable()
+                                .scaledToFill()
+                            } else {
+                                ATHLTHTheme
+                                    .accentSoft
+                            }
+
+                            LinearGradient(
+                                colors: [
+                                    .clear,
+                                    .black
+                                        .opacity(
+                                            0.64
+                                        )
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+
+                            Text(
+                                artwork.title
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .padding(8)
+
+                            if isSelected {
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 18,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .shadow(
+                                    color:
+                                        .black
+                                        .opacity(
+                                            0.18
+                                        ),
+                                    radius: 3
+                                )
+                                .padding(7)
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    maxHeight:
+                                        .infinity,
+                                    alignment:
+                                        .topTrailing
+                                )
+                            }
+                        }
+                        .frame(
+                            width: 116,
+                            height: 76
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                            .stroke(
+                                isSelected
+                                    ? ATHLTHTheme
+                                        .accentDeep
+                                    : Color.black
+                                        .opacity(
+                                            0.055
+                                        ),
+                                lineWidth:
+                                    isSelected
+                                        ? 2
+                                        : 0.7
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(
+                .vertical,
+                2
+            )
+        }
+    }
+}
