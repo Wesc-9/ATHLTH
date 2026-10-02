@@ -319,6 +319,30 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         }
+        // A strength workout is a true full-screen surface. Spotify can
+        // temporarily move ATHLTH to the background while App Remote wakes the
+        // Spotify app. When iOS restores this fullScreenCover, an explicit
+        // opaque canvas prevents the underlying Home/Train hierarchy and tab
+        // bar from being composited through the workout.
+        .background {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.22)
+            )
+        }
+        .toolbarBackground(
+            ATHLTHTheme.canvasTop,
+            for: .navigationBar
+        )
+        .toolbarBackground(
+            .visible,
+            for: .navigationBar
+        )
+        .presentationBackground(
+            ATHLTHTheme.canvasTop
+        )
     }
 
     @MainActor
