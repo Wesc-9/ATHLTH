@@ -179,18 +179,13 @@ struct AppRootView: View {
     private func handleWatchSpotifyCommand(
         _ command: WatchSpotifyCommand
     ) {
-        switch command.kind {
-        case .requestState:
-            break
-        case .pause:
-            spotifyPlayback.pause()
-        case .resume:
-            spotifyPlayback.resume()
-        case .next:
-            spotifyPlayback.skipToNext()
+        Task { @MainActor in
+            await spotifyPlayback
+                .handleWatchRemoteCommand(
+                    command.kind
+                )
+            syncSpotifyPlaybackToWatch()
         }
-
-        syncSpotifyPlaybackToWatch()
     }
 
     private func syncSpotifyPlaybackToWatch() {
