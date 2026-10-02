@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ActiveStrengthWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,6 +14,13 @@ struct ActiveStrengthWorkoutView: View {
     @State private var finishInProgress = false
     @State private var showingExerciseLibrary = false
     @State private var pendingExercise: ExerciseLibraryEntry?
+    @StateObject private var strengthCoach =
+        StrengthAudioCoachSpeaker()
+    @State private var restCueTask:
+        Task<Void, Never>?
+    @State private var statusCoachTask:
+        Task<Void, Never>?
+    @State private var didDisableIdleTimer = false
 
     var body: some View {
         NavigationStack {
@@ -107,14 +115,380 @@ struct ActiveStrengthWorkoutView: View {
             }
             .onAppear {
                 loadDefaultsFromCurrentSet()
+                configureAdvancedRuntime()
+                scheduleRestCues(
+                    for: strength.restEndsAt
+                )
+                scheduleStatusCoach()
+            }
+            .onDisappear {
+                restCueTask?.cancel()
+                statusCoachTask?.cancel()
+                strengthCoach.stop()
+
+                if didDisableIdleTimer {
+                    UIApplication.shared
+                        .isIdleTimerDisabled = false
+                    didDisableIdleTimer = false
+                }
             }
             .onChange(of: strength.currentSetIndex) {
                 loadDefaultsFromCurrentSet()
             }
-            .onChange(of: strength.currentExerciseIndex) {
+            .onChange(
+                of: strength.currentExerciseIndex
+            ) { oldValue, newValue in
                 loadDefaultsFromCurrentSet()
+                guard oldValue != newValue else {
+                    return
+                }
+                announceNextExerciseIfNeeded()
+            }
+            .onChange(
+                of:
+                    strength
+                        .activeWorkout?
+                        .totalCompletedSets
+            ) { oldValue, newValue in
+                guard let oldValue,
+                      let newValue,
+                      newValue > oldValue
+                else {
+                    return
+                }
+
+                announceCompletedSetIfNeeded()
+            }
+            .onChange(
+                of: strength.restEndsAt
+            ) { _, newValue in
+                scheduleRestCues(
+                    for: newValue
+                )
             }
         }
+    }
+
+    @MainActor
+    private func configureAdvancedRuntime() {
+        guard let workout =
+                strength.activeWorkout,
+              workout.trackingMode ==
+                .advanced,
+              let configuration =
+                workout
+                    .advancedConfiguration
+        else {
+            return
+        }
+
+        if configuration.keepScreenAwake {
+            UIApplication.shared
+                .isIdleTimerDisabled = true
+            didDisableIdleTimer = true
+        }
+
+        if workout.captureDevice == .iPhone,
+           configuration.audioCoach.enabled {
+            strengthCoach.speak(
+                english:
+                    "Audio Coach is ready for your strength workout.",
+                norwegian:
+                    "Audio Coach er klar for styrkeøkten din.",
+                configuration:
+                    configuration.audioCoach
+            )
+        }
+    }
+
+    @MainActor
+    private func announceCompletedSetIfNeeded() {
+        guard let workout =
+                strength.activeWorkout,
+              workout.captureDevice ==
+                .iPhone,
+              let configuration =
+                workout
+                    .advancedConfiguration,
+              configuration.audioCoach.enabled,
+              configuration.audioCoach
+                .announceSetComplete,
+              let completed =
+                workout.exercises
+                    .flatMap(\.sets)
+                    .filter(\.isCompleted)
+                    .max(
+                        by: {
+                            ($0.completedAt ?? .distantPast) <
+                            ($1.completedAt ?? .distantPast)
+                        }
+                    )
+        else {
+            return
+        }
+
+        let setNumber =
+            completed.setNumber
+
+        if let reps =
+                completed.completedReps,
+           let weight =
+                completed
+                    .completedWeightKilograms {
+            let formattedWeight =
+                weight.rounded() == weight
+                    ? String(
+                        Int(weight)
+                    )
+                    : String(
+                        format: "%.1f",
+                        weight
+                    )
+
+            strengthCoach.speak(
+                english:
+                    "Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.",
+                norwegian:
+                    "Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo.",
+                configuration:
+                    configuration.audioCoach
+            )
+        } else {
+            strengthCoach.speak(
+                english:
+                    "Set \(setNumber) complete.",
+                norwegian:
+                    "Sett \(setNumber) fullført.",
+                configuration:
+                    configuration.audioCoach
+            )
+        }
+    }
+
+    @MainActor
+    private func announceNextExerciseIfNeeded() {
+        guard let workout =
+                strength.activeWorkout,
+              workout.captureDevice ==
+                .iPhone,
+              let configuration =
+                workout
+                    .advancedConfiguration,
+              configuration.audioCoach.enabled,
+              configuration.audioCoach
+                .announceNextExercise,
+              let exercise =
+                strength.currentExercise
+        else {
+            return
+        }
+
+        strengthCoach.speak(
+            english:
+                "Next exercise. \(exercise.exercise.name).",
+            norwegian:
+                "Neste øvelse. \(exercise.exercise.name).",
+            configuration:
+                configuration.audioCoach
+        )
+    }
+
+    @MainActor
+    private func scheduleRestCues(
+        for restEndsAt: Date?
+    ) {
+        restCueTask?.cancel()
+        restCueTask = nil
+
+        guard let restEndsAt,
+              let workout =
+                strength.activeWorkout,
+              workout.captureDevice ==
+                .iPhone,
+              let configuration =
+                workout
+                    .advancedConfiguration,
+              configuration.restCues
+                .automaticRestTimer
+        else {
+            return
+        }
+
+        let coachConfiguration =
+            configuration.audioCoach
+        let countdownSeconds =
+            coachConfiguration
+                .restCountdownSeconds
+        let initialRemaining =
+            max(
+                Int(
+                    restEndsAt
+                        .timeIntervalSinceNow
+                        .rounded()
+                ),
+                0
+            )
+
+        if coachConfiguration.enabled &&
+            coachConfiguration
+                .announceRestStarted {
+            strengthCoach.speak(
+                english:
+                    "Rest started. \(initialRemaining) seconds.",
+                norwegian:
+                    "Hvile startet. \(initialRemaining) sekunder.",
+                configuration:
+                    coachConfiguration
+            )
+        }
+
+        restCueTask =
+            Task { @MainActor in
+                let countdownDelay =
+                    restEndsAt
+                        .timeIntervalSinceNow -
+                    TimeInterval(
+                        countdownSeconds
+                    )
+
+                if countdownDelay > 0 {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                countdownDelay
+                            )
+                    )
+                }
+
+                guard !Task.isCancelled,
+                      strength.restEndsAt ==
+                        restEndsAt
+                else {
+                    return
+                }
+
+                if coachConfiguration.enabled &&
+                    coachConfiguration
+                        .announceRestCountdown {
+                    strengthCoach.speak(
+                        english:
+                            "\(countdownSeconds) seconds left.",
+                        norwegian:
+                            "\(countdownSeconds) sekunder igjen.",
+                        configuration:
+                            coachConfiguration
+                    )
+                }
+
+                let finalDelay =
+                    restEndsAt
+                        .timeIntervalSinceNow
+
+                if finalDelay > 0 {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                finalDelay
+                            )
+                    )
+                }
+
+                guard !Task.isCancelled,
+                      strength.restEndsAt ==
+                        restEndsAt
+                else {
+                    return
+                }
+
+                if configuration
+                    .restCues
+                    .hapticsEnabled {
+                    UINotificationFeedbackGenerator()
+                        .notificationOccurred(
+                            .success
+                        )
+                }
+
+                if coachConfiguration.enabled &&
+                    coachConfiguration
+                        .announceRestComplete {
+                    strengthCoach.speak(
+                        english:
+                            "Rest complete. Ready for the next set.",
+                        norwegian:
+                            "Hvilen er ferdig. Klar for neste sett.",
+                        configuration:
+                            coachConfiguration
+                    )
+                }
+            }
+    }
+
+    @MainActor
+    private func scheduleStatusCoach() {
+        statusCoachTask?.cancel()
+        statusCoachTask = nil
+
+        guard let workout =
+                strength.activeWorkout,
+              workout.captureDevice ==
+                .iPhone,
+              let configuration =
+                workout
+                    .advancedConfiguration,
+              configuration.audioCoach.enabled,
+              configuration.audioCoach
+                .announceWorkoutStatus
+        else {
+            return
+        }
+
+        let interval =
+            max(
+                configuration.audioCoach
+                    .workoutStatusIntervalMinutes,
+                5
+            )
+
+        statusCoachTask =
+            Task { @MainActor in
+                while !Task.isCancelled {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                Double(
+                                    interval *
+                                    60
+                                )
+                            )
+                    )
+
+                    guard !Task.isCancelled,
+                          let active =
+                            strength.activeWorkout,
+                          active.id ==
+                            workout.id
+                    else {
+                        return
+                    }
+
+                    let exerciseName =
+                        strength
+                            .currentExercise?
+                            .exercise
+                            .name ??
+                        active.title
+
+                    strengthCoach.speak(
+                        english:
+                            "\(active.totalCompletedSets) sets complete. Current exercise: \(exerciseName).",
+                        norwegian:
+                            "\(active.totalCompletedSets) sett fullført. Nåværende øvelse: \(exerciseName).",
+                        configuration:
+                            configuration.audioCoach
+                    )
+                }
+            }
     }
 
     @MainActor
@@ -346,8 +720,14 @@ struct ActiveStrengthWorkoutView: View {
             .padding(.top, 10)
         }
 
-        if strength.currentExerciseAllSetsCompleted {
-            exerciseCompleteControls(workout: workout)
+        if !canLogOnIPhone(workout) {
+            watchInputCompanionCard(
+                workout: workout
+            )
+        } else if strength.currentExerciseAllSetsCompleted {
+            exerciseCompleteControls(
+                workout: workout
+            )
         } else if strength.isResting {
             restControls
         } else {
@@ -426,6 +806,97 @@ struct ActiveStrengthWorkoutView: View {
         }
 
         return snapshot
+    }
+
+    private func canLogOnIPhone(
+        _ workout: StrengthWorkoutLog
+    ) -> Bool {
+        guard workout.captureDevice ==
+                .appleWatch
+        else {
+            return true
+        }
+
+        return
+            workout
+                .advancedConfiguration?
+                .inputMode != .appleWatch
+    }
+
+    @ViewBuilder
+    private func watchInputCompanionCard(
+        workout: StrengthWorkoutLog
+    ) -> some View {
+        ATHLTHCard {
+            VStack(spacing: 10) {
+                Image(systemName: "applewatch")
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Log this set on Apple Watch",
+                        norwegian:
+                            "Registrer dette settet på Apple Watch"
+                    )
+                )
+                .font(.headline)
+                .multilineTextAlignment(.center)
+
+                if let restEndsAt =
+                        strength.restEndsAt {
+                    TimelineView(
+                        .periodic(
+                            from: .now,
+                            by: 1
+                        )
+                    ) { context in
+                        let remaining =
+                            max(
+                                restEndsAt
+                                    .timeIntervalSince(
+                                        context.date
+                                    ),
+                                0
+                            )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Rest · \(remaining.clockDuration)",
+                                norwegian:
+                                    "Hvile · \(remaining.clockDuration)"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .monospacedDigit()
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+                } else {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "iPhone stays synchronized and can still add exercises or finish the workout.",
+                            norwegian:
+                                "iPhone holdes synkronisert og kan fortsatt legge til øvelser eller avslutte økten."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     @ViewBuilder
