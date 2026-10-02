@@ -9,7 +9,7 @@ from pathlib import Path
 
 SIZE = 1024
 SOURCE = Path("ATHLTH/Brand/AppIconSource/ATHLTH-AppIcon-Source-1024.png")
-EXPECTED_SOURCE_SHA256 = "0e76317bfdd07c525378453bc94f5ba7e05f3fea5e5765154691dd2c96f9748d"
+EXPECTED_SOURCE_SHA256 = "4e390d68b1c14b0ca29e1b52c18ecbb94a90305b36d0bd91c122a26ace3ceef0"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
