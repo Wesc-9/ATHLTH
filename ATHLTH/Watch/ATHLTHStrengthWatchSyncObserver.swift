@@ -8,7 +8,6 @@ struct ATHLTHStrengthWatchSyncObserver: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
-    @State private var processedCommandIDs: Set<UUID> = []
     @State private var pendingDraftSnapshotTask: Task<Void, Never>?
     @State private var lastStrengthMutationAtByWorkout:
         [UUID: Date] = [:]
@@ -18,18 +17,22 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
             .task {
+                drainPendingCommands()
                 sendSnapshotNow()
             }
             .onDisappear {
                 pendingDraftSnapshotTask?.cancel()
                 pendingDraftSnapshotTask = nil
             }
-            .onChange(of: watchConnection.lastStrengthCommand) { _, command in
-                guard let command else { return }
-                handle(command)
-                watchConnection.clearStrengthCommand()
+            .onChange(
+                of:
+                    watchConnection
+                        .pendingStrengthCommands
+            ) { _, _ in
+                drainPendingCommands()
             }
             .onChange(of: strengthWorkout.activeWorkout) { _, _ in
+                drainPendingCommands()
                 sendSnapshotNow()
             }
             .onChange(of: strengthWorkout.currentExerciseIndex) { _, _ in
@@ -64,39 +67,38 @@ struct ATHLTHStrengthWatchSyncObserver: View {
     @MainActor
     private func handle(
         _ command: WatchStrengthCommand
-    ) {
-        guard !processedCommandIDs.contains(command.id) else {
-            return
-        }
-
-        processedCommandIDs.insert(command.id)
-        if processedCommandIDs.count > 200 {
-            processedCommandIDs =
-                Set(processedCommandIDs.suffix(100))
-        }
-
+    ) -> Bool {
         if command.kind == .requestSnapshot {
             sendSnapshotNow()
-            return
+            return true
         }
 
-        guard let workout = strengthWorkout.activeWorkout,
-              workout.captureDevice == .appleWatch
+        guard let workout =
+                strengthWorkout.activeWorkout
         else {
-            return
+            // Keep queued commands until account/workout checkpoint restore has
+            // had a chance to recreate the authoritative iPhone strength log.
+            return false
+        }
+
+        guard workout.captureDevice ==
+                .appleWatch
+        else {
+            sendSnapshotNow()
+            return true
         }
 
         if workout
             .advancedConfiguration?
             .inputMode == .iPhone {
             sendSnapshotNow()
-            return
+            return true
         }
 
         if let workoutID = command.workoutID,
            workoutID != workout.id {
             sendSnapshotNow()
-            return
+            return true
         }
 
         let setScopedCommand =
@@ -112,7 +114,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 strengthWorkout
                     .currentExerciseIndex {
             sendSnapshotNow()
-            return
+            return true
         }
 
         if setScopedCommand,
@@ -122,7 +124,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 strengthWorkout
                     .currentSetIndex {
             sendSnapshotNow()
-            return
+            return true
         }
 
         if command.kind == .nextExercise,
@@ -132,7 +134,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 strengthWorkout
                     .currentExerciseIndex {
             sendSnapshotNow()
-            return
+            return true
         }
 
         if command.kind == .updateDraft,
@@ -145,18 +147,27 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             // must never arrive later and overwrite the new authoritative
             // iPhone state.
             sendSnapshotNow()
-            return
+            return true
         }
 
         switch command.kind {
         case .updateDraft:
+            guard command.sentAt >=
+                    strengthWorkout
+                        .lastPhoneDraftMutationAt
+            else {
+                sendSnapshotNow()
+                return true
+            }
+
             strengthWorkout.setDraft(
                 reps: command.reps,
                 weightKilograms: command.weightKilograms,
                 restSeconds: command.restSeconds,
                 rpe: command.rpe,
                 rir: command.rir,
-                warmUp: command.isWarmUp
+                warmUp: command.isWarmUp,
+                origin: .watch
             )
 
         case .completeSet:
@@ -166,7 +177,8 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 restSeconds: command.restSeconds,
                 rpe: command.rpe,
                 rir: command.rir,
-                warmUp: command.isWarmUp
+                warmUp: command.isWarmUp,
+                origin: .watch
             )
             strengthWorkout.completeCurrentDraftSet()
 
@@ -213,6 +225,24 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         // resulting state immediately. Only free-form draft edits are
         // coalesced.
         sendSnapshotNow()
+        return true
+    }
+
+    @MainActor
+    private func drainPendingCommands() {
+        while let command =
+                watchConnection
+                    .pendingStrengthCommands
+                    .first {
+            guard handle(command) else {
+                break
+            }
+
+            watchConnection
+                .consumeStrengthCommand(
+                    command.id
+                )
+        }
     }
 
     @MainActor
