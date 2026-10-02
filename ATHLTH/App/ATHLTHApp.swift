@@ -1716,7 +1716,9 @@ struct AppRootView: View {
             strength: strengthWorkout,
             goals: goals,
             challenges: challengeStore,
-            currentUserID: appSession.profile.userID
+            currentUserID: appSession.profile.userID,
+            username:
+                appSession.profile.username
         )
         notifications.syncTrophyEvents(from: trophies.unlocks)
     }
