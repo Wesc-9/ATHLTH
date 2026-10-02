@@ -222,6 +222,19 @@ struct ActiveStrengthWorkoutView: View {
                 loadDefaultsFromCurrentSet()
             }
             .onChange(
+                of:
+                    strength
+                        .activeWorkout?
+                        .trackingMode
+            ) { _, newValue in
+                guard newValue == .advanced else {
+                    return
+                }
+
+                configureAdvancedRuntime()
+                scheduleStatusCoach()
+            }
+            .onChange(
                 of: strength.currentExerciseIndex
             ) { oldValue, newValue in
                 loadDefaultsFromCurrentSet()
