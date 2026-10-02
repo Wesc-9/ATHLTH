@@ -9675,7 +9675,9 @@ struct ATHLTHProfileView: View {
                 ),
             destination:
                 AnyView(
-                    TrophyCollectionView()
+                    TrophyCollectionView(
+                        startInCabinet: true
+                    )
                 )
         ) {
             HStack(
@@ -9735,7 +9737,9 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
                     } else {
                         NavigationLink {
-                            TrophyCollectionView()
+                            TrophyCollectionView(
+                        startInCabinet: true
+                    )
                         } label: {
                             VStack(
                                 spacing: 8
