@@ -827,9 +827,12 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         startDate = strengthWorkout.startedAt
         endDate = strengthWorkout.endedAt ?? strengthWorkout.startedAt
         duration = max(
-            (strengthWorkout.endedAt ?? strengthWorkout.startedAt)
-                .timeIntervalSince(strengthWorkout.startedAt),
-            0
+            max(
+                (strengthWorkout.endedAt ?? strengthWorkout.startedAt)
+                    .timeIntervalSince(strengthWorkout.startedAt),
+                0
+            ),
+            strengthWorkout.healthMetrics.duration ?? 0
         )
         distanceMeters = nil
         activeEnergyKilocalories = strengthWorkout.healthMetrics.activeCalories
