@@ -233,6 +233,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if !configuration.enabled {
             audioCoachReadyAnnouncedForWorkout = false
+            strengthRestCoachTask?.cancel()
+            strengthRestCoachTask = nil
+            strengthStatusCoachTask?.cancel()
+            strengthStatusCoachTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
             return
@@ -275,6 +279,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if !configuration.enabled {
             audioCoachReadyAnnouncedForWorkout = false
+            strengthRestCoachTask?.cancel()
+            strengthRestCoachTask = nil
+            strengthStatusCoachTask?.cancel()
+            strengthStatusCoachTask = nil
             speechSynthesizer.stopSpeaking(at: .immediate)
             deactivateAudioCoachAudioSession()
         } else {
