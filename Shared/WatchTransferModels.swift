@@ -378,6 +378,17 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
 
+    // Strength-specific Audio Coach cues. Optional fields keep older queued
+    // Watch payloads and persisted configurations backwards compatible.
+    var announceStrengthSetComplete: Bool? = nil
+    var announceStrengthRestStarted: Bool? = nil
+    var announceStrengthRestCountdown: Bool? = nil
+    var announceStrengthRestComplete: Bool? = nil
+    var announceStrengthNextExercise: Bool? = nil
+    var strengthStatusIntervalSeconds: TimeInterval? = nil
+    var strengthRestCountdownSeconds: Int? = nil
+    var strengthHapticsEnabled: Bool? = nil
+
     var shouldDuckOtherAudio: Bool {
         duckOtherAudio ?? true
     }
@@ -423,6 +434,34 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
 
     var shouldAnnounceWorkoutComplete: Bool {
         announceWorkoutComplete ?? true
+    }
+
+    var shouldAnnounceStrengthSetComplete: Bool {
+        announceStrengthSetComplete ?? false
+    }
+
+    var shouldAnnounceStrengthRestStarted: Bool {
+        announceStrengthRestStarted ?? false
+    }
+
+    var shouldAnnounceStrengthRestCountdown: Bool {
+        announceStrengthRestCountdown ?? false
+    }
+
+    var shouldAnnounceStrengthRestComplete: Bool {
+        announceStrengthRestComplete ?? false
+    }
+
+    var shouldAnnounceStrengthNextExercise: Bool {
+        announceStrengthNextExercise ?? false
+    }
+
+    var resolvedStrengthRestCountdownSeconds: Int {
+        min(max(strengthRestCountdownSeconds ?? 10, 3), 30)
+    }
+
+    var shouldUseStrengthHaptics: Bool {
+        strengthHapticsEnabled ?? true
     }
 
     static let disabled = WatchAudioCoachConfiguration(
@@ -771,6 +810,34 @@ struct WatchWorkoutLapSummary: Codable, Hashable {
     var averagePaceSecondsPerKilometer: TimeInterval?
 }
 
+enum WatchStrengthInputMode:
+    String,
+    Codable,
+    CaseIterable,
+    Hashable,
+    Identifiable
+{
+    case both
+    case iPhone
+    case appleWatch
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .both:
+            return ATHLTHLocalization.choose(
+                english: "Both",
+                norwegian: "Begge"
+            )
+        case .iPhone:
+            return "iPhone"
+        case .appleWatch:
+            return "Apple Watch"
+        }
+    }
+}
+
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var workoutID: UUID
     var title: String
@@ -792,6 +859,7 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var hasNextExercise: Bool
     var allExercisesComplete: Bool
     var updatedAt: Date
+    var inputMode: WatchStrengthInputMode? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
