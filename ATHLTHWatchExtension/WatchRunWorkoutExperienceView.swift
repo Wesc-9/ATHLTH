@@ -33,8 +33,11 @@ struct WatchRunWorkoutExperienceView: View {
                     routePage
                         .tag(2)
 
-                    controlsPage
+                    WatchSpotifyRemotePage()
                         .tag(3)
+
+                    controlsPage
+                        .tag(4)
                 }
                 .tabViewStyle(
                     .verticalPage
@@ -826,7 +829,7 @@ struct WatchRunWorkoutExperienceView: View {
         .watchSurface(radius: 17)
     }
 
-    // MARK: - Page 4: controls
+    // MARK: - Page 5: controls
 
     private var controlsPage: some View {
         VStack(spacing: 9) {
