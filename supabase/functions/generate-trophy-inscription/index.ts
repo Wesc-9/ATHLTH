@@ -401,11 +401,7 @@ Deno.serve(
 
     if (
       award.engraving_achievement &&
-      award.engraving_text &&
-      Number(
-        award.engraving_version ??
-          0,
-      ) >= ENGRAVING_VERSION
+      award.engraving_text
     ) {
       return json({
         athlete:
