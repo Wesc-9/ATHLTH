@@ -4,6 +4,7 @@ struct WorkoutStartOptionsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -12,7 +13,8 @@ struct WorkoutStartOptionsView: View {
         WorkoutCaptureDevice,
         StrengthTrackingMode,
         [SocialProfileCard],
-        WatchAudioCoachConfiguration
+        WatchAudioCoachConfiguration,
+        StrengthAdvancedConfiguration
     ) -> Void
 
     @State private var captureDevice: WorkoutCaptureDevice
@@ -20,6 +22,22 @@ struct WorkoutStartOptionsView: View {
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var audioCoachLoaded = false
+    @State private var strengthAudioCoach =
+        StrengthAudioCoachConfiguration()
+    @State private var restCues =
+        StrengthRestCueConfiguration()
+    @State private var selectedSpotifyPlaylist:
+        SpotifyPlaylistReference?
+    @State private var spotifyAutoplay = false
+    @State private var keepScreenAwake = false
+    @State private var inputMode:
+        WatchStrengthInputMode = .both
+
+    @State private var showingSpotifyPicker = false
+    @State private var showingAudioCoachSettings = false
+    @State private var showingRestCueSettings = false
+    @State private var showingTrainingPartners = false
+    @State private var showingDisplayControls = false
 
     init(
         session: PlannedSession,
@@ -31,7 +49,8 @@ struct WorkoutStartOptionsView: View {
             WorkoutCaptureDevice,
             StrengthTrackingMode,
             [SocialProfileCard],
-            WatchAudioCoachConfiguration
+            WatchAudioCoachConfiguration,
+            StrengthAdvancedConfiguration
         ) -> Void
     ) {
         self.session = session
@@ -48,6 +67,15 @@ struct WorkoutStartOptionsView: View {
         _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
             initialValue: defaultTracking == .advanced ? .advanced : .simple
+        )
+        _selectedSpotifyPlaylist = State(
+            initialValue:
+                session.spotifyPlaylist
+        )
+        _spotifyAutoplay = State(
+            initialValue:
+                session.spotifyAutoplayOnStart ??
+                (session.spotifyPlaylist != nil)
         )
     }
 
@@ -127,22 +155,84 @@ struct WorkoutStartOptionsView: View {
                     }
 
                     if trackingMode == .advanced {
-                        VStack(spacing: 12) {
-                            if captureDevice == .appleWatch {
-                                AudioCoachSetupCard(
-                                    draft:
-                                        $audioCoachDraft,
-                                    showRouteOptions: false,
-                                    showStructuredOptions:
-                                        false
-                                )
+                        VStack(spacing: 9) {
+                            advancedOptionButton(
+                                title: "Spotify",
+                                subtitle:
+                                    spotifySummary,
+                                icon: "music.note",
+                                tint: Color.green
+                            ) {
+                                showingSpotifyPicker = true
                             }
 
-                            ATHLTHCard {
-                                WorkoutFriendPicker(
-                                    selectedFriendIDs:
-                                        $selectedFriendIDs
-                                )
+                            advancedOptionButton(
+                                title: "Audio Coach",
+                                subtitle:
+                                    strengthAudioCoach.enabled
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Strength cues on",
+                                            norwegian: "Styrkevarsler på"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Off",
+                                            norwegian: "Av"
+                                        ),
+                                icon: "waveform.and.mic",
+                                tint: ATHLTHTheme.premiumGold
+                            ) {
+                                showingAudioCoachSettings = true
+                            }
+
+                            advancedOptionButton(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Rest & cues",
+                                        norwegian: "Hvile & varsler"
+                                    ),
+                                subtitle:
+                                    restCueSummary,
+                                icon: "timer",
+                                tint: ATHLTHTheme.accent
+                            ) {
+                                showingRestCueSettings = true
+                            }
+
+                            advancedOptionButton(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Train Together",
+                                        norwegian: "Tren sammen"
+                                    ),
+                                subtitle:
+                                    selectedFriendIDs.isEmpty
+                                        ? ATHLTHLocalization.choose(
+                                            english: "No one selected",
+                                            norwegian: "Ingen valgt"
+                                        )
+                                        : ATHLTHLocalization.format(
+                                            english: "%d selected",
+                                            norwegian: "%d valgt",
+                                            selectedFriendIDs.count
+                                        ),
+                                icon: "person.2.fill",
+                                tint: ATHLTHTheme.vitality
+                            ) {
+                                showingTrainingPartners = true
+                            }
+
+                            advancedOptionButton(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Display & input",
+                                        norwegian: "Skjerm & registrering"
+                                    ),
+                                subtitle:
+                                    displayControlSummary,
+                                icon: "rectangle.and.hand.point.up.left.fill",
+                                tint: ATHLTHTheme.accentDeep
+                            ) {
+                                showingDisplayControls = true
                             }
                         }
                         .transition(
@@ -167,16 +257,37 @@ struct WorkoutStartOptionsView: View {
                                     }
                                 : []
 
+                        let advancedConfiguration =
+                            StrengthAdvancedConfiguration(
+                                spotifyPlaylist:
+                                    trackingMode == .advanced
+                                        ? selectedSpotifyPlaylist
+                                        : nil,
+                                spotifyAutoplay:
+                                    trackingMode == .advanced &&
+                                    spotifyAutoplay,
+                                audioCoach:
+                                    strengthAudioCoach,
+                                restCues:
+                                    restCues,
+                                keepScreenAwake:
+                                    trackingMode == .advanced &&
+                                    keepScreenAwake,
+                                inputMode:
+                                    captureDevice == .appleWatch
+                                        ? inputMode
+                                        : .iPhone
+                            )
+
                         onStart(
                             captureDevice,
                             trackingMode,
                             selectedFriends,
-                            trackingMode == .advanced &&
-                                captureDevice ==
-                                .appleWatch
-                                ? audioCoachDraft
-                                    .configuration()
-                                : .disabled
+                            trackingMode == .advanced
+                                ? strengthAudioCoach
+                                    .watchConfiguration
+                                : .disabled,
+                            advancedConfiguration
                         )
                         dismiss()
                     } label: {
@@ -227,12 +338,113 @@ struct WorkoutStartOptionsView: View {
                     audioCoachDraft.load(
                         from: settings
                     )
+                    strengthAudioCoach.language =
+                        settings.audioCoachLanguage
+                    strengthAudioCoach.voiceIdentifier =
+                        settings.audioCoachVoiceIdentifier
+                    strengthAudioCoach.speechRate =
+                        settings.audioCoachSpeechRate
+                    strengthAudioCoach.speechVolume =
+                        settings.audioCoachSpeechVolume
+                    strengthAudioCoach.duckOtherAudio =
+                        settings.audioCoachDuckOtherAudio
                     audioCoachLoaded = true
+                }
+
+                if spotify.isConnected &&
+                    spotify.playlists.isEmpty {
+                    await spotify.refreshPlaylists()
                 }
 
                 if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
+            }
+            .sheet(
+                isPresented: $showingSpotifyPicker
+            ) {
+                SpotifyPlaylistPickerView(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Strength Playlist",
+                            norwegian: "Spilleliste for styrke"
+                        ),
+                    selection:
+                        $selectedSpotifyPlaylist
+                )
+                .onDisappear {
+                    spotifyAutoplay =
+                        selectedSpotifyPlaylist != nil
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingAudioCoachSettings
+            ) {
+                StrengthAudioCoachSettingsView(
+                    configuration:
+                        $strengthAudioCoach
+                )
+            }
+            .sheet(
+                isPresented:
+                    $showingRestCueSettings
+            ) {
+                StrengthRestCueSettingsView(
+                    configuration:
+                        $restCues
+                )
+            }
+            .sheet(
+                isPresented:
+                    $showingTrainingPartners
+            ) {
+                NavigationStack {
+                    ScrollView {
+                        ATHLTHCard {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs:
+                                    $selectedFriendIDs
+                            )
+                        }
+                        .padding(16)
+                    }
+                    .navigationTitle(
+                        ATHLTHLocalization.choose(
+                            english: "Train Together",
+                            norwegian: "Tren sammen"
+                        )
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(
+                            placement: .confirmationAction
+                        ) {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english: "Done",
+                                    norwegian: "Ferdig"
+                                )
+                            ) {
+                                showingTrainingPartners = false
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .sheet(
+                isPresented:
+                    $showingDisplayControls
+            ) {
+                StrengthDisplayControlSettingsView(
+                    keepScreenAwake:
+                        $keepScreenAwake,
+                    inputMode:
+                        $inputMode,
+                    watchAvailable:
+                        captureDevice == .appleWatch
+                )
             }
             .toolbar {
                 ToolbarItem(
@@ -250,6 +462,136 @@ struct WorkoutStartOptionsView: View {
                 }
             }
         }
+    }
+
+    private var spotifySummary: String {
+        guard spotifyAutoplay,
+              let selectedSpotifyPlaylist
+        else {
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+        }
+
+        return selectedSpotifyPlaylist.name
+    }
+
+    private var restCueSummary: String {
+        guard restCues.automaticRestTimer else {
+            return ATHLTHLocalization.choose(
+                english: "Timer off",
+                norwegian: "Timer av"
+            )
+        }
+
+        let hapticText =
+            restCues.hapticsEnabled
+                ? ATHLTHLocalization.choose(
+                    english: "haptics",
+                    norwegian: "haptikk"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "no haptics",
+                    norwegian: "uten haptikk"
+                )
+
+        return "\(restCues.defaultRestSeconds) s · \(hapticText)"
+    }
+
+    private var displayControlSummary: String {
+        let screen =
+            keepScreenAwake
+                ? ATHLTHLocalization.choose(
+                    english: "Screen on",
+                    norwegian: "Skjerm på"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Auto-lock",
+                    norwegian: "Autolås"
+                )
+
+        return "\(screen) · \(inputMode.title)"
+    }
+
+    private func advancedOptionButton(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(tint)
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        tint.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(title)
+                        .font(
+                            .subheadline.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 13)
+            .frame(height: 58)
+            .background(
+                Color.white.opacity(0.92),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(0.05),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var strengthIntroCard: some View {
@@ -493,3 +835,351 @@ struct WorkoutStartOptionsView: View {
     }
 
 }
+
+private struct StrengthAudioCoachSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var configuration:
+        StrengthAudioCoachConfiguration
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle(
+                        "Audio Coach",
+                        isOn: $configuration.enabled
+                    )
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Announcements",
+                        norwegian: "Meldinger"
+                    )
+                ) {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Set completed",
+                            norwegian: "Sett fullført"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceSetComplete
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Rest started",
+                            norwegian: "Hvile startet"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceRestStarted
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Rest countdown",
+                            norwegian: "Nedtelling av hvile"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceRestCountdown
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Rest complete",
+                            norwegian: "Hvile ferdig"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceRestComplete
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Next exercise",
+                            norwegian: "Neste øvelse"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceNextExercise
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Workout status",
+                            norwegian: "Øktstatus"
+                        ),
+                        isOn:
+                            $configuration
+                                .announceWorkoutStatus
+                    )
+                }
+
+                if configuration.announceRestCountdown {
+                    Section(
+                        ATHLTHLocalization.choose(
+                            english: "Rest countdown",
+                            norwegian: "Hvilenedtelling"
+                        )
+                    ) {
+                        Stepper(
+                            value:
+                                $configuration
+                                    .restCountdownSeconds,
+                            in: 3...30,
+                            step: 1
+                        ) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "%d seconds before",
+                                    norwegian: "%d sekunder før",
+                                    configuration
+                                        .restCountdownSeconds
+                                )
+                            )
+                        }
+                    }
+                }
+
+                if configuration.announceWorkoutStatus {
+                    Section(
+                        ATHLTHLocalization.choose(
+                            english: "Workout status",
+                            norwegian: "Øktstatus"
+                        )
+                    ) {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Every",
+                                norwegian: "Hvert"
+                            ),
+                            selection:
+                                $configuration
+                                    .workoutStatusIntervalMinutes
+                        ) {
+                            Text("15 min").tag(15)
+                            Text("30 min").tag(30)
+                        }
+                    }
+                }
+
+                Section {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Lower music while speaking",
+                            norwegian: "Senk musikken mens stemmen snakker"
+                        ),
+                        isOn:
+                            $configuration
+                                .duckOtherAudio
+                    )
+                }
+            }
+            .navigationTitle("Audio Coach")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StrengthRestCueSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var configuration:
+        StrengthRestCueConfiguration
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Automatic rest timer",
+                            norwegian: "Automatisk hviletimer"
+                        ),
+                        isOn:
+                            $configuration
+                                .automaticRestTimer
+                    )
+
+                    Stepper(
+                        value:
+                            $configuration
+                                .defaultRestSeconds,
+                        in: 0...600,
+                        step: 15
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Default rest",
+                                    norwegian: "Standard hvile"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "\(configuration.defaultRestSeconds) s"
+                            )
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(
+                        !configuration
+                            .automaticRestTimer
+                    )
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Haptic when rest ends",
+                            norwegian: "Haptikk når hvilen er ferdig"
+                        ),
+                        isOn:
+                            $configuration
+                                .hapticsEnabled
+                    )
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Exercise-specific rest times still take priority. The default is used when an exercise has no rest target.",
+                            norwegian:
+                                "Hviletid på den enkelte øvelsen har fortsatt prioritet. Standardverdien brukes når øvelsen ikke har egen hviletid."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Rest & Cues",
+                    norwegian: "Hvile & varsler"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StrengthDisplayControlSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var keepScreenAwake: Bool
+    @Binding var inputMode:
+        WatchStrengthInputMode
+    let watchAvailable: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Keep iPhone screen awake",
+                            norwegian: "Hold iPhone-skjermen aktiv"
+                        ),
+                        isOn: $keepScreenAwake
+                    )
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Set logging",
+                        norwegian: "Registrering av sett"
+                    )
+                ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Enter reps and weight on",
+                            norwegian: "Registrer reps og vekt på"
+                        ),
+                        selection: $inputMode
+                    ) {
+                        Text(
+                            WatchStrengthInputMode
+                                .both.title
+                        )
+                        .tag(
+                            WatchStrengthInputMode
+                                .both
+                        )
+
+                        Text("iPhone")
+                            .tag(
+                                WatchStrengthInputMode
+                                    .iPhone
+                            )
+
+                        if watchAvailable {
+                            Text("Apple Watch")
+                                .tag(
+                                    WatchStrengthInputMode
+                                        .appleWatch
+                                )
+                        }
+                    }
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Both keeps iPhone and Apple Watch synchronized. Choosing one device makes the other a read-only workout companion.",
+                            norwegian:
+                                "Begge holder iPhone og Apple Watch synkronisert. Velger du én enhet blir den andre en skrivebeskyttet treningspartner."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Display & Input",
+                    norwegian: "Skjerm & registrering"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
