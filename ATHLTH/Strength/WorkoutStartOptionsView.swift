@@ -277,91 +277,6 @@ struct WorkoutStartOptionsView: View {
                         )
                     }
 
-                    Button {
-                        let selectedFriends =
-                            trackingMode == .advanced
-                                ? social.trainingPartners
-                                    .filter {
-                                        selectedFriendIDs
-                                            .contains(
-                                                $0.userID
-                                            )
-                                    }
-                                : []
-
-                        let advancedConfiguration =
-                            StrengthAdvancedConfiguration(
-                                spotifyPlaylist:
-                                    trackingMode == .advanced
-                                        ? selectedSpotifyPlaylist
-                                        : nil,
-                                spotifyAutoplay:
-                                    trackingMode == .advanced &&
-                                    spotifyAutoplay,
-                                audioCoach:
-                                    strengthAudioCoach,
-                                restCues:
-                                    restCues,
-                                keepScreenAwake:
-                                    trackingMode == .advanced &&
-                                    keepScreenAwake,
-                                inputMode:
-                                    captureDevice == .appleWatch
-                                        ? inputMode
-                                        : .iPhone,
-                                effortMetric:
-                                    effortMetric
-                            )
-
-                        if trackingMode == .advanced {
-                            advancedConfiguration
-                                .saveAsDefaults()
-                        }
-
-                        var watchAudioCoach =
-                            trackingMode == .advanced
-                                ? strengthAudioCoach
-                                    .watchConfiguration
-                                : .disabled
-                        watchAudioCoach
-                            .strengthHapticsEnabled =
-                            restCues.hapticsEnabled
-
-                        onStart(
-                            captureDevice,
-                            trackingMode,
-                            selectedFriends,
-                            watchAudioCoach,
-                            advancedConfiguration
-                        )
-                        dismiss()
-                    } label: {
-                        Label(
-                            captureDevice == .appleWatch
-                                ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Start with Apple Watch",
-                                    norwegian:
-                                        "Start med Apple Watch"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english:
-                                        "Start on iPhone",
-                                    norwegian:
-                                        "Start på iPhone"
-                                ),
-                            systemImage:
-                                captureDevice ==
-                                .appleWatch
-                                    ? "applewatch"
-                                    : "play.fill"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTheme.vitality)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -370,6 +285,12 @@ struct WorkoutStartOptionsView: View {
                     .easeInOut(duration: 0.18),
                     value: trackingMode
                 )
+            }
+            .safeAreaInset(
+                edge: .bottom,
+                spacing: 0
+            ) {
+                strengthStickyStartBar
             }
             .navigationTitle(
                 ATHLTHLocalization.choose(
@@ -516,6 +437,110 @@ struct WorkoutStartOptionsView: View {
                 }
             }
         }
+    }
+
+    private var strengthStickyStartBar: some View {
+        strengthStartButton
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(
+                .ultraThinMaterial
+            )
+            .overlay(
+                alignment: .top
+            ) {
+                Divider()
+                    .opacity(0.35)
+            }
+    }
+
+    private var strengthStartButton: some View {
+        Button {
+            let selectedFriends =
+                trackingMode == .advanced
+                    ? social.trainingPartners
+                        .filter {
+                            selectedFriendIDs
+                                .contains(
+                                    $0.userID
+                                )
+                        }
+                    : []
+
+            let advancedConfiguration =
+                StrengthAdvancedConfiguration(
+                    spotifyPlaylist:
+                        trackingMode == .advanced
+                            ? selectedSpotifyPlaylist
+                            : nil,
+                    spotifyAutoplay:
+                        trackingMode == .advanced &&
+                        spotifyAutoplay,
+                    audioCoach:
+                        strengthAudioCoach,
+                    restCues:
+                        restCues,
+                    keepScreenAwake:
+                        trackingMode == .advanced &&
+                        keepScreenAwake,
+                    inputMode:
+                        captureDevice == .appleWatch
+                            ? inputMode
+                            : .iPhone,
+                    effortMetric:
+                        effortMetric
+                )
+
+            if trackingMode == .advanced {
+                advancedConfiguration
+                    .saveAsDefaults()
+            }
+
+            var watchAudioCoach =
+                trackingMode == .advanced
+                    ? strengthAudioCoach
+                        .watchConfiguration
+                    : .disabled
+            watchAudioCoach
+                .strengthHapticsEnabled =
+                restCues.hapticsEnabled
+
+            onStart(
+                captureDevice,
+                trackingMode,
+                selectedFriends,
+                watchAudioCoach,
+                advancedConfiguration
+            )
+            dismiss()
+        } label: {
+            Label(
+                captureDevice == .appleWatch
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Start with Apple Watch",
+                        norwegian:
+                            "Start med Apple Watch"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Start on iPhone",
+                        norwegian:
+                            "Start på iPhone"
+                    ),
+                systemImage:
+                    captureDevice ==
+                    .appleWatch
+                        ? "applewatch"
+                        : "play.fill"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(ATHLTHTheme.vitality)
     }
 
     private var spotifySummary: String {
