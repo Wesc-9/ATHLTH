@@ -1165,17 +1165,11 @@ struct AppRootView: View {
                     )
             }
 
-            Task { @MainActor in
-                await refreshHealthAfterWatchCompletion()
-                await officialWeeklyChallenges
-                    .syncCompletionState(
-                        workouts:
-                            health.workouts
-                    )
-                syncAppleHealthProfileDetailsIfNeeded()
-                watchConnection
-                    .clearCompletedWorkout()
-            }
+            // The strength completion handler owns every downstream side
+            // effect, including the post-Watch Health refresh. The raw Watch
+            // result is now fully consumed.
+            watchConnection
+                .clearCompletedWorkout()
             return
         }
 
@@ -1492,7 +1486,15 @@ struct AppRootView: View {
         )
 
         Task {
-            if workout.captureDevice == .iPhone,
+            if workout.captureDevice == .appleWatch {
+                await refreshHealthAfterWatchCompletion()
+                await officialWeeklyChallenges
+                    .syncCompletionState(
+                        workouts:
+                            health.workouts
+                    )
+                syncAppleHealthProfileDetailsIfNeeded()
+            } else if workout.captureDevice == .iPhone,
                workout.healthMetrics
                     .healthKitWorkoutUUID == nil,
                let endedAt = workout.endedAt {
