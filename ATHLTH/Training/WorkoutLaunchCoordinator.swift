@@ -731,11 +731,8 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        guard await social
+        _ = await social
             .confirmCurrentJoinedWorkoutStarted()
-        else {
-            return false
-        }
 
         return true
     }
