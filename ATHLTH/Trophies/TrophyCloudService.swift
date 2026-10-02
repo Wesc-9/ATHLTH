@@ -240,8 +240,8 @@ private struct TrophyCloudUnlockRow:
     }
 }
 
-final class TrophyCloudService:
-    Sendable
+@MainActor
+final class TrophyCloudService
 {
     private let client:
         SupabaseClient
@@ -419,10 +419,7 @@ final class TrophyCloudService:
                     showcaseIDs:
                         Array(
                             showcaseIDs
-                                .prefix(
-                                    TrophyStore
-                                        .showcaseLimit
-                                )
+                                .prefix(4)
                         )
                 )
             )
