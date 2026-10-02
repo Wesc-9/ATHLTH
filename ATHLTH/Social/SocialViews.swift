@@ -2790,16 +2790,45 @@ private struct WorkoutInviteLaunchSheet: View {
                         .cancellationAction
                 ) {
                     Button(
-                        ATHLTHLocalization.choose(
-                            english: "Not now",
-                            norwegian: "Ikke nå"
-                        )
+                        role:
+                            isStarting
+                                ? .destructive
+                                : nil
                     ) {
-                        dismiss()
+                        if isStarting {
+                            Task {
+                                await social
+                                    .declineWorkoutInvite(
+                                        invite
+                                    )
+                                dismiss()
+                            }
+                        } else {
+                            dismiss()
+                        }
+                    } label: {
+                        Text(
+                            isStarting
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Leave",
+                                    norwegian:
+                                        "Forlat"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Not now",
+                                    norwegian:
+                                        "Ikke nå"
+                                )
+                        )
                     }
                 }
             }
         }
+        .interactiveDismissDisabled(
+            isStarting
+        )
         .fullScreenCover(
             isPresented:
                 $showingStrengthWorkout
