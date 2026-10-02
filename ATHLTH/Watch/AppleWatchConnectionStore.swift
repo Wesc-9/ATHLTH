@@ -256,17 +256,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         if session.isReachable {
             session.sendMessage(
                 payload,
-                replyHandler: nil
-            ) { [weak self] error in
-                // Reachability can change while the Watch app is launching.
-                // Queue the same payload so route selection is not lost.
-                session.transferUserInfo(payload)
-
-                let message = error.localizedDescription
-                Task { @MainActor [weak self] in
-                    self?.workoutLaunchError = message
-                }
-            }
+                replyHandler: nil,
+                errorHandler: Self.makeDurableMessageErrorHandler(
+                    session: session,
+                    payload: payload,
+                    store: self
+                )
+            )
         } else {
             session.transferUserInfo(payload)
         }
@@ -403,19 +399,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         if session.isReachable {
             session.sendMessage(
                 payload,
-                replyHandler: nil
-            ) { [weak self] error in
-                // An immediate message is best for an already-open Watch app,
-                // but launch-time reachability is transient. Queue a durable
-                // copy if the message fails so workout configuration still
-                // arrives after the Watch process becomes ready.
-                session.transferUserInfo(payload)
-
-                DispatchQueue.main.async {
-                    self?.workoutLaunchError =
-                        error.localizedDescription
-                }
-            }
+                replyHandler: nil,
+                errorHandler: Self.makeDurableMessageErrorHandler(
+                    session: session,
+                    payload: payload,
+                    store: self
+                )
+            )
         } else {
             session.transferUserInfo(payload)
         }
@@ -440,14 +430,85 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         ]
 
         if session.isReachable {
-            session.sendMessage(payload, replyHandler: nil) { [weak self] error in
-                let message = error.localizedDescription
-                Task { @MainActor [weak self] in
-                    self?.workoutLaunchError = message
-                }
-            }
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: Self.makeMessageErrorHandler(
+                    store: self
+                )
+            )
         } else {
             session.transferUserInfo(payload)
+        }
+    }
+
+    // WatchConnectivity invokes reply/error blocks on its own operation
+    // queues. These factories are deliberately nonisolated so Swift 6 does
+    // not attach MainActor isolation to the Objective-C callback blocks.
+    // Any mutation of observable app state is explicitly hopped back to
+    // MainActor inside the returned block.
+    nonisolated private static func makeDurableMessageErrorHandler(
+        session: WCSession,
+        payload: [String: Any],
+        store: AppleWatchConnectionStore?
+    ) -> (Error) -> Void {
+        { [weak store] error in
+            session.transferUserInfo(payload)
+            let message = error.localizedDescription
+
+            Task { @MainActor [weak store] in
+                store?.workoutLaunchError = message
+            }
+        }
+    }
+
+    nonisolated private static func makeMessageErrorHandler(
+        store: AppleWatchConnectionStore?
+    ) -> (Error) -> Void {
+        { [weak store] error in
+            let message = error.localizedDescription
+
+            Task { @MainActor [weak store] in
+                store?.workoutLaunchError = message
+            }
+        }
+    }
+
+    nonisolated private static func makeConnectivityReplyHandler(
+        store: AppleWatchConnectionStore?
+    ) -> ([String: Any]) -> Void {
+        { [weak store] reply in
+            let incoming = IncomingWatchPayload(reply)
+
+            Task { @MainActor [weak store] in
+                store?.handleConnectivityAck(incoming)
+            }
+        }
+    }
+
+    nonisolated private static func makeConnectivityErrorHandler(
+        store: AppleWatchConnectionStore?,
+        probeID: String
+    ) -> (Error) -> Void {
+        { [weak store] error in
+            let message = error.localizedDescription
+
+            Task { @MainActor [weak store] in
+                guard let store else { return }
+
+                store.connectivityError = message
+
+                guard let currentSession = store.session,
+                      currentSession.activationState == .activated
+                else {
+                    return
+                }
+
+                store.queueConnectivityProbe(
+                    probeID: probeID,
+                    on: currentSession
+                )
+            }
         }
     }
 
@@ -519,33 +580,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         if session.isReachable {
             session.sendMessage(
                 payload,
-                replyHandler: { [weak self] reply in
-                    let incoming = IncomingWatchPayload(reply)
-
-                    Task { @MainActor [weak self] in
-                        self?.handleConnectivityAck(incoming)
-                    }
-                },
-                errorHandler: { [weak self] error in
-                    let message = error.localizedDescription
-
-                    Task { @MainActor [weak self] in
-                        guard let self else { return }
-
-                        self.connectivityError = message
-
-                        guard let currentSession = self.session,
-                              currentSession.activationState == .activated
-                        else {
-                            return
-                        }
-
-                        self.queueConnectivityProbe(
-                            probeID: probeID,
-                            on: currentSession
-                        )
-                    }
-                }
+                replyHandler: Self.makeConnectivityReplyHandler(
+                    store: self
+                ),
+                errorHandler: Self.makeConnectivityErrorHandler(
+                    store: self,
+                    probeID: probeID
+                )
             )
         } else {
             queueConnectivityProbe(
