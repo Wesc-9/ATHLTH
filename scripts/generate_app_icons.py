@@ -9,29 +9,38 @@ import zlib
 from pathlib import Path
 
 SIZE = 1024
-SOURCE_SIZE = 1024
+LEVELS = 16
 SOURCE_PARTS = [
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part00.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part01.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part02.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part03.b64"),
 ]
-EXPECTED_SOURCE_SHA256 = "943986c220c3f228145cc6501eeefbb34e6ba9028165289ad0cb264174fe12a0"
+EXPECTED_SOURCE_SHA256 = "9242193c420763c2db2f36fe12aa4d762995786588d7050c38afcd6b39621c6e"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
 
 
-def load_source_rgb() -> bytes:
-    encoded = "".join(path.read_text(encoding="utf-8").strip() for path in SOURCE_PARTS)
+def load_source_levels() -> bytes:
+    encoded = "".join(
+        path.read_text(encoding="utf-8").strip()
+        for path in SOURCE_PARTS
+    )
+    if not encoded:
+        raise SystemExit("ATHLTH app icon source is empty.")
+
     compressed = base64.b64decode(encoded, validate=True)
     raw = zlib.decompress(compressed)
 
-    expected_bytes = SOURCE_SIZE * SOURCE_SIZE * 3
+    expected_bytes = SIZE * SIZE
     if len(raw) != expected_bytes:
         raise SystemExit(
             f"ATHLTH icon source has {len(raw)} bytes; expected {expected_bytes}."
         )
+
+    if any(value >= LEVELS for value in raw):
+        raise SystemExit("ATHLTH icon source contains an invalid grayscale level.")
 
     digest = hashlib.sha256(raw).hexdigest()
     if digest != EXPECTED_SOURCE_SHA256:
@@ -43,49 +52,19 @@ def load_source_rgb() -> bytes:
     return raw
 
 
-def resize_bilinear(source: bytes) -> list[bytes]:
-    src = memoryview(source)
-
-    x_lookup: list[tuple[int, int, int]] = []
-    for x in range(SIZE):
-        source_x = (x + 0.5) * SOURCE_SIZE / SIZE - 0.5
-        x0 = max(0, min(SOURCE_SIZE - 1, int(source_x)))
-        x1 = min(SOURCE_SIZE - 1, x0 + 1)
-        fraction = max(0.0, min(1.0, source_x - x0))
-        x_lookup.append((x0, x1, int(round(fraction * 256))))
-
+def source_rows(source: bytes) -> list[bytes]:
     rows: list[bytes] = []
     for y in range(SIZE):
-        source_y = (y + 0.5) * SOURCE_SIZE / SIZE - 0.5
-        y0 = max(0, min(SOURCE_SIZE - 1, int(source_y)))
-        y1 = min(SOURCE_SIZE - 1, y0 + 1)
-        fy = int(round(max(0.0, min(1.0, source_y - y0)) * 256))
-
-        base0 = y0 * SOURCE_SIZE * 3
-        base1 = y1 * SOURCE_SIZE * 3
+        start = y * SIZE
+        end = start + SIZE
         row = bytearray(SIZE * 3)
 
-        for x, (x0, x1, fx) in enumerate(x_lookup):
-            i00 = base0 + x0 * 3
-            i01 = base0 + x1 * 3
-            i10 = base1 + x0 * 3
-            i11 = base1 + x1 * 3
-            output = x * 3
-
-            for channel in range(3):
-                upper = (
-                    src[i00 + channel] * (256 - fx)
-                    + src[i01 + channel] * fx
-                    + 128
-                ) >> 8
-                lower = (
-                    src[i10 + channel] * (256 - fx)
-                    + src[i11 + channel] * fx
-                    + 128
-                ) >> 8
-                row[output + channel] = (
-                    upper * (256 - fy) + lower * fy + 128
-                ) >> 8
+        for x, level in enumerate(source[start:end]):
+            value = round(level * 255 / (LEVELS - 1))
+            offset = x * 3
+            row[offset] = value
+            row[offset + 1] = value
+            row[offset + 2] = value
 
         rows.append(bytes(row))
 
@@ -113,19 +92,62 @@ def png_payload(rows: list[bytes]) -> bytes:
     )
 
 
+def validate_png(payload: bytes) -> None:
+    if payload[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit("Generated ATHLTH icon is not a PNG.")
+
+    ihdr_length = struct.unpack(">I", payload[8:12])[0]
+    if ihdr_length != 13 or payload[12:16] != b"IHDR":
+        raise SystemExit("Generated ATHLTH icon has an invalid IHDR chunk.")
+
+    width, height, bit_depth, color_type, _, _, _ = struct.unpack(
+        ">IIBBBBB", payload[16:29]
+    )
+    if (width, height) != (SIZE, SIZE):
+        raise SystemExit(
+            f"Generated ATHLTH icon is {width}x{height}; expected {SIZE}x{SIZE}."
+        )
+    if bit_depth != 8 or color_type != 2:
+        raise SystemExit(
+            "Generated ATHLTH icon must be 8-bit RGB with no alpha channel."
+        )
+
+    # Force a full zlib decode of all IDAT data before the file is accepted.
+    offset = 8
+    idat = bytearray()
+    saw_iend = False
+    while offset + 12 <= len(payload):
+        length = struct.unpack(">I", payload[offset:offset + 4])[0]
+        kind = payload[offset + 4:offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        chunk_end = data_end + 4
+        if chunk_end > len(payload):
+            raise SystemExit(f"Generated ATHLTH icon has truncated {kind!r} chunk.")
+        if kind == b"IDAT":
+            idat.extend(payload[data_start:data_end])
+        if kind == b"IEND":
+            saw_iend = True
+            break
+        offset = chunk_end
+
+    if not saw_iend:
+        raise SystemExit("Generated ATHLTH icon is missing IEND.")
+    zlib.decompress(bytes(idat))
+
+
 def write_icon(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
 
 
 def main() -> None:
-    source = load_source_rgb()
-    rows = resize_bilinear(source)
-    payload = png_payload(rows)
+    source = load_source_levels()
+    payload = png_payload(source_rows(source))
+    validate_png(payload)
 
-    # The approved pulse-A ATHLTH mark is intentionally identical across
-    # normal, dark, tinted, and Apple Watch appearances so ATHLTH keeps one
-    # recognizable identity everywhere.
+    # One approved user-provided ATHLTH logo is the single source of truth for
+    # iPhone, dark, tinted and Apple Watch app icons.
     write_icon(IOS_DIR / "AppIcon.png", payload)
     write_icon(IOS_DIR / "AppIcon-dark.png", payload)
     write_icon(IOS_DIR / "AppIcon-tinted.png", payload)
@@ -175,6 +197,11 @@ def main() -> None:
     (WATCH_DIR / "Contents.json").write_text(
         json.dumps(watch_contents, indent=2) + "\n",
         encoding="utf-8",
+    )
+
+    print(
+        "Generated ATHLTH app icons from the user-provided logo "
+        f"({len(payload)} bytes, SHA256 {hashlib.sha256(payload).hexdigest()})."
     )
 
 
