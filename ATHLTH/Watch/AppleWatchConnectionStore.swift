@@ -76,6 +76,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private let healthStore = HKHealthStore()
     private var verificationRequested = true
     private var lastProbeID: String?
+    private var handledWorkoutResultIDs:
+        [UUID] = []
+    private let handledWorkoutResultsKey =
+        "athlth.watch.handledWorkoutResultIDs.v1"
     private var latestTodaySnapshot =
         WatchTodaySnapshot(
             workout: nil,
@@ -87,6 +91,19 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     override init() {
+        if let stored =
+                UserDefaults.standard
+                    .stringArray(
+                        forKey:
+                            handledWorkoutResultsKey
+                    ) {
+            handledWorkoutResultIDs =
+                stored
+                    .compactMap(
+                        UUID.init(uuidString:)
+                    )
+        }
+
         super.init()
         // WatchConnectivity tracks Apple Watch availability independently
         // of workout capture. The user chooses iPhone or Apple Watch when
@@ -251,7 +268,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             WatchTransferMetadataKey.kind:
                 WatchTransferKind.workoutRouteSelection.rawValue,
             WatchTransferMetadataKey.routeID:
-                routeID?.uuidString ?? ""
+                routeID?.uuidString ?? "",
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
         ]
 
         if session.isReachable {
@@ -367,7 +386,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         let payload: [String: Any] = [
             WatchTransferMetadataKey.kind:
                 WatchTransferKind.strengthSnapshot.rawValue,
-            WatchTransferMetadataKey.payload: data
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
         ]
 
         // applicationContext keeps only the newest strength state, which is
@@ -407,7 +428,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
         let payload: [String: Any] = [
             WatchTransferMetadataKey.kind: kind.rawValue,
-            WatchTransferMetadataKey.payload: data
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
         ]
 
         if session.isReachable {
@@ -426,6 +449,29 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func clearCompletedWorkout() {
+        if let id =
+                lastCompletedWorkout?.id {
+            handledWorkoutResultIDs.removeAll {
+                $0 == id
+            }
+            handledWorkoutResultIDs.append(id)
+
+            if handledWorkoutResultIDs.count > 64 {
+                handledWorkoutResultIDs =
+                    Array(
+                        handledWorkoutResultIDs
+                            .suffix(64)
+                    )
+            }
+
+            UserDefaults.standard.set(
+                handledWorkoutResultIDs
+                    .map(\.uuidString),
+                forKey:
+                    handledWorkoutResultsKey
+            )
+        }
+
         lastCompletedWorkout = nil
     }
 
@@ -439,20 +485,39 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         let payload: [String: Any] = [
-            WatchTransferMetadataKey.kind: WatchTransferKind.workoutCommand.rawValue,
-            WatchTransferMetadataKey.command: command.rawValue
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutCommand.rawValue,
+            WatchTransferMetadataKey.command:
+                command.rawValue,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
         ]
 
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler: Self.makeMessageErrorHandler(
-                    store: self
-                )
+                errorHandler:
+                    command == .end
+                        ? Self.makeDurableMessageErrorHandler(
+                            session: session,
+                            payload: payload,
+                            store: self
+                        )
+                        : Self.makeMessageErrorHandler(
+                            store: self
+                        )
             )
-        } else {
+        } else if command == .end {
             session.transferUserInfo(payload)
+        } else {
+            workoutLaunchError =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Apple Watch is not reachable. Pause or resume directly on the Watch.",
+                    norwegian:
+                        "Apple Watch er ikke tilgjengelig. Pause eller fortsett direkte på klokken."
+                )
         }
     }
 
@@ -724,6 +789,17 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 from: data
             )
         else {
+            return
+        }
+
+        guard !handledWorkoutResultIDs
+            .contains(result.id)
+        else {
+            return
+        }
+
+        if lastCompletedWorkout?.id ==
+            result.id {
             return
         }
 
