@@ -546,11 +546,11 @@ struct AppRootView: View {
         }
         .task(
             id:
-                watchConnection
-                    .lastCompletedWorkout?
-                    .id
+                "\(watchConnection.lastCompletedWorkout?.id.uuidString ?? "none")-\(startupAuthenticationResolved)-\(appSession.signedIn)"
         ) {
-            guard let result =
+            guard startupAuthenticationResolved,
+                  appSession.signedIn,
+                  let result =
                     watchConnection
                         .lastCompletedWorkout
             else {
