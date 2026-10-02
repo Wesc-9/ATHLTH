@@ -671,6 +671,21 @@ Deno.serve(
           ),
         );
 
+      const elapsedSeconds =
+        (
+          endedAt.getTime() -
+          startedAt.getTime()
+        ) / 1000;
+      const averageSpeed =
+        Number.isFinite(distance) &&
+        Number.isFinite(duration) &&
+        duration > 0
+          ? distance / duration
+          : Number.POSITIVE_INFINITY;
+      const endedTooFarInFuture =
+        endedAt.getTime() >
+        Date.now() + 5 * 60 * 1000;
+
       if (
         evidence.activity_type !==
           "running" ||
@@ -701,12 +716,12 @@ Deno.serve(
         ) ||
         endedAt <=
           startedAt ||
+        endedTooFarInFuture ||
+        averageSpeed > 8.0 ||
+        averageSpeed < 0.4 ||
+        duration < 20 * 60 ||
         Math.abs(
-          (
-            endedAt.getTime() -
-            startedAt.getTime()
-          ) /
-            1000 -
+          elapsedSeconds -
           duration,
         ) > 600
       ) {
