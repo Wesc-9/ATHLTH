@@ -1120,6 +1120,70 @@ final class HealthKitManager: ObservableObject {
             return cached.snapshot
         }
 
+        let walkDistanceThresholds = [
+            10_000,
+            50_000,
+            250_000,
+            1_000_000
+        ]
+        let walkSessionThresholds = [
+            10,
+            50,
+            150,
+            500
+        ]
+        var walkingDistanceReachedAt: [Int: Date] = [:]
+        var walkingWorkoutCountReachedAt: [Int: Date] = [:]
+        var cumulativeWalkDistance = 0.0
+        var walkingWorkoutCount = 0
+        var longestWalkMeters = 0.0
+        var firstFiveKWalkDate: Date?
+        var firstTenKWalkDate: Date?
+
+        for workout in workouts where workout.workoutActivityType == .walking {
+            walkingWorkoutCount += 1
+
+            for threshold in walkSessionThresholds
+            where walkingWorkoutCountReachedAt[threshold] == nil &&
+                    walkingWorkoutCount >= threshold {
+                walkingWorkoutCountReachedAt[threshold] =
+                    workout.endDate
+            }
+
+            let distance =
+                workout.athlthDistanceMeters ?? 0
+            guard distance > 0 else {
+                continue
+            }
+
+            longestWalkMeters =
+                max(
+                    longestWalkMeters,
+                    distance
+                )
+            cumulativeWalkDistance +=
+                distance
+
+            if firstFiveKWalkDate == nil,
+               distance >= 5_000 {
+                firstFiveKWalkDate =
+                    workout.endDate
+            }
+
+            if firstTenKWalkDate == nil,
+               distance >= 10_000 {
+                firstTenKWalkDate =
+                    workout.endDate
+            }
+
+            for threshold in walkDistanceThresholds
+            where walkingDistanceReachedAt[threshold] == nil &&
+                    cumulativeWalkDistance >= Double(threshold) {
+                walkingDistanceReachedAt[threshold] =
+                    workout.endDate
+            }
+        }
+
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let trendStart = calendar.date(
@@ -1307,6 +1371,7 @@ final class HealthKitManager: ObservableObject {
         var cumulativeRunDistance = 0.0
         var longestRunMeters = 0.0
         var firstFiveKDate: Date?
+        var firstTenKDate: Date?
         var firstHalfMarathonDate: Date?
         var firstMarathonDate: Date?
 
@@ -1319,6 +1384,10 @@ final class HealthKitManager: ObservableObject {
 
             if firstFiveKDate == nil, distance >= 5_000 {
                 firstFiveKDate = workout.endDate
+            }
+
+            if firstTenKDate == nil, distance >= 10_000 {
+                firstTenKDate = workout.endDate
             }
 
             if firstHalfMarathonDate == nil, distance >= 21_097.5 {
@@ -1379,7 +1448,12 @@ final class HealthKitManager: ObservableObject {
             .map(\.key)
             .sorted()
 
-        let sleepThresholds = [7, 30, 100]
+        let sleepThresholds = [
+            7,
+            30,
+            100,
+            365
+        ]
         var qualifyingSleepNightsReachedAt: [Int: Date] = [:]
 
         for (index, day) in qualifyingSleepDays.enumerated() {
@@ -1396,8 +1470,22 @@ final class HealthKitManager: ObservableObject {
             runningDistanceReachedAt: runningDistanceReachedAt,
             longestRunMeters: longestRunMeters,
             firstFiveKDate: firstFiveKDate,
+            firstTenKDate: firstTenKDate,
             firstHalfMarathonDate: firstHalfMarathonDate,
             firstMarathonDate: firstMarathonDate,
+            walkingWorkoutCount: walkingWorkoutCount,
+            walkingWorkoutCountReachedAt:
+                walkingWorkoutCountReachedAt,
+            totalWalkingDistanceMeters:
+                cumulativeWalkDistance,
+            walkingDistanceReachedAt:
+                walkingDistanceReachedAt,
+            longestWalkMeters:
+                longestWalkMeters,
+            firstFiveKWalkDate:
+                firstFiveKWalkDate,
+            firstTenKWalkDate:
+                firstTenKWalkDate,
             longestWorkoutStreakDays: longestStreak,
             workoutStreakReachedAt: workoutStreakReachedAt,
             qualifyingSleepNights: qualifyingSleepDays.count,
