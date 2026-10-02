@@ -45,8 +45,14 @@ struct WatchRunWorkoutExperienceView: View {
             }
         }
         .background(
-            WatchTheme.canvas
-                .ignoresSafeArea()
+            Group {
+                if isLuminanceReduced {
+                    Color.black
+                } else {
+                    WatchTheme.canvas
+                }
+            }
+            .ignoresSafeArea()
         )
         .foregroundStyle(
             WatchTheme.textPrimary
