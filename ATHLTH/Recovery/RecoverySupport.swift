@@ -2084,7 +2084,7 @@ struct MuscleRecoveryCard: View {
                         )
                     )
 
-                    VStack(spacing: 9) {
+                    VStack(spacing: 7) {
                         ForEach(statuses.prefix(8)) { status in
                             muscleRow(status)
                         }
@@ -2095,13 +2095,13 @@ struct MuscleRecoveryCard: View {
 
             Text(
                 recoveryText(
-                    "Colors reflect minute-weighted recent load against your training baseline. Neutral/green = low load; red is reserved for genuinely high recent load or marked soreness. ATHLTH estimate only.",
-                    "Fargene bygger på minuttvektet nyere belastning mot treningsgrunnlaget ditt. Nøytral/grønn = lav belastning; rødt brukes kun ved reelt høy belastning eller tydelig ømhet. Kun ATHLTH-estimat."
+                    "Estimated from recorded training data. Use as guidance only — do not rely on the estimate blindly.",
+                    "Estimert ut fra registrerte treningsdata. Bruk dette kun som veiledning – ikke stol blindt på estimatet."
                 )
             )
-            .font(.system(size: 8.5, weight: .regular))
-            .foregroundStyle(.secondary)
-            .padding(.top, 7)
+            .font(.system(size: 7.5, weight: .regular))
+            .foregroundStyle(.tertiary)
+            .padding(.top, 5)
         }
     }
 
@@ -2152,15 +2152,15 @@ struct MuscleRecoveryCard: View {
     private func muscleRow(
         _ status: MuscleRecoveryStatus
     ) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(recoveryMuscleName(status.muscleGroup))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(status.sourceSummary)
-                        .font(.system(size: 8.5, weight: .medium))
+                        .font(.system(size: 8, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
 
