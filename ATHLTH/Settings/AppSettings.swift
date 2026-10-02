@@ -284,6 +284,67 @@ enum ExternalWorkoutImportMode: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum AchievementEffectPreference:
+    String,
+    CaseIterable,
+    Identifiable,
+    Codable
+{
+    case full
+    case reduced
+    case off
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .full:
+            return ATHLTHLocalization.choose(
+                english: "Full",
+                norwegian: "Full"
+            )
+        case .reduced:
+            return ATHLTHLocalization.choose(
+                english: "Reduced",
+                norwegian: "Redusert"
+            )
+        case .off:
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .full:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Particles, glow and Signature tilt effects",
+                norwegian:
+                    "Partikler, glød og Signature-effekt ved tilt"
+            )
+        case .reduced:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Keeps premium surfaces with calmer motion",
+                norwegian:
+                    "Beholder premium-overflatene med roligere bevegelse"
+            )
+        case .off:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Static achievement surfaces only",
+                norwegian:
+                    "Kun statiske achievement-overflater"
+            )
+        }
+    }
+}
+
 enum IntegrationKind: String, CaseIterable, Identifiable {
     case appleHealth
     case appleWatch
@@ -342,6 +403,18 @@ final class AppSettingsStore: ObservableObject {
     @Published var workoutSharingChoiceCompleted: Bool { didSet { persist() } }
     @Published var audioCuesEnabled: Bool { didSet { persist() } }
     @Published var hapticCuesEnabled: Bool { didSet { persist() } }
+    @Published var achievementEffects:
+        AchievementEffectPreference {
+        didSet { persist() }
+    }
+    @Published var achievementUnlockSoundsEnabled:
+        Bool {
+        didSet { persist() }
+    }
+    @Published var achievementUnlockHapticsEnabled:
+        Bool {
+        didSet { persist() }
+    }
 
     @Published var routeAlertsEnabled: Bool { didSet { persist() } }
     @Published var routeAlertDeviationMeters: Double { didSet { persist() } }
@@ -550,6 +623,24 @@ final class AppSettingsStore: ObservableObject {
         ) as? Bool ?? false
         audioCuesEnabled = defaults.object(forKey: "settings.audioCues") as? Bool ?? true
         hapticCuesEnabled = defaults.object(forKey: "settings.hapticCues") as? Bool ?? true
+        achievementEffects =
+            AchievementEffectPreference(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.achievements.effects"
+                    ) ?? ""
+            ) ?? .full
+        achievementUnlockSoundsEnabled =
+            defaults.object(
+                forKey:
+                    "settings.achievements.unlockSounds"
+            ) as? Bool ?? true
+        achievementUnlockHapticsEnabled =
+            defaults.object(
+                forKey:
+                    "settings.achievements.unlockHaptics"
+            ) as? Bool ?? true
 
         routeAlertsEnabled =
             defaults.object(
@@ -786,6 +877,21 @@ final class AppSettingsStore: ObservableObject {
         )
         defaults.set(audioCuesEnabled, forKey: "settings.audioCues")
         defaults.set(hapticCuesEnabled, forKey: "settings.hapticCues")
+        defaults.set(
+            achievementEffects.rawValue,
+            forKey:
+                "settings.achievements.effects"
+        )
+        defaults.set(
+            achievementUnlockSoundsEnabled,
+            forKey:
+                "settings.achievements.unlockSounds"
+        )
+        defaults.set(
+            achievementUnlockHapticsEnabled,
+            forKey:
+                "settings.achievements.unlockHaptics"
+        )
 
         defaults.set(
             routeAlertsEnabled,
