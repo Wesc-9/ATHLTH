@@ -2017,21 +2017,6 @@ final class SocialStore: ObservableObject {
         } else {
             activeWorkoutParticipants = []
         }
-
-        if coordinatedLobbySessionID == nil,
-           let activeWorkoutSession,
-           activeWorkoutSession.creatorID == currentUserID,
-           activeWorkoutSession.coordinatedStartAt == nil,
-           let ownParticipant = activeWorkoutParticipants.first(
-                where: {
-                    $0.userID == currentUserID
-                }
-           ),
-           ownParticipant.readyAt != nil,
-           ownParticipant.workoutStartedAt == nil {
-            coordinatedLobbySessionID =
-                activeWorkoutSession.id
-        }
     }
 
     private func resolve(
