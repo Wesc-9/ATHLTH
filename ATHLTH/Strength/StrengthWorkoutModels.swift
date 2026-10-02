@@ -341,6 +341,9 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var healthMetrics: LinkedHealthWorkoutMetrics
     var advancedConfiguration:
         StrengthAdvancedConfiguration? = nil
+    // True only when the athlete explicitly starts a no-plan strength
+    // workout. Optional preserves older workout-history decoding.
+    var allowsLiveExerciseBuilding: Bool? = nil
 
     var totalCompletedSets: Int {
         exercises
