@@ -12,6 +12,9 @@ struct ActiveStrengthWorkoutView: View {
 
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
+    @State private var watchFinishTimeoutTask:
+        Task<Void, Never>?
+    @State private var watchFinishError: String?
     @State private var showingExerciseLibrary = false
     @State private var pendingExercise: ExerciseLibraryEntry?
     @State private var showingExerciseSwap = false
@@ -78,7 +81,10 @@ struct ActiveStrengthWorkoutView: View {
                     Button("Finish") {
                         showingFinishConfirmation = true
                     }
-                    .disabled(strength.activeWorkout == nil)
+                    .disabled(
+                        strength.activeWorkout == nil ||
+                        finishInProgress
+                    )
                 }
             }
             .sheet(isPresented: $showingExerciseLibrary) {
@@ -201,6 +207,31 @@ struct ActiveStrengthWorkoutView: View {
             } message: {
                 Text(finishMessage)
             }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Apple Watch",
+                    norwegian: "Apple Watch"
+                ),
+                isPresented:
+                    Binding(
+                        get: {
+                            watchFinishError != nil
+                        },
+                        set: { shown in
+                            if !shown {
+                                watchFinishError = nil
+                            }
+                        }
+                    )
+            ) {
+                Button("OK") {
+                    watchFinishError = nil
+                }
+            } message: {
+                Text(
+                    watchFinishError ?? ""
+                )
+            }
             .onAppear {
                 loadDefaultsFromCurrentSet()
                 configureAdvancedRuntime()
@@ -212,6 +243,8 @@ struct ActiveStrengthWorkoutView: View {
             .onDisappear {
                 restCueTask?.cancel()
                 statusCoachTask?.cancel()
+                watchFinishTimeoutTask?.cancel()
+                watchFinishTimeoutTask = nil
                 strengthCoach.stop()
 
                 if didDisableIdleTimer {
@@ -219,6 +252,24 @@ struct ActiveStrengthWorkoutView: View {
                         .isIdleTimerDisabled = false
                     didDisableIdleTimer = false
                 }
+            }
+            .onChange(
+                of:
+                    strength
+                        .activeWorkout?
+                        .id
+            ) { oldValue, newValue in
+                guard oldValue != nil,
+                      newValue == nil
+                else {
+                    return
+                }
+
+                watchFinishTimeoutTask?.cancel()
+                watchFinishTimeoutTask = nil
+                finishInProgress = false
+                appSession.endTrainingStatus()
+                dismiss()
             }
             .onChange(of: strength.currentSetIndex) {
                 loadDefaultsFromCurrentSet()
@@ -595,44 +646,101 @@ struct ActiveStrengthWorkoutView: View {
     @MainActor
     private func finishWorkout() async {
         guard !finishInProgress,
-              let workout = strength.activeWorkout
+              let workout =
+                strength.activeWorkout
         else {
             return
         }
 
         finishInProgress = true
-        defer { finishInProgress = false }
-
-        let endDate = Date()
-        let ownerID = appSession.profile.userID
 
         switch workout.captureDevice {
         case .appleWatch:
-            watchConnection.sendWorkoutCommand(.end)
-            strength.finish(
-                duration: endDate.timeIntervalSince(workout.startedAt)
-            )
+            // Apple Watch owns HealthKit for this workout. iPhone only asks it
+            // to finish; the local strength log is finalized when the Watch
+            // returns the authoritative result/HealthKit UUID.
+            if workoutMirroring
+                .hasActiveMirroredWorkout {
+                workoutMirroring
+                    .sendCommand(.end)
+            } else {
+                watchConnection
+                    .sendWorkoutCommand(
+                        .end,
+                        workoutID:
+                            workout.id
+                    )
+            }
+
+            watchFinishTimeoutTask?.cancel()
+            let workoutID = workout.id
+
+            watchFinishTimeoutTask =
+                Task { @MainActor in
+                    try? await Task.sleep(
+                        for: .seconds(18)
+                    )
+
+                    guard !Task.isCancelled,
+                          strength
+                            .activeWorkout?
+                            .id == workoutID
+                    else {
+                        return
+                    }
+
+                    finishInProgress = false
+                    watchFinishError =
+                        ATHLTHLocalization.choose(
+                            english:
+                                "ATHLTH has not received confirmation that Apple Watch finished the workout. The strength log is still safe. Finish or retry on the Watch, then ATHLTH will attach the Health data when it arrives.",
+                            norwegian:
+                                "ATHLTH har ikke fått bekreftet at Apple Watch avsluttet økten. Styrkeloggen er fortsatt trygg. Avslutt eller prøv igjen på klokken, så kobler ATHLTH til Health-data når de kommer."
+                        )
+                }
+
+            return
 
         case .iPhone:
+            let endDate = Date()
+            let ownerID =
+                appSession.profile.userID
+
             // ATHLTH is the source of truth for the strength log. When Health
             // write access is available, also create a real HealthKit workout
             // so Apple Health, Progress and streak all see the same session.
-            let healthWorkoutUUID = await health.saveManualStrengthWorkout(
-                startDate: workout.startedAt,
-                endDate: endDate,
-                externalID: workout.id
-            )
+            let healthWorkoutUUID =
+                await health
+                    .saveManualStrengthWorkout(
+                        startDate:
+                            workout.startedAt,
+                        endDate: endDate,
+                        externalID:
+                            workout.id
+                    )
 
-            guard appSession.signedIn, appSession.profile.userID == ownerID,
-                  strength.activeWorkout?.id == workout.id else { return }
+            guard appSession.signedIn,
+                  appSession.profile.userID ==
+                    ownerID,
+                  strength.activeWorkout?.id ==
+                    workout.id
+            else {
+                finishInProgress = false
+                return
+            }
+
             strength.finish(
-                healthKitWorkoutUUID: healthWorkoutUUID,
-                duration: endDate.timeIntervalSince(workout.startedAt)
+                healthKitWorkoutUUID:
+                    healthWorkoutUUID,
+                duration:
+                    endDate.timeIntervalSince(
+                        workout.startedAt
+                    )
             )
+            appSession.endTrainingStatus()
+            finishInProgress = false
+            dismiss()
         }
-
-        appSession.endTrainingStatus()
-        dismiss()
     }
 
     private var finishMessage: String {
