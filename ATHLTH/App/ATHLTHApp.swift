@@ -176,6 +176,29 @@ struct AppRootView: View {
     private let minimumLifecycleRefreshInterval:
         TimeInterval = 90
 
+    private func handleWatchSpotifyCommand(
+        _ command: WatchSpotifyCommand
+    ) {
+        switch command.kind {
+        case .requestState:
+            break
+        case .pause:
+            spotifyPlayback.pause()
+        case .resume:
+            spotifyPlayback.resume()
+        case .next:
+            spotifyPlayback.skipToNext()
+        }
+
+        syncSpotifyPlaybackToWatch()
+    }
+
+    private func syncSpotifyPlaybackToWatch() {
+        watchConnection.sendSpotifyPlaybackState(
+            spotifyPlayback.watchPlaybackState
+        )
+    }
+
     private var signedInUserID: UUID? {
         appSession.signedIn
             ? appSession.profile.userID
@@ -217,6 +240,7 @@ struct AppRootView: View {
             // Watch availability is discovered independently of workout capture.
             // The user chooses iPhone vs Apple Watch for each workout.
             watchConnection.connect()
+            syncSpotifyPlaybackToWatch()
 
             await subscriptionStore.start()
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
@@ -331,6 +355,20 @@ struct AppRootView: View {
             lastFullLifecycleRefreshAt = Date()
         }
         .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
+        .onChange(of: watchConnection.lastSpotifyCommand) { _, command in
+            guard let command else { return }
+            handleWatchSpotifyCommand(command)
+            watchConnection.clearSpotifyCommand()
+        }
+        .onChange(of: spotifyPlayback.isPlaying) { _, _ in
+            syncSpotifyPlaybackToWatch()
+        }
+        .onChange(of: spotifyPlayback.activePlaylist?.id) { _, _ in
+            syncSpotifyPlaybackToWatch()
+        }
+        .onChange(of: spotifyPlayback.connectionState) { _, _ in
+            syncSpotifyPlaybackToWatch()
+        }
         .overlay(alignment: .top) {
             if appSession.signedIn, phoneWorkout.active != nil {
                 Button { phoneWorkout.showingWorkout = true } label: {
