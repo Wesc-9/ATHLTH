@@ -247,7 +247,7 @@ export default {
 
       const { data: current, error: currentError } = await ctx.supabaseAdmin
         .from("subscription_entitlements")
-        .select("last_verified_at")
+        .select("last_verified_at, source")
         .eq("user_id", userID)
         .maybeSingle();
 
@@ -258,8 +258,13 @@ export default {
       const lastVerifiedAt = current?.last_verified_at
         ? new Date(current.last_verified_at)
         : null;
+      const hasAdminOverride = current?.source === "admin";
 
-      if (lastVerifiedAt && lastVerifiedAt.getTime() > signedAt.getTime()) {
+      if (
+        !hasAdminOverride &&
+        lastVerifiedAt &&
+        lastVerifiedAt.getTime() > signedAt.getTime()
+      ) {
         return Response.json({
           received: true,
           notificationUUID: notification.notificationUUID ?? null,
@@ -267,22 +272,24 @@ export default {
         });
       }
 
-      const { error: entitlementError } = await ctx.supabaseAdmin
-        .from("subscription_entitlements")
-        .update({
-          tier: "athlth_plus",
-          status,
-          source: "app_store",
-          app_store_product_id: transaction.productId,
-          app_store_original_transaction_id: transaction.originalTransactionId,
-          app_store_environment: environment,
-          current_period_ends_at: periodEndsAt?.toISOString() ?? null,
-          last_verified_at: signedAt.toISOString(),
-        })
-        .eq("user_id", userID);
+      if (!hasAdminOverride) {
+        const { error: entitlementError } = await ctx.supabaseAdmin
+          .from("subscription_entitlements")
+          .update({
+            tier: "athlth_plus",
+            status,
+            source: "app_store",
+            app_store_product_id: transaction.productId,
+            app_store_original_transaction_id: transaction.originalTransactionId,
+            app_store_environment: environment,
+            current_period_ends_at: periodEndsAt?.toISOString() ?? null,
+            last_verified_at: signedAt.toISOString(),
+          })
+          .eq("user_id", userID);
 
-      if (entitlementError) {
-        throw new Error("Unable to update subscription entitlement.");
+        if (entitlementError) {
+          throw new Error("Unable to update subscription entitlement.");
+        }
       }
 
       await ctx.supabaseAdmin
