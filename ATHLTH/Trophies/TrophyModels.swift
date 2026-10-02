@@ -67,6 +67,44 @@ enum TrophyRarity: Int, CaseIterable, Codable, Hashable, Comparable {
     }
 }
 
+enum ATHLTHAwardClass: String, Codable, Hashable {
+    case achievement
+    case trophy
+
+    var title: String {
+        switch self {
+        case .achievement:
+            return ATHLTHLocalization.choose(
+                english: "Achievement",
+                norwegian: "Achievement"
+            )
+        case .trophy:
+            return ATHLTHLocalization.choose(
+                english: "Trophy",
+                norwegian: "Pokal"
+            )
+        }
+    }
+}
+
+enum PrestigeTrophyCatalog {
+    static let halfMarathonID =
+        "signature.half-marathon"
+    static let marathonID =
+        "signature.marathon"
+
+    static let ids: Set<String> = [
+        halfMarathonID,
+        marathonID
+    ]
+
+    static func isPrestigeTrophy(
+        _ id: String
+    ) -> Bool {
+        ids.contains(id)
+    }
+}
+
 enum TrophyVerificationSource: String, Codable, Hashable {
     case appleHealth
     case athlth
@@ -199,6 +237,17 @@ struct TrophyProgressItem: Identifiable, Hashable {
 
         return ATHLTHLocalization.string( "Locked")
     }
+
+    var awardClass: ATHLTHAwardClass {
+        PrestigeTrophyCatalog
+            .isPrestigeTrophy(id)
+            ? .trophy
+            : .achievement
+    }
+
+    var isPrestigeTrophy: Bool {
+        awardClass == .trophy
+    }
 }
 
 struct TrophyUnlockRecord: Identifiable, Codable, Hashable {
@@ -212,6 +261,17 @@ struct TrophyUnlockRecord: Identifiable, Codable, Hashable {
     let category: TrophyCategory
     let verificationSource: TrophyVerificationSource
     let unlockedAt: Date
+
+    var awardClass: ATHLTHAwardClass {
+        PrestigeTrophyCatalog
+            .isPrestigeTrophy(trophyID)
+            ? .trophy
+            : .achievement
+    }
+
+    var isPrestigeTrophy: Bool {
+        awardClass == .trophy
+    }
 }
 
 enum TrophyCatalog {
