@@ -1958,11 +1958,17 @@ private struct HomeMetricMiniBars:
                         $0.isFinite &&
                         $0 >= 0
                     }
+            let rawMaximum =
+                valid.max() ?? 0
             let maximum =
-                max(
-                    valid.max() ?? 0,
-                    0.001
-                )
+                zeroIsEmpty
+                    ? roundedScaleMaximum(
+                        rawMaximum
+                    )
+                    : max(
+                        rawMaximum,
+                        0.001
+                    )
 
             HStack(
                 alignment: .bottom,
@@ -2004,6 +2010,42 @@ private struct HomeMetricMiniBars:
             }
         }
         .accessibilityHidden(true)
+    }
+
+    private func roundedScaleMaximum(
+        _ value: Double
+    ) -> Double {
+        guard value > 0 else {
+            return 1
+        }
+
+        let magnitude =
+            pow(
+                10,
+                floor(log10(value))
+            )
+        let normalized =
+            value / magnitude
+        let rounded:
+            Double
+
+        switch normalized {
+        case ...1:
+            rounded = 1
+        case ...2:
+            rounded = 2
+        case ...4:
+            rounded = 4
+        case ...5:
+            rounded = 5
+        default:
+            rounded = 10
+        }
+
+        return max(
+            rounded * magnitude,
+            value
+        )
     }
 
     private func barHeight(
