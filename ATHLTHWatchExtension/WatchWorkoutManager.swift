@@ -671,11 +671,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
 
-            if audioCoachConfiguration
-                .shouldUseStrengthHaptics {
-                WKInterfaceDevice.current()
-                    .play(.click)
-            }
         }
 
         if let previous,
