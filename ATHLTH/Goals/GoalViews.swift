@@ -4607,13 +4607,11 @@ private struct GoalPreviewCard: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    LinearGradient(
-                        colors: coverColors,
-                        startPoint:
-                            .topLeading,
-                        endPoint:
-                            .bottomTrailing
-                    )
+                    Image(coverStyle.assetName)
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFill()
                 }
             }
             .frame(height: 158)
