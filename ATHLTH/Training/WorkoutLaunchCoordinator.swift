@@ -677,12 +677,15 @@ enum WorkoutLaunchCoordinator {
 
         if captureDevice == .appleWatch {
             do {
-                try await watchConnection
-                    .startWorkoutOnWatch(.strength)
+                // Deliver coach settings before HealthKit launches the Watch
+                // app so the first spoken cue cannot race the configuration.
                 watchConnection
                     .sendAudioCoachConfiguration(
                         audioCoach
                     )
+
+                try await watchConnection
+                    .startWorkoutOnWatch(.strength)
                 watchSessionID = UUID()
             } catch {
                 await social
@@ -707,6 +710,26 @@ enum WorkoutLaunchCoordinator {
                     ? advancedConfiguration
                     : nil
         )
+
+        if captureDevice == .appleWatch {
+            // The iPhone strength log is authoritative for exercise/set state.
+            // Push it immediately instead of waiting for a SwiftUI observer so
+            // Watch launch and iPhone view construction cannot race each other.
+            if let snapshot =
+                    strengthWorkout.watchSnapshot {
+                watchConnection
+                    .sendStrengthSnapshot(
+                        snapshot
+                    )
+            }
+
+            // Launch can briefly change reachability; re-send the small coach
+            // payload after local strength state exists.
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    audioCoach
+                )
+        }
 
         if trackingMode == .advanced {
             if advancedConfiguration
