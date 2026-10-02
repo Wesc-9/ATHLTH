@@ -451,6 +451,13 @@ struct TrainTogetherCreatorLobbyView: View {
         _ participant:
             SocialWorkoutParticipantRecord
     ) -> String {
+        if participant.launchFailedAt != nil {
+            return ATHLTHLocalization.choose(
+                english: "Couldn’t start",
+                norwegian: "Kunne ikke starte"
+            )
+        }
+
         if participant.workoutFinishedAt != nil {
             return ATHLTHLocalization.choose(
                 english: "Finished",
@@ -505,6 +512,9 @@ struct TrainTogetherCreatorLobbyView: View {
         _ participant:
             SocialWorkoutParticipantRecord
     ) -> Color {
+        if participant.launchFailedAt != nil {
+            return .red
+        }
         if participant.workoutStartedAt != nil {
             return ATHLTHTheme.accent
         }
