@@ -137,6 +137,9 @@ struct TrainTogetherStatusStrip: View {
                 )
             )
             .task(id: sessionID) {
+                _ = await social
+                    .confirmCurrentJoinedWorkoutStarted()
+
                 while !Task.isCancelled {
                     try? await social
                         .refreshWorkoutLobby(
