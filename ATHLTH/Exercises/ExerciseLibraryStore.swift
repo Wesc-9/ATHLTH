@@ -51,7 +51,7 @@ enum ExerciseMuscleGroup: String, CaseIterable, Identifiable, Hashable {
         case .glutes:
             return ATHLTHLocalization.choose(
                 english: "Glutes",
-                norwegian: "Sete"
+                norwegian: "Setemuskler"
             )
         case .quads:
             return ATHLTHLocalization.choose(
