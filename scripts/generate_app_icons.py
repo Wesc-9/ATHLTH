@@ -9,14 +9,14 @@ import zlib
 from pathlib import Path
 
 SIZE = 1024
-SOURCE_SIZE = 128
+SOURCE_SIZE = 1024
 SOURCE_PARTS = [
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part00.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part01.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part02.b64"),
     Path("ATHLTH/Brand/AppIconSource/v134-logo-part03.b64"),
 ]
-EXPECTED_SOURCE_SHA256 = "bcff09223742b4a7495305f5f82707b26ca48bf3bdbe84deebf6d94bf091d845"
+EXPECTED_SOURCE_SHA256 = "943986c220c3f228145cc6501eeefbb34e6ba9028165289ad0cb264174fe12a0"
 
 IOS_DIR = Path("ATHLTH/Assets.xcassets/AppIcon.appiconset")
 WATCH_DIR = Path("ATHLTHWatchApp/Assets.xcassets/AppIcon.appiconset")
