@@ -920,19 +920,102 @@ final class StrengthWorkoutStore: ObservableObject {
             return
         }
 
-        let previous =
+        let source =
             workout.exercises[
                 currentExerciseIndex
-            ].exercise.name
+            ]
+        let previous =
+            source.exercise.name
+        let completedSets =
+            source.sets.filter(\.isCompleted)
+        let remainingSets =
+            source.sets.filter {
+                !$0.isCompleted
+            }
+
+        if completedSets.isEmpty {
+            workout.exercises[
+                currentExerciseIndex
+            ].exercise = exercise.snapshot
+            workout.exercises[
+                currentExerciseIndex
+            ].substitutedFromExerciseName =
+                previous
+
+            activeWorkout = workout
+            reloadDraftFromCurrentSet()
+            return
+        }
+
+        guard !remainingSets.isEmpty else {
+            return
+        }
 
         workout.exercises[
             currentExerciseIndex
-        ].exercise = exercise.snapshot
+        ].sets = completedSets
         workout.exercises[
             currentExerciseIndex
-        ].substitutedFromExerciseName =
-            previous
+        ].completedAt = Date()
 
+        let replacementSets =
+            remainingSets
+                .enumerated()
+                .map {
+                    offset,
+                    set in
+
+                    StrengthSetLog(
+                        id: UUID(),
+                        setNumber:
+                            offset + 1,
+                        plannedReps:
+                            set.plannedReps,
+                        plannedWeightKilograms:
+                            set.plannedWeightKilograms,
+                        completedReps: nil,
+                        completedWeightKilograms:
+                            nil,
+                        rpe: nil,
+                        completedAt: nil,
+                        restSeconds:
+                            set.restSeconds,
+                        rir: nil,
+                        isWarmUp:
+                            set.isWarmUp
+                    )
+                }
+
+        let replacement =
+            StrengthExerciseLog(
+                id: UUID(),
+                plannedExerciseID: nil,
+                exercise: exercise.snapshot,
+                sets: replacementSets,
+                completedAt: nil,
+                restSecondsOverride:
+                    source.restSecondsOverride,
+                groupID: source.groupID,
+                groupStyle:
+                    source.groupStyle,
+                substitutedFromExerciseName:
+                    previous
+            )
+
+        let insertionIndex =
+            min(
+                currentExerciseIndex + 1,
+                workout.exercises.count
+            )
+        workout.exercises.insert(
+            replacement,
+            at: insertionIndex
+        )
+
+        currentExerciseIndex =
+            insertionIndex
+        currentSetIndex = 0
+        restEndsAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
     }
