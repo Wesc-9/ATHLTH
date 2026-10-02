@@ -985,6 +985,25 @@ final class SocialStore: ObservableObject {
                     return false
                 }
 
+                guard let currentUserID,
+                      let currentParticipant =
+                        workoutParticipants.first(
+                            where: {
+                                $0.sessionID == sessionID &&
+                                $0.userID == currentUserID
+                            }
+                        ),
+                      (
+                        currentParticipant.state == .creator ||
+                        currentParticipant.state == .accepted
+                      )
+                else {
+                    if coordinatedLobbySessionID == sessionID {
+                        coordinatedLobbySessionID = nil
+                    }
+                    return false
+                }
+
                 if let startAt = session.coordinatedStartAt {
                     let delay = startAt.timeIntervalSinceNow
                     if delay > 0 {
@@ -995,14 +1014,7 @@ final class SocialStore: ObservableObject {
                         )
                     }
 
-                    guard let currentUserID,
-                          let participant = workoutParticipants.first(
-                            where: {
-                                $0.sessionID == sessionID &&
-                                $0.userID == currentUserID
-                            }
-                          ),
-                          participant.readyAt != nil
+                    guard currentParticipant.readyAt != nil
                     else {
                         return false
                     }
@@ -1010,7 +1022,7 @@ final class SocialStore: ObservableObject {
                     try await service
                         .markWorkoutParticipantStarted(
                             participantID:
-                                participant.id
+                                currentParticipant.id
                         )
                     currentJoinedWorkoutSessionID =
                         sessionID
