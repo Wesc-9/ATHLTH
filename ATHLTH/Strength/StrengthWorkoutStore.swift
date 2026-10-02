@@ -113,7 +113,7 @@ final class StrengthWorkoutStore: ObservableObject {
             .filter(\.isFinished)
             .sorted { $0.startedAt < $1.startedAt }
 
-        let thresholds = [10, 25, 50, 100]
+        let thresholds = [10, 25, 50, 250]
         var reachedAt: [Int: Date] = [:]
 
         for (index, workout) in completed.enumerated() {
@@ -127,7 +127,7 @@ final class StrengthWorkoutStore: ObservableObject {
             10_000,
             50_000,
             250_000,
-            1_000_000
+            2_500_000
         ]
         var volumeReachedAt: [Int: Date] = [:]
         var totalVolumeKilograms = 0.0
