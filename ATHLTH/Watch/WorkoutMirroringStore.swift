@@ -188,8 +188,10 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     ) {
         guard var snapshot,
               snapshot.kind == result.kind,
+              let mirroredStartedAt =
+                snapshot.startedAt,
               abs(
-                snapshot.startedAt
+                mirroredStartedAt
                     .timeIntervalSince(
                         result.startedAt
                     )
