@@ -2602,6 +2602,87 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
+            goalInputCard(
+                icon:
+                    automaticTracking
+                        ? effectiveDataSource.systemImage
+                        : "hand.tap.fill",
+                title:
+                    ATHLTHLocalization.format(
+                        english: "Tracking",
+                        norwegian: "Sporing"
+                    )
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    if category != .custom {
+                        Picker(
+                            "",
+                            selection:
+                                $automaticTracking
+                        ) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Automatic",
+                                    norwegian: "Automatisk"
+                                )
+                            )
+                            .tag(true)
+
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Manual",
+                                    norwegian: "Manuell"
+                                )
+                            )
+                            .tag(false)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    } else {
+                        Label(
+                            ATHLTHLocalization.format(
+                                english: "Manual tracking",
+                                norwegian: "Manuell sporing"
+                            ),
+                            systemImage:
+                                "hand.tap.fill"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    }
+
+                    Text(
+                        automaticTracking &&
+                        category != .custom
+                            ? ATHLTHLocalization.format(
+                                english:
+                                    "ATHLTH follows qualifying data automatically. You can still mark any milestone as completed manually at any time.",
+                                norwegian:
+                                    "ATHLTH følger kvalifiserende data automatisk. Du kan fortsatt markere alle delmål som fullført manuelt når som helst."
+                            )
+                            : ATHLTHLocalization.format(
+                                english:
+                                    "Nothing is completed automatically. You mark each milestone yourself.",
+                                norwegian:
+                                    "Ingenting fullføres automatisk. Du markerer hvert delmål selv."
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+            }
+
             ForEach(
                 Array(
                     previewMilestones
@@ -2610,9 +2691,11 @@ struct GoalCreationView: View {
                 id: \.element.id
             ) { index, milestone in
                 let isFinal =
-                    index ==
-                    previewMilestones
-                        .count - 1
+                    milestone.completesGoal
+                let isCustom =
+                    setupMilestones.contains {
+                        $0.id == milestone.id
+                    }
 
                 HStack(
                     alignment: .top,
@@ -2710,6 +2793,27 @@ struct GoalCreationView: View {
                                     ATHLTHTheme
                                         .accentDeep
                                 )
+                            } else if isCustom {
+                                Button(role: .destructive) {
+                                    setupMilestones
+                                        .removeAll {
+                                            $0.id ==
+                                                milestone.id
+                                        }
+                                } label: {
+                                    Image(
+                                        systemName:
+                                            "trash"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 12,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
 
@@ -2796,19 +2900,124 @@ struct GoalCreationView: View {
                 )
             }
 
-            goalTrackingNote(
+            goalInputCard(
                 icon: "plus.circle.fill",
                 title:
                     ATHLTHLocalization.format(
-                        english: "You can add more later",
-                        norwegian: "Du kan legge til flere senere"
-                    ),
-                detail:
-                    ATHLTHLocalization.format(
-                        english: "Manual milestones can be added or checked at any time.",
-                        norwegian: "Manuelle delmål kan legges til eller markeres når som helst."
+                        english: "Add your own milestone",
+                        norwegian: "Legg til eget delmål"
                     )
-            )
+            ) {
+                VStack(spacing: 10) {
+                    TextField(
+                        ATHLTHLocalization.format(
+                            english: "Milestone",
+                            norwegian: "Navn på delmål"
+                        ),
+                        text:
+                            $newMilestoneTitle
+                    )
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(
+                        Color.black.opacity(0.035),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.format(
+                            english: "Description (optional)",
+                            norwegian: "Beskrivelse (valgfritt)"
+                        ),
+                        text:
+                            $newMilestoneDetail
+                    )
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(
+                        Color.black.opacity(0.035),
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+
+                    Button {
+                        let milestoneTitle =
+                            newMilestoneTitle
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                        let milestoneDetail =
+                            newMilestoneDetail
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+
+                        guard
+                            !milestoneTitle.isEmpty
+                        else {
+                            return
+                        }
+
+                        setupMilestones.append(
+                            GoalMilestone(
+                                createdAt: Date(),
+                                title:
+                                    milestoneTitle,
+                                targetDescription:
+                                    milestoneDetail
+                                        .isEmpty
+                                        ? ATHLTHLocalization.format(
+                                            english:
+                                                "Manual milestone",
+                                            norwegian:
+                                                "Manuelt delmål"
+                                        )
+                                        : milestoneDetail
+                            )
+                        )
+
+                        newMilestoneTitle = ""
+                        newMilestoneDetail = ""
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.format(
+                                english: "Add milestone",
+                                norwegian: "Legg til delmål"
+                            ),
+                            systemImage: "plus"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 42
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .disabled(
+                        newMilestoneTitle
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                    )
+                }
+            }
         }
     }
 
