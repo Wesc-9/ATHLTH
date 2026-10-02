@@ -623,6 +623,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         let previous = strengthSession
 
+        if let previous,
+           previous.workoutID ==
+                snapshot.workoutID {
+            // Never let a delayed applicationContext/userInfo payload roll
+            // completed strength work backwards. Draft-only changes get a
+            // small clock-skew tolerance because iPhone and Watch timestamps
+            // come from different devices.
+            if snapshot.completedSets <
+                previous.completedSets {
+                return
+            }
+
+            if previous.allExercisesComplete &&
+                !snapshot.allExercisesComplete {
+                return
+            }
+
+            if snapshot.completedSets ==
+                    previous.completedSets,
+               snapshot.updatedAt
+                    .addingTimeInterval(0.75) <
+                    previous.updatedAt {
+                return
+            }
+        }
+
         publish {
             self.strengthSession = snapshot
         }
@@ -3669,10 +3695,41 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        WCSession.default.transferUserInfo([
-            WatchTransferMetadataKey.kind: WatchTransferKind.workoutResult.rawValue,
-            WatchTransferMetadataKey.payload: data
-        ])
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.workoutResult.rawValue,
+            WatchTransferMetadataKey.payload:
+                data,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
+        ]
+
+        let session = WCSession.default
+
+        if session.activationState == .activated,
+           session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler:
+                    Self.makeWorkoutResultFallbackHandler(
+                        payload: payload
+                    )
+            )
+        } else {
+            session.transferUserInfo(
+                payload
+            )
+        }
+    }
+
+    nonisolated private static func makeWorkoutResultFallbackHandler(
+        payload: [String: Any]
+    ) -> (Error) -> Void {
+        { _ in
+            WCSession.default
+                .transferUserInfo(payload)
+        }
     }
 
     private func sendLiveSnapshot(
