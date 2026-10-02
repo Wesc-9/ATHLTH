@@ -17,8 +17,12 @@ final class TrophyStore: ObservableObject {
     init() {
         let persisted = Self.loadState()
         unlocks = persisted.unlocks
-        showcaseIDs = persisted.showcaseIDs
-        hasInitializedShowcase = persisted.hasInitializedShowcase
+        showcaseIDs = Array(
+            persisted.showcaseIDs
+                .prefix(Self.showcaseLimit)
+        )
+        hasInitializedShowcase =
+            persisted.hasInitializedShowcase
         activationDate = Self.loadOrCreateActivationDate()
     }
 
