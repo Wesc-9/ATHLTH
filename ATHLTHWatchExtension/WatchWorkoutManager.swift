@@ -141,6 +141,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
     private var audioCoachReadyAnnouncedForWorkout = false
+    private var strengthRestCoachTask:
+        Task<Void, Never>?
+    private var strengthStatusCoachTask:
+        Task<Void, Never>?
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var nextDistanceAnnouncementMeters: Double?
@@ -245,6 +249,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 announceCurrentStructuredStep(
                     prefix: "Current"
                 )
+            }
+
+            if let strengthSession {
+                scheduleStrengthRestCoach(
+                    strengthSession
+                )
+                scheduleStrengthStatusCoach()
             }
         }
     }
@@ -602,9 +613,277 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func configureStrengthSession(
         _ snapshot: WatchStrengthSessionSnapshot
     ) {
+        let previous = strengthSession
+
         publish {
             self.strengthSession = snapshot
         }
+
+        handleStrengthCoachTransition(
+            from: previous,
+            to: snapshot
+        )
+    }
+
+    private func handleStrengthCoachTransition(
+        from previous:
+            WatchStrengthSessionSnapshot?,
+        to current:
+            WatchStrengthSessionSnapshot
+    ) {
+        guard audioCoachConfiguration.enabled
+        else {
+            strengthRestCoachTask?.cancel()
+            strengthStatusCoachTask?.cancel()
+            strengthStatusCoachTask = nil
+            return
+        }
+
+        if let previous,
+           current.completedSets >
+            previous.completedSets,
+           audioCoachConfiguration
+            .shouldAnnounceStrengthSetComplete {
+            let setNumber =
+                previous.setNumber ??
+                current.setNumber ??
+                current.completedSets
+
+            let weight =
+                previous
+                    .draftWeightKilograms
+            let reps =
+                previous.draftReps
+            let formattedWeight =
+                weight.rounded() == weight
+                    ? String(Int(weight))
+                    : String(
+                        format: "%.1f",
+                        weight
+                    )
+
+            speak(
+                coachPhrase(
+                    english:
+                        "Set \(setNumber) complete. \(reps) reps at \(formattedWeight) kilograms.",
+                    norwegian:
+                        "Sett \(setNumber) fullført. \(reps) repetisjoner på \(formattedWeight) kilo."
+                )
+            )
+
+            if audioCoachConfiguration
+                .shouldUseStrengthHaptics {
+                WKInterfaceDevice.current()
+                    .play(.click)
+            }
+        }
+
+        if let previous,
+           current.exerciseIndex !=
+            previous.exerciseIndex,
+           audioCoachConfiguration
+            .shouldAnnounceStrengthNextExercise,
+           let exerciseName =
+            current.exerciseName {
+            speak(
+                coachPhrase(
+                    english:
+                        "Next exercise. \(exerciseName).",
+                    norwegian:
+                        "Neste øvelse. \(exerciseName)."
+                )
+            )
+        }
+
+        if previous?.restEndsAt !=
+            current.restEndsAt {
+            scheduleStrengthRestCoach(
+                current
+            )
+        }
+
+        scheduleStrengthStatusCoach()
+    }
+
+    private func scheduleStrengthRestCoach(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) {
+        strengthRestCoachTask?.cancel()
+        strengthRestCoachTask = nil
+
+        guard audioCoachConfiguration.enabled,
+              snapshot.isResting,
+              let restEndsAt =
+                snapshot.restEndsAt
+        else {
+            return
+        }
+
+        let countdownSeconds =
+            audioCoachConfiguration
+                .resolvedStrengthRestCountdownSeconds
+        let remaining =
+            max(
+                Int(
+                    restEndsAt
+                        .timeIntervalSinceNow
+                        .rounded()
+                ),
+                0
+            )
+
+        if audioCoachConfiguration
+            .shouldAnnounceStrengthRestStarted {
+            speak(
+                coachPhrase(
+                    english:
+                        "Rest started. \(remaining) seconds.",
+                    norwegian:
+                        "Hvile startet. \(remaining) sekunder."
+                )
+            )
+        }
+
+        strengthRestCoachTask =
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                let countdownDelay =
+                    restEndsAt
+                        .timeIntervalSinceNow -
+                    TimeInterval(
+                        countdownSeconds
+                    )
+
+                if countdownDelay > 0 {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                countdownDelay
+                            )
+                    )
+                }
+
+                guard !Task.isCancelled,
+                      self.strengthSession?
+                        .restEndsAt ==
+                        restEndsAt
+                else {
+                    return
+                }
+
+                if self.audioCoachConfiguration
+                    .shouldUseStrengthHaptics {
+                    WKInterfaceDevice.current()
+                        .play(.click)
+                }
+
+                if self.audioCoachConfiguration
+                    .shouldAnnounceStrengthRestCountdown {
+                    self.speak(
+                        self.coachPhrase(
+                            english:
+                                "\(countdownSeconds) seconds left.",
+                            norwegian:
+                                "\(countdownSeconds) sekunder igjen."
+                        )
+                    )
+                }
+
+                let finalDelay =
+                    restEndsAt
+                        .timeIntervalSinceNow
+
+                if finalDelay > 0 {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                finalDelay
+                            )
+                    )
+                }
+
+                guard !Task.isCancelled,
+                      self.strengthSession?
+                        .restEndsAt ==
+                        restEndsAt
+                else {
+                    return
+                }
+
+                if self.audioCoachConfiguration
+                    .shouldUseStrengthHaptics {
+                    WKInterfaceDevice.current()
+                        .play(.success)
+                }
+
+                if self.audioCoachConfiguration
+                    .shouldAnnounceStrengthRestComplete {
+                    self.speak(
+                        self.coachPhrase(
+                            english:
+                                "Rest complete. Ready for the next set.",
+                            norwegian:
+                                "Hvilen er ferdig. Klar for neste sett."
+                        )
+                    )
+                }
+            }
+    }
+
+    private func scheduleStrengthStatusCoach() {
+        guard strengthStatusCoachTask == nil,
+              audioCoachConfiguration.enabled,
+              let interval =
+                audioCoachConfiguration
+                    .strengthStatusIntervalSeconds,
+              interval > 0
+        else {
+            return
+        }
+
+        strengthStatusCoachTask =
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                while !Task.isCancelled {
+                    try? await Task.sleep(
+                        for:
+                            .seconds(
+                                max(
+                                    interval,
+                                    300
+                                )
+                            )
+                    )
+
+                    guard !Task.isCancelled,
+                          self.kind == .strength,
+                          let snapshot =
+                            self.strengthSession
+                    else {
+                        return
+                    }
+
+                    let exercise =
+                        snapshot.exerciseName ??
+                        snapshot.title
+
+                    self.speak(
+                        self.coachPhrase(
+                            english:
+                                "\(snapshot.completedSets) sets complete. Current exercise: \(exercise).",
+                            norwegian:
+                                "\(snapshot.completedSets) sett fullført. Nåværende øvelse: \(exercise)."
+                        )
+                    )
+                }
+            }
     }
 
     func configureLiveSurface(
@@ -1345,6 +1624,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.completedResult = nil
             self.errorMessage = nil
         }
+
+        strengthRestCoachTask?.cancel()
+        strengthRestCoachTask = nil
+        strengthStatusCoachTask?.cancel()
+        strengthStatusCoachTask = nil
 
         clearPersistedWorkoutState()
     }
