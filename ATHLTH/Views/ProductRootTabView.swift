@@ -479,7 +479,7 @@ struct ATHLTHHomeView: View {
 
                     homeGoalAndCalendarRow
 
-                    HomeRecentActivityStrip()
+                    HomePersonalRecentActivitySection()
 
                     HomeWeeklySummaryCard(
                         runningDistanceKilometers:
