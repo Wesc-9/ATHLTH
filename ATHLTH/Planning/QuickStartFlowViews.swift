@@ -307,6 +307,86 @@ struct WalkQuickStartConfiguration {
     let gearIDs: Set<UUID>
 }
 
+extension RunQuickStartConfiguration {
+    func trainTogetherInvitePayload(
+        savedRoutes: [TrainingRoute]
+    ) -> SocialWorkoutInvitePayload {
+        let resolvedRoute: TrainingRoute? = {
+            if let route {
+                return route
+            }
+
+            guard let routeID =
+                    workout?.routeID
+            else {
+                return nil
+            }
+
+            return savedRoutes.first {
+                $0.id == routeID
+            }
+        }()
+
+        var snapshot = PlannedSession(
+            id: UUID(),
+            title: title,
+            kind: .running,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID:
+                resolvedRoute?.id ??
+                workout?.routeID,
+            exercises: [],
+            notes: nil
+        )
+        snapshot.runningWorkout = workout
+        snapshot.runningWorkouts =
+            workout.map { [$0] }
+        snapshot.audioCoachConfiguration =
+            audioCoach
+        snapshot.autoPauseEnabled =
+            autoPauseEnabled
+
+        return SocialWorkoutInvitePayload(
+            workout: snapshot,
+            route: resolvedRoute,
+            routeAlerts: routeAlerts
+        )
+    }
+}
+
+extension WalkQuickStartConfiguration {
+    var trainTogetherInvitePayload:
+        SocialWorkoutInvitePayload {
+        var snapshot = PlannedSession(
+            id: UUID(),
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Walk",
+                    norwegian: "Gåtur"
+                ),
+            kind: .walking,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil
+        )
+        snapshot.audioCoachConfiguration =
+            audioCoach
+        snapshot.autoPauseEnabled =
+            autoPauseEnabled
+
+        return SocialWorkoutInvitePayload(
+            workout: snapshot
+        )
+    }
+}
+
 private struct QuickStartAutoPauseCard: View {
     @Binding var preference: WorkoutAutoPausePreference
     let appDefaultEnabled: Bool
