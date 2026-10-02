@@ -3606,16 +3606,8 @@ struct GoalCreationView: View {
 
     private var goalReviewSummaryCard:
         some View {
-        let source: GoalDataSource
-
-        switch category {
-        case .strength:
-            source = .athlth
-        case .custom:
-            source = .manual
-        default:
-            source = .appleHealth
-        }
+        let source =
+            effectiveDataSource
 
         return VStack(
             spacing: 0
@@ -3939,8 +3931,74 @@ struct GoalCreationView: View {
         }
     }
 
-    private var previewMilestones: [GoalMilestone] {
-        makeMilestones(createdAt: Date())
+    private var effectiveDataSource:
+        GoalDataSource {
+        guard
+            automaticTracking,
+            category != .custom
+        else {
+            return .manual
+        }
+
+        switch category {
+        case .strength:
+            return .athlth
+        default:
+            return .appleHealth
+        }
+    }
+
+    private var previewMilestones:
+        [GoalMilestone] {
+        configuredMilestones(
+            createdAt: Date()
+        )
+    }
+
+    private func configuredMilestones(
+        createdAt: Date
+    ) -> [GoalMilestone] {
+        var generated =
+            makeMilestones(
+                createdAt: createdAt
+            )
+
+        if !automaticTracking ||
+            category == .custom {
+            for index in
+                generated.indices {
+                generated[index]
+                    .automationRule = nil
+            }
+        }
+
+        let custom =
+            setupMilestones.map {
+                milestone in
+                var copy = milestone
+                copy.createdAt =
+                    createdAt
+                copy.automationRule = nil
+                return copy
+            }
+
+        guard !custom.isEmpty
+        else {
+            return generated
+        }
+
+        let insertionIndex =
+            generated.firstIndex {
+                $0.completesGoal
+            } ??
+            generated.endIndex
+
+        generated.insert(
+            contentsOf: custom,
+            at: insertionIndex
+        )
+
+        return generated
     }
 
     private func createGoal() {
@@ -3948,15 +4006,8 @@ struct GoalCreationView: View {
         let goalID = UUID()
         let baselineWeight = health.personalDetails.weightKilograms
 
-        let source: GoalDataSource
-        switch category {
-        case .strength:
-            source = .athlth
-        case .custom:
-            source = .manual
-        default:
-            source = .appleHealth
-        }
+        let source =
+            effectiveDataSource
 
         let target: GoalTarget?
         switch category {
@@ -4012,7 +4063,7 @@ struct GoalCreationView: View {
             isPrimary: makePrimary,
             dataSource: source,
             target: target,
-            milestones: makeMilestones(createdAt: now),
+            milestones: configuredMilestones(createdAt: now),
             linkedTrainingPlanID: linkActivePlan ? session.activePlan?.id : nil
         )
 
