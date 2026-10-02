@@ -246,6 +246,13 @@ enum StrengthPersonalRecordKind: String, Codable, Hashable {
     }
 }
 
+struct StrengthProgressionSuggestion: Hashable {
+    let previousWeightKilograms: Double
+    let previousReps: Int
+    let suggestedWeightKilograms: Double
+    let suggestedReps: Int
+}
+
 struct StrengthPersonalRecord: Identifiable, Hashable {
     let id: String
     let kind: StrengthPersonalRecordKind
