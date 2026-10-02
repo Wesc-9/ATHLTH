@@ -10423,6 +10423,8 @@ struct CommunityGroupEventCreateView: View {
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
+    @State private var selectedArtwork:
+        ATHLTHStandardArtwork?
     @State private var saving = false
     @State private var creationError: String?
 
@@ -10433,6 +10435,8 @@ struct CommunityGroupEventCreateView: View {
                     CommunityContentCoverPicker(
                         selectedPhoto: $selectedPhoto,
                         imageData: $imageData,
+                        selectedArtwork:
+                            $selectedArtwork,
                         placeholderIcon:
                             "calendar.badge.plus"
                     )
@@ -10577,6 +10581,9 @@ struct CommunityGroupEventCreateView: View {
                 startsAt: startsAt,
                 meetingName: meetingName,
                 imageData: imageData,
+                imageReference:
+                    selectedArtwork?
+                        .reference,
                 activityConfiguration:
                     configuration,
                 advancedOptions:
@@ -10629,6 +10636,8 @@ struct CommunityGroupChallengeCreateView: View {
     @State private var selectedPhoto:
         PhotosPickerItem?
     @State private var imageData: Data?
+    @State private var selectedArtwork:
+        ATHLTHStandardArtwork?
     @State private var saving = false
     @State private var creationError: String?
 
@@ -10652,6 +10661,8 @@ struct CommunityGroupChallengeCreateView: View {
                     CommunityContentCoverPicker(
                         selectedPhoto: $selectedPhoto,
                         imageData: $imageData,
+                        selectedArtwork:
+                            $selectedArtwork,
                         placeholderIcon: "bolt.fill"
                     )
                 }
@@ -10875,6 +10886,9 @@ struct CommunityGroupChallengeCreateView: View {
                 startsAt: startsAt,
                 endsAt: endsAt,
                 imageData: imageData,
+                imageReference:
+                    selectedArtwork?
+                        .reference,
                 activityConfiguration:
                     configuration,
                 advancedOptions:
