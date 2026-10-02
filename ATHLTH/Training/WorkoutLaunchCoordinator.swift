@@ -350,6 +350,27 @@ enum WorkoutLaunchCoordinator {
         }
     }
 
+    private static func startQuickSpotifyIfNeeded(
+        playlist: SpotifyPlaylistReference?,
+        autoplay: Bool,
+        settings: AppSettingsStore,
+        spotify: SpotifyPlaybackStore
+    ) {
+        guard autoplay,
+              let playlist
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await spotify.startLinkedPlaylist(
+                playlist,
+                settings: settings,
+                respectGlobalAutoplay: false
+            )
+        }
+    }
+
     static func startRunQuick(
         configuration: RunQuickStartConfiguration,
         session: AppSessionStore,
@@ -357,6 +378,7 @@ enum WorkoutLaunchCoordinator {
         gear: ProfileGearStore,
         phoneWorkout: IPhoneWorkoutStore,
         watchConnection: AppleWatchConnectionStore,
+        spotify: SpotifyPlaybackStore,
         ghostRace: GhostRaceStore? = nil
     ) async throws {
         let selectedRoute: TrainingRoute? = {
@@ -453,6 +475,14 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .autoPauseEnabled
             )
+            startQuickSpotifyIfNeeded(
+                playlist:
+                    configuration.spotifyPlaylist,
+                autoplay:
+                    configuration.spotifyAutoplay,
+                settings: settings,
+                spotify: spotify
+            )
             return
         }
 
@@ -527,6 +557,14 @@ enum WorkoutLaunchCoordinator {
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
         )
+        startQuickSpotifyIfNeeded(
+            playlist:
+                configuration.spotifyPlaylist,
+            autoplay:
+                configuration.spotifyAutoplay,
+            settings: settings,
+            spotify: spotify
+        )
 
         // Launch can briefly change WCSession reachability. Re-send the small
         // configuration payload after launch; the connection store queues a
@@ -556,7 +594,8 @@ enum WorkoutLaunchCoordinator {
         settings: AppSettingsStore,
         gear: ProfileGearStore,
         phoneWorkout: IPhoneWorkoutStore,
-        watchConnection: AppleWatchConnectionStore
+        watchConnection: AppleWatchConnectionStore,
+        spotify: SpotifyPlaybackStore
     ) async throws {
         if configuration.captureDevice == .iPhone {
             gear.prepareNextWorkoutGear(
@@ -575,6 +614,14 @@ enum WorkoutLaunchCoordinator {
                     settings.routeAlertConfiguration,
                 autoPauseEnabled:
                     configuration.autoPauseEnabled
+            )
+            startQuickSpotifyIfNeeded(
+                playlist:
+                    configuration.spotifyPlaylist,
+                autoplay:
+                    configuration.spotifyAutoplay,
+                settings: settings,
+                spotify: spotify
             )
             return
         }
@@ -616,6 +663,14 @@ enum WorkoutLaunchCoordinator {
 
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
+        )
+        startQuickSpotifyIfNeeded(
+            playlist:
+                configuration.spotifyPlaylist,
+            autoplay:
+                configuration.spotifyAutoplay,
+            settings: settings,
+            spotify: spotify
         )
 
         watchConnection
