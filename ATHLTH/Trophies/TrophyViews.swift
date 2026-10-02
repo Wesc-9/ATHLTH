@@ -2665,13 +2665,40 @@ struct TrophyDetailView: View {
 
 struct TrophyUnlockRevealView: View {
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var session: AppSessionStore
     let unlock: TrophyUnlockRecord
 
     private var trophy: TrophyProgressItem? {
         trophies.trophies.first { $0.id == unlock.trophyID }
     }
 
+    private var athleteName: String {
+        let username =
+            session.profile.username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !username.isEmpty {
+            return username
+        }
+
+        let displayName =
+            session.profile.displayName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        return displayName.isEmpty
+            ? "ATHLTH ATHLETE"
+            : displayName
+    }
+
     @State private var revealed = false
+    @State private var inscription:
+        TrophyInscription?
 
     var body: some View {
         ZStack {
@@ -2687,7 +2714,11 @@ struct TrophyUnlockRevealView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                Text("NEW ATHLTH TROPHY")
+                Text(
+                    unlock.isPrestigeTrophy
+                        ? "NEW ATHLTH TROPHY"
+                        : "NEW ATHLTH ACHIEVEMENT"
+                )
                     .font(.caption.bold())
                     .tracking(2.2)
                     .foregroundStyle(.white.opacity(0.72))
@@ -2695,7 +2726,11 @@ struct TrophyUnlockRevealView: View {
                 if let trophy {
                     ATHLTHTrophyCoreView(
                         trophy: trophy,
-                        size: 220
+                        size: 220,
+                        inscription:
+                            inscription,
+                        athleteName:
+                            athleteName
                     )
                     .scaleEffect(revealed ? 1 : 0.72)
                     .opacity(revealed ? 1 : 0)
@@ -2748,6 +2783,29 @@ struct TrophyUnlockRevealView: View {
         }
         .onAppear {
             revealed = true
+        }
+        .task(id: unlock.stageKey) {
+            guard unlock.isPrestigeTrophy,
+                  let trophy,
+                  trophy.isUnlocked
+            else {
+                inscription = nil
+                return
+            }
+
+            inscription =
+                await TrophyInscriptionAIService
+                    .shared
+                    .inscription(
+                        trophyID: trophy.id,
+                        username: athleteName,
+                        achievementTitle:
+                            trophy.title,
+                        achievementDetail:
+                            trophy.subtitle,
+                        unlockedAt:
+                            unlock.unlockedAt
+                    )
         }
         .sensoryFeedback(.success, trigger: revealed)
     }
