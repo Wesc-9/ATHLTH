@@ -483,14 +483,20 @@ final class StrengthWorkoutStore: ObservableObject {
                 currentExerciseAllSetsCompleted,
             hasNextExercise: hasNextExercise,
             allExercisesComplete: allExercisesComplete,
-            updatedAt: Date()
+            updatedAt: Date(),
+            inputMode:
+                workout
+                    .advancedConfiguration?
+                    .inputMode
         )
     }
 
     func startFreestyle(
         watchSessionID: UUID?,
         trackingMode: StrengthTrackingMode = .advanced,
-        captureDevice: WorkoutCaptureDevice = .iPhone
+        captureDevice: WorkoutCaptureDevice = .iPhone,
+        advancedConfiguration:
+            StrengthAdvancedConfiguration? = nil
     ) {
         activeWorkout = StrengthWorkoutLog(
             id: UUID(),
@@ -508,7 +514,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 activeCalories: nil,
                 averageHeartRate: nil,
                 maxHeartRate: nil
-            )
+            ),
+            advancedConfiguration:
+                advancedConfiguration
         )
 
         currentExerciseIndex = 0
@@ -550,7 +558,6 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let wasEmpty = workout.exercises.isEmpty
         workout.exercises.append(log)
-        workout.trackingMode = .advanced
         activeWorkout = workout
 
         if wasEmpty {
@@ -565,7 +572,9 @@ final class StrengthWorkoutStore: ObservableObject {
         session: PlannedSession,
         watchSessionID: UUID?,
         trackingMode: StrengthTrackingMode,
-        captureDevice: WorkoutCaptureDevice
+        captureDevice: WorkoutCaptureDevice,
+        advancedConfiguration:
+            StrengthAdvancedConfiguration? = nil
     ) {
         let exerciseLogs = session.exercises.map { planned in
             let setCount = max(planned.sets, 1)
@@ -607,7 +616,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 activeCalories: nil,
                 averageHeartRate: nil,
                 maxHeartRate: nil
-            )
+            ),
+            advancedConfiguration:
+                advancedConfiguration
         )
 
         currentExerciseIndex = 0
@@ -648,9 +659,42 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises[currentExerciseIndex].completedAt = Date()
             restEndsAt = nil
         } else {
-            let restSeconds = max(set.restSeconds ?? 0, 0)
-            restEndsAt = restSeconds > 0 ? Date().addingTimeInterval(TimeInterval(restSeconds)) : nil
-            advanceSetIndex(in: workout.exercises[currentExerciseIndex])
+            let restConfiguration =
+                workout
+                    .advancedConfiguration?
+                    .restCues
+
+            let automaticRestTimer =
+                restConfiguration?
+                    .automaticRestTimer ??
+                true
+            let fallbackRestSeconds =
+                restConfiguration?
+                    .defaultRestSeconds ??
+                90
+            let resolvedRestSeconds =
+                max(
+                    set.restSeconds ??
+                        fallbackRestSeconds,
+                    0
+                )
+
+            restEndsAt =
+                automaticRestTimer &&
+                resolvedRestSeconds > 0
+                    ? Date()
+                        .addingTimeInterval(
+                            TimeInterval(
+                                resolvedRestSeconds
+                            )
+                        )
+                    : nil
+            advanceSetIndex(
+                in:
+                    workout.exercises[
+                        currentExerciseIndex
+                    ]
+            )
         }
 
         activeWorkout = workout
