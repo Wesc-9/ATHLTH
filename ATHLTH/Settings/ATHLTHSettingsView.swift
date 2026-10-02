@@ -2512,6 +2512,36 @@ private struct ATHLTHTrainingSettingsView: View {
             }
 
             Section {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Auto-pause outdoor workouts",
+                        norwegian: "Auto-pause utendørs trening"
+                    ),
+                    isOn:
+                        $settings
+                            .autoPauseOutdoorWorkouts
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This is the default for outdoor running and walking. Advanced setup on an individual workout can use this default or override it.",
+                        norwegian:
+                            "Dette er standarden for utendørs løping og gåing. Avansert oppsett på en enkelt økt kan bruke standarden eller overstyre den."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Outdoor workouts",
+                        norwegian: "Utendørsøkter"
+                    )
+                )
+            }
+
+            Section {
                 NavigationLink {
                     ATHLTHWorkoutGuidanceSettingsView()
                 } label: {
