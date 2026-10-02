@@ -4262,7 +4262,7 @@ struct SessionEditorView: View {
     @State private var selectedSpotifyPlaylist:
         SpotifyPlaylistReference? = nil
     @State private var spotifyAutoplayOnStart:
-        Bool? = false
+        Bool? = nil
     @State private var showingSpotifyPlaylistPicker = false
 
     @State private var targetPaceEnabled = false
