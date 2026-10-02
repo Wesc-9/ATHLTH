@@ -260,6 +260,14 @@ struct GoalDetailView: View {
                     .padding(.bottom, 30)
                 }
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
+                .safeAreaInset(
+                    edge: .bottom,
+                    spacing: 0
+                ) {
+                    if goal.status != .completed {
+                        goalCompletionBar(goal)
+                    }
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -527,12 +535,35 @@ struct GoalDetailView: View {
             Text("Tracking")
                 .font(.headline)
 
-            Label(goal.dataSource.title, systemImage: goal.dataSource.systemImage)
-                .font(.subheadline.weight(.semibold))
+            Label(
+                goal.dataSource == .manual
+                    ? ATHLTHLocalization.format(
+                        english: "Manual",
+                        norwegian: "Manuell"
+                    )
+                    : ATHLTHLocalization.format(
+                        english: "Automatic · %@",
+                        norwegian: "Automatisk · %@",
+                        goal.dataSource.title
+                    ),
+                systemImage:
+                    goal.dataSource.systemImage
+            )
+            .font(.subheadline.weight(.semibold))
 
-            Text("Automatic milestones only use qualifying data recorded after the goal or milestone was created. Every milestone can also be checked manually.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                goal.dataSource == .manual
+                    ? ATHLTHLocalization.format(
+                        english: "Nothing is completed automatically. You mark each milestone yourself.",
+                        norwegian: "Ingenting fullføres automatisk. Du markerer hvert delmål selv."
+                    )
+                    : ATHLTHLocalization.format(
+                        english: "ATHLTH follows qualifying data automatically. You can still mark any milestone manually at any time.",
+                        norwegian: "ATHLTH følger kvalifiserende data automatisk. Du kan fortsatt markere alle delmål manuelt når som helst."
+                    )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             if let deadline = goal.deadline {
                 Divider()
@@ -578,39 +609,160 @@ struct GoalDetailView: View {
         .padding(.horizontal)
     }
 
-    private func actionsCard(_ goal: ATHLTHGoal) -> some View {
+    private func actionsCard(
+        _ goal: ATHLTHGoal
+    ) -> some View {
         VStack(spacing: 10) {
             if goal.status == .active {
                 Button {
-                    goalStore.setStatus(.paused, for: goal.id)
+                    goalStore.setStatus(
+                        .paused,
+                        for: goal.id
+                    )
                 } label: {
-                    Label("Pause Goal", systemImage: "pause.fill")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        ATHLTHLocalization.format(
+                            english: "Pause Goal",
+                            norwegian: "Sett mål på pause"
+                        ),
+                        systemImage:
+                            "pause.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 46
+                    )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .background(
+                    Color.black.opacity(0.045),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
             } else if goal.status == .paused {
                 Button {
-                    goalStore.setStatus(.active, for: goal.id)
+                    goalStore.setStatus(
+                        .active,
+                        for: goal.id
+                    )
                 } label: {
-                    Label("Resume Goal", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        ATHLTHLocalization.format(
+                            english: "Resume Goal",
+                            norwegian: "Fortsett med målet"
+                        ),
+                        systemImage:
+                            "play.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 46
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-            }
-
-            if goal.status != .completed {
-                Button {
-                    goalStore.setStatus(.completed, for: goal.id)
-                } label: {
-                    Label("Mark Goal Complete", systemImage: "checkmark.seal.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
+                .buttonStyle(.plain)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .background(
+                    Color.black.opacity(0.045),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
             }
         }
+        .padding(12)
+        .goalCard()
         .padding(.horizontal)
+    }
+
+    private func goalCompletionBar(
+        _ goal: ATHLTHGoal
+    ) -> some View {
+        Button {
+            goalStore.setStatus(
+                .completed,
+                for: goal.id
+            )
+        } label: {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "checkmark.seal.fill"
+                )
+                .font(
+                    .system(
+                        size: 18,
+                        weight: .semibold
+                    )
+                )
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Mark Goal Complete",
+                        norwegian: "Marker mål som fullført"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .bold
+                    )
+                )
+            }
+            .foregroundStyle(.white)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 54
+            )
+            .background(
+                ATHLTHTheme.accentDeep,
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(10)
+        .background(
+            Color.white.opacity(0.96),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.055),
+                lineWidth: 0.7
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.10),
+            radius: 16,
+            y: 6
+        )
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
     }
 
     private func completionText(_ method: GoalCompletionMethod) -> String {
