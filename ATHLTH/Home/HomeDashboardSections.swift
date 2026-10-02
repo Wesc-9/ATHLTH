@@ -1637,7 +1637,7 @@ struct HomeHealthMetricStrip: View {
                     Text(kind.title)
                         .font(
                             .system(
-                                size: 10,
+                                size: 8.8,
                                 weight: .semibold
                             )
                         )
@@ -1646,6 +1646,7 @@ struct HomeHealthMetricStrip: View {
                                 .primaryText
                         )
                         .lineLimit(1)
+                        .minimumScaleFactor(0.78)
 
                     Spacer(
                         minLength: 0
@@ -2346,11 +2347,27 @@ struct HomeHealthMetricDetailView:
     }
 }
 
+private struct HomeWeeklyProgressDaySelection:
+    Identifiable {
+    var id: Date { date }
+
+    let date: Date
+    let planned: [PlannedSession]
+    let actual: [WorkoutSummary]
+    let completedPlannedIDs: Set<UUID>
+}
+
 struct HomeWeeklyProgressStrip:
     View {
+    @EnvironmentObject private var session:
+        AppSessionStore
+
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
-    let onOpenPlan: () -> Void
+
+    @State private var weekOffset = 0
+    @State private var selectedDay:
+        HomeWeeklyProgressDaySelection?
 
     private var calendar:
         Calendar {
@@ -2365,13 +2382,8 @@ struct HomeWeeklyProgressStrip:
             alignment: .leading,
             spacing: 8
         ) {
-            Button(
-                action: onOpenPlan
-            ) {
-                HStack(spacing: 7) {
-                    Text(
-                        "Ukens fremdrift"
-                    )
+            HStack(spacing: 7) {
+                Text("Ukens fremdrift")
                     .font(
                         .subheadline
                             .weight(.bold)
@@ -2381,37 +2393,18 @@ struct HomeWeeklyProgressStrip:
                             .primaryText
                     )
 
-                    Spacer()
+                Spacer()
 
-                    Text(progressText)
-                        .font(
-                            .caption
-                                .weight(
-                                    .semibold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
+                Text(progressText)
                     .font(
-                        .system(
-                            size: 9,
-                            weight: .bold
-                        )
+                        .caption
+                            .weight(.semibold)
                     )
                     .foregroundStyle(
                         ATHLTHTheme
                             .mutedText
                     )
-                }
             }
-            .buttonStyle(.plain)
 
             ProgressView(
                 value: progress
@@ -2425,12 +2418,46 @@ struct HomeWeeklyProgressStrip:
                 anchor: .center
             )
 
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
+                if weekOffset > 0 {
+                    weekNavigationButton(
+                        systemImage:
+                            "chevron.left"
+                    ) {
+                        withAnimation(
+                            .snappy(
+                                duration: 0.22
+                            )
+                        ) {
+                            weekOffset =
+                                max(
+                                    weekOffset - 1,
+                                    0
+                                )
+                        }
+                    }
+                }
+
                 ForEach(
-                    weekDates,
+                    visibleWeekDates,
                     id: \.self
                 ) { date in
-                    day(date)
+                    dayButton(date)
+                }
+
+                weekNavigationButton(
+                    systemImage:
+                        "chevron.right",
+                    enabled:
+                        canAdvance
+                ) {
+                    withAnimation(
+                        .snappy(
+                            duration: 0.22
+                        )
+                    ) {
+                        weekOffset += 1
+                    }
                 }
             }
         }
@@ -2452,10 +2479,25 @@ struct HomeWeeklyProgressStrip:
                 lineWidth: 0.7
             )
         }
+        .sheet(item: $selectedDay) {
+            selection in
+            HomeWeeklyProgressDaySheet(
+                selection: selection
+            )
+            .presentationDetents(
+                [.medium, .large]
+            )
+            .presentationDragIndicator(
+                .visible
+            )
+            .presentationCornerRadius(
+                28
+            )
+        }
     }
 
     @ViewBuilder
-    private func day(
+    private func dayButton(
         _ date: Date
     ) -> some View {
         let planned =
@@ -2463,33 +2505,82 @@ struct HomeWeeklyProgressStrip:
                 for: date
             )
         let actual =
-            workouts.filter {
-                calendar.isDate(
-                    $0.startDate,
-                    inSameDayAs:
-                        date
+            workoutsForDay(
+                date
+            )
+        let completedIDs =
+            completedPlanSessionIDs(
+                date: date,
+                planned: planned
+            )
+
+        Button {
+            selectedDay =
+                HomeWeeklyProgressDaySelection(
+                    date: date,
+                    planned: planned,
+                    actual: actual,
+                    completedPlannedIDs:
+                        completedIDs
                 )
-            }
-        let hasActual =
-            !actual.isEmpty
+        } label: {
+            day(
+                date,
+                planned: planned,
+                actual: actual,
+                completedIDs:
+                    completedIDs
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(
+            ATHLTHLocalization.choose(
+                english:
+                    "Show workouts for this day",
+                norwegian:
+                    "Vis økter for denne dagen"
+            )
+        )
+    }
+
+    private func day(
+        _ date: Date,
+        planned: [PlannedSession],
+        actual: [WorkoutSummary],
+        completedIDs: Set<UUID>
+    ) -> some View {
         let plannedSession =
+            planned.first {
+                !completedIDs
+                    .contains($0.id)
+            } ??
             planned.first
+        let allPlannedCompleted =
+            !planned.isEmpty &&
+            completedIDs.count ==
+                planned.count
+        let hasUnplannedActual =
+            planned.isEmpty &&
+            !actual.isEmpty
+        let isCompleted =
+            allPlannedCompleted ||
+            hasUnplannedActual
         let isToday =
             calendar.isDateInToday(
                 date
             )
 
-        VStack(spacing: 4) {
+        return VStack(spacing: 4) {
             ZStack {
                 Circle()
                     .fill(
-                        hasActual
+                        isCompleted
                             ? ATHLTHTheme
                                 .vitality
                             : Color.clear
                     )
 
-                if !hasActual {
+                if !isCompleted {
                     Circle()
                         .stroke(
                             plannedSession ==
@@ -2523,7 +2614,7 @@ struct HomeWeeklyProgressStrip:
                         )
                 }
 
-                if hasActual {
+                if isCompleted {
                     Image(
                         systemName:
                             "checkmark"
@@ -2596,9 +2687,80 @@ struct HomeWeeklyProgressStrip:
         .frame(
             maxWidth: .infinity
         )
+        .contentShape(
+            Rectangle()
+        )
     }
 
-    private var weekInterval:
+    private func weekNavigationButton(
+        systemImage: String,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(
+            action: action
+        ) {
+            Image(
+                systemName:
+                    systemImage
+            )
+            .font(
+                .system(
+                    size: 10,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                enabled
+                    ? ATHLTHTheme
+                        .primaryText
+                    : ATHLTHTheme
+                        .mutedText
+                        .opacity(0.35)
+            )
+            .frame(
+                width: 30,
+                height: 30
+            )
+            .background(
+                Color.white.opacity(
+                    enabled
+                        ? 0.80
+                        : 0.40
+                ),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.black.opacity(
+                            0.045
+                        ),
+                        lineWidth: 0.7
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(
+            systemImage ==
+                "chevron.right"
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "Next days",
+                    norwegian:
+                        "Neste dager"
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "Previous days",
+                    norwegian:
+                        "Forrige dager"
+                )
+        )
+    }
+
+    private var currentWeekInterval:
         DateInterval {
         calendar.dateInterval(
             of: .weekOfYear,
@@ -2615,31 +2777,53 @@ struct HomeWeeklyProgressStrip:
             )
     }
 
-    private var weekDates:
+    private var visibleWeekInterval:
+        DateInterval {
+        let start =
+            calendar.date(
+                byAdding: .day,
+                value:
+                    weekOffset * 7,
+                to:
+                    currentWeekInterval
+                        .start
+            ) ??
+            currentWeekInterval
+                .start
+
+        return DateInterval(
+            start: start,
+            duration:
+                7 * 86_400
+        )
+    }
+
+    private var visibleWeekDates:
         [Date] {
         (0..<7).compactMap {
             calendar.date(
                 byAdding: .day,
                 value: $0,
                 to:
-                    weekInterval
+                    visibleWeekInterval
                         .start
             )
         }
     }
 
-    private var workoutsThisWeek:
+    private var visibleWorkouts:
         [WorkoutSummary] {
         workouts.filter {
-            weekInterval.contains(
-                $0.startDate
-            )
+            visibleWeekInterval
+                .contains(
+                    $0.startDate
+                )
         }
     }
 
     private var plannedCount:
         Int {
-        weekDates.reduce(0) {
+        visibleWeekDates.reduce(0) {
             $0 +
                 plannedSessions(
                     for: $1
@@ -2652,14 +2836,23 @@ struct HomeWeeklyProgressStrip:
         Int {
         if plannedCount == 0 {
             return
-                workoutsThisWeek
-                    .count
+                visibleWorkouts.count
         }
 
-        return min(
-            workoutsThisWeek.count,
-            plannedCount
-        )
+        return visibleWeekDates.reduce(
+            0
+        ) { total, date in
+            let planned =
+                plannedSessions(
+                    for: date
+                )
+            return total +
+                completedPlanSessionIDs(
+                    date: date,
+                    planned: planned
+                )
+                .count
+        }
     }
 
     private var progress:
@@ -2667,12 +2860,12 @@ struct HomeWeeklyProgressStrip:
         guard plannedCount > 0
         else {
             return
-                workoutsThisWeek
+                visibleWorkouts
                     .isEmpty
                     ? 0
                     : min(
                         Double(
-                            workoutsThisWeek
+                            visibleWorkouts
                                 .count
                         ) / 5.0,
                         1
@@ -2690,7 +2883,168 @@ struct HomeWeeklyProgressStrip:
         String {
         plannedCount > 0
             ? "\(completedCount) av \(plannedCount)"
-            : "\(workoutsThisWeek.count) økter"
+            : "\(visibleWorkouts.count) økter"
+    }
+
+    private var canAdvance:
+        Bool {
+        guard let plan,
+              !plan.weeks.isEmpty
+        else {
+            return false
+        }
+
+        if let startDate =
+                plan.startDate {
+            let currentStart =
+                calendar.startOfDay(
+                    for:
+                        currentWeekInterval
+                            .start
+                )
+            let planStart =
+                calendar.startOfDay(
+                    for: startDate
+                )
+            let daysFromPlanStart =
+                calendar
+                    .dateComponents(
+                        [.day],
+                        from: planStart,
+                        to: currentStart
+                    )
+                    .day ?? 0
+            let currentPlanWeek =
+                max(
+                    daysFromPlanStart / 7,
+                    0
+                )
+            let remaining =
+                max(
+                    plan.weeks.count -
+                        currentPlanWeek -
+                        1,
+                    0
+                )
+            return weekOffset <
+                remaining
+        }
+
+        return weekOffset <
+            max(
+                plan.weeks.count - 1,
+                0
+            )
+    }
+
+    private func workoutsForDay(
+        _ date: Date
+    ) -> [WorkoutSummary] {
+        workouts
+            .filter {
+                calendar.isDate(
+                    $0.startDate,
+                    inSameDayAs:
+                        date
+                )
+            }
+            .sorted {
+                $0.startDate <
+                    $1.startDate
+            }
+    }
+
+    private func completedPlanSessionIDs(
+        date: Date,
+        planned: [PlannedSession]
+    ) -> Set<UUID> {
+        guard !planned.isEmpty
+        else {
+            return []
+        }
+
+        var completed =
+            Set<UUID>()
+
+        if let plan {
+            for item in planned
+            where session
+                .isPlanSessionManuallyCompleted(
+                    planID: plan.id,
+                    sessionID: item.id
+                ) {
+                completed.insert(
+                    item.id
+                )
+            }
+        }
+
+        var unused =
+            workoutsForDay(date)
+
+        for item in planned
+        where !completed
+            .contains(item.id) {
+            guard let index =
+                    unused.firstIndex(
+                        where: {
+                            healthWorkout(
+                                $0,
+                                matches: item
+                            )
+                        }
+                    )
+            else {
+                continue
+            }
+
+            completed.insert(
+                item.id
+            )
+            unused.remove(
+                at: index
+            )
+        }
+
+        return completed
+    }
+
+    private func healthWorkout(
+        _ workout: WorkoutSummary,
+        matches planned:
+            PlannedSession
+    ) -> Bool {
+        switch planned.kind {
+        case .running:
+            return workout.activity ==
+                .running
+        case .walking:
+            return workout.activity ==
+                .walking ||
+                workout.activity ==
+                    .hiking
+        case .strength:
+            return workout.activity ==
+                .strength
+        case .mobility:
+            return workout.activity ==
+                .yoga ||
+                workout.activity ==
+                    .coreTraining
+        case .recovery:
+            return false
+        case .custom:
+            return workout.activity ==
+                .hiit ||
+                workout.activity ==
+                    .rowing ||
+                workout.activity ==
+                    .cycling ||
+                workout.activity ==
+                    .stairClimbing ||
+                workout.activity ==
+                    .other
+        }
     }
 
     private func plannedSessions(
@@ -2717,27 +3071,45 @@ struct HomeWeeklyProgressStrip:
                         for: date
                     )
             let days =
+                calendar
+                    .dateComponents(
+                        [.day],
+                        from: start,
+                        to: target
+                    )
+                    .day ?? 0
+
+            guard days >= 0 else {
+                return []
+            }
+
+            weekIndex =
+                days / 7
+        } else {
+            let targetWeek =
+                calendar.dateInterval(
+                    of: .weekOfYear,
+                    for: date
+                )?
+                .start ??
+                calendar.startOfDay(
+                    for: date
+                )
+            let days =
+                calendar
+                    .dateComponents(
+                        [.day],
+                        from:
+                            currentWeekInterval
+                                .start,
+                        to: targetWeek
+                    )
+                    .day ?? 0
+            weekIndex =
                 max(
-                    calendar
-                        .dateComponents(
-                            [.day],
-                            from: start,
-                            to: target
-                        )
-                        .day ?? 0,
+                    days / 7,
                     0
                 )
-            weekIndex =
-                min(
-                    days / 7,
-                    max(
-                        plan.weeks.count -
-                            1,
-                        0
-                    )
-                )
-        } else {
-            weekIndex = 0
         }
 
         guard
@@ -2792,6 +3164,374 @@ struct HomeWeeklyProgressStrip:
         default:
             return "Søn"
         }
+    }
+}
+
+private struct HomeWeeklyProgressDaySheet:
+    View {
+    let selection:
+        HomeWeeklyProgressDaySelection
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    if selection.planned.isEmpty &&
+                        selection.actual.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No workouts",
+                                norwegian:
+                                    "Ingen økter"
+                            ),
+                            systemImage:
+                                "calendar"
+                        )
+                        .padding(.top, 40)
+                    }
+
+                    if !selection
+                        .planned
+                        .isEmpty {
+                        sectionTitle(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Planned",
+                                norwegian:
+                                    "Planlagt"
+                            )
+                        )
+
+                        ForEach(
+                            selection.planned
+                        ) { workout in
+                            plannedRow(
+                                workout
+                            )
+                        }
+                    }
+
+                    if !selection
+                        .actual
+                        .isEmpty {
+                        sectionTitle(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Completed workouts",
+                                norwegian:
+                                    "Utførte økter"
+                            )
+                        )
+
+                        ForEach(
+                            selection.actual
+                        ) { workout in
+                            actualRow(
+                                workout
+                            )
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(
+                Color(
+                    .systemGroupedBackground
+                )
+                .ignoresSafeArea()
+            )
+            .navigationTitle(
+                selection.date.formatted(
+                    .dateTime
+                        .weekday(.wide)
+                        .day()
+                        .month(.wide)
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+        }
+    }
+
+    private func sectionTitle(
+        _ title: String
+    ) -> some View {
+        Text(title.uppercased())
+            .font(
+                .system(
+                    size: 9,
+                    weight: .bold
+                )
+            )
+            .tracking(1.0)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(.top, 4)
+    }
+
+    private func plannedRow(
+        _ workout: PlannedSession
+    ) -> some View {
+        let completed =
+            selection
+                .completedPlannedIDs
+                .contains(
+                    workout.id
+                )
+
+        return HStack(spacing: 11) {
+            Image(
+                systemName:
+                    completed
+                        ? "checkmark"
+                        : workout
+                            .kind
+                            .systemImage
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                completed
+                    ? .white
+                    : ATHLTHTheme
+                        .accentDeep
+            )
+            .frame(
+                width: 36,
+                height: 36
+            )
+            .background(
+                completed
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .accentSoft,
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(workout.title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(
+                    plannedDetail(
+                        workout
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(
+                completed
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Completed",
+                        norwegian:
+                            "Fullført"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Planned",
+                        norwegian:
+                            "Planlagt"
+                    )
+            )
+            .font(
+                .caption2.weight(
+                    .semibold
+                )
+            )
+            .foregroundStyle(
+                completed
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .mutedText
+            )
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+
+    private func actualRow(
+        _ workout: WorkoutSummary
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(
+                systemName:
+                    workout.activity.icon
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 36,
+                height: 36
+            )
+            .background(
+                ATHLTHTheme.accentSoft,
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    workout.activity
+                        .rawValue
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+
+                Text(
+                    actualDetail(
+                        workout
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+
+    private func plannedDetail(
+        _ workout: PlannedSession
+    ) -> String {
+        var parts: [String] = []
+
+        if let start =
+                workout.scheduledStart {
+            parts.append(
+                start.formatted(
+                    date: .omitted,
+                    time: .shortened
+                )
+            )
+        }
+
+        if let minutes =
+                workout.durationMinutes {
+            parts.append(
+                "\(minutes) min"
+            )
+        }
+
+        if let distance =
+                workout
+                    .targetDistanceKilometers {
+            parts.append(
+                String(
+                    format:
+                        "%.1f km",
+                    distance
+                )
+            )
+        }
+
+        if !workout.exercises
+            .isEmpty {
+            parts.append(
+                ATHLTHLocalization.format(
+                    english:
+                        "%d exercises",
+                    norwegian:
+                        "%d øvelser",
+                    workout.exercises.count
+                )
+            )
+        }
+
+        return parts.isEmpty
+            ? workout.kind.title
+            : parts.joined(
+                separator: " · "
+            )
+    }
+
+    private func actualDetail(
+        _ workout: WorkoutSummary
+    ) -> String {
+        let minutes =
+            max(
+                Int(
+                    (workout.duration / 60)
+                        .rounded()
+                ),
+                0
+            )
+        var parts =
+            [
+                "\(minutes) min"
+            ]
+
+        if let distance =
+                workout.distanceMeters,
+           distance > 0 {
+            parts.append(
+                String(
+                    format:
+                        "%.1f km",
+                    distance / 1_000
+                )
+            )
+        }
+
+        return parts.joined(
+            separator: " · "
+        )
     }
 }
 
