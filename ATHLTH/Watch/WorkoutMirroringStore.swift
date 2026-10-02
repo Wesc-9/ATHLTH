@@ -40,33 +40,46 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             state == .ending
     }
 
-    func sendCommand(_ command: WatchWorkoutCommand) {
+    @discardableResult
+    func sendCommand(
+        _ command: WatchWorkoutCommand
+    ) -> Bool {
         guard let mirroredSession else {
             publish {
                 self.errorMessage =
                     ATHLTHLocalization.choose(
-                        english: "The mirrored Apple Watch workout is not connected.",
-                        norwegian: "Den speilede Apple Watch-økten er ikke tilkoblet."
+                        english:
+                            "The mirrored Apple Watch workout is reconnecting.",
+                        norwegian:
+                            "Den speilede Apple Watch-økten kobler til på nytt."
                     )
             }
-            return
+            return false
         }
 
         guard let data = try? JSONEncoder().encode(
-            WatchWorkoutMirrorCommand(command: command)
+            WatchWorkoutMirrorCommand(
+                command: command
+            )
         ) else {
-            return
+            return false
         }
 
         Task {
             do {
-                try await mirroredSession.sendToRemoteWorkoutSession(data: data)
+                try await mirroredSession
+                    .sendToRemoteWorkoutSession(
+                        data: data
+                    )
             } catch {
                 publish {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage =
+                        error.localizedDescription
                 }
             }
         }
+
+        return true
     }
 
     func dismissSummary() {
@@ -137,15 +150,97 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             self.connectionText =
                 latestSnapshot.state == .completed
                     ? ATHLTHLocalization.choose(
-                        english: "Workout completed",
-                        norwegian: "Økt fullført"
+                        english:
+                            "Workout completed",
+                        norwegian:
+                            "Økt fullført"
                     )
-                    : ATHLTHLocalization.choose(
-                        english: "Live from Apple Watch",
-                        norwegian: "Direkte fra Apple Watch"
-                    )
+                    : latestSnapshot.state == .failed
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Workout connection ended",
+                            norwegian:
+                                "Økttilkoblingen ble avsluttet"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Live from Apple Watch",
+                            norwegian:
+                                "Direkte fra Apple Watch"
+                        )
             self.isPresentationRequested = true
         }
+
+        if latestSnapshot.state == .completed ||
+            latestSnapshot.state == .failed {
+            mirroredSession = nil
+            ATHLTHWatchWorkoutRuntime
+                .isMirroredWorkoutActive =
+                false
+            ATHLTHWatchWorkoutRuntime
+                .lastMirrorDetectedAt =
+                Date()
+        }
+    }
+
+    func reconcileCompletedWatchWorkout(
+        _ result: WatchWorkoutResult
+    ) {
+        guard var snapshot,
+              snapshot.kind == result.kind,
+              abs(
+                snapshot.startedAt
+                    .timeIntervalSince(
+                        result.startedAt
+                    )
+              ) < 180
+        else {
+            return
+        }
+
+        snapshot.state = .completed
+        snapshot.capturedAt = Date()
+        snapshot.elapsedTime =
+            result.duration
+        snapshot.heartRate =
+            result.averageHeartRate ??
+            snapshot.heartRate
+        snapshot.activeCalories =
+            max(
+                result.activeCalories,
+                snapshot.activeCalories
+            )
+        snapshot.distanceMeters =
+            max(
+                result.distanceMeters,
+                snapshot.distanceMeters
+            )
+        snapshot.averageHeartRate =
+            result.averageHeartRate ??
+            snapshot.averageHeartRate
+        snapshot.maxHeartRate =
+            result.maxHeartRate ??
+            snapshot.maxHeartRate
+        snapshot.routePointCount =
+            max(
+                result.routePointCount,
+                snapshot.routePointCount
+            )
+
+        self.snapshot = snapshot
+        mirroredSession = nil
+        connectionText =
+            ATHLTHLocalization.choose(
+                english:
+                    "Workout completed",
+                norwegian:
+                    "Økt fullført"
+            )
+        isPresentationRequested = true
+        ATHLTHWatchWorkoutRuntime
+            .isMirroredWorkoutActive = false
+        ATHLTHWatchWorkoutRuntime
+            .lastMirrorDetectedAt = Date()
     }
 
     private func elapsedTime(for session: HKWorkoutSession) -> TimeInterval {
@@ -300,6 +395,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             guard let self else { return }
 
             self.mirroredSession = nil
+            ATHLTHWatchWorkoutRuntime
+                .lastMirrorDetectedAt =
+                Date()
             self.connectionText =
                 ATHLTHLocalization.choose(
                     english: "Reconnecting to Apple Watch",
