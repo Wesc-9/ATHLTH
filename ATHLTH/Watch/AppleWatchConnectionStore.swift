@@ -113,6 +113,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     override init() {
+        super.init()
+
         if let stored =
                 UserDefaults.standard
                     .stringArray(
@@ -185,7 +187,6 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 pendingStrengthCommands.first
         }
 
-        super.init()
         // WatchConnectivity tracks Apple Watch availability independently
         // of workout capture. The user chooses iPhone or Apple Watch when
         // starting each workout; this store only reports Watch readiness.
