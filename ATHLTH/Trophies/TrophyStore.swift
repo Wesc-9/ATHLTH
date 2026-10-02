@@ -5,6 +5,8 @@ final class TrophyStore: ObservableObject {
     @Published private(set) var trophies: [TrophyProgressItem] = []
     @Published private(set) var unlocks: [TrophyUnlockRecord] = []
     @Published private(set) var showcaseIDs: [String] = []
+    @Published private(set) var trophyInscriptions:
+        [String: TrophyInscription] = [:]
     @Published private(set) var isRefreshing = false
     @Published private(set) var pendingReveal: TrophyUnlockRecord?
 
@@ -27,6 +29,10 @@ final class TrophyStore: ObservableObject {
             persisted.showcaseIDs
                 .prefix(Self.showcaseLimit)
         )
+        trophyInscriptions =
+            persisted
+                .trophyInscriptions ??
+            [:]
         hasInitializedShowcase =
             persisted.hasInitializedShowcase
         stateOwnerUserID =
@@ -140,6 +146,7 @@ final class TrophyStore: ObservableObject {
                owner != currentUserID {
                 unlocks = []
                 showcaseIDs = []
+                trophyInscriptions = [:]
                 revealQueue = []
                 pendingReveal = nil
                 hasInitializedShowcase = false
@@ -157,6 +164,13 @@ final class TrophyStore: ObservableObject {
             mergeRemoteUnlocks(
                 remote.unlocks
             )
+            trophyInscriptions
+                .merge(
+                    remote.inscriptions
+                ) {
+                    _, remote in
+                    remote
+                }
 
             if let remoteUpdated =
                     remote
@@ -580,11 +594,7 @@ final class TrophyStore: ObservableObject {
             let effectiveRarity =
                 historical?
                     .rarity ??
-                (
-                    completedAt == nil
-                        ? .epic
-                        : .epic
-                )
+                .epic
             let effectiveUnlockedAt =
                 historical?
                     .unlockedAt ??
@@ -723,6 +733,25 @@ final class TrophyStore: ObservableObject {
 
     func isShowcased(_ trophyID: String) -> Bool {
         showcaseIDs.contains(trophyID)
+    }
+
+    func inscription(
+        for trophyID: String
+    ) -> TrophyInscription? {
+        trophyInscriptions[
+            trophyID
+        ]
+    }
+
+    func cacheInscription(
+        _ inscription:
+            TrophyInscription,
+        for trophyID: String
+    ) {
+        trophyInscriptions[
+            trophyID
+        ] = inscription
+        persist()
     }
 
     func toggleShowcase(_ trophyID: String) {
@@ -1232,6 +1261,8 @@ final class TrophyStore: ObservableObject {
         let state = TrophyPersistedState(
             unlocks: unlocks,
             showcaseIDs: showcaseIDs,
+            trophyInscriptions:
+                trophyInscriptions,
             hasInitializedShowcase: hasInitializedShowcase,
             ownerUserID: stateOwnerUserID,
             showcaseUpdatedAt: showcaseUpdatedAt
@@ -1290,6 +1321,8 @@ final class TrophyStore: ObservableObject {
 private struct TrophyPersistedState: Codable {
     let unlocks: [TrophyUnlockRecord]
     let showcaseIDs: [String]
+    let trophyInscriptions:
+        [String: TrophyInscription]?
     let hasInitializedShowcase: Bool
     let ownerUserID: UUID?
     let showcaseUpdatedAt: Date?
@@ -1297,6 +1330,7 @@ private struct TrophyPersistedState: Codable {
     static let empty = TrophyPersistedState(
         unlocks: [],
         showcaseIDs: [],
+        trophyInscriptions: [:],
         hasInitializedShowcase: false,
         ownerUserID: nil,
         showcaseUpdatedAt: nil
