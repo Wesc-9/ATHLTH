@@ -2096,7 +2096,7 @@ struct MuscleRecoveryCard: View {
             Text(
                 recoveryText(
                     "Estimated from recorded training data. Use as guidance only — do not rely on the estimate blindly.",
-                    "Estimert ut fra registrerte treningsdata. Bruk dette kun som veiledning – ikke stol blindt på estimatet."
+                    "Estimert ut fra registrerte treningsdata. Bruk dette kun som veiledning."
                 )
             )
             .font(.system(size: 7.5, weight: .regular))
