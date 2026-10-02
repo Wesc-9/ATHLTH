@@ -56,6 +56,7 @@ enum SubscriptionAccessSource: String, Codable, Hashable {
     case athlthTrial
     case appStore
     case serverVerified
+    case ownerOverride
 }
 
 enum ATHLTHFeature: Hashable, CaseIterable {
