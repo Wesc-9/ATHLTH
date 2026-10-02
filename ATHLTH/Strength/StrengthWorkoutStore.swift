@@ -592,7 +592,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 maxHeartRate: nil
             ),
             advancedConfiguration:
-                advancedConfiguration
+                advancedConfiguration,
+            allowsLiveExerciseBuilding:
+                session.exercises.isEmpty
         )
 
         currentExerciseIndex = 0
