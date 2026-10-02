@@ -10168,6 +10168,8 @@ struct CommunityGroupMembersView: View {
 private struct CommunityContentCoverPicker: View {
     @Binding var selectedPhoto: PhotosPickerItem?
     @Binding var imageData: Data?
+    @Binding var selectedArtwork:
+        ATHLTHStandardArtwork?
 
     let placeholderIcon: String
 
@@ -10176,13 +10178,23 @@ private struct CommunityContentCoverPicker: View {
     var body: some View {
         let photoButtonTitle =
             imageData == nil
-                ? "Choose Photo"
+                ? "Upload Photo"
                 : "Change Photo"
 
-        return VStack(spacing: 12) {
+        return VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
             Group {
                 if let imageData,
                    let image = UIImage(data: imageData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else if let selectedArtwork,
+                          let image =
+                            selectedArtwork
+                                .resolvedUIImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -10230,6 +10242,29 @@ private struct CommunityContentCoverPicker: View {
                 )
             }
 
+            Text("ATHLTH images")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            ATHLTHStandardArtworkPicker(
+                selection: Binding(
+                    get: {
+                        selectedArtwork
+                    },
+                    set: { artwork in
+                        selectedArtwork =
+                            artwork
+                        if artwork != nil {
+                            selectedPhoto = nil
+                            imageData = nil
+                            imageError = nil
+                        }
+                    }
+                )
+            )
+
             HStack(spacing: 10) {
                 PhotosPicker(
                     selection: $selectedPhoto,
@@ -10242,13 +10277,15 @@ private struct CommunityContentCoverPicker: View {
                 }
                 .buttonStyle(.bordered)
 
-                if imageData != nil {
+                if imageData != nil ||
+                    selectedArtwork != nil {
                     Button(
                         "Remove",
                         role: .destructive
                     ) {
                         selectedPhoto = nil
                         imageData = nil
+                        selectedArtwork = nil
                         imageError = nil
                     }
                     .buttonStyle(.bordered)
@@ -10267,7 +10304,7 @@ private struct CommunityContentCoverPicker: View {
                     )
             } else {
                 Text(
-                    "Optional. ATHLTH resizes the image before upload."
+                    "Choose an ATHLTH image or upload your own. Uploaded photos are resized before upload."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -10300,6 +10337,7 @@ private struct CommunityContentCoverPicker: View {
                     }
 
                     imageData = jpeg
+                    selectedArtwork = nil
                     imageError = nil
                 } catch {
                     imageError =
