@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
     case event
