@@ -946,210 +946,7 @@ private struct StrengthBodyFigureCanvas:
         context: inout GraphicsContext,
         size: CGSize
     ) {
-        if style == .recoveryLoad {
-            drawRecoverySilhouette(
-                context: &context,
-                size: size
-            )
-            return
-        }
-
-        let base =
-            style == .recoveryLoad
-                ? Color(
-                    red: 0.89,
-                    green: 0.87,
-                    blue: 0.83
-                )
-                : Color(
-                    red: 0.83,
-                    green: 0.84,
-                    blue: 0.85
-                )
-        let outline =
-            Color.black.opacity(
-                style == .recoveryLoad
-                    ? 0.055
-                    : 0.09
-            )
-
-        let recoverySilhouette: Bool
-        switch style {
-        case .activation:
-            recoverySilhouette = false
-        case .recoveryLoad:
-            recoverySilhouette = true
-        }
-
-        let head =
-            CGRect(
-                x:
-                    size.width *
-                    (recoverySilhouette ? 0.41 : 0.39),
-                y: size.height * 0.02,
-                width:
-                    size.width *
-                    (recoverySilhouette ? 0.18 : 0.22),
-                height:
-                    size.width *
-                    (recoverySilhouette ? 0.18 : 0.22)
-            )
-        context.fill(
-            Path(
-                ellipseIn: head
-            ),
-            with: .color(
-                base
-            )
-        )
-
-        var torso = Path()
-        torso.move(
-            to: CGPoint(
-                x: size.width * 0.50,
-                y: size.height * 0.15
-            )
-        )
-        torso.addCurve(
-            to: CGPoint(
-                x:
-                    size.width *
-                    (recoverySilhouette ? 0.72 : 0.75),
-                y: size.height * 0.28
-            ),
-            control1:
-                CGPoint(
-                    x: size.width * 0.63,
-                    y: size.height * 0.16
-                ),
-            control2:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.70 : 0.73),
-                    y: size.height * 0.20
-                )
-        )
-        torso.addCurve(
-            to: CGPoint(
-                x:
-                    size.width *
-                    (recoverySilhouette ? 0.61 : 0.64),
-                y: size.height * 0.58
-            ),
-            control1:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.68 : 0.73),
-                    y: size.height * 0.40
-                ),
-            control2:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.63 : 0.68),
-                    y: size.height * 0.52
-                )
-        )
-        torso.addLine(
-            to: CGPoint(
-                x:
-                    size.width *
-                    (recoverySilhouette ? 0.39 : 0.36),
-                y: size.height * 0.58
-            )
-        )
-        torso.addCurve(
-            to: CGPoint(
-                x:
-                    size.width *
-                    (recoverySilhouette ? 0.28 : 0.25),
-                y: size.height * 0.28
-            ),
-            control1:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.37 : 0.32),
-                    y: size.height * 0.52
-                ),
-            control2:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.32 : 0.27),
-                    y: size.height * 0.40
-                )
-        )
-        torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.50,
-                y: size.height * 0.15
-            ),
-            control1:
-                CGPoint(
-                    x:
-                        size.width *
-                        (recoverySilhouette ? 0.30 : 0.27),
-                    y: size.height * 0.20
-                ),
-            control2:
-                CGPoint(
-                    x: size.width * 0.37,
-                    y: size.height * 0.16
-                )
-        )
-        torso.closeSubpath()
-
-        context.fill(
-            torso,
-            with: .color(base)
-        )
-        context.stroke(
-            torso,
-            with: .color(outline),
-            lineWidth: 0.8
-        )
-
-        drawCapsule(
-            x: recoverySilhouette ? 0.18 : 0.16,
-            y: 0.23,
-            width: recoverySilhouette ? 0.11 : 0.14,
-            height: recoverySilhouette ? 0.36 : 0.38,
-            rotation: -0.08,
-            fill: base,
-            context: &context,
-            size: size
-        )
-        drawCapsule(
-            x: recoverySilhouette ? 0.71 : 0.70,
-            y: 0.23,
-            width: recoverySilhouette ? 0.11 : 0.14,
-            height: recoverySilhouette ? 0.36 : 0.38,
-            rotation: 0.08,
-            fill: base,
-            context: &context,
-            size: size
-        )
-
-        drawCapsule(
-            x: recoverySilhouette ? 0.35 : 0.33,
-            y: 0.55,
-            width: recoverySilhouette ? 0.13 : 0.16,
-            height: 0.41,
-            rotation: -0.015,
-            fill: base,
-            context: &context,
-            size: size
-        )
-        drawCapsule(
-            x: recoverySilhouette ? 0.52 : 0.51,
-            y: 0.55,
-            width: recoverySilhouette ? 0.13 : 0.16,
-            height: 0.41,
-            rotation: 0.015,
-            fill: base,
+        drawRecoverySilhouette(
             context: &context,
             size: size
         )
@@ -1159,14 +956,30 @@ private struct StrengthBodyFigureCanvas:
         context: inout GraphicsContext,
         size: CGSize
     ) {
-        let base =
-            Color(
-                red: 0.90,
-                green: 0.89,
-                blue: 0.86
-            )
-        let outline =
-            Color.black.opacity(0.075)
+        let base: Color
+        let outline: Color
+
+        switch style {
+        case .activation:
+            base =
+                Color(
+                    red: 0.83,
+                    green: 0.84,
+                    blue: 0.85
+                )
+            outline =
+                Color.black.opacity(0.09)
+
+        case .recoveryLoad:
+            base =
+                Color(
+                    red: 0.90,
+                    green: 0.89,
+                    blue: 0.86
+                )
+            outline =
+                Color.black.opacity(0.075)
+        }
 
         let head =
             CGRect(
