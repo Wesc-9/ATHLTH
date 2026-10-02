@@ -162,15 +162,6 @@ struct ATHLTHCommunityV4View: View {
         )
     }
 
-    private var attentionCount: Int {
-        messaging.unreadCount +
-        messaging.messageRequestCount +
-        social.incomingRequests.count +
-        social.workoutInvites.count +
-        challengeInvites.count +
-        groups.ownInvites.count
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -179,7 +170,6 @@ struct ATHLTHCommunityV4View: View {
                     spacing: 12
                 ) {
                     CommunityReferenceHeader(
-                        attentionCount: attentionCount,
                         canManageWeekly:
                             session.currentRole
                                 .canAccessControlCenter
@@ -1124,7 +1114,6 @@ struct ATHLTHCommunityV4View: View {
 // MARK: - Reference Community Front Page
 
 private struct CommunityReferenceHeader: View {
-    let attentionCount: Int
     let canManageWeekly: Bool
 
     var body: some View {
@@ -1159,19 +1148,6 @@ private struct CommunityReferenceHeader: View {
             Spacer(minLength: 4)
 
             HStack(spacing: 8) {
-                NavigationLink {
-                    ATHLTHNotificationCenterView()
-                } label: {
-                    button(
-                        icon:
-                            attentionCount > 0
-                                ? "bell.fill"
-                                : "bell",
-                        badge: attentionCount
-                    )
-                }
-                .buttonStyle(.plain)
-
                 if canManageWeekly {
                     NavigationLink {
                         OfficialWeeklyChallengeAdminListView()
@@ -3816,7 +3792,6 @@ private struct CommunityReferenceAvatar: View {
 
 private struct CommunityV4Header: View {
     let unreadMessages: Int
-    let attentionCount: Int
     let canManageWeekly: Bool
 
     var body: some View {
@@ -3882,37 +3857,6 @@ private struct CommunityV4Header: View {
                     unreadMessages > 0
                         ? "Messages, \(unreadMessages) unread"
                         : "Messages"
-                )
-
-                NavigationLink {
-                    ATHLTHNotificationCenterView()
-                } label: {
-                    ZStack(
-                        alignment: .topTrailing
-                    ) {
-                        headerButton(
-                            icon:
-                                attentionCount > 0
-                                ? "bell.fill"
-                                : "bell"
-                        )
-
-                        if attentionCount > 0 {
-                            badge(
-                                attentionCount
-                            )
-                            .offset(
-                                x: 4,
-                                y: -4
-                            )
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    attentionCount > 0
-                        ? "Notifications, \(attentionCount)"
-                        : "Notifications"
                 )
 
                 if canManageWeekly {
