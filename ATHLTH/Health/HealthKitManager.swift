@@ -1310,6 +1310,10 @@ final class HealthKitManager: ObservableObject {
         var firstTenKDate: Date?
         var firstHalfMarathonDate: Date?
         var firstMarathonDate: Date?
+        var firstHalfMarathonEvidence:
+            PrestigeRunEvidence?
+        var firstMarathonEvidence:
+            PrestigeRunEvidence?
 
         for workout in workouts where workout.workoutActivityType == .running {
             let distance = workout.athlthDistanceMeters ?? 0
@@ -1326,12 +1330,99 @@ final class HealthKitManager: ObservableObject {
                 firstTenKDate = workout.endDate
             }
 
-            if firstHalfMarathonDate == nil, distance >= 21_097.5 {
-                firstHalfMarathonDate = workout.endDate
+            let wasUserEntered: Bool = {
+                guard let value =
+                        workout.metadata?[
+                            HKMetadataKeyWasUserEntered
+                        ]
+                else {
+                    return false
+                }
+
+                if let number =
+                    value as? NSNumber {
+                    return number.boolValue
+                }
+
+                if let bool =
+                    value as? Bool {
+                    return bool
+                }
+
+                return false
+            }()
+
+            let sourceBundleIdentifier =
+                workout
+                    .sourceRevision
+                    .source
+                    .bundleIdentifier
+            let sourceName =
+                workout
+                    .sourceRevision
+                    .source
+                    .name
+
+            let locationType =
+                workout
+                    .workoutActivities
+                    .first?
+                    .workoutConfiguration
+                    .locationType
+            let isIndoor: Bool?
+            switch locationType {
+            case .indoor:
+                isIndoor = true
+            case .outdoor:
+                isIndoor = false
+            default:
+                isIndoor = nil
             }
 
-            if firstMarathonDate == nil, distance >= 42_195 {
-                firstMarathonDate = workout.endDate
+            let prestigeEvidence =
+                PrestigeRunEvidence(
+                    workoutID:
+                        workout.uuid,
+                    distanceMeters:
+                        distance,
+                    durationSeconds:
+                        workout.duration,
+                    startedAt:
+                        workout.startDate,
+                    endedAt:
+                        workout.endDate,
+                    sourceBundleIdentifier:
+                        sourceBundleIdentifier,
+                    sourceName:
+                        sourceName,
+                    isIndoor:
+                        isIndoor,
+                    wasUserEntered:
+                        wasUserEntered
+                )
+
+            // Gold running trophies require one real HealthKit workout.
+            // Manually entered Health records are intentionally excluded.
+            if firstHalfMarathonDate == nil,
+               distance >= 21_097.5,
+               !wasUserEntered,
+               workout.duration > 0,
+               !sourceBundleIdentifier.isEmpty {
+                firstHalfMarathonDate =
+                    workout.endDate
+                firstHalfMarathonEvidence =
+                    prestigeEvidence
+            }
+
+            if firstMarathonDate == nil,
+               distance >= 42_195,
+               !wasUserEntered,
+               workout.duration > 0,
+               !sourceBundleIdentifier.isEmpty {
+                firstMarathonDate =
+                    workout.endDate
+                firstMarathonEvidence =
+                    prestigeEvidence
             }
 
             for threshold in runThresholds
@@ -1473,6 +1564,10 @@ final class HealthKitManager: ObservableObject {
             firstTenKDate: firstTenKDate,
             firstHalfMarathonDate: firstHalfMarathonDate,
             firstMarathonDate: firstMarathonDate,
+            firstHalfMarathonEvidence:
+                firstHalfMarathonEvidence,
+            firstMarathonEvidence:
+                firstMarathonEvidence,
             walkingWorkoutCount: walkingWorkoutCount,
             walkingWorkoutCountReachedAt:
                 walkingWorkoutCountReachedAt,
