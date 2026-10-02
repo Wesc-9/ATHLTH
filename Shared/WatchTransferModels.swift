@@ -860,6 +860,10 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var allExercisesComplete: Bool
     var updatedAt: Date
     var inputMode: WatchStrengthInputMode? = nil
+    var draftRPE: Double? = nil
+    var draftRIR: Double? = nil
+    var isWarmUp: Bool? = nil
+    var effortMetricRaw: String? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
@@ -881,6 +885,9 @@ struct WatchStrengthCommand: Codable, Hashable {
     var restSeconds: Int?
     var addRestSeconds: Int?
     var sentAt: Date
+    var rpe: Double? = nil
+    var rir: Double? = nil
+    var isWarmUp: Bool? = nil
 }
 
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
