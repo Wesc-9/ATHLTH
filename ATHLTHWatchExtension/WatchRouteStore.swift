@@ -8,6 +8,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var connectionText = "Connecting to iPhone"
     @Published private(set) var companionLinked = false
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
+    @Published private(set) var spotifyPlaybackState =
+        WatchSpotifyPlaybackState.unavailable
 
     private let fileManager = FileManager.default
     private let todayWorkoutDefaultsKey =
@@ -169,6 +171,45 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
     }
 
+    func requestSpotifyPlaybackState() {
+        sendSpotifyCommand(.requestState)
+    }
+
+    func sendSpotifyCommand(
+        _ kind: WatchSpotifyCommandKind
+    ) {
+        guard WCSession.isSupported(),
+              WCSession.default.activationState == .activated,
+              let data = try? JSONEncoder().encode(
+                WatchSpotifyCommand(kind: kind)
+              )
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind.spotifyCommand.rawValue,
+            WatchTransferMetadataKey.payload:
+                data
+        ]
+
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler:
+                    Self.makeTransferFallbackErrorHandler(
+                        payload: payload
+                    )
+            )
+        } else {
+            WCSession.default.transferUserInfo(
+                payload
+            )
+        }
+    }
+
     private func applyWorkoutConfiguration(
         kind rawKind: String,
         data: Data
@@ -282,12 +323,23 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchWorkoutManager.shared
                 .configureStrengthSession(snapshot)
 
+        case .spotifyPlaybackState:
+            guard let playbackState = try? JSONDecoder().decode(
+                WatchSpotifyPlaybackState.self,
+                from: data
+            ) else {
+                return
+            }
+
+            spotifyPlaybackState = playbackState
+
         case .route,
              .workoutResult,
              .workoutCommand,
              .workoutRouteSelection,
              .todayWorkoutRequest,
              .strengthCommand,
+             .spotifyCommand,
              .connectivityProbe,
              .connectivityAck:
             break
@@ -512,7 +564,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .liveSurfaceConfiguration ||
            transferKind == .liveSurfaceContext ||
            transferKind == .todayWorkout ||
-           transferKind == .strengthSnapshot {
+           transferKind == .strengthSnapshot ||
+           transferKind == .spotifyPlaybackState {
             Task { @MainActor [weak self] in
                 self?.applyWorkoutConfiguration(
                     kind: rawKind,
@@ -574,6 +627,7 @@ extension WatchRouteStore:
 
             Task { @MainActor [weak self] in
                 self?.requestTodayWorkoutSnapshot()
+                self?.requestSpotifyPlaybackState()
             }
         }
     }
