@@ -10019,7 +10019,8 @@ struct ATHLTHProfileView: View {
             destination:
                 AnyView(
                     PerformanceStatsView(
-                        stats: performanceStats
+                        stats: performanceStats,
+                        healthRecords: personalRecords
                     )
                 )
         ) {
