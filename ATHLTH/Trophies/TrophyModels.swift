@@ -151,6 +151,21 @@ struct TrophySeriesDefinition: Identifiable, Hashable {
     let stages: [TrophyStageDefinition]
 }
 
+struct PrestigeRunEvidence:
+    Hashable,
+    Codable
+{
+    let workoutID: UUID
+    let distanceMeters: Double
+    let durationSeconds: TimeInterval
+    let startedAt: Date
+    let endedAt: Date
+    let sourceBundleIdentifier: String
+    let sourceName: String
+    let isIndoor: Bool?
+    let wasUserEntered: Bool
+}
+
 struct TrophyHealthSnapshot: Hashable, Codable {
     let workoutCount: Int
     let workoutCountReachedAt: [Int: Date]
@@ -163,6 +178,8 @@ struct TrophyHealthSnapshot: Hashable, Codable {
     let firstTenKDate: Date?
     let firstHalfMarathonDate: Date?
     let firstMarathonDate: Date?
+    let firstHalfMarathonEvidence: PrestigeRunEvidence?
+    let firstMarathonEvidence: PrestigeRunEvidence?
 
     // Optional so an existing on-device trophy cache from an older ATHLTH
     // build remains decodable after the walking trophy expansion.
@@ -236,6 +253,148 @@ struct TrophyProgressItem: Identifiable, Hashable {
         }
 
         return ATHLTHLocalization.string( "Locked")
+    }
+
+    var concreteProgressText: String? {
+        guard let nextTargetValue else {
+            return nil
+        }
+
+        func integer(
+            _ value: Double
+        ) -> String {
+            Int(value.rounded())
+                .formatted(
+                    .number
+                        .grouping(.automatic)
+                )
+        }
+
+        if id ==
+            TrophyCatalog
+                .runningDistance
+                .id ||
+            id ==
+            TrophyCatalog
+                .walkingDistance
+                .id {
+            let currentKilometers =
+                currentValue / 1_000
+            let targetKilometers =
+                nextTargetValue / 1_000
+
+            return ATHLTHLocalization.format(
+                english: "%.0f / %.0f km",
+                norwegian: "%.0f / %.0f km",
+                currentKilometers,
+                targetKilometers
+            )
+        }
+
+        if id ==
+            TrophyCatalog
+                .strengthVolume
+                .id {
+            return ATHLTHLocalization.format(
+                english: "%@ / %@ kg",
+                norwegian: "%@ / %@ kg",
+                integer(currentValue),
+                integer(
+                    nextTargetValue
+                )
+            )
+        }
+
+        let unit: String
+        switch id {
+        case TrophyCatalog
+            .workoutMomentum
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "workouts",
+                    norwegian: "økter"
+                )
+        case TrophyCatalog
+            .walkingSessions
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "walks",
+                    norwegian: "gåturer"
+                )
+        case TrophyCatalog
+            .streak
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "days",
+                    norwegian: "dager"
+                )
+        case TrophyCatalog
+            .strengthSessions
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "sessions",
+                    norwegian: "økter"
+                )
+        case TrophyCatalog
+            .recoveryNights
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "nights",
+                    norwegian: "netter"
+                )
+        case TrophyCatalog
+            .completedGoals
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "goals",
+                    norwegian: "mål"
+                )
+        case TrophyCatalog
+            .challengeParticipation
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "challenges",
+                    norwegian: "challenges"
+                )
+        case TrophyCatalog
+            .challengeWins
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "wins",
+                    norwegian: "seire"
+                )
+        case TrophyCatalog
+            .friendsChallenged
+            .id:
+            unit =
+                ATHLTHLocalization.choose(
+                    english: "friends",
+                    norwegian: "venner"
+                )
+        default:
+            if let completed =
+                journeyMilestonesCompleted,
+               let total =
+                journeyMilestonesTotal {
+                return ATHLTHLocalization.format(
+                    english: "%d / %d milestones",
+                    norwegian: "%d / %d milepæler",
+                    completed,
+                    total
+                )
+            }
+            return nil
+        }
+
+        return "\(integer(currentValue)) / \(integer(nextTargetValue)) \(unit)"
     }
 
     var awardClass: ATHLTHAwardClass {
