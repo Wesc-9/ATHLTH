@@ -3139,6 +3139,65 @@ private struct WorkoutInviteLaunchSheet: View {
                     }
                 }
 
+                if let startAt =
+                        social.workoutSessions
+                            .first(
+                                where: {
+                                    $0.id ==
+                                        invite.session.id
+                                }
+                            )?
+                            .coordinatedStartAt {
+                    TimelineView(
+                        .periodic(
+                            from: .now,
+                            by: 0.2
+                        )
+                    ) { context in
+                        let remaining =
+                            max(
+                                startAt
+                                    .timeIntervalSince(
+                                        context.date
+                                    ),
+                                0
+                            )
+                        let count =
+                            max(
+                                Int(
+                                    ceil(remaining)
+                                ),
+                                0
+                            )
+
+                        HStack {
+                            Spacer()
+
+                            Text(
+                                count > 0
+                                    ? "\(count)"
+                                    : ATHLTHLocalization.choose(
+                                        english: "GO",
+                                        norwegian: "KJØR"
+                                    )
+                            )
+                            .font(
+                                .system(
+                                    size: 42,
+                                    weight: .black,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accent
+                            )
+
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 Text(
                     ATHLTHLocalization.choose(
                         english:
