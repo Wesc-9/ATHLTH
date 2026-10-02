@@ -1094,9 +1094,20 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func enableAdvancedTracking() {
-        guard var workout = activeWorkout else { return }
+        guard var workout = activeWorkout else {
+            return
+        }
+
         workout.trackingMode = .advanced
+
+        if workout.advancedConfiguration == nil {
+            workout.advancedConfiguration =
+                StrengthAdvancedConfiguration
+                    .savedDefaults()
+        }
+
         activeWorkout = workout
+        reloadDraftFromCurrentSet()
     }
 
     func completeCurrentSetWithoutDetails(
