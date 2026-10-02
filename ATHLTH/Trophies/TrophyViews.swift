@@ -1186,8 +1186,8 @@ struct TrophyCabinetSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Trophy cabinet",
-                            norwegian: "Troféskap"
+                            english: "Trophy shelf",
+                            norwegian: "Trofehylle"
                         )
                     )
                         .font(.title3.weight(.bold))
@@ -1210,8 +1210,8 @@ struct TrophyCabinetSection: View {
                 } label: {
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Open cabinet",
-                            norwegian: "Åpne skap"
+                            english: "Open shelf",
+                            norwegian: "Åpne hylle"
                         )
                     )
                         .font(.caption.weight(.semibold))
@@ -1226,7 +1226,14 @@ struct TrophyCabinetSection: View {
                         .frame(width: 38, height: 28)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Your cabinet is waiting")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Your trophy shelf is waiting",
+                                norwegian:
+                                    "Trofehyllen din venter"
+                            )
+                        )
                             .font(.subheadline.weight(.semibold))
                         Text(
                             ATHLTHLocalization.choose(
@@ -1562,8 +1569,12 @@ struct TrophyCollectionView: View {
         }
 
         if selectedTab == .shelf {
-            return
-                "\(count)/\(TrophyStore.showcaseLimit) valgt"
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(count)/\(TrophyStore.showcaseLimit) selected",
+                norwegian:
+                    "\(count)/\(TrophyStore.showcaseLimit) valgt"
+            )
         }
 
         return ATHLTHLocalization.format(
@@ -2796,9 +2807,9 @@ struct TrophyCollectionView: View {
                 Label(
                     ATHLTHLocalization.choose(
                         english:
-                            "In cabinet",
+                            "On shelf",
                         norwegian:
-                            "I troféskapet"
+                            "På trofehyllen"
                     ),
                     systemImage:
                         "checkmark.circle.fill"
@@ -3512,7 +3523,11 @@ struct TrophyDetailView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(unlock.stageTitle)
+                        Text(
+                            historyStageTitle(
+                                unlock
+                            )
+                        )
                             .font(.subheadline.weight(.semibold))
                         Text(unlock.unlockedAt.formatted(.dateTime.day().month(.abbreviated).year()))
                             .font(.caption2)
@@ -3521,7 +3536,12 @@ struct TrophyDetailView: View {
 
                     Spacer()
 
-                    Text(unlock.rarity.title)
+                    Text(
+                        historyRarity(
+                            unlock
+                        )
+                        .title
+                    )
                         .font(.caption2.bold())
                         .foregroundStyle(unlock.category.trophyAccent)
                 }
@@ -3529,6 +3549,86 @@ struct TrophyDetailView: View {
         }
         .padding()
         .trophyDetailCard()
+    }
+
+    private func historyRarity(
+        _ unlock:
+            TrophyUnlockRecord
+    ) -> TrophyRarity {
+        if let definition =
+                TrophyCatalog
+                    .allSeries
+                    .first(
+                        where: {
+                            $0.id ==
+                                unlock
+                                    .trophyID
+                        }
+                    ),
+           let stage =
+                definition
+                    .stages
+                    .first(
+                        where: {
+                            unlock
+                                .stageKey ==
+                            "\(definition.id).stage.\($0.id)"
+                        }
+                    ) {
+            return stage.rarity
+        }
+
+        if let trophy,
+           !trophy
+                .isPrestigeTrophy,
+           unlock
+                .stageKey ==
+                "\(trophy.id).unlocked" {
+            return trophy
+                .displayRarity
+        }
+
+        return unlock.rarity
+    }
+
+    private func historyStageTitle(
+        _ unlock:
+            TrophyUnlockRecord
+    ) -> String {
+        if let definition =
+                TrophyCatalog
+                    .allSeries
+                    .first(
+                        where: {
+                            $0.id ==
+                                unlock
+                                    .trophyID
+                        }
+                    ),
+           let stage =
+                definition
+                    .stages
+                    .first(
+                        where: {
+                            unlock
+                                .stageKey ==
+                            "\(definition.id).stage.\($0.id)"
+                        }
+                    ) {
+            return stage.title
+        }
+
+        if let trophy,
+           !trophy
+                .isPrestigeTrophy,
+           unlock
+                .stageKey ==
+                "\(trophy.id).unlocked" {
+            return trophy
+                .stageLabel
+        }
+
+        return unlock.stageTitle
     }
 
     private func verificationText(_ source: TrophyVerificationSource) -> String {
