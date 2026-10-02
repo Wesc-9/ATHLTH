@@ -13,6 +13,11 @@ final class TrophyStore: ObservableObject {
     private var hasInitializedShowcase = false
     private var revealQueue: [TrophyUnlockRecord] = []
     private let activationDate: Date
+    private let cloud =
+        TrophyCloudService()
+    private var activeUserID: UUID?
+    private var activeUsername: String?
+    private var showcaseUpdatedAt: Date?
 
     init() {
         let persisted = Self.loadState()
@@ -23,6 +28,8 @@ final class TrophyStore: ObservableObject {
         )
         hasInitializedShowcase =
             persisted.hasInitializedShowcase
+        showcaseUpdatedAt =
+            persisted.showcaseUpdatedAt
         activationDate = Self.loadOrCreateActivationDate()
     }
 
@@ -108,14 +115,65 @@ final class TrophyStore: ObservableObject {
         strength: StrengthWorkoutStore,
         goals: GoalStore,
         challenges: ChallengeStore? = nil,
-        currentUserID: UUID? = nil
+        currentUserID: UUID? = nil,
+        username: String? = nil
     ) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
 
+        activeUserID =
+            currentUserID
+        activeUsername =
+            username?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if currentUserID != nil,
+           let remote =
+                try? await cloud
+                    .loadState() {
+            mergeRemoteUnlocks(
+                remote.unlocks
+            )
+
+            if let remoteUpdated =
+                    remote
+                        .cabinetUpdatedAt,
+               showcaseUpdatedAt == nil ||
+               remoteUpdated >
+                    (
+                        showcaseUpdatedAt ??
+                        .distantPast
+                    ) {
+                showcaseIDs =
+                    Array(
+                        remote
+                            .showcaseIDs
+                            .prefix(
+                                Self
+                                    .showcaseLimit
+                            )
+                    )
+                showcaseUpdatedAt =
+                    remoteUpdated
+                hasInitializedShowcase =
+                    true
+            }
+        }
+
         let healthSnapshot = try? await health.trophySnapshot()
         let strengthSnapshot = strength.trophySnapshot()
+
+        if currentUserID != nil,
+           let healthSnapshot {
+            await claimPrestigeTrophies(
+                from: healthSnapshot
+            )
+        }
+
         let completedGoals = goals.goals.filter { $0.status == .completed }
         let completedGoalCount = completedGoals.count
 
@@ -321,6 +379,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "Your first recorded running workout of at least 5 kilometres.",
                     icon: "5.circle.fill",
                     source: .appleHealth,
+                    rarity: .core,
                     unlockedAt: healthSnapshot.firstFiveKDate
                 )
             )
@@ -332,6 +391,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "Your first recorded running workout of at least 10 kilometres.",
                     icon: "figure.run",
                     source: .appleHealth,
+                    rarity: .rare,
                     unlockedAt:
                         healthSnapshot
                             .firstTenKDate
@@ -345,7 +405,13 @@ final class TrophyStore: ObservableObject {
                     subtitle: "A recorded run reaching 21.1 kilometres.",
                     icon: "figure.run",
                     source: .appleHealth,
-                    unlockedAt: healthSnapshot.firstHalfMarathonDate
+                    rarity: .signature,
+                    unlockedAt:
+                        historicalUnlockDate(
+                            for:
+                                PrestigeTrophyCatalog
+                                    .halfMarathonID
+                        )
                 )
             )
 
@@ -356,7 +422,13 @@ final class TrophyStore: ObservableObject {
                     subtitle: "42.195 kilometres recorded in a single run.",
                     icon: "flag.checkered",
                     source: .appleHealth,
-                    unlockedAt: healthSnapshot.firstMarathonDate
+                    rarity: .signature,
+                    unlockedAt:
+                        historicalUnlockDate(
+                            for:
+                                PrestigeTrophyCatalog
+                                    .marathonID
+                        )
                 )
             )
 
@@ -367,6 +439,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "A single recorded walking workout reaching 5 kilometres.",
                     icon: "figure.walk",
                     source: .appleHealth,
+                    rarity: .core,
                     unlockedAt:
                         healthSnapshot
                             .firstFiveKWalkDate
@@ -380,6 +453,7 @@ final class TrophyStore: ObservableObject {
                     subtitle: "A single recorded walking workout reaching 10 kilometres.",
                     icon: "shoeprints.fill",
                     source: .appleHealth,
+                    rarity: .rare,
                     unlockedAt:
                         healthSnapshot
                             .firstTenKWalkDate
@@ -394,6 +468,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Your first weighted set logged in ATHLTH.",
                 icon: "dumbbell.fill",
                 source: .athlth,
+                rarity: .core,
                 unlockedAt: strengthSnapshot.firstWeightedSetDate
             )
         )
@@ -405,6 +480,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Win an ATHLTH Challenge on a specific verified route.",
                 icon: "point.topleft.down.to.point.bottomright.curvepath",
                 source: .challenge,
+                rarity: .rare,
                 unlockedAt: routeWinDates.first
             )
         )
@@ -416,6 +492,7 @@ final class TrophyStore: ObservableObject {
                 subtitle: "Win a strength challenge against your competition.",
                 icon: "dumbbell.fill",
                 source: .challenge,
+                rarity: .rare,
                 unlockedAt: strengthWinDates.first
             )
         )
@@ -430,7 +507,7 @@ final class TrophyStore: ObservableObject {
                     title: "Goal Complete",
                     threshold: targetValue,
                     displayTarget: "Completed",
-                    rarity: .signature
+                    rarity: .epic
                 )
             }
 
@@ -439,7 +516,7 @@ final class TrophyStore: ObservableObject {
                     id: "goal.journey.\(goal.id.uuidString)",
                     title: goal.title,
                     subtitle: "Goal Journey · \(goal.completedMilestones) of \(goal.milestones.count) milestones complete.",
-                    category: .signature,
+                    category: .goals,
                     verificationSource: .goal,
                     systemImage: goal.category.systemImage,
                     currentValue: currentValue,
@@ -451,10 +528,10 @@ final class TrophyStore: ObservableObject {
                             title: "Complete Journey",
                             threshold: targetValue,
                             displayTarget: "\(goal.milestones.count) milestones",
-                            rarity: .signature
+                            rarity: .epic
                         )
                         : nil,
-                    highestRarity: .signature,
+                    highestRarity: .epic,
                     unlockedAt: unlockedAt,
                     goalID: goal.id,
                     journeyMilestonesCompleted: goal.completedMilestones,
@@ -468,8 +545,8 @@ final class TrophyStore: ObservableObject {
                     trophyID: "goal.journey.\(goal.id.uuidString)",
                     stageTitle: "Goal Complete",
                     title: goal.title,
-                    rarity: .signature,
-                    category: .signature,
+                    rarity: .epic,
+                    category: .goals,
                     source: .goal,
                     unlockedAt: unlockedAt
                 )
@@ -498,6 +575,27 @@ final class TrophyStore: ObservableObject {
             )
         }
 
+        if currentUserID != nil {
+            try? await cloud
+                .syncAchievements(
+                    unlocks,
+                    trophies: trophies,
+                    username:
+                        activeUsername
+                )
+
+            if showcaseUpdatedAt != nil {
+                if let cloudDate =
+                        try? await cloud
+                            .saveCabinet(
+                                showcaseIDs
+                            ) {
+                    showcaseUpdatedAt =
+                        cloudDate
+                }
+            }
+        }
+
         persist()
     }
 
@@ -521,7 +619,31 @@ final class TrophyStore: ObservableObject {
         }
 
         hasInitializedShowcase = true
+        showcaseUpdatedAt = Date()
         persist()
+
+        guard activeUserID != nil
+        else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            if let cloudDate =
+                    try? await self
+                        .cloud
+                        .saveCabinet(
+                            self
+                                .showcaseIDs
+                        ) {
+                self.showcaseUpdatedAt =
+                    cloudDate
+                self.persist()
+            }
+        }
     }
 
     func dismissCurrentReveal() {
@@ -543,50 +665,159 @@ final class TrophyStore: ObservableObject {
         value: Double,
         evidenceDate: (Double) -> Date?
     ) -> TrophyProgressItem {
-        let stages = definition.stages.sorted { $0.threshold < $1.threshold }
-        let completed = stages.filter { value >= $0.threshold }
-        let current = completed.last
-        let next = stages.first { value < $0.threshold }
+        let stages =
+            definition.stages
+                .sorted {
+                    $0.threshold <
+                    $1.threshold
+                }
+        let completed =
+            stages.filter {
+                value >=
+                $0.threshold
+            }
 
         for stage in completed {
-            if let date = evidenceDate(stage.threshold) {
+            if let date =
+                    evidenceDate(
+                        stage.threshold
+                    ) {
                 registerUnlock(
-                    stageKey: "\(definition.id).stage.\(stage.id)",
-                    trophyID: definition.id,
-                    stageTitle: stage.title,
-                    title: definition.title,
-                    rarity: stage.rarity,
-                    category: definition.category,
-                    source: definition.verificationSource,
-                    unlockedAt: date
+                    stageKey:
+                        "\(definition.id).stage.\(stage.id)",
+                    trophyID:
+                        definition.id,
+                    stageTitle:
+                        stage.title,
+                    title:
+                        definition.title,
+                    rarity:
+                        stage.rarity,
+                    category:
+                        definition.category,
+                    source:
+                        definition
+                            .verificationSource,
+                    unlockedAt:
+                        date
                 )
             }
         }
 
-        let latestUnlock = completed
-            .compactMap { stage in
-                unlocks.first(where: { $0.stageKey == "\(definition.id).stage.\(stage.id)" })
+        let historical =
+            unlocks
+                .filter {
+                    $0.trophyID ==
+                    definition.id
+                }
+                .max {
+                    if $0.rarity !=
+                        $1.rarity {
+                        return $0.rarity <
+                            $1.rarity
+                    }
+
+                    return $0.unlockedAt <
+                        $1.unlockedAt
+                }
+
+        let historicalStage =
+            historical.flatMap {
+                record in
+                stages.last {
+                    $0.rarity <=
+                        record.rarity
+                }
             }
-            .sorted { $0.unlockedAt > $1.unlockedAt }
-            .first?
-            .unlockedAt
+        let liveStage =
+            completed.last
+        let current:
+            TrophyStageDefinition?
+
+        switch (
+            liveStage,
+            historicalStage
+        ) {
+        case let (live?, old?):
+            current =
+                live.rarity >=
+                    old.rarity
+                    ? live
+                    : old
+        case let (live?, nil):
+            current = live
+        case let (nil, old?):
+            current = old
+        case (nil, nil):
+            current = nil
+        }
+
+        let next =
+            current.flatMap {
+                current in
+                stages.first {
+                    $0.rarity >
+                        current.rarity
+                }
+            } ??
+            stages.first {
+                stage in
+                current == nil &&
+                value <
+                    stage.threshold
+            }
+
+        let effectiveValue =
+            max(
+                value,
+                current?
+                    .threshold ??
+                0
+            )
+        let latestUnlock =
+            unlocks
+                .filter {
+                    $0.trophyID ==
+                    definition.id
+                }
+                .max {
+                    $0.unlockedAt <
+                    $1.unlockedAt
+                }?
+                .unlockedAt
 
         return TrophyProgressItem(
             id: definition.id,
-            title: definition.title,
-            subtitle: definition.subtitle,
-            category: definition.category,
-            verificationSource: definition.verificationSource,
-            systemImage: definition.systemImage,
-            currentValue: value,
-            nextTargetValue: next?.threshold,
-            currentStage: current,
-            nextStage: next,
-            highestRarity: stages.last?.rarity ?? .core,
-            unlockedAt: latestUnlock,
+            title:
+                definition.title,
+            subtitle:
+                definition.subtitle,
+            category:
+                definition.category,
+            verificationSource:
+                definition
+                    .verificationSource,
+            systemImage:
+                definition.systemImage,
+            currentValue:
+                effectiveValue,
+            nextTargetValue:
+                next?.threshold,
+            currentStage:
+                current,
+            nextStage:
+                next,
+            highestRarity:
+                stages.last?
+                    .rarity ??
+                .core,
+            unlockedAt:
+                latestUnlock,
             goalID: nil,
-            journeyMilestonesCompleted: nil,
-            journeyMilestonesTotal: nil
+            journeyMilestonesCompleted:
+                nil,
+            journeyMilestonesTotal:
+                nil
         )
     }
 
@@ -596,56 +827,240 @@ final class TrophyStore: ObservableObject {
         subtitle: String,
         icon: String,
         source: TrophyVerificationSource,
+        rarity: TrophyRarity = .signature,
         unlockedAt: Date?
     ) -> TrophyProgressItem {
-        let stage = unlockedAt.map { _ in
-            TrophyStageDefinition(
-                id: "unlocked",
-                title: "Signature",
-                threshold: 1,
-                displayTarget: "Unlocked",
-                rarity: .signature
+        if let unlockedAt,
+           !PrestigeTrophyCatalog
+                .isPrestigeTrophy(id) {
+            registerUnlock(
+                stageKey:
+                    "\(id).unlocked",
+                trophyID: id,
+                stageTitle:
+                    rarity.title,
+                title: title,
+                rarity: rarity,
+                category: .signature,
+                source: source,
+                unlockedAt:
+                    unlockedAt
             )
         }
 
-        if let unlockedAt {
-            registerUnlock(
-                stageKey: "\(id).unlocked",
-                trophyID: id,
-                stageTitle: "Signature",
-                title: title,
-                rarity: .signature,
-                category: .signature,
-                source: source,
-                unlockedAt: unlockedAt
+        let historical =
+            unlocks
+                .filter {
+                    $0.trophyID == id
+                }
+                .max {
+                    if $0.rarity !=
+                        $1.rarity {
+                        return $0.rarity <
+                            $1.rarity
+                    }
+
+                    return $0.unlockedAt <
+                        $1.unlockedAt
+                }
+        let resolvedUnlockedAt =
+            historical?
+                .unlockedAt ??
+            (
+                PrestigeTrophyCatalog
+                    .isPrestigeTrophy(id)
+                    ? nil
+                    : unlockedAt
             )
-        }
+        let resolvedRarity =
+            historical.map {
+                max(
+                    $0.rarity,
+                    rarity
+                )
+            } ??
+            rarity
+        let stage =
+            resolvedUnlockedAt.map {
+                _ in
+                TrophyStageDefinition(
+                    id: "unlocked",
+                    title:
+                        resolvedRarity
+                            .title,
+                    threshold: 1,
+                    displayTarget:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Unlocked",
+                            norwegian:
+                                "Låst opp"
+                        ),
+                    rarity:
+                        resolvedRarity
+                )
+            }
 
         return TrophyProgressItem(
             id: id,
             title: title,
             subtitle: subtitle,
             category: .signature,
-            verificationSource: source,
+            verificationSource:
+                source,
             systemImage: icon,
-            currentValue: unlockedAt == nil ? 0 : 1,
-            nextTargetValue: unlockedAt == nil ? 1 : nil,
-            currentStage: stage,
-            nextStage: unlockedAt == nil
-                ? TrophyStageDefinition(
-                    id: "unlocked",
-                    title: "Signature",
-                    threshold: 1,
-                    displayTarget: "Complete",
-                    rarity: .signature
-                )
-                : nil,
-            highestRarity: .signature,
-            unlockedAt: unlockedAt,
+            currentValue:
+                resolvedUnlockedAt == nil
+                    ? 0
+                    : 1,
+            nextTargetValue:
+                resolvedUnlockedAt == nil
+                    ? 1
+                    : nil,
+            currentStage:
+                stage,
+            nextStage:
+                resolvedUnlockedAt == nil
+                    ? TrophyStageDefinition(
+                        id: "unlocked",
+                        title:
+                            rarity.title,
+                        threshold: 1,
+                        displayTarget:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Complete",
+                                norwegian:
+                                    "Fullfør"
+                            ),
+                        rarity:
+                            rarity
+                    )
+                    : nil,
+            highestRarity:
+                resolvedRarity,
+            unlockedAt:
+                resolvedUnlockedAt,
             goalID: nil,
-            journeyMilestonesCompleted: nil,
-            journeyMilestonesTotal: nil
+            journeyMilestonesCompleted:
+                nil,
+            journeyMilestonesTotal:
+                nil
         )
+    }
+
+    private func historicalUnlockDate(
+        for trophyID: String
+    ) -> Date? {
+        unlocks
+            .filter {
+                $0.trophyID ==
+                    trophyID
+            }
+            .map(\.unlockedAt)
+            .min()
+    }
+
+    private func claimPrestigeTrophies(
+        from snapshot:
+            TrophyHealthSnapshot
+    ) async {
+        let claims:
+            [
+                (
+                    id: String,
+                    evidence:
+                        PrestigeRunEvidence?
+                )
+            ] = [
+                (
+                    PrestigeTrophyCatalog
+                        .halfMarathonID,
+                    snapshot
+                        .firstHalfMarathonEvidence
+                ),
+                (
+                    PrestigeTrophyCatalog
+                        .marathonID,
+                    snapshot
+                        .firstMarathonEvidence
+                )
+            ]
+
+        for claim in claims {
+            guard
+                historicalUnlockDate(
+                    for: claim.id
+                ) == nil,
+                let evidence =
+                    claim.evidence
+            else {
+                continue
+            }
+
+            if let record =
+                    try? await cloud
+                        .claimPrestigeTrophy(
+                            trophyID:
+                                claim.id,
+                            evidence:
+                                evidence,
+                            username:
+                                activeUsername
+                        ) {
+                registerCloudUnlock(
+                    record,
+                    allowReveal: true
+                )
+            }
+        }
+    }
+
+    private func mergeRemoteUnlocks(
+        _ remote:
+            [TrophyUnlockRecord]
+    ) {
+        for record in remote {
+            registerCloudUnlock(
+                record,
+                allowReveal: false
+            )
+        }
+    }
+
+    private func registerCloudUnlock(
+        _ record:
+            TrophyUnlockRecord,
+        allowReveal: Bool
+    ) {
+        if let index =
+            unlocks.firstIndex(
+                where: {
+                    $0.stageKey ==
+                        record.stageKey
+                }
+            ) {
+            // The server is the immutable source of truth once a row exists.
+            unlocks[index] =
+                record
+            return
+        }
+
+        unlocks.append(record)
+
+        guard allowReveal,
+              record.unlockedAt >=
+                activationDate
+        else {
+            return
+        }
+
+        revealQueue.append(record)
+
+        if pendingReveal == nil {
+            pendingReveal =
+                revealQueue.first
+        }
     }
 
     private func registerUnlock(
@@ -699,7 +1114,8 @@ final class TrophyStore: ObservableObject {
         let state = TrophyPersistedState(
             unlocks: unlocks,
             showcaseIDs: showcaseIDs,
-            hasInitializedShowcase: hasInitializedShowcase
+            hasInitializedShowcase: hasInitializedShowcase,
+            showcaseUpdatedAt: showcaseUpdatedAt
         )
 
         guard let url = Self.stateURL,
@@ -756,10 +1172,12 @@ private struct TrophyPersistedState: Codable {
     let unlocks: [TrophyUnlockRecord]
     let showcaseIDs: [String]
     let hasInitializedShowcase: Bool
+    let showcaseUpdatedAt: Date?
 
     static let empty = TrophyPersistedState(
         unlocks: [],
         showcaseIDs: [],
-        hasInitializedShowcase: false
+        hasInitializedShowcase: false,
+        showcaseUpdatedAt: nil
     )
 }
