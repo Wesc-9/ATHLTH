@@ -507,6 +507,13 @@ struct WorkoutStartOptionsView: View {
                         dismiss()
                     }
                 }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    trackingModeButton
+                }
             }
         }
     }
@@ -644,7 +651,7 @@ struct WorkoutStartOptionsView: View {
     private var strengthIntroCard: some View {
         ZStack {
             Image(
-                "StrengthPostWorkoutHero"
+                "StrengthQuickStartHero"
             )
             .resizable()
             .scaledToFill()
@@ -661,53 +668,48 @@ struct WorkoutStartOptionsView: View {
                 endPoint: .trailing
             )
 
-            HStack(
-                alignment: .top,
-                spacing: 12
+            VStack(
+                alignment: .leading,
+                spacing: 5
             ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text(session.title)
-                        .font(
-                            .title2.weight(
-                                .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(
-                            0.82
-                        )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                trackingMode == .advanced
-                                    ? "Detailed tracking, exercise by exercise."
-                                    : "Fast setup. Add the exercises you want next.",
-                            norwegian:
-                                trackingMode == .advanced
-                                    ? "Detaljert registrering, øvelse for øvelse."
-                                    : "Raskt oppsett. Legg til øvelsene du ønsker på neste side."
+                Text(session.title)
+                    .font(
+                        .title2.weight(
+                            .bold
                         )
                     )
-                    .font(.caption)
                     .foregroundStyle(
-                        Color.white.opacity(
-                            0.84
-                        )
+                        .white
                     )
-                    .lineLimit(2)
-                }
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.82
+                    )
 
-                Spacer(minLength: 6)
-
-                trackingModeButton
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            trackingMode == .advanced
+                                ? "Detailed tracking, exercise by exercise."
+                                : "Fast setup. Add the exercises you want next.",
+                        norwegian:
+                            trackingMode == .advanced
+                                ? "Detaljert registrering, øvelse for øvelse."
+                                : "Raskt oppsett. Legg til øvelsene du ønsker på neste side."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.84
+                    )
+                )
+                .lineLimit(2)
             }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
             .padding(16)
         }
         .frame(height: 118)
@@ -774,25 +776,27 @@ struct WorkoutStartOptionsView: View {
                 )
             }
             .foregroundStyle(
-                Color.white
+                trackingMode == .advanced
+                    ? Color.white
+                    : ATHLTHTheme.primaryText
             )
             .padding(.horizontal, 11)
             .frame(height: 34)
             .background(
                 trackingMode == .advanced
                     ? ATHLTHTheme.vitality
-                    : Color.black.opacity(
-                        0.34
+                    : Color.primary.opacity(
+                        0.055
                     ),
                 in: Capsule()
             )
             .overlay {
                 Capsule()
                     .stroke(
-                        Color.white.opacity(
-                            0.24
+                        Color.black.opacity(
+                            0.045
                         ),
-                        lineWidth: 0.8
+                        lineWidth: 0.7
                     )
             }
         }
