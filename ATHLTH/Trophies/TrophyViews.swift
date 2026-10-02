@@ -2085,7 +2085,14 @@ struct TrophyCollectionView: View {
                     .lineLimit(2)
 
                 Text(
-                    trophy.stageLabel
+                    trophy.isPrestigeTrophy
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Gold Trophy",
+                            norwegian:
+                                "Gullpokal"
+                        )
+                        : trophy.stageLabel
                 )
                 .font(
                     .caption2
@@ -2527,7 +2534,16 @@ struct TrophyDetailView: View {
 
                 Spacer()
 
-                Text(trophy.displayRarity.title)
+                Text(
+                    trophy.isPrestigeTrophy
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Gold Trophy",
+                            norwegian:
+                                "Gullpokal"
+                        )
+                        : trophy.displayRarity.title
+                )
                     .font(.caption.bold())
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
