@@ -1084,19 +1084,6 @@ struct WatchSpotifyCommand: Codable, Hashable {
     var sentAt: Date = Date()
 }
 
-struct WatchSpotifyCredentialTransfer: Codable, Hashable {
-    var clientID: String
-    var accessToken: String
-    var refreshToken: String?
-    var expiresAt: Date
-    var updatedAt: Date = Date()
-
-    var canRefresh: Bool {
-        refreshToken?.isEmpty == false &&
-        !clientID.isEmpty
-    }
-}
-
 struct WatchSpotifyPlaybackState: Codable, Hashable {
     var isConfigured: Bool
     var isConnected: Bool
