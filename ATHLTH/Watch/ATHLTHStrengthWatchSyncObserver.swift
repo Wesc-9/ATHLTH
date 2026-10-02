@@ -99,6 +99,42 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return
         }
 
+        let setScopedCommand =
+            command.kind == .updateDraft ||
+            command.kind == .completeSet ||
+            command.kind ==
+                .completeSetWithoutDetails
+
+        if setScopedCommand,
+           let exerciseIndex =
+                command.exerciseIndex,
+           exerciseIndex !=
+                strengthWorkout
+                    .currentExerciseIndex {
+            sendSnapshotNow()
+            return
+        }
+
+        if setScopedCommand,
+           let setIndex =
+                command.setIndex,
+           setIndex !=
+                strengthWorkout
+                    .currentSetIndex {
+            sendSnapshotNow()
+            return
+        }
+
+        if command.kind == .nextExercise,
+           let exerciseIndex =
+                command.exerciseIndex,
+           exerciseIndex !=
+                strengthWorkout
+                    .currentExerciseIndex {
+            sendSnapshotNow()
+            return
+        }
+
         if command.kind == .updateDraft,
            let lastMutationAt =
                 lastStrengthMutationAtByWorkout[
