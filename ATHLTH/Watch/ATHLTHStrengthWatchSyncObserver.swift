@@ -5,6 +5,7 @@ import SwiftUI
 /// hierarchy.
 struct ATHLTHStrengthWatchSyncObserver: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
@@ -69,8 +70,34 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         _ command: WatchStrengthCommand
     ) -> Bool {
         if command.kind == .requestSnapshot {
+            if strengthWorkout.activeWorkout == nil,
+               command.initiatedOnWatch == true {
+                guard appSession.signedIn else {
+                    // Keep the request queued until account restoration has
+                    // selected the correct per-user strength checkpoint.
+                    return false
+                }
+
+                var configuration =
+                    StrengthAdvancedConfiguration
+                        .savedDefaults()
+                configuration.inputMode = .both
+
+                strengthWorkout.startFreestyle(
+                    watchSessionID:
+                        command.id,
+                    trackingMode: .advanced,
+                    captureDevice: .appleWatch,
+                    advancedConfiguration:
+                        configuration
+                )
+            }
+
             sendSnapshotNow()
-            return true
+            return
+                strengthWorkout.activeWorkout !=
+                nil ||
+                command.initiatedOnWatch != true
         }
 
         guard let workout =
