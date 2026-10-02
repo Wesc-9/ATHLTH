@@ -48,6 +48,15 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .onChange(of: strengthWorkout.draftRestSeconds) { _, _ in
                 scheduleDraftSnapshot()
             }
+            .onChange(of: strengthWorkout.draftRPE) { _, _ in
+                scheduleDraftSnapshot()
+            }
+            .onChange(of: strengthWorkout.draftRIR) { _, _ in
+                scheduleDraftSnapshot()
+            }
+            .onChange(of: strengthWorkout.draftWarmUp) { _, _ in
+                scheduleDraftSnapshot()
+            }
     }
 
     @MainActor
@@ -93,14 +102,20 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             strengthWorkout.setDraft(
                 reps: command.reps,
                 weightKilograms: command.weightKilograms,
-                restSeconds: command.restSeconds
+                restSeconds: command.restSeconds,
+                rpe: command.rpe,
+                rir: command.rir,
+                warmUp: command.isWarmUp
             )
 
         case .completeSet:
             strengthWorkout.setDraft(
                 reps: command.reps,
                 weightKilograms: command.weightKilograms,
-                restSeconds: command.restSeconds
+                restSeconds: command.restSeconds,
+                rpe: command.rpe,
+                rir: command.rir,
+                warmUp: command.isWarmUp
             )
             strengthWorkout.completeCurrentDraftSet()
 
