@@ -31,13 +31,40 @@ struct ATHLTHTrophyCoreView: View {
     var inscription: TrophyInscription? = nil
     var athleteName: String? = nil
 
+    @EnvironmentObject private var settings:
+        AppSettingsStore
+    @Environment(
+        \.accessibilityReduceMotion
+    ) private var reduceMotion
+    @Environment(
+        \.accessibilityReduceTransparency
+    ) private var reduceTransparency
     @ObservedObject private var tilt =
         AchievementTiltMotionStore.shared
+
+    private var achievementEffectsEnabled:
+        Bool
+    {
+        settings.achievementEffects !=
+            .off
+    }
 
     private var usesSignatureTilt: Bool {
         trophy.isUnlocked &&
         !trophy.isPrestigeTrophy &&
-        trophy.displayRarity == .signature
+        trophy.displayRarity == .signature &&
+        settings.achievementEffects ==
+            .full &&
+        !reduceMotion &&
+        !reduceTransparency
+    }
+
+    private var showsSignatureSheen: Bool {
+        trophy.isUnlocked &&
+        !trophy.isPrestigeTrophy &&
+        trophy.displayRarity == .signature &&
+        achievementEffectsEnabled &&
+        !reduceTransparency
     }
 
     private var visualForm: TrophyVisualForm {
@@ -158,6 +185,17 @@ struct ATHLTHTrophyCoreView: View {
                         tilt.end()
                     }
                 }
+                .onChange(
+                    of:
+                        usesSignatureTilt
+                ) {
+                    _, enabled in
+                    if enabled {
+                        tilt.begin()
+                    } else {
+                        tilt.end()
+                    }
+                }
                 .accessibilityElement(
                     children: .ignore
                 )
@@ -231,16 +269,20 @@ struct ATHLTHTrophyCoreView: View {
                 }
 
             if trophy.isUnlocked &&
-               trophy.displayRarity == .rare {
+               trophy.displayRarity == .rare &&
+               achievementEffectsEnabled &&
+               !reduceTransparency {
                 metallicSheen
             }
 
             if trophy.isUnlocked &&
-               trophy.displayRarity == .epic {
+               trophy.displayRarity == .epic &&
+               achievementEffectsEnabled &&
+               !reduceTransparency {
                 epicInnerGlow
             }
 
-            if usesSignatureTilt {
+            if showsSignatureSheen {
                 signatureHolographicSheen
             }
 
@@ -1170,10 +1212,24 @@ struct TrophyCabinetSection: View {
                             } label: {
                                 ATHLTHTrophyCoreView(
                                     trophy: trophy,
-                                    size: 94,
+                                    size:
+                                        trophy.isPrestigeTrophy
+                                            ? 106
+                                            : 86,
                                     showLabel: true
                                 )
-                                .frame(width: 112)
+                                .offset(
+                                    y:
+                                        trophy.isPrestigeTrophy
+                                            ? -6
+                                            : 4
+                                )
+                                .frame(
+                                    width:
+                                        trophy.isPrestigeTrophy
+                                            ? 126
+                                            : 108
+                                )
                             }
                             .buttonStyle(.plain)
                         }
@@ -2079,7 +2135,16 @@ struct TrophyCollectionView: View {
                     ATHLTHTrophyCoreView(
                         trophy:
                             trophy,
-                        size: 88
+                        size:
+                            trophy.isPrestigeTrophy
+                                ? 104
+                                : 78
+                    )
+                    .offset(
+                        y:
+                            trophy.isPrestigeTrophy
+                                ? -8
+                                : 4
                     )
 
                     Text(
@@ -2103,10 +2168,14 @@ struct TrophyCollectionView: View {
                     maxWidth:
                         .infinity
                 )
-                .frame(height: 118)
+                .frame(height: 128)
                 .background(
                     Color.white
-                        .opacity(0.035),
+                        .opacity(
+                            trophy.isPrestigeTrophy
+                                ? 0.055
+                                : 0.030
+                        ),
                     in:
                         RoundedRectangle(
                             cornerRadius:
@@ -2530,6 +2599,29 @@ struct TrophyCollectionView: View {
                     }
                 }
                 .frame(height: 6)
+
+                if let progressText =
+                        trophy
+                            .concreteProgressText {
+                    Text(progressText)
+                        .font(
+                            .system(
+                                size: 9.5,
+                                weight:
+                                    .semibold,
+                                design:
+                                    .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.72
+                        )
+                }
             }
 
             if trophies
@@ -3021,8 +3113,34 @@ struct TrophyDetailView: View {
                 }
 
                 HStack {
-                    Text("\(Int((trophy.progress * 100).rounded()))%")
-                        .font(.title3.bold())
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            "\(Int((trophy.progress * 100).rounded()))%"
+                        )
+                        .font(
+                            .title3.bold()
+                        )
+
+                        if let progressText =
+                                trophy
+                                    .concreteProgressText {
+                            Text(
+                                progressText
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
 
                     Spacer()
 
@@ -3142,6 +3260,13 @@ struct TrophyDetailView: View {
 struct TrophyUnlockRevealView: View {
     @EnvironmentObject private var trophies: TrophyStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(
+        \.accessibilityReduceMotion
+    ) private var reduceMotion
+    @Environment(
+        \.accessibilityReduceTransparency
+    ) private var reduceTransparency
     let unlock: TrophyUnlockRecord
 
     private var trophy: TrophyProgressItem? {
@@ -3176,6 +3301,30 @@ struct TrophyUnlockRevealView: View {
     @State private var inscription:
         TrophyInscription?
 
+    private var showsParticles:
+        Bool
+    {
+        settings.achievementEffects !=
+            .off &&
+        !reduceMotion
+    }
+
+    private var fullRevealMotion:
+        Bool
+    {
+        settings.achievementEffects ==
+            .full &&
+        !reduceMotion
+    }
+
+    private var reducedRevealMotion:
+        Bool
+    {
+        settings.achievementEffects ==
+            .reduced &&
+        !reduceMotion
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -3189,14 +3338,21 @@ struct TrophyUnlockRevealView: View {
             )
             .ignoresSafeArea()
 
-            AchievementParticleBurst(
-                rarity: unlock.rarity
-            )
-            .opacity(
-                revealed
-                    ? 1
-                    : 0
-            )
+            if showsParticles {
+                AchievementParticleBurst(
+                    rarity:
+                        unlock.rarity,
+                    reduced:
+                        settings
+                            .achievementEffects ==
+                            .reduced
+                )
+                .opacity(
+                    revealed
+                        ? 1
+                        : 0
+                )
+            }
 
             VStack(spacing: 24) {
                 Text(
@@ -3217,15 +3373,48 @@ struct TrophyUnlockRevealView: View {
                         athleteName:
                             athleteName
                     )
-                    .scaleEffect(revealed ? 1 : 0.72)
-                    .opacity(revealed ? 1 : 0)
+                    .scaleEffect(
+                        revealed
+                            ? 1
+                            : fullRevealMotion
+                                ? 0.72
+                                : reducedRevealMotion
+                                    ? 0.94
+                                    : 1
+                    )
+                    .opacity(
+                        revealed
+                            ? 1
+                            : 0
+                    )
                     .rotation3DEffect(
-                        .degrees(revealed ? 0 : -18),
-                        axis: (x: 0, y: 1, z: 0)
+                        .degrees(
+                            revealed ||
+                            !fullRevealMotion
+                                ? 0
+                                : -18
+                        ),
+                        axis:
+                            (
+                                x: 0,
+                                y: 1,
+                                z: 0
+                            )
                     )
                     .animation(
-                        .spring(response: 0.7, dampingFraction: 0.72),
-                        value: revealed
+                        fullRevealMotion
+                            ? .spring(
+                                response:
+                                    0.7,
+                                dampingFraction:
+                                    0.72
+                            )
+                            : .easeOut(
+                                duration:
+                                    0.16
+                            ),
+                        value:
+                            revealed
                     )
                 }
 
@@ -3271,7 +3460,13 @@ struct TrophyUnlockRevealView: View {
             AchievementUnlockFeedback
                 .play(
                     rarity:
-                        unlock.rarity
+                        unlock.rarity,
+                    soundEnabled:
+                        settings
+                            .achievementUnlockSoundsEnabled,
+                    hapticsEnabled:
+                        settings
+                            .achievementUnlockHapticsEnabled
                 )
         }
         .task(id: unlock.stageKey) {
