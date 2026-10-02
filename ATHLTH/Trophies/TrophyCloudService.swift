@@ -328,24 +328,18 @@ final class TrophyCloudService
 
         let rows =
             response.unlocks ?? []
-        let inscriptions =
-            Dictionary(
-                uniqueKeysWithValues:
-                    rows.compactMap {
-                        row in
-                        guard
-                            let inscription =
-                                row.inscription
-                        else {
-                            return nil
-                        }
+        var inscriptions:
+            [String: TrophyInscription] =
+            [:]
 
-                        return (
-                            row.awardID,
-                            inscription
-                        )
-                    }
-            )
+        for row in rows {
+            if let inscription =
+                    row.inscription {
+                inscriptions[
+                    row.awardID
+                ] = inscription
+            }
+        }
 
         return TrophyCloudState(
             unlocks:
