@@ -1738,7 +1738,9 @@ final class CommunityGroupStore: ObservableObject {
         visibility: String,
         joinMode: String = "open",
         membersCanCreateContent: Bool = true,
-        imageJPEGData: Data? = nil
+        imageJPEGData: Data? = nil,
+        headerImageJPEGData: Data? = nil,
+        headerArtworkReference: String? = nil
     ) async -> Bool {
         guard let userID = currentUserID else { return false }
 
@@ -1869,6 +1871,94 @@ final class CommunityGroupStore: ObservableObject {
                     // the owner can add/change the cover in Club Settings.
                     errorMessage =
                         "Club created, but the image could not be uploaded. You can add it from Club Settings."
+                }
+            }
+
+            if let headerImageJPEGData {
+                if headerImageJPEGData.count <=
+                    5_242_880 {
+                    let path =
+                        "\(groupID.uuidString.lowercased())/header.jpg"
+
+                    do {
+                        try await client.storage
+                            .from(
+                                "community-group-images"
+                            )
+                            .upload(
+                                path,
+                                data:
+                                    headerImageJPEGData,
+                                options:
+                                    FileOptions(
+                                        cacheControl:
+                                            "3600",
+                                        contentType:
+                                            "image/jpeg",
+                                        upsert: true
+                                    )
+                            )
+
+                        let publicURL =
+                            try client.storage
+                                .from(
+                                    "community-group-images"
+                                )
+                                .getPublicURL(
+                                    path: path
+                                )
+
+                        try await client
+                            .from(
+                                "community_groups"
+                            )
+                            .update(
+                                CommunityGroupHeaderImageUpdate(
+                                    headerImageURL:
+                                        publicURL
+                                            .absoluteString,
+                                    updatedAt:
+                                        Date()
+                                )
+                            )
+                            .eq(
+                                "id",
+                                value:
+                                    groupID
+                            )
+                            .execute()
+                    } catch {
+                        errorMessage =
+                            "Club created, but the header image could not be uploaded. You can change it from Club Settings."
+                    }
+                }
+            } else if let headerArtworkReference,
+                      ATHLTHStandardArtwork(
+                        reference:
+                            headerArtworkReference
+                      ) != nil {
+                do {
+                    try await client
+                        .from(
+                            "community_groups"
+                        )
+                        .update(
+                            CommunityGroupHeaderImageUpdate(
+                                headerImageURL:
+                                    headerArtworkReference,
+                                updatedAt:
+                                    Date()
+                            )
+                        )
+                        .eq(
+                            "id",
+                            value:
+                                groupID
+                        )
+                        .execute()
+                } catch {
+                    errorMessage =
+                        "Club created, but the header image could not be saved. You can change it from Club Settings."
                 }
             }
 
