@@ -798,7 +798,8 @@ final class SocialStore: ObservableObject {
         kind: WorkoutKind,
         friends: [SocialProfileCard],
         creatorName: String,
-        creatorUsername: String?
+        creatorUsername: String?,
+        invitePayload: SocialWorkoutInvitePayload? = nil
     ) async {
         guard !friends.isEmpty else {
             activeWorkoutSession = nil
@@ -820,7 +821,8 @@ final class SocialStore: ObservableObject {
                 workoutKind: kind,
                 creatorName: creatorName,
                 creatorUsername: creatorUsername,
-                friends: friends
+                friends: friends,
+                invitePayload: invitePayload
             )
 
             activeWorkoutSession = session
@@ -878,12 +880,23 @@ final class SocialStore: ObservableObject {
         }
     }
 
-    func acceptWorkoutInvite(_ invite: SocialWorkoutInviteDisplay) async {
-        await resolveWorkoutInvite(invite, state: .accepted)
+    @discardableResult
+    func acceptWorkoutInvite(
+        _ invite: SocialWorkoutInviteDisplay
+    ) async -> Bool {
+        await resolveWorkoutInvite(
+            invite,
+            state: .accepted
+        )
     }
 
-    func declineWorkoutInvite(_ invite: SocialWorkoutInviteDisplay) async {
-        await resolveWorkoutInvite(invite, state: .declined)
+    func declineWorkoutInvite(
+        _ invite: SocialWorkoutInviteDisplay
+    ) async {
+        _ = await resolveWorkoutInvite(
+            invite,
+            state: .declined
+        )
     }
 
     func workoutActivity(for workoutID: UUID) async -> SocialActivityRecord? {
@@ -1634,7 +1647,7 @@ final class SocialStore: ObservableObject {
     private func resolveWorkoutInvite(
         _ invite: SocialWorkoutInviteDisplay,
         state: SocialWorkoutParticipantState
-    ) async {
+    ) async -> Bool {
         errorMessage = nil
 
         do {
@@ -1643,8 +1656,10 @@ final class SocialStore: ObservableObject {
                 state: state
             )
             await refresh()
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
