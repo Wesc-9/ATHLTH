@@ -1021,13 +1021,17 @@ struct WatchSpotifyPlaybackState: Codable, Hashable {
     var isConnected: Bool
     var isPlaying: Bool
     var playlistName: String?
+    var trackTitle: String?
+    var artistName: String?
     var updatedAt: Date = Date()
 
     static let unavailable = WatchSpotifyPlaybackState(
         isConfigured: false,
         isConnected: false,
         isPlaying: false,
-        playlistName: nil
+        playlistName: nil,
+        trackTitle: nil,
+        artistName: nil
     )
 }
 
