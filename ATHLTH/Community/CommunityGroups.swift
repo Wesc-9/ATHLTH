@@ -3999,7 +3999,9 @@ struct CommunityGroupDetailView: View {
                     }
                     .ignoresSafeArea(edges: .top)
                     .frame(
-                        width: geometry.size.width,
+                        width: geometry.size.width
+                    )
+                    .frame(
                         maxHeight: .infinity
                     )
                 } else {
@@ -5325,6 +5327,9 @@ struct CommunityGroupDetailView: View {
         .padding(10)
         .frame(
             maxWidth: .infinity,
+            alignment: .topLeading
+        )
+        .frame(
             height: 108,
             alignment: .topLeading
         )
