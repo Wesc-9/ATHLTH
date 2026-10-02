@@ -102,6 +102,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var currentLapDistanceMeters: Double = 0
     @Published private(set) var lapSummaries: [WatchWorkoutLapSummary] = []
     @Published private(set) var automaticPauseActive = false
+    @Published private(set) var automaticPauseEnabled = false
     @Published private(set) var automaticPauseCount = 0
     @Published private(set) var averageHeartRate: Double?
     @Published private(set) var maxHeartRate: Double?
@@ -171,6 +172,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastAcceptedOutdoorLocation: CLLocation?
     private var healthKitDistanceMeters: Double = 0
     private var healthKitDistanceLastUpdatedAt: Date?
+    private var autoPauseDetector =
+        OutdoorAutoPauseDetector()
+    private var manualPauseActive = false
 
     private var capturedRouteLocations: [CLLocation] = []
     private var lastRenderedRouteLocation: CLLocation?
@@ -284,9 +288,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             self.targetAlertConfiguration =
                 workout.targetAlerts
+            self.automaticPauseEnabled =
+                workout.autoPauseEnabled ?? false
             self.liveTargetStatus = nil
         }
 
+        autoPauseDetector.reset(
+            enabled:
+                workout.autoPauseEnabled ?? false
+        )
+        manualPauseActive = false
         structuredStepStartElapsedTime = elapsedTime
         structuredStepStartDistanceMeters = distanceMeters
         structuredWorkoutComplete = false
@@ -1200,11 +1211,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func pause() {
         guard state == .running else { return }
+        manualPauseActive = true
+        automaticPauseActive = false
+        autoPauseDetector.reset(
+            enabled: false
+        )
         workoutSession?.pause()
     }
 
     func resume() {
         guard state == .paused else { return }
+        manualPauseActive = false
+        autoPauseDetector.reset(
+            enabled: automaticPauseEnabled
+        )
         workoutSession?.resume()
     }
 
@@ -1250,7 +1270,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastLapDistanceMeters = 0
         lapSummaries = []
         automaticPauseActive = false
+        automaticPauseEnabled = false
         automaticPauseCount = 0
+        manualPauseActive = false
+        autoPauseDetector.reset(enabled: false)
         capturedRouteLocations = []
         lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
@@ -1283,6 +1306,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.currentLapDistanceMeters = 0
             self.lapSummaries = []
             self.automaticPauseActive = false
+            self.automaticPauseEnabled = false
             self.automaticPauseCount = 0
             self.averageHeartRate = nil
             self.maxHeartRate = nil
@@ -1358,6 +1382,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lapSummaries = []
         automaticPauseActive = false
         automaticPauseCount = 0
+        manualPauseActive = false
+        autoPauseDetector.reset(
+            enabled:
+                (kind == .running ||
+                 kind == .walking) &&
+                automaticPauseEnabled
+        )
         capturedRouteLocations = []
         lastRenderedRouteLocation = nil
         gpsFallbackDistanceMeters = 0
@@ -3639,6 +3670,39 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    private func triggerAutomaticPause() {
+        guard automaticPauseEnabled,
+              !manualPauseActive,
+              !automaticPauseActive,
+              state == .running
+        else {
+            return
+        }
+
+        automaticPauseActive = true
+        automaticPauseCount += 1
+        workoutSession?.pause()
+        persistWorkoutRecoveryState()
+        WKInterfaceDevice.current().play(.click)
+    }
+
+    private func triggerAutomaticResume() {
+        guard automaticPauseEnabled,
+              !manualPauseActive,
+              automaticPauseActive
+        else {
+            return
+        }
+
+        automaticPauseActive = false
+        autoPauseDetector.reset(
+            enabled: automaticPauseEnabled
+        )
+        workoutSession?.resume()
+        persistWorkoutRecoveryState()
+        WKInterfaceDevice.current().play(.click)
+    }
+
     private func handleSystemWorkoutEvent(
         _ type: HKWorkoutEventType
     ) {
@@ -3651,17 +3715,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
         case .motionPaused:
-            automaticPauseActive = true
-            automaticPauseCount += 1
-            persistWorkoutRecoveryState()
-            WKInterfaceDevice.current()
-                .play(.click)
+            triggerAutomaticPause()
 
         case .motionResumed:
-            automaticPauseActive = false
-            persistWorkoutRecoveryState()
-            WKInterfaceDevice.current()
-                .play(.click)
+            triggerAutomaticResume()
 
         default:
             break
@@ -4081,6 +4138,31 @@ private extension WatchWorkoutManager {
             filtered.sorted {
                 $0.timestamp < $1.timestamp
             }
+
+        if automaticPauseEnabled &&
+            (kind == .running ||
+             kind == .walking) {
+            for location in orderedLocations {
+                if let action =
+                        autoPauseDetector.evaluate(
+                            location,
+                            walking:
+                                kind == .walking
+                        ) {
+                    switch action {
+                    case .pause:
+                        triggerAutomaticPause()
+                    case .resume:
+                        triggerAutomaticResume()
+                    }
+                }
+            }
+        }
+
+        if automaticPauseActive ||
+            state == .paused {
+            return
+        }
 
         for location in orderedLocations {
             recordFallbackDistance(
