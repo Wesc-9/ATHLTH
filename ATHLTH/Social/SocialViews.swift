@@ -134,6 +134,8 @@ struct SocialHubView: View {
     @State private var selectedTab: SocialHubTab
     @State private var searchText = ""
     @State private var showingNewMessage = false
+    @State private var acceptedWorkoutInvite:
+        SocialWorkoutInviteDisplay?
 
     init(initialTab: SocialHubTab = .feed) {
         self.initialTab = initialTab
@@ -237,6 +239,11 @@ struct SocialHubView: View {
         .sheet(isPresented: $showingNewMessage) {
             NewMessageView()
         }
+        .sheet(item: $acceptedWorkoutInvite) { invite in
+            WorkoutInviteLaunchSheet(
+                invite: invite
+            )
+        }
         .task {
             async let socialRefresh: Void =
                 social.refresh()
@@ -338,9 +345,20 @@ struct SocialHubView: View {
                                 .buttonStyle(.bordered)
                                 .frame(maxWidth: .infinity)
 
-                                Button("Join") {
+                                Button(
+                                    ATHLTHLocalization.choose(
+                                        english: "Join",
+                                        norwegian: "Godta"
+                                    )
+                                ) {
                                     Task {
-                                        await social.acceptWorkoutInvite(invite)
+                                        if await social
+                                            .acceptWorkoutInvite(
+                                                invite
+                                            ) {
+                                            acceptedWorkoutInvite =
+                                                invite
+                                        }
                                     }
                                 }
                                 .buttonStyle(.borderedProminent)
@@ -2537,5 +2555,625 @@ private extension View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(Color.primary.opacity(0.05), lineWidth: 1)
             }
+    }
+}
+
+
+private struct WorkoutInviteLaunchSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @EnvironmentObject private var session:
+        AppSessionStore
+    @EnvironmentObject private var settings:
+        AppSettingsStore
+    @EnvironmentObject private var social:
+        SocialStore
+    @EnvironmentObject private var strengthWorkout:
+        StrengthWorkoutStore
+    @EnvironmentObject private var watchConnection:
+        AppleWatchConnectionStore
+    @EnvironmentObject private var spotify:
+        SpotifyPlaybackStore
+    @EnvironmentObject private var gear:
+        ProfileGearStore
+    @EnvironmentObject private var phoneWorkout:
+        IPhoneWorkoutStore
+    @EnvironmentObject private var ghostRace:
+        GhostRaceStore
+
+    let invite: SocialWorkoutInviteDisplay
+
+    @State private var captureDevice:
+        WorkoutCaptureDevice = .iPhone
+    @State private var isStarting = false
+    @State private var launchError: String?
+    @State private var showingStrengthWorkout = false
+
+    private var payload:
+        SocialWorkoutInvitePayload? {
+        invite.session.invitePayload
+    }
+
+    private var copiedWorkout:
+        PlannedSession? {
+        guard let payload else {
+            return nil
+        }
+
+        var copy = payload.recipientCopy()
+        copy.sharedSourceOwnerID =
+            invite.session.creatorID
+        copy.sharedSourceSessionID =
+            payload.workout.id
+        return copy
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    introCard
+
+                    if let copiedWorkout {
+                        workoutSummary(
+                            copiedWorkout
+                        )
+                        devicePicker
+
+                        Button {
+                            start(
+                                copiedWorkout
+                            )
+                        } label: {
+                            HStack(spacing: 9) {
+                                if isStarting {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(
+                                        systemName:
+                                            captureDevice ==
+                                                .appleWatch
+                                            ? "applewatch"
+                                            : "iphone"
+                                    )
+                                }
+
+                                Text(
+                                    startButtonTitle
+                                )
+                                .font(
+                                    .headline.weight(
+                                        .semibold
+                                    )
+                                )
+                            }
+                            .frame(
+                                maxWidth: .infinity
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .controlSize(.large)
+                        .tint(ATHLTHTheme.accent)
+                        .disabled(
+                            isStarting ||
+                            (
+                                captureDevice ==
+                                    .appleWatch &&
+                                !watchConnection
+                                    .isReady
+                            )
+                        )
+                    } else {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Workout copy unavailable",
+                                norwegian:
+                                    "Øktkopien er ikke tilgjengelig"
+                            ),
+                            systemImage:
+                                "exclamationmark.triangle",
+                            description:
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Ask the sender to send a new Train Together invitation.",
+                                        norwegian:
+                                            "Be avsenderen sende en ny Tren sammen-invitasjon."
+                                    )
+                                )
+                        )
+                        .padding(.vertical, 28)
+                    }
+
+                    if let launchError {
+                        Text(launchError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(
+                                .center
+                            )
+                    }
+                }
+                .padding(16)
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme.accent
+                            .opacity(0.18)
+                )
+            )
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Train Together",
+                    norwegian: "Tren sammen"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Not now",
+                            norwegian: "Ikke nå"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .fullScreenCover(
+            isPresented:
+                $showingStrengthWorkout
+        ) {
+            ActiveStrengthWorkoutView()
+                .environmentObject(
+                    strengthWorkout
+                )
+                .environmentObject(
+                    session
+                )
+        }
+    }
+
+    private var introCard: some View {
+        ATHLTHCard {
+            HStack(spacing: 12) {
+                if let creator =
+                        invite.creator {
+                    SocialAvatar(
+                        profile: creator,
+                        size: 48
+                    )
+                } else {
+                    Image(
+                        systemName:
+                            "person.2.fill"
+                    )
+                    .font(.title3)
+                    .foregroundStyle(
+                        ATHLTHTheme.accent
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accent
+                            .opacity(0.10),
+                        in: Circle()
+                    )
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Invitation accepted",
+                            norwegian:
+                                "Invitasjonen er godtatt"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "You get your own copy of the sender's workout.",
+                            norwegian:
+                                "Du får din egen kopi av økten til avsenderen."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+        }
+    }
+
+    private func workoutSummary(
+        _ workout: PlannedSession
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                HStack {
+                    Label(
+                        workout.title,
+                        systemImage:
+                            workout.kind
+                                .systemImage
+                    )
+                    .font(
+                        .headline.weight(
+                            .semibold
+                        )
+                    )
+
+                    Spacer()
+                }
+
+                if workout.kind ==
+                    .strength {
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "%d exercises copied",
+                            norwegian:
+                                "%d øvelser kopiert",
+                            workout.exercises.count
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else if let route =
+                            payload?.route {
+                    Text(
+                        String(
+                            format:
+                                "%.1f km · %@",
+                            route
+                                .distanceKilometers,
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "route copied",
+                                norwegian:
+                                    "rute kopiert"
+                            )
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else if let running =
+                            workout
+                                .resolvedRunningWorkouts
+                                .first {
+                    Text(running.title)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Device, gear and music stay personal to you.",
+                        norwegian:
+                            "Enhet, utstyr og musikk velger du selv."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var devicePicker: some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Where do you want to train?",
+                        norwegian:
+                            "Hvor vil du trene?"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+
+                HStack(spacing: 10) {
+                    deviceButton(
+                        device: .iPhone,
+                        title: "iPhone",
+                        icon: "iphone",
+                        enabled: true
+                    )
+
+                    deviceButton(
+                        device: .appleWatch,
+                        title: "Apple Watch",
+                        icon: "applewatch",
+                        enabled:
+                            watchConnection.isReady
+                    )
+                }
+
+                if !watchConnection.isReady {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Apple Watch is unavailable right now. You can still start the copied workout on iPhone.",
+                            norwegian:
+                                "Apple Watch er ikke tilgjengelig akkurat nå. Du kan fortsatt starte øktkopien på iPhone."
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func deviceButton(
+        device: WorkoutCaptureDevice,
+        title: String,
+        icon: String,
+        enabled: Bool
+    ) -> some View {
+        Button {
+            guard enabled else { return }
+            captureDevice = device
+        } label: {
+            VStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.title3)
+
+                Text(title)
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+            }
+            .foregroundStyle(
+                captureDevice == device
+                    ? Color.white
+                    : ATHLTHTheme
+                        .primaryText
+            )
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 72
+            )
+            .background(
+                captureDevice == device
+                    ? ATHLTHTheme.accent
+                    : Color(
+                        .secondarySystemGroupedBackground
+                    ),
+                in: RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+    }
+
+    private var startButtonTitle:
+        String {
+        ATHLTHLocalization.choose(
+            english:
+                captureDevice == .appleWatch
+                    ? "Start on Apple Watch"
+                    : "Start on iPhone",
+            norwegian:
+                captureDevice == .appleWatch
+                    ? "Start på Apple Watch"
+                    : "Start på iPhone"
+        )
+    }
+
+    private func start(
+        _ workout: PlannedSession
+    ) {
+        guard !isStarting else { return }
+
+        isStarting = true
+        launchError = nil
+
+        Task { @MainActor in
+            do {
+                switch workout.kind {
+                case .strength:
+                    let trackingMode =
+                        payload?
+                            .strengthTrackingMode ??
+                        (
+                            workout.exercises
+                                .isEmpty
+                                ? .simple
+                                : .advanced
+                        )
+
+                    var advanced =
+                        payload?
+                            .strengthAdvancedConfiguration ??
+                        .standard
+                    advanced.spotifyPlaylist = nil
+                    advanced.spotifyAutoplay = false
+
+                    let audioCoach =
+                        workout
+                            .audioCoachConfiguration ??
+                        advanced
+                            .audioCoach
+                            .watchConfiguration
+
+                    try await WorkoutLaunchCoordinator
+                        .startStrength(
+                            workout: workout,
+                            captureDevice:
+                                captureDevice,
+                            trackingMode:
+                                trackingMode,
+                            selectedFriends: [],
+                            audioCoach:
+                                audioCoach,
+                            advancedConfiguration:
+                                advanced,
+                            session: session,
+                            settings: settings,
+                            social: social,
+                            strengthWorkout:
+                                strengthWorkout,
+                            watchConnection:
+                                watchConnection,
+                            spotify: spotify
+                        )
+
+                    showingStrengthWorkout =
+                        true
+
+                case .running:
+                    let runningWorkout =
+                        workout
+                            .resolvedRunningWorkouts
+                            .first
+                    let route =
+                        payload?.route
+                    let mode:
+                        RunQuickStartMode =
+                        runningWorkout != nil
+                            ? .structured
+                            : route != nil
+                                ? .route
+                                : .free
+
+                    try await WorkoutLaunchCoordinator
+                        .startRunQuick(
+                            configuration:
+                                RunQuickStartConfiguration(
+                                    mode: mode,
+                                    route: route,
+                                    workout:
+                                        runningWorkout,
+                                    captureDevice:
+                                        captureDevice,
+                                    audioCoach:
+                                        workout
+                                            .audioCoachConfiguration ??
+                                        .disabled,
+                                    routeAlerts:
+                                        payload?
+                                            .routeAlerts ??
+                                        settings
+                                            .routeAlertConfiguration,
+                                    ghostTargetDurationSeconds:
+                                        nil,
+                                    ghostUpdates:
+                                        nil,
+                                    autoPauseEnabled:
+                                        workout
+                                            .autoPauseEnabled ??
+                                        settings
+                                            .autoPauseOutdoorWorkouts,
+                                    friends: [],
+                                    gearIDs: []
+                                ),
+                            session: session,
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout:
+                                phoneWorkout,
+                            watchConnection:
+                                watchConnection,
+                            ghostRace:
+                                ghostRace
+                        )
+                    dismiss()
+
+                case .walking:
+                    try await WorkoutLaunchCoordinator
+                        .startWalkQuick(
+                            configuration:
+                                WalkQuickStartConfiguration(
+                                    captureDevice:
+                                        captureDevice,
+                                    audioCoach:
+                                        workout
+                                            .audioCoachConfiguration ??
+                                        .disabled,
+                                    autoPauseEnabled:
+                                        workout
+                                            .autoPauseEnabled ??
+                                        settings
+                                            .autoPauseOutdoorWorkouts,
+                                    friends: [],
+                                    gearIDs: []
+                                ),
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout:
+                                phoneWorkout,
+                            watchConnection:
+                                watchConnection
+                        )
+                    dismiss()
+
+                case .mobility,
+                     .recovery,
+                     .custom:
+                    throw NSError(
+                        domain:
+                            "ATHLTH.TrainTogether",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "This copied workout type cannot be launched yet.",
+                                    norwegian:
+                                        "Denne typen øktkopi kan ikke startes ennå."
+                                )
+                        ]
+                    )
+                }
+            } catch {
+                launchError =
+                    error.localizedDescription
+            }
+
+            isStarting = false
+        }
     }
 }
