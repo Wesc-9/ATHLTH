@@ -96,7 +96,8 @@ struct ActiveStrengthWorkoutView: View {
                         sets: $0,
                         reps: $1,
                         targetWeightKilograms: $2,
-                        restSeconds: $3
+                        restSeconds: $3,
+                        warmUpSets: $4
                     )
                     pendingExercise = nil
                     loadDefaultsFromCurrentSet()
@@ -1598,11 +1599,13 @@ private struct FreestyleExercisePrescriptionView: View {
     @Environment(\.dismiss) private var dismiss
 
     let entry: ExerciseLibraryEntry
-    let onAdd: (Int, Int?, Double?, Int?) -> Void
+    let onAdd:
+        (Int, Int?, Double?, Int?, Int) -> Void
 
     @State private var sets = 3
     @State private var reps = 8
     @State private var restSeconds = 90
+    @State private var warmUpSets = 0
     @State private var useWeightTarget = false
     @State private var weightKilograms = 20.0
 
@@ -1637,6 +1640,23 @@ private struct FreestyleExercisePrescriptionView: View {
                         in: 0...600,
                         step: 15
                     )
+
+                    Stepper(
+                        ATHLTHLocalization.format(
+                            english: "Warm-up sets: %d",
+                            norwegian: "Oppvarmingssett: %d",
+                            warmUpSets
+                        ),
+                        value: $warmUpSets,
+                        in: 0...sets
+                    )
+                    .onChange(of: sets) { _, newValue in
+                        warmUpSets =
+                            min(
+                                warmUpSets,
+                                newValue
+                            )
+                    }
 
                     Toggle("Target weight", isOn: $useWeightTarget)
 
@@ -1679,7 +1699,8 @@ private struct FreestyleExercisePrescriptionView: View {
                             sets,
                             reps,
                             useWeightTarget ? weightKilograms : nil,
-                            restSeconds
+                            restSeconds,
+                            warmUpSets
                         )
                         dismiss()
                     }
