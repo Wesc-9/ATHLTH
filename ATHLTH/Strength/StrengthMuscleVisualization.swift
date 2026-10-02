@@ -917,6 +917,13 @@ private struct StrengthBodyFigureCanvas:
                         profile.absoluteScore(
                             for: region
                         )
+
+                    // Keep untouched / trivial-load areas neutral. Rendering
+                    // every zero-value region was what made the recovery body
+                    // look like a green/orange block figure.
+                    guard intensity >= 0.08 else {
+                        continue
+                    }
                 }
 
                 draw(
@@ -939,6 +946,14 @@ private struct StrengthBodyFigureCanvas:
         context: inout GraphicsContext,
         size: CGSize
     ) {
+        if style == .recoveryLoad {
+            drawRecoverySilhouette(
+                context: &context,
+                size: size
+            )
+            return
+        }
+
         let base =
             style == .recoveryLoad
                 ? Color(
@@ -1134,6 +1149,235 @@ private struct StrengthBodyFigureCanvas:
             width: recoverySilhouette ? 0.13 : 0.16,
             height: 0.41,
             rotation: 0.015,
+            fill: base,
+            context: &context,
+            size: size
+        )
+    }
+
+    private func drawRecoverySilhouette(
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let base =
+            Color(
+                red: 0.90,
+                green: 0.89,
+                blue: 0.86
+            )
+        let outline =
+            Color.black.opacity(0.075)
+
+        let head =
+            CGRect(
+                x: size.width * 0.39,
+                y: size.height * 0.015,
+                width: size.width * 0.22,
+                height: size.width * 0.23
+            )
+        context.fill(
+            Path(ellipseIn: head),
+            with: .color(base)
+        )
+        context.stroke(
+            Path(ellipseIn: head),
+            with: .color(outline),
+            lineWidth: 0.7
+        )
+
+        drawRounded(
+            x: 0.455,
+            y: 0.115,
+            width: 0.09,
+            height: 0.07,
+            radius: 0.035,
+            fill: base,
+            context: &context,
+            size: size
+        )
+
+        var torso = Path()
+        torso.move(
+            to: CGPoint(
+                x: size.width * 0.46,
+                y: size.height * 0.155
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.29,
+                y: size.height * 0.235
+            ),
+            control1: CGPoint(
+                x: size.width * 0.39,
+                y: size.height * 0.16
+            ),
+            control2: CGPoint(
+                x: size.width * 0.32,
+                y: size.height * 0.19
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.38,
+                y: size.height * 0.53
+            ),
+            control1: CGPoint(
+                x: size.width * 0.32,
+                y: size.height * 0.34
+            ),
+            control2: CGPoint(
+                x: size.width * 0.34,
+                y: size.height * 0.47
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.50,
+                y: size.height * 0.575
+            ),
+            control1: CGPoint(
+                x: size.width * 0.41,
+                y: size.height * 0.55
+            ),
+            control2: CGPoint(
+                x: size.width * 0.46,
+                y: size.height * 0.575
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.62,
+                y: size.height * 0.53
+            ),
+            control1: CGPoint(
+                x: size.width * 0.54,
+                y: size.height * 0.575
+            ),
+            control2: CGPoint(
+                x: size.width * 0.59,
+                y: size.height * 0.55
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.71,
+                y: size.height * 0.235
+            ),
+            control1: CGPoint(
+                x: size.width * 0.66,
+                y: size.height * 0.47
+            ),
+            control2: CGPoint(
+                x: size.width * 0.68,
+                y: size.height * 0.34
+            )
+        )
+        torso.addCurve(
+            to: CGPoint(
+                x: size.width * 0.54,
+                y: size.height * 0.155
+            ),
+            control1: CGPoint(
+                x: size.width * 0.68,
+                y: size.height * 0.19
+            ),
+            control2: CGPoint(
+                x: size.width * 0.61,
+                y: size.height * 0.16
+            )
+        )
+        torso.closeSubpath()
+
+        context.fill(
+            torso,
+            with: .color(base)
+        )
+        context.stroke(
+            torso,
+            with: .color(outline),
+            lineWidth: 0.8
+        )
+
+        // Segmented limbs create a more recognisable human silhouette while
+        // remaining a single lightweight Canvas with no image allocation.
+        drawCapsule(
+            x: 0.185,
+            y: 0.225,
+            width: 0.105,
+            height: 0.205,
+            rotation: -0.07,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.145,
+            y: 0.405,
+            width: 0.078,
+            height: 0.205,
+            rotation: -0.025,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.71,
+            y: 0.225,
+            width: 0.105,
+            height: 0.205,
+            rotation: 0.07,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.777,
+            y: 0.405,
+            width: 0.078,
+            height: 0.205,
+            rotation: 0.025,
+            fill: base,
+            context: &context,
+            size: size
+        )
+
+        drawCapsule(
+            x: 0.345,
+            y: 0.545,
+            width: 0.135,
+            height: 0.225,
+            rotation: -0.012,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.52,
+            y: 0.545,
+            width: 0.135,
+            height: 0.225,
+            rotation: 0.012,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.365,
+            y: 0.755,
+            width: 0.095,
+            height: 0.22,
+            rotation: 0.012,
+            fill: base,
+            context: &context,
+            size: size
+        )
+        drawCapsule(
+            x: 0.54,
+            y: 0.755,
+            width: 0.095,
+            height: 0.22,
+            rotation: -0.012,
             fill: base,
             context: &context,
             size: size
@@ -1414,27 +1658,28 @@ private struct StrengthBodyFigureCanvas:
     private func recoveryLoadColor(
         score: Double
     ) -> Color {
-        let value = min(max(score, 0), 1)
+        let value =
+            min(max(score, 0), 1)
 
         let green = (
-            red: 0.20,
-            green: 0.68,
-            blue: 0.42
+            red: 0.24,
+            green: 0.70,
+            blue: 0.43
         )
         let yellow = (
-            red: 0.96,
+            red: 0.95,
             green: 0.78,
-            blue: 0.16
+            blue: 0.18
         )
         let orange = (
             red: 0.96,
-            green: 0.47,
+            green: 0.48,
             blue: 0.14
         )
         let red = (
-            red: 0.88,
-            green: 0.18,
-            blue: 0.20
+            red: 0.86,
+            green: 0.17,
+            blue: 0.19
         )
 
         let color: (
@@ -1444,29 +1689,37 @@ private struct StrengthBodyFigureCanvas:
         )
 
         switch value {
-        case ..<0.34:
+        case ..<0.20:
+            color = green
+
+        case 0.20..<0.44:
             color = interpolate(
                 from: green,
                 to: yellow,
-                progress: value / 0.34
+                progress:
+                    (value - 0.20) /
+                    0.24
             )
 
-        case 0.34..<0.60:
+        case 0.44..<0.65:
             color = interpolate(
                 from: yellow,
                 to: orange,
                 progress:
-                    (value - 0.34) /
-                    0.26
+                    (value - 0.44) /
+                    0.21
             )
+
+        case 0.65..<0.84:
+            color = orange
 
         default:
             color = interpolate(
                 from: orange,
                 to: red,
                 progress:
-                    (value - 0.60) /
-                    0.40
+                    (value - 0.84) /
+                    0.16
             )
         }
 
@@ -1475,7 +1728,7 @@ private struct StrengthBodyFigureCanvas:
             green: color.green,
             blue: color.blue
         )
-        .opacity(0.92)
+        .opacity(0.78)
     }
 
     private func interpolate(
