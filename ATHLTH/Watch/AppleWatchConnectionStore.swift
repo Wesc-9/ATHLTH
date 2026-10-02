@@ -475,7 +475,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         lastCompletedWorkout = nil
     }
 
-    func sendWorkoutCommand(_ command: WatchWorkoutCommand) {
+    func sendWorkoutCommand(
+        _ command: WatchWorkoutCommand,
+        workoutID: UUID? = nil
+    ) {
         guard
             let session,
             session.activationState == .activated,
@@ -489,6 +492,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 WatchTransferKind.workoutCommand.rawValue,
             WatchTransferMetadataKey.command:
                 command.rawValue,
+            WatchTransferMetadataKey.workoutID:
+                workoutID?.uuidString ?? "",
             WatchTransferMetadataKey.sentAt:
                 Date().timeIntervalSince1970
         ]
