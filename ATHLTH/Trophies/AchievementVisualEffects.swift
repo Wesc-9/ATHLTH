@@ -4,6 +4,7 @@ import CoreMotion
 import SwiftUI
 import UIKit
 
+@MainActor
 final class AchievementTiltMotionStore:
     ObservableObject
 {
