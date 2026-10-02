@@ -185,20 +185,13 @@ struct CommunityGroupEventDetailView: View {
 
     @ViewBuilder
     private var cover: some View {
-        if let value = current.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    coverFallback(
-                        icon: "calendar"
-                    )
-                }
-            }
+        if current.imageURL != nil {
+            ATHLTHArtworkImage(
+                reference:
+                    current.imageURL,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
             .frame(maxWidth: .infinity)
             .frame(height: 220)
             .clipShape(
@@ -1069,18 +1062,13 @@ struct CommunityGroupChallengeDetailView: View {
 
     @ViewBuilder
     private var cover: some View {
-        if let value = current.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    challengeCoverFallback
-                }
-            }
+        if current.imageURL != nil {
+            ATHLTHArtworkImage(
+                reference:
+                    current.imageURL,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
             .frame(maxWidth: .infinity)
             .frame(height: 220)
             .clipShape(
