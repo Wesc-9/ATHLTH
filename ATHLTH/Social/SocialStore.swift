@@ -1676,24 +1676,81 @@ final class SocialStore: ObservableObject {
             ? String(format: "%.0f kg volume", workout.totalVolumeKilograms)
             : "\(workout.totalCompletedSets) sets"
 
+        let performedExercises =
+            workout.exercises.filter {
+                $0.isCompleted ||
+                $0.sets.contains(
+                    where: {
+                        $0.isCompleted
+                    }
+                )
+            }
+
+        var muscleGroups: [String] = []
+        for raw in performedExercises.flatMap({
+            $0.exercise.primaryMuscles +
+            ($0.exercise.secondaryMuscles ?? [])
+        }) {
+            let value =
+                raw.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+            guard !value.isEmpty,
+                  !muscleGroups.contains(
+                    where: {
+                        $0.caseInsensitiveCompare(
+                            value
+                        ) == .orderedSame
+                    }
+                  )
+            else {
+                continue
+            }
+
+            muscleGroups.append(value)
+        }
+
+        var metadata: [String: String] = [
+            "workout_id": workout.id.uuidString,
+            "kind": "strength",
+            "duration_seconds": String(
+                max(
+                    endedAt.timeIntervalSince(
+                        workout.startedAt
+                    ),
+                    0
+                )
+            ),
+            "exercise_count":
+                String(
+                    performedExercises.count
+                )
+        ]
+
+        if workout.totalVolumeKilograms > 0 {
+            metadata["volume_kg"] =
+                String(
+                    workout.totalVolumeKilograms
+                )
+        }
+
+        if !muscleGroups.isEmpty {
+            metadata["muscle_groups"] =
+                muscleGroups
+                    .prefix(8)
+                    .joined(
+                        separator: "|"
+                    )
+        }
+
         do {
             try await service.publishActivity(
                 eventKey: "strength-workout-\(workout.id.uuidString)",
                 kind: "workout",
                 title: workout.title,
                 subtitle: volume,
-                metadata: [
-                    "workout_id": workout.id.uuidString,
-                    "kind": "strength",
-                    "duration_seconds": String(
-                        max(
-                            endedAt.timeIntervalSince(
-                                workout.startedAt
-                            ),
-                            0
-                        )
-                    )
-                ],
+                metadata: metadata,
                 visibility: configuredVisibility
             )
         } catch {
