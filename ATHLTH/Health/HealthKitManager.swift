@@ -1120,70 +1120,6 @@ final class HealthKitManager: ObservableObject {
             return cached.snapshot
         }
 
-        let walkDistanceThresholds = [
-            10_000,
-            50_000,
-            250_000,
-            1_000_000
-        ]
-        let walkSessionThresholds = [
-            10,
-            50,
-            150,
-            500
-        ]
-        var walkingDistanceReachedAt: [Int: Date] = [:]
-        var walkingWorkoutCountReachedAt: [Int: Date] = [:]
-        var cumulativeWalkDistance = 0.0
-        var walkingWorkoutCount = 0
-        var longestWalkMeters = 0.0
-        var firstFiveKWalkDate: Date?
-        var firstTenKWalkDate: Date?
-
-        for workout in workouts where workout.workoutActivityType == .walking {
-            walkingWorkoutCount += 1
-
-            for threshold in walkSessionThresholds
-            where walkingWorkoutCountReachedAt[threshold] == nil &&
-                    walkingWorkoutCount >= threshold {
-                walkingWorkoutCountReachedAt[threshold] =
-                    workout.endDate
-            }
-
-            let distance =
-                workout.athlthDistanceMeters ?? 0
-            guard distance > 0 else {
-                continue
-            }
-
-            longestWalkMeters =
-                max(
-                    longestWalkMeters,
-                    distance
-                )
-            cumulativeWalkDistance +=
-                distance
-
-            if firstFiveKWalkDate == nil,
-               distance >= 5_000 {
-                firstFiveKWalkDate =
-                    workout.endDate
-            }
-
-            if firstTenKWalkDate == nil,
-               distance >= 10_000 {
-                firstTenKWalkDate =
-                    workout.endDate
-            }
-
-            for threshold in walkDistanceThresholds
-            where walkingDistanceReachedAt[threshold] == nil &&
-                    cumulativeWalkDistance >= Double(threshold) {
-                walkingDistanceReachedAt[threshold] =
-                    workout.endDate
-            }
-        }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let trendStart = calendar.date(
@@ -1402,6 +1338,70 @@ final class HealthKitManager: ObservableObject {
             where runningDistanceReachedAt[threshold] == nil &&
                     cumulativeRunDistance >= Double(threshold) {
                 runningDistanceReachedAt[threshold] = workout.endDate
+            }
+        }
+
+        let walkDistanceThresholds = [
+            10_000,
+            50_000,
+            250_000,
+            1_000_000
+        ]
+        let walkSessionThresholds = [
+            10,
+            50,
+            150,
+            500
+        ]
+        var walkingDistanceReachedAt: [Int: Date] = [:]
+        var walkingWorkoutCountReachedAt: [Int: Date] = [:]
+        var cumulativeWalkDistance = 0.0
+        var walkingWorkoutCount = 0
+        var longestWalkMeters = 0.0
+        var firstFiveKWalkDate: Date?
+        var firstTenKWalkDate: Date?
+
+        for workout in workouts where workout.workoutActivityType == .walking {
+            walkingWorkoutCount += 1
+
+            for threshold in walkSessionThresholds
+            where walkingWorkoutCountReachedAt[threshold] == nil &&
+                    walkingWorkoutCount >= threshold {
+                walkingWorkoutCountReachedAt[threshold] =
+                    workout.endDate
+            }
+
+            let distance =
+                workout.athlthDistanceMeters ?? 0
+            guard distance > 0 else {
+                continue
+            }
+
+            longestWalkMeters =
+                max(
+                    longestWalkMeters,
+                    distance
+                )
+            cumulativeWalkDistance +=
+                distance
+
+            if firstFiveKWalkDate == nil,
+               distance >= 5_000 {
+                firstFiveKWalkDate =
+                    workout.endDate
+            }
+
+            if firstTenKWalkDate == nil,
+               distance >= 10_000 {
+                firstTenKWalkDate =
+                    workout.endDate
+            }
+
+            for threshold in walkDistanceThresholds
+            where walkingDistanceReachedAt[threshold] == nil &&
+                    cumulativeWalkDistance >= Double(threshold) {
+                walkingDistanceReachedAt[threshold] =
+                    workout.endDate
             }
         }
 
