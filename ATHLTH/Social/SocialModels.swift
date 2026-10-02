@@ -663,6 +663,32 @@ enum SocialWorkoutParticipantState: String, Codable, Hashable {
     case declined
 }
 
+struct SocialWorkoutInvitePayload: Codable, Hashable {
+    var version: Int = 1
+    var workout: PlannedSession
+    var route: TrainingRoute? = nil
+    var strengthTrackingMode: StrengthTrackingMode? = nil
+    var strengthAdvancedConfiguration:
+        StrengthAdvancedConfiguration? = nil
+    var routeAlerts:
+        WatchRouteAlertConfiguration? = nil
+    var createdAt: Date = Date()
+
+    /// The invited athlete chooses their own capture device, gear and music.
+    /// The payload only preserves the workout itself and guidance that changes
+    /// how the workout is performed.
+    func recipientCopy() -> PlannedSession {
+        var copy = workout
+        copy.sharedSourceOwnerID = nil
+        copy.sharedSourceSessionID = workout.id
+        copy.gearIDs = []
+        copy.spotifyPlaylist = nil
+        copy.spotifyAutoplayOnStart = false
+        copy.scheduledStart = nil
+        return copy
+    }
+}
+
 struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let creatorID: UUID
@@ -674,6 +700,7 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
     var sourceWorkoutID: UUID?
     let createdAt: Date
     var updatedAt: Date?
+    var invitePayload: SocialWorkoutInvitePayload? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -686,6 +713,7 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
         case sourceWorkoutID = "source_workout_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case invitePayload = "invite_payload"
     }
 }
 
