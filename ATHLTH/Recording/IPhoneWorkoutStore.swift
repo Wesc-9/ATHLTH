@@ -4,6 +4,33 @@ import Foundation
 @preconcurrency import HealthKit
 import UIKit
 
+@MainActor
+enum ATHLTHWorkoutScreenAwake {
+    private static var reasons: Set<String> = []
+
+    static func set(
+        _ enabled: Bool,
+        reason: String
+    ) {
+        if enabled {
+            reasons.insert(reason)
+        } else {
+            reasons.remove(reason)
+        }
+
+        let shouldStayAwake =
+            !reasons.isEmpty
+
+        if UIApplication.shared
+            .isIdleTimerDisabled !=
+            shouldStayAwake {
+            UIApplication.shared
+                .isIdleTimerDisabled =
+                shouldStayAwake
+        }
+    }
+}
+
 struct PhoneWorkoutPauseInterval: Codable, Equatable {
     let startedAt: Date
     var endedAt: Date?
