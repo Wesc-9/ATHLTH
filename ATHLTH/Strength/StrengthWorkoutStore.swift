@@ -399,8 +399,17 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     var hasNextExercise: Bool {
-        guard let workout = activeWorkout else { return false }
-        return currentExerciseIndex + 1 < workout.exercises.count
+        guard let workout = activeWorkout else {
+            return false
+        }
+
+        return workout.exercises
+            .enumerated()
+            .contains {
+                index, exercise in
+                index != currentExerciseIndex &&
+                !exercise.isCompleted
+            }
     }
 
     func setDraft(
@@ -1135,15 +1144,51 @@ final class StrengthWorkoutStore: ObservableObject {
     func moveToNextExercise() {
         guard
             let workout = activeWorkout,
-            workout.exercises.indices.contains(currentExerciseIndex),
-            workout.exercises[currentExerciseIndex].sets.allSatisfy(\.isCompleted),
+            workout.exercises.indices
+                .contains(
+                    currentExerciseIndex
+                ),
+            workout.exercises[
+                currentExerciseIndex
+            ].sets.allSatisfy(\.isCompleted),
             hasNextExercise
         else {
             return
         }
 
-        currentExerciseIndex += 1
-        currentSetIndex = workout.exercises[currentExerciseIndex].sets.firstIndex(where: { !$0.isCompleted }) ?? 0
+        let later =
+            workout.exercises.indices
+                .dropFirst(
+                    currentExerciseIndex + 1
+                )
+                .first {
+                    !workout.exercises[$0]
+                        .isCompleted
+                }
+        let earlier =
+            workout.exercises.indices
+                .prefix(
+                    currentExerciseIndex
+                )
+                .first {
+                    !workout.exercises[$0]
+                        .isCompleted
+                }
+
+        guard let nextIndex =
+                later ?? earlier
+        else {
+            return
+        }
+
+        currentExerciseIndex = nextIndex
+        currentSetIndex =
+            workout.exercises[nextIndex]
+                .sets.firstIndex(
+                    where: {
+                        !$0.isCompleted
+                    }
+                ) ?? 0
         restEndsAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
