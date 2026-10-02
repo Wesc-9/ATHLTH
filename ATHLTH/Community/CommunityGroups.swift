@@ -3964,7 +3964,7 @@ struct CommunityGroupDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.accentDeep.opacity(0.18)
+                    accent: ATHLTHTheme.premiumGold.opacity(0.16)
                 )
 
                 if isMember && selectedTab == .chat {
@@ -3975,8 +3975,17 @@ struct CommunityGroupDetailView: View {
                         )
 
                         groupAreaPicker
-                            .padding(.horizontal, 16)
+                            .frame(
+                                width: max(
+                                    0,
+                                    min(
+                                        geometry.size.width - 28,
+                                        760
+                                    )
+                                )
+                            )
                             .padding(.vertical, 11)
+                            .frame(maxWidth: .infinity)
                             .background(
                                 ATHLTHTheme.canvasTop
                                     .opacity(0.96)
@@ -3990,7 +3999,7 @@ struct CommunityGroupDetailView: View {
                     }
                     .ignoresSafeArea(edges: .top)
                     .frame(
-                        maxWidth: .infinity,
+                        width: geometry.size.width,
                         maxHeight: .infinity
                     )
                 } else {
@@ -4095,12 +4104,13 @@ struct CommunityGroupDetailView: View {
                 } label: {
                     Text(tab.displayTitle)
                         .font(
-                            .subheadline
-                                .weight(
+                            .system(
+                                size: 13,
+                                weight:
                                     selectedTab == tab
                                         ? .semibold
                                         : .medium
-                                )
+                            )
                         )
                         .foregroundStyle(
                             selectedTab == tab
@@ -4109,20 +4119,16 @@ struct CommunityGroupDetailView: View {
                                     .primaryText
                         )
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(0.66)
                         .frame(
-                            maxWidth:
-                                .infinity
+                            maxWidth: .infinity
                         )
                         .frame(height: 42)
                         .background {
-                            if selectedTab ==
-                                tab {
+                            if selectedTab == tab {
                                 RoundedRectangle(
-                                    cornerRadius:
-                                        15,
-                                    style:
-                                        .continuous
+                                    cornerRadius: 15,
+                                    style: .continuous
                                 )
                                 .fill(
                                     LinearGradient(
@@ -4130,21 +4136,17 @@ struct CommunityGroupDetailView: View {
                                             ATHLTHTheme
                                                 .accentDeep,
                                             ATHLTHTheme
-                                                .vitality
+                                                .premiumGold
                                         ],
-                                        startPoint:
-                                            .leading,
-                                        endPoint:
-                                            .trailing
+                                        startPoint: .leading,
+                                        endPoint: .trailing
                                     )
                                 )
                                 .shadow(
                                     color:
                                         ATHLTHTheme
-                                            .accentDeep
-                                            .opacity(
-                                                0.16
-                                            ),
+                                            .premiumGold
+                                            .opacity(0.12),
                                     radius: 7,
                                     y: 3
                                 )
@@ -4152,11 +4154,13 @@ struct CommunityGroupDetailView: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(4)
         .background(
-            Color.white.opacity(0.92),
+            ATHLTHTheme.card.opacity(0.96),
             in:
                 RoundedRectangle(
                     cornerRadius: 20,
@@ -4169,7 +4173,9 @@ struct CommunityGroupDetailView: View {
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.05),
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.16),
                 lineWidth: 0.8
             )
         }
@@ -4791,7 +4797,7 @@ struct CommunityGroupDetailView: View {
                 LinearGradient(
                     colors: [
                         ATHLTHTheme.accentDeep,
-                        ATHLTHTheme.vitality
+                        ATHLTHTheme.premiumGold
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -4940,7 +4946,7 @@ struct CommunityGroupDetailView: View {
                                 ATHLTHTheme
                                     .accentDeep,
                                 ATHLTHTheme
-                                    .vitality
+                                    .premiumGold
                             ],
                             startPoint:
                                 .topLeading,
@@ -4972,33 +4978,60 @@ struct CommunityGroupDetailView: View {
             }
 
             HStack(spacing: 8) {
-                Button {
-                    updateComposerFocused = true
-                } label: {
-                    referenceActionTile(
-                        title:
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "New post",
-                                    norwegian:
-                                        "Nytt innlegg"
-                                ),
-                        detail:
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Share",
-                                    norwegian:
-                                        "Del med gruppen"
-                                ),
-                        icon: "pencil",
-                        tint:
-                            ATHLTHTheme
-                                .accentDeep
-                    )
+                if groups.canManage(
+                    currentGroup
+                ) {
+                    Button {
+                        showingGroupSettings = true
+                    } label: {
+                        referenceActionTile(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Manage",
+                                        norwegian:
+                                            "Administrer"
+                                    ),
+                            detail:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Club settings",
+                                        norwegian:
+                                            "Club-innstillinger"
+                                    ),
+                            icon:
+                                "slider.horizontal.3",
+                            tint:
+                                ATHLTHTheme
+                                    .premiumGold
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        selectedTab = .chat
+                    } label: {
+                        referenceActionTile(
+                            title: "Chat",
+                            detail:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Talk together",
+                                        norwegian:
+                                            "Snakk sammen"
+                                    ),
+                            icon:
+                                "bubble.left.and.bubble.right.fill",
+                            tint:
+                                ATHLTHTheme
+                                    .accentDeep
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 NavigationLink {
                     CommunityGroupMembersView(
@@ -5044,7 +5077,7 @@ struct CommunityGroupDetailView: View {
                                 : "person.2.fill",
                         tint:
                             ATHLTHTheme
-                                .recoveryBlue
+                                .accentDeep
                     )
                 }
                 .buttonStyle(.plain)
@@ -5092,7 +5125,7 @@ struct CommunityGroupDetailView: View {
                         icon: "calendar",
                         tint:
                             ATHLTHTheme
-                                .vitality
+                                .accent
                     )
                 }
                 .buttonStyle(.plain)
@@ -5157,7 +5190,9 @@ struct CommunityGroupDetailView: View {
                                     "Bli med"
                             ),
                     icon: "trophy.fill",
-                    tint: .orange
+                    tint:
+                        ATHLTHTheme
+                            .premiumGold
                 )
             }
             .buttonStyle(.plain)
@@ -5203,7 +5238,9 @@ struct CommunityGroupDetailView: View {
                                         "Se challenges"
                                 ),
                     icon: "trophy.fill",
-                    tint: .orange
+                    tint:
+                        ATHLTHTheme
+                            .premiumGold
                 )
             }
             .buttonStyle(.plain)
@@ -5246,7 +5283,7 @@ struct CommunityGroupDetailView: View {
                 )
                 .font(.caption2.bold())
                 .foregroundStyle(
-                    tint.opacity(0.85)
+                    tint.opacity(0.82)
                 )
             }
 
@@ -5262,6 +5299,10 @@ struct CommunityGroupDetailView: View {
                 )
                 .lineLimit(2)
                 .minimumScaleFactor(0.72)
+                .frame(
+                    height: 30,
+                    alignment: .topLeading
+                )
 
             Text(detail)
                 .font(
@@ -5274,23 +5315,47 @@ struct CommunityGroupDetailView: View {
                     ATHLTHTheme
                         .mutedText
                 )
-                .lineLimit(1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.70)
+                .frame(
+                    height: 24,
+                    alignment: .topLeading
+                )
         }
-        .padding(9)
+        .padding(10)
         .frame(
             maxWidth: .infinity,
-            minHeight: 92,
-            alignment: .leading
+            height: 108,
+            alignment: .topLeading
         )
         .background(
-            tint.opacity(0.08),
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme.champagneSoft,
+                    tint.opacity(0.07)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in:
                 RoundedRectangle(
-                    cornerRadius: 16,
+                    cornerRadius: 17,
                     style: .continuous
                 )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.13),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private func postReferenceClubUpdate() {
@@ -7691,7 +7756,7 @@ struct CommunityGroupDetailView: View {
                 }
                 .defaultScrollAnchor(.bottom)
                 .background(
-                    Color.white.opacity(0.48)
+                    ATHLTHTheme.cardWarm.opacity(0.36)
                 )
                 .frame(maxHeight: .infinity)
                 .onChange(
@@ -7766,10 +7831,13 @@ struct CommunityGroupDetailView: View {
                         style: .continuous
                     )
                     .stroke(
-                        ATHLTHTheme.border.opacity(0.82),
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.16),
                         lineWidth: 1
                     )
                 }
+                .frame(maxWidth: .infinity)
 
                 Button {
                     Task {
@@ -7786,7 +7854,18 @@ struct CommunityGroupDetailView: View {
                         .foregroundStyle(.white)
                         .frame(width: 46, height: 46)
                         .background(
-                            ATHLTHTheme.accentDeep,
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme
+                                        .accentDeep,
+                                    ATHLTHTheme
+                                        .premiumGold
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            ),
                             in: Circle()
                         )
                 }
@@ -7798,9 +7877,11 @@ struct CommunityGroupDetailView: View {
                         .isEmpty
                 )
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.top, 9)
             .padding(.bottom, 8)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
             .background(.ultraThinMaterial)
             .overlay(alignment: .top) {
                 Divider()
@@ -8292,14 +8373,45 @@ struct CommunityGroupDetailView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .background(
-                        mine
-                            ? ATHLTHTheme.accentDeep
-                            : Color.white,
+                        Group {
+                            if mine {
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme
+                                            .accentDeep,
+                                        ATHLTHTheme
+                                            .accent
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                )
+                            } else {
+                                ATHLTHTheme.card
+                            }
+                        },
                         in: RoundedRectangle(
                             cornerRadius: 15,
                             style: .continuous
                         )
                     )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            mine
+                                ? ATHLTHTheme
+                                    .premiumGold
+                                    .opacity(0.22)
+                                : ATHLTHTheme
+                                    .border
+                                    .opacity(0.60),
+                            lineWidth: 0.7
+                        )
+                    }
 
                 Text(
                     message.createdAt.formatted(
