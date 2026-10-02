@@ -9,6 +9,7 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
@@ -268,6 +269,7 @@ struct ActiveStrengthWorkoutView: View {
                 watchFinishTimeoutTask?.cancel()
                 watchFinishTimeoutTask = nil
                 finishInProgress = false
+                spotify.endLinkedWorkoutPlaybackSession()
                 appSession.endTrainingStatus()
                 dismiss()
             }
