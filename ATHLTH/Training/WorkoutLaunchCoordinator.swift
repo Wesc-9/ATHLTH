@@ -566,6 +566,11 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws {
+        var inviteAdvancedConfiguration =
+            advancedConfiguration
+        inviteAdvancedConfiguration.spotifyPlaylist = nil
+        inviteAdvancedConfiguration.spotifyAutoplay = false
+
         await social.beginWorkoutWithFriends(
             title: workout.title,
             kind: .strength,
@@ -573,7 +578,17 @@ enum WorkoutLaunchCoordinator {
             creatorName:
                 session.profile.displayName,
             creatorUsername:
-                session.profile.username
+                session.profile.username,
+            invitePayload:
+                SocialWorkoutInvitePayload(
+                    workout: workout,
+                    strengthTrackingMode:
+                        trackingMode,
+                    strengthAdvancedConfiguration:
+                        trackingMode == .advanced
+                            ? inviteAdvancedConfiguration
+                            : nil
+                )
         )
 
         let watchSessionID: UUID?
