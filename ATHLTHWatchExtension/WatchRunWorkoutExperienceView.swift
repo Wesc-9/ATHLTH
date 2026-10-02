@@ -241,7 +241,7 @@ struct WatchRunWorkoutExperienceView: View {
     // MARK: - Page 1: live metrics
 
     private var metricsPage: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 7) {
             statusHeader(
                 title: workoutManager.kind.title,
                 icon:
@@ -256,62 +256,41 @@ struct WatchRunWorkoutExperienceView: View {
             )
             .font(
                 .system(
-                    size: 25,
-                    weight: .semibold,
+                    size: 30,
+                    weight: .bold,
                     design: .rounded
                 )
             )
             .monospacedDigit()
             .foregroundStyle(
-                WatchTheme.textSecondary
+                WatchTheme.textPrimary
             )
-
-            VStack(spacing: 0) {
-                Text("CURRENT PACE")
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(1.1)
-                    .foregroundStyle(
-                        WatchTheme.muted
-                    )
-
-                Text(
-                    paceText(
-                        workoutManager
-                            .currentPaceSecondsPerKilometer
-                    )
-                )
-                .font(
-                    .system(
-                        size: 43,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .monospacedDigit()
-                .minimumScaleFactor(0.72)
-                .lineLimit(1)
-
-                Text("/km")
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        WatchTheme.muted
-                    )
-            }
             .frame(
-                maxWidth: .infinity
+                maxWidth: .infinity,
+                alignment: .leading
             )
-            .padding(.vertical, 9)
-            .watchSurface(radius: 20)
+            .padding(.horizontal, 2)
+
+            HStack(spacing: 7) {
+                metricTile(
+                    title: "PACE",
+                    value:
+                        paceText(
+                            workoutManager
+                                .currentPaceSecondsPerKilometer
+                        ),
+                    suffix: "/km",
+                    icon: "speedometer"
+                )
+
+                metricTile(
+                    title: "HEART",
+                    value:
+                        heartRateText,
+                    suffix: "bpm",
+                    icon: "heart.fill"
+                )
+            }
 
             HStack(spacing: 7) {
                 metricTile(
@@ -323,11 +302,11 @@ struct WatchRunWorkoutExperienceView: View {
                 )
 
                 metricTile(
-                    title: "HEART",
+                    title: "CALORIES",
                     value:
-                        heartRateText,
-                    suffix: "bpm",
-                    icon: "heart.fill"
+                        "(Int(workoutManager.activeCalories.rounded()))",
+                    suffix: "kcal",
+                    icon: "flame.fill"
                 )
             }
 
@@ -576,7 +555,7 @@ struct WatchRunWorkoutExperienceView: View {
                 )
                 .font(
                     .system(
-                        size: 38,
+                        size: 28,
                         weight: .bold,
                         design: .rounded
                     )
@@ -1188,7 +1167,7 @@ struct WatchRunWorkoutExperienceView: View {
             }
             .foregroundStyle(
                 accent
-                    ? Color.black
+                    ? Color.white
                     : WatchTheme
                         .textPrimary
             )
