@@ -2130,6 +2130,44 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    func setGroupHeaderArtwork(
+        _ group: CommunityGroupRecord,
+        artwork: ATHLTHStandardArtwork
+    ) async -> Bool {
+        guard canManage(group) else {
+            return false
+        }
+
+        let path =
+            "\(group.id.uuidString.lowercased())/header.jpg"
+
+        do {
+            _ = try? await client.storage
+                .from("community-group-images")
+                .remove(paths: [path])
+
+            try await client
+                .from("community_groups")
+                .update(
+                    CommunityGroupHeaderImageUpdate(
+                        headerImageURL:
+                            artwork.reference,
+                        updatedAt: Date()
+                    )
+                )
+                .eq("id", value: group.id)
+                .execute()
+
+            errorMessage = nil
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func removeGroupHeaderImage(
         _ group: CommunityGroupRecord
     ) async -> Bool {
