@@ -92,6 +92,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     @Published private(set) var connectionState: SpotifyConnectionState = .disconnected
     @Published private(set) var playlists: [SpotifyPlaylistReference] = []
     @Published private(set) var activePlaylist: SpotifyPlaylistReference?
+    @Published private(set) var isPlaying = false
     @Published private(set) var lastStartedAt: Date?
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var isRefreshingPlaylists = false
@@ -152,6 +153,16 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     var isConnected: Bool {
         if case .connected = connectionState { return true }
         return false
+    }
+
+    var watchPlaybackState: WatchSpotifyPlaybackState {
+        WatchSpotifyPlaybackState(
+            isConfigured: isConfigured,
+            isConnected: isConnected,
+            isPlaying: isPlaying,
+            playlistName: activePlaylist?.name,
+            updatedAt: Date()
+        )
     }
 
     var setupMessage: String? {
@@ -293,6 +304,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         deleteStoredPKCESession()
         playlists = []
         activePlaylist = nil
+        isPlaying = false
         pendingPlaybackURI = nil
         pendingPlaybackPlaylist = nil
         lastStartedAt = nil
@@ -472,6 +484,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             Task { @MainActor in
                 if let error {
                     self?.lastErrorMessage = error.localizedDescription
+                } else {
+                    self?.isPlaying = false
                 }
             }
         }
@@ -482,6 +496,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             Task { @MainActor in
                 if let error {
                     self?.lastErrorMessage = error.localizedDescription
+                } else {
+                    self?.isPlaying = true
                 }
             }
         }
@@ -499,6 +515,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
 
     func stopPreviewPlaybackState() {
         activePlaylist = nil
+        isPlaying = false
         lastStartedAt = nil
     }
 
@@ -519,6 +536,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                         self?.lastErrorMessage = error.localizedDescription
                     } else {
                         self?.activePlaylist = playlist
+                        self?.isPlaying = true
                         self?.lastStartedAt = Date()
                     }
                     self?.pendingPlaybackURI = nil
