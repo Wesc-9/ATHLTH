@@ -363,6 +363,10 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // per-workout Audio Coach override.
     var audioCoachConfiguration: WatchAudioCoachConfiguration? = nil
 
+    // nil inherits the global outdoor auto-pause setting. true/false is an
+    // explicit per-workout override for outdoor running or walking.
+    var autoPauseEnabled: Bool? = nil
+
     // Per-workout Spotify override. spotifyAutoplayOnStart == nil keeps
     // backwards compatibility by inheriting the program-level Spotify
     // setting. false explicitly disables Spotify for this workout, while
