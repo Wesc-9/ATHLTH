@@ -217,6 +217,20 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    func withdrawWorkoutParticipant(
+        participantID: UUID
+    ) async throws {
+        try await client
+            .from("social_workout_participants")
+            .update([
+                "state":
+                    SocialWorkoutParticipantState
+                        .declined.rawValue
+            ])
+            .eq("id", value: participantID)
+            .execute()
+    }
+
     func completeWorkoutSession(
         sessionID: UUID,
         sourceWorkoutID: UUID,
