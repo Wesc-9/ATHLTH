@@ -1089,6 +1089,266 @@ struct WatchActiveWorkoutView: View {
     }
 }
 
+struct WatchSpotifyRemotePage: View {
+    @EnvironmentObject private var routeStore:
+        WatchRouteStore
+
+    private var playback:
+        WatchSpotifyPlaybackState {
+        routeStore.spotifyPlaybackState
+    }
+
+    private var canControl: Bool {
+        routeStore.companionLinked &&
+        playback.isConfigured &&
+        playback.isConnected
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(
+                    systemName:
+                        "music.note"
+                )
+                .foregroundStyle(
+                    WatchTheme.accent
+                )
+
+                Text("SPOTIFY")
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1)
+
+                Spacer()
+
+                Circle()
+                    .fill(
+                        canControl
+                            ? WatchTheme.accent
+                            : WatchTheme.muted
+                                .opacity(0.45)
+                    )
+                    .frame(
+                        width: 6,
+                        height: 6
+                    )
+            }
+
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            WatchTheme
+                                .accentSoft
+                        )
+                        .frame(
+                            width: 48,
+                            height: 48
+                        )
+
+                    Image(
+                        systemName:
+                            playback.isPlaying
+                                ? "waveform"
+                                : "music.note"
+                    )
+                    .font(
+                        .system(
+                            size: 21,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        WatchTheme.accentDeep
+                    )
+                }
+
+                Text(primaryTitle)
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .bold
+                        )
+                    )
+                    .lineLimit(2)
+                    .multilineTextAlignment(
+                        .center
+                    )
+
+                if let secondaryText {
+                    Text(secondaryText)
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.textSecondary
+                        )
+                        .lineLimit(2)
+                        .multilineTextAlignment(
+                            .center
+                        )
+                }
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+            .padding(10)
+            .watchSurface(radius: 18)
+
+            HStack(spacing: 8) {
+                Button {
+                    routeStore.sendSpotifyCommand(
+                        playback.isPlaying
+                            ? .pause
+                            : .resume
+                    )
+                } label: {
+                    Image(
+                        systemName:
+                            playback.isPlaying
+                                ? "pause.fill"
+                                : "play.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 48
+                    )
+                    .background(
+                        WatchTheme.accent,
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canControl)
+                .opacity(
+                    canControl ? 1 : 0.45
+                )
+
+                Button {
+                    routeStore
+                        .sendSpotifyCommand(
+                            .next
+                        )
+                } label: {
+                    Image(
+                        systemName:
+                            "forward.end.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        WatchTheme.textPrimary
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 48
+                    )
+                    .background(
+                        WatchTheme.slateSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canControl)
+                .opacity(
+                    canControl ? 1 : 0.45
+                )
+            }
+
+            Text(statusText)
+                .font(.system(size: 8))
+                .foregroundStyle(
+                    WatchTheme.muted
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .onAppear {
+            routeStore
+                .requestSpotifyPlaybackState()
+        }
+    }
+
+    private var primaryTitle: String {
+        if let title = playback.trackTitle,
+           !title.isEmpty {
+            return title
+        }
+
+        if let playlist =
+                playback.playlistName,
+           !playlist.isEmpty {
+            return playlist
+        }
+
+        return playback.isConfigured
+            ? "Spotify"
+            : "Spotify unavailable"
+    }
+
+    private var secondaryText: String? {
+        if let artist = playback.artistName,
+           !artist.isEmpty {
+            if let playlist =
+                    playback.playlistName,
+               !playlist.isEmpty {
+                return "\(artist) · \(playlist)"
+            }
+            return artist
+        }
+
+        return playback.playlistName
+    }
+
+    private var statusText: String {
+        guard routeStore.companionLinked
+        else {
+            return "Waiting for iPhone connection"
+        }
+
+        guard playback.isConfigured else {
+            return "Set up Spotify in ATHLTH on iPhone"
+        }
+
+        guard playback.isConnected else {
+            return "Connect Spotify in ATHLTH on iPhone"
+        }
+
+        return playback.isPlaying
+            ? "Playing · controlled through iPhone"
+            : "Paused · controlled through iPhone"
+    }
+}
+
 
 private struct WatchStrengthCrownControl: View {
     let title: String
