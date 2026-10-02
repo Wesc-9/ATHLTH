@@ -838,6 +838,13 @@ enum WatchStrengthInputMode:
     }
 }
 
+struct WatchStrengthExerciseSummary: Codable, Hashable {
+    var index: Int
+    var name: String
+    var primaryMuscles: [String]
+    var setCount: Int
+}
+
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var workoutID: UUID
     var title: String
@@ -864,6 +871,8 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var draftRIR: Double? = nil
     var isWarmUp: Bool? = nil
     var effortMetricRaw: String? = nil
+    var exerciseQueue:
+        [WatchStrengthExerciseSummary]? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
