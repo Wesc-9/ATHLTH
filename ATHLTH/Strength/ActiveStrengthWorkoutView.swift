@@ -34,56 +34,129 @@ struct ActiveStrengthWorkoutView: View {
         NavigationStack {
             Group {
                 if let workout = strength.activeWorkout {
-                    ScrollView {
-                        VStack(spacing: 18) {
-                            workoutHeader(workout)
-
-                            TrainTogetherStatusStrip()
-
-                            addExerciseCard(workout)
-
-                            if workout.trackingMode == .advanced,
-                               let exercise = strength.currentExercise {
-                                advancedTrackingContent(workout: workout, exercise: exercise)
-                            } else {
-                                simpleTrackingContent(workout: workout)
+                    if workout.exercises.isEmpty {
+                        ScrollView {
+                            VStack(spacing: 18) {
+                                workoutHeader(workout)
+                                TrainTogetherStatusStrip()
+                                addExerciseCard(workout)
+                                simpleTrackingContent(
+                                    workout: workout
+                                )
+                                recordingStatusCard(
+                                    workout
+                                )
                             }
-
-                            recordingStatusCard(workout)
+                            .padding()
                         }
-                        .padding()
+                    } else if let exercise =
+                                strength
+                                    .currentExercise {
+                        ScrollView {
+                            focusedStrengthContent(
+                                workout: workout,
+                                exercise: exercise
+                            )
+                            .padding(
+                                .horizontal,
+                                16
+                            )
+                            .padding(.top, 12)
+                            .padding(
+                                .bottom,
+                                36
+                            )
+                        }
+                        .scrollIndicators(.hidden)
+                    } else {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Workout is ready",
+                                norwegian:
+                                    "Økten er klar"
+                            ),
+                            systemImage:
+                                "checkmark.circle",
+                            description: Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Finish the workout when you are done.",
+                                    norwegian:
+                                        "Avslutt økten når du er ferdig."
+                                )
+                            )
+                        )
                     }
                 } else {
                     ContentUnavailableView(
-                        "No active strength workout",
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No active strength workout",
+                            norwegian:
+                                "Ingen aktiv styrkeøkt"
+                        ),
                         systemImage: "dumbbell",
-                        description: Text("Start a strength session from Train.")
+                        description: Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Start a strength session from Train.",
+                                norwegian:
+                                    "Start en styrkeøkt fra Trening."
+                            )
+                        )
                     )
                 }
             }
-            .navigationTitle("Strength")
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    if strength.activeWorkout != nil {
+                ToolbarItemGroup(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    // Adding exercises while the timer is running is reserved
+                    // for explicit freestyle / no-plan workouts. Planned
+                    // sessions stay distraction-free once training starts.
+                    if strength
+                        .activeWorkout?
+                        .exercises
+                        .isEmpty == true {
                         Button {
-                            showingExerciseLibrary = true
+                            showingExerciseLibrary =
+                                true
                         } label: {
-                            Image(systemName: "plus")
+                            Image(
+                                systemName: "plus"
+                            )
                         }
                         .accessibilityLabel(
                             ATHLTHLocalization.choose(
-                                english: "Add exercise",
-                                norwegian: "Legg til øvelse"
+                                english:
+                                    "Add exercise",
+                                norwegian:
+                                    "Legg til øvelse"
                             )
                         )
                     }
 
-                    Button("Finish") {
-                        showingFinishConfirmation = true
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Finish",
+                            norwegian: "Avslutt"
+                        )
+                    ) {
+                        showingFinishConfirmation =
+                            true
                     }
                     .disabled(
-                        strength.activeWorkout == nil ||
+                        strength.activeWorkout ==
+                            nil ||
                         finishInProgress
                     )
                 }
@@ -783,6 +856,1175 @@ struct ActiveStrengthWorkoutView: View {
             return health.canWriteWorkouts
                 ? "This finishes the ATHLTH workout on iPhone and saves it to Apple Health."
                 : "This finishes the ATHLTH workout on iPhone. It will still count toward your ATHLTH streak even without Health write access."
+        }
+    }
+
+    @ViewBuilder
+    private func focusedStrengthContent(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        VStack(spacing: 14) {
+            focusedWorkoutStatus(
+                workout
+            )
+
+            focusedExerciseHero(
+                workout: workout,
+                exercise: exercise
+            )
+
+            if !canLogOnIPhone(
+                workout
+            ) {
+                watchInputCompanionCard(
+                    workout: workout
+                )
+            } else if strength
+                .currentExerciseAllSetsCompleted {
+                focusedExerciseTransition(
+                    workout: workout,
+                    exercise: exercise
+                )
+            } else if strength.isResting {
+                focusedSetRest(
+                    exercise: exercise
+                )
+            } else {
+                focusedSetEntry(
+                    exercise: exercise
+                )
+            }
+        }
+    }
+
+    private func focusedWorkoutStatus(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        HStack(spacing: 10) {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(workout.title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                TimelineView(
+                    .periodic(
+                        from: .now,
+                        by: 1
+                    )
+                ) { context in
+                    Text(
+                        context.date
+                            .timeIntervalSince(
+                                workout.startedAt
+                            )
+                            .clockDuration
+                    )
+                    .font(
+                        .title3
+                            .monospacedDigit()
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+            }
+
+            Spacer()
+
+            Label(
+                workout.captureDevice.title,
+                systemImage:
+                    workout.captureDevice ==
+                        .appleWatch
+                        ? "applewatch"
+                        : "iphone"
+            )
+            .font(
+                .caption
+                    .weight(.semibold)
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+        }
+        .padding(
+            .horizontal,
+            4
+        )
+    }
+
+    private func focusedExerciseHero(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        VStack(spacing: 0) {
+            ZStack(
+                alignment:
+                    .bottomLeading
+            ) {
+                focusedExerciseArtwork(
+                    exercise
+                )
+                .frame(height: 205)
+                .frame(
+                    maxWidth: .infinity
+                )
+                .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.66)
+                    ],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "Exercise %d of %d",
+                            norwegian:
+                                "Øvelse %d av %d",
+                            strength
+                                .currentExerciseIndex +
+                                1,
+                            workout.exercises.count
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.78)
+                    )
+
+                    Text(
+                        exercise.exercise.name
+                    )
+                    .font(
+                        .title2
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+
+                    if !exercise
+                        .exercise
+                        .primaryMuscles
+                        .isEmpty {
+                        Text(
+                            exercise
+                                .exercise
+                                .primaryMuscles
+                                .prefix(3)
+                                .joined(
+                                    separator: " · "
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .white.opacity(0.78)
+                        )
+                        .lineLimit(1)
+                    }
+                }
+                .padding(16)
+            }
+
+            HStack(spacing: 0) {
+                focusedHeroMetric(
+                    value:
+                        "\((strength.currentSet?.setNumber) ?? max(exercise.sets.count, 1)) / \(max(exercise.sets.count, 1))",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "SET",
+                            norwegian: "SETT"
+                        ),
+                    icon:
+                        "list.number"
+                )
+
+                focusedHeroDivider
+
+                focusedHeroMetric(
+                    value:
+                        "\(strength.draftReps)",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "REPS",
+                            norwegian: "REPS"
+                        ),
+                    icon: "repeat"
+                )
+
+                focusedHeroDivider
+
+                focusedHeroMetric(
+                    value:
+                        formatWeight(
+                            strength
+                                .draftWeightKilograms
+                        ) + " kg",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "WEIGHT",
+                            norwegian: "VEKT"
+                        ),
+                    icon:
+                        "scalemass"
+                )
+
+                focusedHeroDivider
+
+                focusedHeroMetric(
+                    value:
+                        "\(strength.draftRestSeconds)s",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "REST",
+                            norwegian: "PAUSE"
+                        ),
+                    icon: "timer"
+                )
+            }
+            .padding(.vertical, 12)
+            .background(
+                Color.white.opacity(0.90)
+            )
+        }
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 1
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.06),
+            radius: 18,
+            y: 8
+        )
+    }
+
+    @ViewBuilder
+    private func focusedExerciseArtwork(
+        _ exercise: StrengthExerciseLog
+    ) -> some View {
+        if let imageURL =
+                exercise.exercise
+                    .imageURL {
+            AsyncImage(
+                url: imageURL
+            ) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+
+                case .failure:
+                    focusedExerciseArtworkFallback(
+                        exercise
+                    )
+
+                case .empty:
+                    ZStack {
+                        focusedExerciseArtworkFallback(
+                            exercise
+                        )
+
+                        ProgressView()
+                            .tint(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                    }
+
+                @unknown default:
+                    focusedExerciseArtworkFallback(
+                        exercise
+                    )
+                }
+            }
+        } else {
+            focusedExerciseArtworkFallback(
+                exercise
+            )
+        }
+    }
+
+    private func focusedExerciseArtworkFallback(
+        _ exercise: StrengthExerciseLog
+    ) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme
+                        .accentSoft,
+                    ATHLTHTheme
+                        .premiumGoldSoft
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            )
+
+            Image(
+                systemName:
+                    "figure.strengthtraining.traditional"
+            )
+            .font(
+                .system(
+                    size: 72,
+                    weight: .light
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.55)
+            )
+        }
+    }
+
+    private func focusedHeroMetric(
+        value: String,
+        label: String,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+
+            Text(label)
+                .font(
+                    .system(
+                        size: 7.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.6)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var focusedHeroDivider:
+        some View {
+        Rectangle()
+            .fill(
+                ATHLTHTheme.divider
+            )
+            .frame(
+                width: 0.5,
+                height: 44
+            )
+    }
+
+    private func focusedSetEntry(
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Set %d of %d",
+                                norwegian:
+                                    "Sett %d av %d",
+                                strength
+                                    .currentSet?
+                                    .setNumber ??
+                                    1,
+                                max(
+                                    exercise
+                                        .sets
+                                        .count,
+                                    1
+                                )
+                            )
+                        )
+                        .font(
+                            .title3
+                                .weight(.bold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Enter what you actually completed.",
+                                norwegian:
+                                    "Registrer det du faktisk gjennomførte."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+                            .frame(
+                                width: 5,
+                                height: 5
+                            )
+
+                        Text(
+                            "\(strength.draftRestSeconds)s"
+                        )
+                        .font(
+                            .caption
+                                .monospacedDigit()
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    focusedNumberField(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Weight",
+                                norwegian: "Vekt"
+                            ),
+                        value:
+                            draftWeightBinding,
+                        suffix: "kg"
+                    )
+
+                    focusedIntegerField(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Reps",
+                                norwegian:
+                                    "Repetisjoner"
+                            ),
+                        value:
+                            draftRepsBinding
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    Image(
+                        systemName: "timer"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 1
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Rest after set",
+                                norwegian:
+                                    "Pause etter sett"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Starts automatically when the set is completed.",
+                                norwegian:
+                                    "Starter automatisk når settet fullføres."
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        strength.setDraft(
+                            restSeconds:
+                                max(
+                                    0,
+                                    strength
+                                        .draftRestSeconds -
+                                        15
+                                )
+                        )
+                    } label: {
+                        Image(
+                            systemName: "minus"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Text(
+                        "\(strength.draftRestSeconds)s"
+                    )
+                    .font(
+                        .subheadline
+                            .monospacedDigit()
+                            .weight(.bold)
+                    )
+                    .frame(minWidth: 46)
+
+                    Button {
+                        strength.setDraft(
+                            restSeconds:
+                                min(
+                                    600,
+                                    strength
+                                        .draftRestSeconds +
+                                        15
+                                )
+                        )
+                    } label: {
+                        Image(
+                            systemName: "plus"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                Button {
+                    strength
+                        .completeCurrentDraftSet()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Complete set",
+                            norwegian:
+                                "Fullfør sett"
+                        ),
+                        systemImage:
+                            "checkmark.circle.fill"
+                    )
+                    .font(
+                        .headline
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 52)
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+            }
+        }
+    }
+
+    private func focusedNumberField(
+        title: String,
+        value: Binding<Double>,
+        suffix: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(title)
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 5
+            ) {
+                TextField(
+                    "0",
+                    value: value,
+                    format:
+                        .number
+                        .precision(
+                            .fractionLength(
+                                0...1
+                            )
+                        )
+                )
+                .keyboardType(
+                    .decimalPad
+                )
+                .font(
+                    .system(
+                        size: 26,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .multilineTextAlignment(
+                    .leading
+                )
+
+                Text(suffix)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+            }
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity
+        )
+        .background(
+            Color.black
+                .opacity(0.025),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func focusedIntegerField(
+        title: String,
+        value: Binding<Int>
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(title)
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+            TextField(
+                "0",
+                value: value,
+                format: .number
+            )
+            .keyboardType(.numberPad)
+            .font(
+                .system(
+                    size: 26,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity
+        )
+        .background(
+            Color.black
+                .opacity(0.025),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var draftWeightBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                strength
+                    .draftWeightKilograms
+            },
+            set: { value in
+                strength.setDraft(
+                    weightKilograms:
+                        max(value, 0)
+                )
+            }
+        )
+    }
+
+    private var draftRepsBinding:
+        Binding<Int> {
+        Binding(
+            get: {
+                strength.draftReps
+            },
+            set: { value in
+                strength.setDraft(
+                    reps:
+                        max(value, 0)
+                )
+            }
+        )
+    }
+
+    private func focusedSetRest(
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        ATHLTHCard {
+            VStack(spacing: 12) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Rest",
+                        norwegian: "Pause"
+                    )
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
+                .tracking(1.6)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+                if let restEndsAt =
+                        strength
+                            .restEndsAt {
+                    TimelineView(
+                        .periodic(
+                            from: .now,
+                            by: 1
+                        )
+                    ) { context in
+                        let remaining =
+                            max(
+                                restEndsAt
+                                    .timeIntervalSince(
+                                        context.date
+                                    ),
+                                0
+                            )
+
+                        if remaining > 0 {
+                            VStack(spacing: 10) {
+                                Text(
+                                    remaining
+                                        .clockDuration
+                                )
+                                .font(
+                                    .system(
+                                        size: 52,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.format(
+                                        english:
+                                            "Next: set %d of %d",
+                                        norwegian:
+                                            "Neste: sett %d av %d",
+                                        strength
+                                            .currentSet?
+                                            .setNumber ??
+                                            1,
+                                        max(
+                                            exercise
+                                                .sets
+                                                .count,
+                                            1
+                                        )
+                                    )
+                                )
+                                .font(.subheadline)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                                Button(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Skip rest",
+                                        norwegian:
+                                            "Hopp over pause"
+                                    )
+                                ) {
+                                    strength
+                                        .skipRest()
+                                }
+                                .buttonStyle(
+                                    .bordered
+                                )
+                            }
+                        } else {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Ready for next set",
+                                    norwegian:
+                                        "Klar for neste sett"
+                                ),
+                                systemImage:
+                                    "checkmark.circle.fill"
+                            )
+                            .font(
+                                .headline
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .onAppear {
+                                strength
+                                    .skipRest()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(
+                maxWidth: .infinity
+            )
+            .padding(
+                .vertical,
+                8
+            )
+        }
+    }
+
+    private func focusedExerciseTransition(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        ATHLTHCard {
+            TimelineView(
+                .periodic(
+                    from: .now,
+                    by: 1
+                )
+            ) { context in
+                let completedAt =
+                    exercise.completedAt ??
+                    context.date
+                let elapsed =
+                    max(
+                        context.date
+                            .timeIntervalSince(
+                                completedAt
+                            ),
+                        0
+                    )
+                let remaining =
+                    max(
+                        strength
+                            .restEndsAt?
+                            .timeIntervalSince(
+                                context.date
+                            ) ?? 0,
+                        0
+                    )
+
+                VStack(spacing: 14) {
+                    Image(
+                        systemName:
+                            strength
+                                .hasNextExercise
+                                ? "arrow.right.circle.fill"
+                                : "checkmark.seal.fill"
+                    )
+                    .font(
+                        .system(size: 30)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+
+                    Text(
+                        strength
+                            .hasNextExercise
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Exercise complete",
+                                norwegian:
+                                    "Øvelse fullført"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Workout exercises complete",
+                                norwegian:
+                                    "Alle øvelser fullført"
+                            )
+                    )
+                    .font(
+                        .title3
+                            .weight(.bold)
+                    )
+
+                    if strength
+                        .hasNextExercise {
+                        if remaining > 0 {
+                            VStack(spacing: 4) {
+                                Text(
+                                    remaining
+                                        .clockDuration
+                                )
+                                .font(
+                                    .system(
+                                        size: 48,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .monospacedDigit()
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Programmed rest",
+                                        norwegian:
+                                            "Planlagt pause"
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+                        } else {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Ready when you are",
+                                    norwegian:
+                                        "Klar når du er"
+                                )
+                            )
+                            .font(
+                                .headline
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
+
+                        HStack(spacing: 5) {
+                            Image(
+                                systemName:
+                                    "stopwatch"
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Between exercises: \(elapsed.clockDuration)",
+                                    norwegian:
+                                        "Mellom øvelser: \(elapsed.clockDuration)"
+                                )
+                            )
+                            .monospacedDigit()
+                        }
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Button {
+                            strength
+                                .moveToNextExercise()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Ready for next exercise",
+                                    norwegian:
+                                        "Klar for neste øvelse"
+                                ),
+                                systemImage:
+                                    "arrow.right"
+                            )
+                            .font(.headline)
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                            .frame(height: 52)
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .tint(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .disabled(
+                            remaining > 0
+                        )
+                        .opacity(
+                            remaining > 0
+                                ? 0.48
+                                : 1
+                        )
+                    } else {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "All planned exercises are complete.",
+                                norwegian:
+                                    "Alle planlagte øvelser er fullført."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Button {
+                            showingFinishConfirmation =
+                                true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Finish workout",
+                                    norwegian:
+                                        "Avslutt økten"
+                                ),
+                                systemImage:
+                                    "flag.checkered"
+                            )
+                            .font(.headline)
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                            .frame(height: 52)
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .tint(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity
+                )
+                .padding(
+                    .vertical,
+                    8
+                )
+            }
         }
     }
 
