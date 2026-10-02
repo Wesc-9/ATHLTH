@@ -512,7 +512,15 @@ final class StrengthWorkoutStore: ObservableObject {
             inputMode:
                 workout
                     .advancedConfiguration?
-                    .inputMode
+                    .inputMode,
+            draftRPE: draftRPE,
+            draftRIR: draftRIR,
+            isWarmUp: draftWarmUp,
+            effortMetricRaw:
+                workout
+                    .advancedConfiguration?
+                    .effortMetric?
+                    .rawValue
         )
     }
 
