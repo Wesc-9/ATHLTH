@@ -79,6 +79,19 @@ struct TrainTogetherCreatorLobbyView: View {
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled()
         }
+        .task(id: sessionID) {
+            while !Task.isCancelled,
+                  social.coordinatedLobbySessionID ==
+                    sessionID {
+                try? await social
+                    .refreshWorkoutLobby(
+                        sessionID: sessionID
+                    )
+                try? await Task.sleep(
+                    for: .seconds(1)
+                )
+            }
+        }
     }
 
     private var headerCard: some View {
@@ -202,6 +215,52 @@ struct TrainTogetherCreatorLobbyView: View {
                             .foregroundStyle(
                                 ATHLTHTheme.accent
                             )
+                        }
+
+                        if participant.userID !=
+                                social.currentUserID,
+                           participant.workoutStartedAt == nil,
+                           participant.state == .invited ||
+                                participant.state == .accepted {
+                            Menu {
+                                Button(
+                                    role: .destructive
+                                ) {
+                                    Task {
+                                        await social
+                                            .withdrawWorkoutParticipant(
+                                                participant
+                                            )
+                                    }
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Remove from workout",
+                                            norwegian:
+                                                "Fjern fra økten"
+                                        ),
+                                        systemImage:
+                                            "person.badge.minus"
+                                    )
+                                }
+                            } label: {
+                                Image(
+                                    systemName:
+                                        "ellipsis"
+                                )
+                                .font(
+                                    .system(
+                                        size: 16,
+                                        weight: .semibold
+                                    )
+                                )
+                                .frame(
+                                    width: 30,
+                                    height: 30
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
