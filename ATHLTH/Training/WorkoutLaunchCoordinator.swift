@@ -648,27 +648,29 @@ enum WorkoutLaunchCoordinator {
         inviteAdvancedConfiguration.spotifyPlaylist = nil
         inviteAdvancedConfiguration.spotifyAutoplay = false
 
-        guard await social.beginWorkoutWithFriends(
-            title: workout.title,
-            kind: .strength,
-            friends: selectedFriends,
-            creatorName:
-                session.profile.displayName,
-            creatorUsername:
-                session.profile.username,
-            invitePayload:
-                SocialWorkoutInvitePayload(
-                    workout: workout,
-                    strengthTrackingMode:
-                        trackingMode,
-                    strengthAdvancedConfiguration:
-                        trackingMode == .advanced
-                            ? inviteAdvancedConfiguration
-                            : nil
-                ),
-            creatorCaptureDevice: captureDevice
-        ) else {
-            return false
+        if !selectedFriends.isEmpty {
+            guard await social.beginWorkoutWithFriends(
+                title: workout.title,
+                kind: .strength,
+                friends: selectedFriends,
+                creatorName:
+                    session.profile.displayName,
+                creatorUsername:
+                    session.profile.username,
+                invitePayload:
+                    SocialWorkoutInvitePayload(
+                        workout: workout,
+                        strengthTrackingMode:
+                            trackingMode,
+                        strengthAdvancedConfiguration:
+                            trackingMode == .advanced
+                                ? inviteAdvancedConfiguration
+                                : nil
+                    ),
+                creatorCaptureDevice: captureDevice
+            ) else {
+                return false
+            }
         }
 
         let watchSessionID: UUID?
