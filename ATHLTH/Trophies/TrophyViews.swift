@@ -2234,12 +2234,15 @@ private enum TrophyHubTab:
 struct TrophyDetailView: View {
     @EnvironmentObject private var trophies: TrophyStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
 
     let trophyID: String
 
     @State private var sharingToATHLTH = false
     @State private var shareSucceeded = false
     @State private var shareError: String?
+    @State private var inscription:
+        TrophyInscription?
 
     private var trophy: TrophyProgressItem? {
         trophies.trophies.first { $0.id == trophyID }
@@ -2251,6 +2254,30 @@ struct TrophyDetailView: View {
             .sorted { $0.unlockedAt > $1.unlockedAt }
     }
 
+    private var athleteName: String {
+        let username =
+            session.profile.username
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if !username.isEmpty {
+            return username
+        }
+
+        let displayName =
+            session.profile.displayName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        return displayName.isEmpty
+            ? "ATHLTH ATHLETE"
+            : displayName
+    }
+
     var body: some View {
         Group {
             if let trophy {
@@ -2259,7 +2286,11 @@ struct TrophyDetailView: View {
                         VStack(spacing: 16) {
                             ATHLTHTrophyCoreView(
                                 trophy: trophy,
-                                size: 190
+                                size: 190,
+                                inscription:
+                                    inscription,
+                                athleteName:
+                                    athleteName
                             )
 
                             VStack(spacing: 5) {
@@ -2267,7 +2298,16 @@ struct TrophyDetailView: View {
                                     .font(.largeTitle.bold())
                                     .multilineTextAlignment(.center)
 
-                                Text(trophy.stageLabel.uppercased())
+                                Text(
+                                    trophy.isPrestigeTrophy
+                                        ? ATHLTHLocalization.choose(
+                                            english:
+                                                "GOLD TROPHY",
+                                            norwegian:
+                                                "GULLPOKAL"
+                                        )
+                                        : trophy.stageLabel.uppercased()
+                                )
                                     .font(.caption.bold())
                                     .tracking(1.2)
                                     .foregroundStyle(ATHLTHTheme.accent)
@@ -2288,31 +2328,62 @@ struct TrophyDetailView: View {
                         }
 
                         if trophy.isUnlocked {
-                            Button {
-                                trophies.toggleShowcase(trophy.id)
-                            } label: {
-                                Label(
-                                    trophies.isShowcased(trophy.id)
-                                        ? ATHLTHLocalization.choose(
-                                            english: "Remove from Trophy Cabinet",
-                                            norwegian: "Fjern fra troféskapet"
+                            if trophy.isPrestigeTrophy {
+                                Button {
+                                    trophies.toggleShowcase(
+                                        trophy.id
+                                    )
+                                } label: {
+                                    Label(
+                                        trophies.isShowcased(
+                                            trophy.id
                                         )
-                                        : ATHLTHLocalization.choose(
-                                            english: "Show in Trophy Cabinet",
-                                            norwegian: "Vis i troféskapet"
-                                        ),
-                                    systemImage: trophies.isShowcased(trophy.id)
-                                        ? "rectangle.stack.badge.minus"
-                                        : "rectangle.stack.badge.plus"
+                                            ? ATHLTHLocalization.choose(
+                                                english:
+                                                    "Remove from Trophy Cabinet",
+                                                norwegian:
+                                                    "Fjern fra troféskapet"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english:
+                                                    "Show in Trophy Cabinet",
+                                                norwegian:
+                                                    "Vis i troféskapet"
+                                            ),
+                                        systemImage:
+                                            trophies.isShowcased(
+                                                trophy.id
+                                            )
+                                                ? "rectangle.stack.badge.minus"
+                                                : "rectangle.stack.badge.plus"
+                                    )
+                                    .frame(
+                                        maxWidth:
+                                            .infinity
+                                    )
+                                }
+                                .buttonStyle(
+                                    .borderedProminent
                                 )
-                                .frame(maxWidth: .infinity)
+                                .tint(
+                                    trophies.isShowcased(
+                                        trophy.id
+                                    )
+                                        ? .secondary
+                                        : ATHLTHTheme
+                                            .premiumGold
+                                )
+                                .disabled(
+                                    !trophies.isShowcased(
+                                        trophy.id
+                                    ) &&
+                                    trophies
+                                        .showcaseIDs
+                                        .count >=
+                                        TrophyStore
+                                            .showcaseLimit
+                                )
                             }
-                            .buttonStyle(.borderedProminent)
-                            .tint(trophies.isShowcased(trophy.id) ? .secondary : ATHLTHTheme.accent)
-                            .disabled(
-                                !trophies.isShowcased(trophy.id) &&
-                                trophies.showcaseIDs.count >= TrophyStore.showcaseLimit
-                            )
 
                             if let unlock = history.first {
                                 Button {
@@ -2375,7 +2446,8 @@ struct TrophyDetailView: View {
                                     .frame(maxWidth: .infinity)
                             }
 
-                            if !trophies.isShowcased(trophy.id) &&
+                            if trophy.isPrestigeTrophy &&
+                               !trophies.isShowcased(trophy.id) &&
                                trophies.showcaseIDs.count >= TrophyStore.showcaseLimit {
                                 Text(
                                     ATHLTHLocalization.choose(
@@ -2391,11 +2463,44 @@ struct TrophyDetailView: View {
                     .padding()
                 }
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
-                .navigationTitle("Trophy")
+                .navigationTitle(
+                    trophy.isPrestigeTrophy
+                        ? ATHLTHLocalization.choose(
+                            english: "Trophy",
+                            norwegian: "Pokal"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Achievement",
+                            norwegian: "Achievement"
+                        )
+                )
                 .navigationBarTitleDisplayMode(.inline)
             } else {
                 ContentUnavailableView("Trophy unavailable", systemImage: "trophy")
             }
+        }
+        .task(id: trophyID) {
+            guard let trophy,
+                  trophy.isPrestigeTrophy,
+                  trophy.isUnlocked
+            else {
+                inscription = nil
+                return
+            }
+
+            inscription =
+                await TrophyInscriptionAIService
+                    .shared
+                    .inscription(
+                        trophyID: trophy.id,
+                        username: athleteName,
+                        achievementTitle:
+                            trophy.title,
+                        achievementDetail:
+                            trophy.subtitle,
+                        unlockedAt:
+                            trophy.unlockedAt
+                    )
         }
     }
 
