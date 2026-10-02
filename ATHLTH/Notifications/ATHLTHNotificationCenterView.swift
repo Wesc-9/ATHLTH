@@ -42,6 +42,7 @@ struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var goals: GoalStore
 
     @State private var selectedWorkoutImportIDs: Set<UUID> = []
     @State private var selectedScope: ATHLTHNotificationScope = .all
@@ -479,7 +480,19 @@ struct ATHLTHNotificationCenterView: View {
 
             LazyVStack(spacing: 9) {
                 ForEach(items) { item in
-                    notificationCard(item)
+                    NotificationSwipeDeleteContainer(
+                        onDelete: {
+                            withAnimation(
+                                .easeOut(duration: 0.18)
+                            ) {
+                                notifications.delete(
+                                    item.id
+                                )
+                            }
+                        }
+                    ) {
+                        notificationCard(item)
+                    }
                 }
             }
         }
@@ -1005,6 +1018,11 @@ struct ATHLTHNotificationCenterView: View {
                             showsChevron: true
                         )
                     }
+                } else if isDeletedGoalNotification(item) {
+                    notificationLabel(
+                        item,
+                        showsChevron: false
+                    )
                 } else {
                     Button {
                         markOpened(item)
@@ -1131,7 +1149,37 @@ struct ATHLTHNotificationCenterView: View {
                     .foregroundStyle(tint.opacity(0.86))
                 }
 
-                if isActionable(item) || showsChevron {
+                if isDeletedGoalNotification(item) {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "archivebox"
+                        )
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .semibold
+                            )
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Goal deleted",
+                                norwegian:
+                                    "Målet er slettet"
+                            )
+                        )
+                        .font(
+                            .caption2
+                                .weight(.medium)
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .padding(.top, 1)
+                } else if isActionable(item) || showsChevron {
                     HStack(spacing: 5) {
                         Text(
                             isActionable(item)
@@ -1423,9 +1471,14 @@ struct ATHLTHNotificationCenterView: View {
     private func hasDestination(
         _ item: ATHLTHNotificationItem
     ) -> Bool {
-        if item.challengeID != nil ||
-            item.goalID != nil {
+        if item.challengeID != nil {
             return true
+        }
+
+        if let goalID = item.goalID {
+            return goals.goals.contains {
+                $0.id == goalID
+            }
         }
 
         if item.kind == .achievement ||
@@ -1453,9 +1506,30 @@ struct ATHLTHNotificationCenterView: View {
             ChallengeDetailView(
                 challengeID: challengeID
             )
-        } else if let goalID = item.goalID {
+        } else if let goalID = item.goalID,
+                  goals.goals.contains(
+                    where: {
+                        $0.id == goalID
+                    }
+                  ) {
             GoalDetailView(
                 goalID: goalID
+            )
+        } else if item.goalID != nil {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english: "Goal deleted",
+                    norwegian: "Målet er slettet"
+                ),
+                systemImage: "archivebox",
+                description: Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This notification belongs to a goal that no longer exists.",
+                        norwegian:
+                            "Dette varselet tilhører et mål som ikke finnes lenger."
+                    )
+                )
             )
         } else if item.kind == .achievement {
             TrophyCollectionView()
@@ -1487,6 +1561,20 @@ struct ATHLTHNotificationCenterView: View {
                     initialTab: .feed
                 )
             }
+        }
+    }
+
+    private func isDeletedGoalNotification(
+        _ item: ATHLTHNotificationItem
+    ) -> Bool {
+        guard let goalID =
+                item.goalID
+        else {
+            return false
+        }
+
+        return !goals.goals.contains {
+            $0.id == goalID
         }
     }
 
@@ -1687,6 +1775,169 @@ struct ATHLTHNotificationPermissionPrimerView: View {
                 )
 
             Spacer()
+        }
+    }
+}
+
+private struct NotificationSwipeDeleteContainer<
+    Content: View
+>: View {
+    let onDelete: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var restingOffset:
+        CGFloat = 0
+    @GestureState private var dragOffset:
+        CGFloat = 0
+
+    private let revealWidth:
+        CGFloat = 78
+
+    private var effectiveOffset:
+        CGFloat {
+        min(
+            max(
+                restingOffset +
+                    dragOffset,
+                -revealWidth
+            ),
+            0
+        )
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .fill(Color.red)
+
+            Button(
+                role: .destructive
+            ) {
+                onDelete()
+            } label: {
+                VStack(spacing: 4) {
+                    Image(
+                        systemName:
+                            "trash.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Delete",
+                            norwegian: "Slett"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .semibold
+                        )
+                    )
+                }
+                .foregroundStyle(.white)
+                .frame(
+                    width: revealWidth
+                )
+                .frame(
+                    maxHeight: .infinity
+                )
+            }
+            .buttonStyle(.plain)
+
+            content()
+                .offset(
+                    x: effectiveOffset
+                )
+                .contentShape(
+                    Rectangle()
+                )
+                .simultaneousGesture(
+                    DragGesture(
+                        minimumDistance: 12
+                    )
+                    .updating(
+                        $dragOffset
+                    ) { value, state, _ in
+                        guard abs(
+                            value.translation.width
+                        ) >
+                            abs(
+                                value.translation.height
+                            )
+                        else {
+                            return
+                        }
+
+                        state =
+                            value.translation.width
+                    }
+                    .onEnded { value in
+                        guard abs(
+                            value.translation.width
+                        ) >
+                            abs(
+                                value.translation.height
+                            )
+                        else {
+                            return
+                        }
+
+                        if value.translation.width <
+                            -140 {
+                            onDelete()
+                            return
+                        }
+
+                        withAnimation(
+                            .snappy(
+                                duration: 0.18
+                            )
+                        ) {
+                            restingOffset =
+                                value.translation.width <
+                                    -34
+                                    ? -revealWidth
+                                    : 0
+                        }
+                    }
+                )
+                .onTapGesture {
+                    if restingOffset != 0 {
+                        withAnimation(
+                            .snappy(
+                                duration: 0.16
+                            )
+                        ) {
+                            restingOffset = 0
+                        }
+                    }
+                }
+        }
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .accessibilityAction(
+            named:
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Delete notification",
+                        norwegian: "Slett varsel"
+                    )
+                )
+        ) {
+            onDelete()
         }
     }
 }
