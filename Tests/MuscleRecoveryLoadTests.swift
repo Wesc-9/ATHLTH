@@ -1,7 +1,7 @@
 import XCTest
 @testable import ATHLTH
 
-final class MuscleRecoveryLoadTests: XCTestCase {
+final class MuscleRecoveryMinuteWeightingTests: XCTestCase {
     func testShortRunStaysLowLoadAndMostlyReady() {
         let status =
             MuscleRecoveryStatus(
