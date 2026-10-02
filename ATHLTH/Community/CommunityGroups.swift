@@ -2897,6 +2897,7 @@ final class CommunityGroupStore: ObservableObject {
         startsAt: Date,
         meetingName: String,
         imageData: Data? = nil,
+        imageReference: String? = nil,
         activityConfiguration:
             CommunityGroupActivityConfiguration? = nil,
         advancedOptions:
@@ -2939,7 +2940,7 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 uploadedImage = true
             } else {
-                imageURL = nil
+                imageURL = imageReference
             }
 
             try await client
@@ -3004,6 +3005,7 @@ final class CommunityGroupStore: ObservableObject {
         startsAt: Date,
         endsAt: Date,
         imageData: Data? = nil,
+        imageReference: String? = nil,
         activityConfiguration:
             CommunityGroupActivityConfiguration? = nil,
         advancedOptions:
@@ -3045,7 +3047,7 @@ final class CommunityGroupStore: ObservableObject {
                 )
                 uploadedImage = true
             } else {
-                imageURL = nil
+                imageURL = imageReference
             }
 
             try await client
