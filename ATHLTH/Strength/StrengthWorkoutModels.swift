@@ -261,6 +261,10 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var groupID: UUID? = nil
     var groupStyle: StrengthExerciseGroupStyle? = nil
     var substitutedFromExerciseName: String? = nil
+    // Actual transition time from finishing this exercise until the athlete
+    // explicitly confirms that they are ready to start the next exercise.
+    // Optional keeps older workout history fully decodable.
+    var transitionToNextExerciseSeconds: TimeInterval? = nil
 
     var isCompleted: Bool {
         completedAt != nil
