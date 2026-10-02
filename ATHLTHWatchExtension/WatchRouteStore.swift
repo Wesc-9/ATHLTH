@@ -15,6 +15,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
     private let todayWorkoutDefaultsKey =
         "athlth.watch.todayWorkout.v1"
     private var pendingWorkoutRouteID: UUID?
+    private var latestTransportTimestampByKind:
+        [String: TimeInterval] = [:]
 
     override init() {
         super.init()
@@ -58,6 +60,13 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WCSession.default.transferUserInfo(
                 payload
             )
+        }
+    }
+
+    nonisolated private static func makeEphemeralSpotifyErrorHandler()
+        -> (Error) -> Void {
+        { _ in
+            // Ephemeral remote-control commands are intentionally dropped.
         }
     }
 
@@ -180,10 +189,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
     ) {
         guard WCSession.isSupported(),
               WCSession.default.activationState == .activated,
+              WCSession.default.isReachable,
               let data = try? JSONEncoder().encode(
                 WatchSpotifyCommand(kind: kind)
               )
         else {
+            // Spotify control is intentionally not queued. A delayed pause,
+            // resume or skip arriving when the phone reconnects would control
+            // music long after the user tapped the Watch.
+            spotifyPlaybackState = .unavailable
             return
         }
 
@@ -191,23 +205,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchTransferMetadataKey.kind:
                 WatchTransferKind.spotifyCommand.rawValue,
             WatchTransferMetadataKey.payload:
-                data
+                data,
+            WatchTransferMetadataKey.sentAt:
+                Date().timeIntervalSince1970
         ]
 
-        if WCSession.default.isReachable {
-            WCSession.default.sendMessage(
-                payload,
-                replyHandler: nil,
-                errorHandler:
-                    Self.makeTransferFallbackErrorHandler(
-                        payload: payload
-                    )
-            )
-        } else {
-            WCSession.default.transferUserInfo(
-                payload
-            )
-        }
+        WCSession.default.sendMessage(
+            payload,
+            replyHandler: nil,
+            errorHandler:
+                Self.makeEphemeralSpotifyErrorHandler()
+        )
     }
 
     private func applyWorkoutConfiguration(
@@ -483,11 +491,38 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 WatchWorkoutManager.shared
                     .requestStrengthSnapshot()
             }
-        } else if activated,
-                  companionLinked != true {
+
+            requestSpotifyPlaybackState()
+        } else if activated {
+            companionLinked = false
             connectionText =
-                "Ready for iPhone"
+                "iPhone not reachable"
+            spotifyPlaybackState =
+                .unavailable
         }
+    }
+
+    private func shouldAcceptTransport(
+        kind: String,
+        sentAt: TimeInterval?
+    ) -> Bool {
+        guard let sentAt else {
+            // Keep compatibility with older iPhone builds.
+            return true
+        }
+
+        if let latest =
+                latestTransportTimestampByKind[
+                    kind
+                ],
+           sentAt < latest {
+            return false
+        }
+
+        latestTransportTimestampByKind[
+            kind
+        ] = sentAt
+        return true
     }
 
     nonisolated private func receive(
@@ -540,8 +575,22 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 ] as? String
                 ?? ""
 
+            let sentAt =
+                payload[
+                    WatchTransferMetadataKey.sentAt
+                ] as? TimeInterval
+
             Task { @MainActor [weak self] in
-                self?.applyRouteSelection(
+                guard let self,
+                      self.shouldAcceptTransport(
+                        kind: rawKind,
+                        sentAt: sentAt
+                      )
+                else {
+                    return
+                }
+
+                self.applyRouteSelection(
                     rawRouteID: rawRouteID
                 )
             }
@@ -567,8 +616,22 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot ||
            transferKind == .spotifyPlaybackState {
+            let sentAt =
+                payload[
+                    WatchTransferMetadataKey.sentAt
+                ] as? TimeInterval
+
             Task { @MainActor [weak self] in
-                self?.applyWorkoutConfiguration(
+                guard let self,
+                      self.shouldAcceptTransport(
+                        kind: rawKind,
+                        sentAt: sentAt
+                      )
+                else {
+                    return
+                }
+
+                self.applyWorkoutConfiguration(
                     kind: rawKind,
                     data: data
                 )
@@ -585,8 +648,22 @@ final class WatchRouteStore: NSObject, ObservableObject {
             payload[
                 WatchTransferMetadataKey.command
             ] as? String {
+            let sentAt =
+                payload[
+                    WatchTransferMetadataKey.sentAt
+                ] as? TimeInterval
+
             Task { @MainActor [weak self] in
-                self?.applyWorkoutCommand(
+                guard let self,
+                      self.shouldAcceptTransport(
+                        kind: rawKind,
+                        sentAt: sentAt
+                      )
+                else {
+                    return
+                }
+
+                self.applyWorkoutCommand(
                     rawCommand: rawCommand
                 )
             }
