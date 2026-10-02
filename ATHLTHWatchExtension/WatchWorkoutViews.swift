@@ -67,7 +67,7 @@ struct WatchWorkoutStartView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(kind.title)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(WatchTheme.textPrimary)
 
                     Text(
                         kind.supportsDistanceMetric
@@ -155,7 +155,10 @@ struct WatchActiveWorkoutView: View {
                 Text(durationText(workoutManager.elapsedTime))
                     .font(
                         .system(
-                            size: 34,
+                            size:
+                                workoutManager.kind == .strength
+                                    ? 24
+                                    : 34,
                             weight: .semibold,
                             design: .rounded
                         )
@@ -293,7 +296,7 @@ struct WatchActiveWorkoutView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
                 .background(
-                    Color.red,
+                    WatchTheme.danger,
                     in: RoundedRectangle(cornerRadius: 14)
                 )
                 .disabled(workoutManager.state == .ending)
@@ -416,7 +419,8 @@ struct WatchActiveWorkoutView: View {
                     value: strengthWeightBinding,
                     range: 0...500,
                     step: 0.5,
-                    icon: "scalemass.fill"
+                    icon: "scalemass.fill",
+                    tint: WatchTheme.slate
                 )
 
                 WatchStrengthCrownControl(
@@ -425,7 +429,8 @@ struct WatchActiveWorkoutView: View {
                     value: strengthRepsBinding,
                     range: 0...100,
                     step: 1,
-                    icon: "repeat"
+                    icon: "repeat",
+                    tint: WatchTheme.accent
                 )
 
                 WatchStrengthCrownControl(
@@ -437,7 +442,8 @@ struct WatchActiveWorkoutView: View {
                     value: strengthRestBinding,
                     range: 0...600,
                     step: 15,
-                    icon: "timer"
+                    icon: "timer",
+                    tint: WatchTheme.accentDeep
                 )
 
                 Button {
@@ -1003,6 +1009,7 @@ private struct WatchStrengthCrownControl: View {
     let range: ClosedRange<Double>
     let step: Double
     let icon: String
+    let tint: Color
 
     @FocusState private var crownFocused: Bool
 
@@ -1010,7 +1017,7 @@ private struct WatchStrengthCrownControl: View {
         HStack(spacing: 9) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(WatchTheme.green)
+                .foregroundStyle(tint)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -1035,7 +1042,7 @@ private struct WatchStrengthCrownControl: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(
                     crownFocused
-                        ? WatchTheme.green
+                        ? tint
                         : WatchTheme.muted
                 )
         }
