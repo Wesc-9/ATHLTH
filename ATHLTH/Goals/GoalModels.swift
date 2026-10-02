@@ -200,32 +200,98 @@ enum GoalMilestoneManualOverride: String, Codable, Hashable {
 }
 
 enum GoalCoverStyle: String, CaseIterable, Identifiable, Codable, Hashable {
+    // Legacy cases stay decodable for goals created before the shared
+    // artwork library was introduced.
     case forest
     case summit
     case track
     case strength
     case calm
 
+    case sprint
+    case walking
+    case mountain
+    case progress
+    case relax
+    case running
+    case endurance
+    case recovery
+    case consistency
+    case event
+    case adventure
+
     var id: String { rawValue }
 
+    static var selectableCases: [GoalCoverStyle] {
+        [
+            .sprint,
+            .walking,
+            .mountain,
+            .progress,
+            .relax,
+            .running,
+            .strength,
+            .endurance,
+            .recovery,
+            .consistency,
+            .event,
+            .adventure
+        ]
+    }
+
     var title: String {
+        standardArtwork?.title ??
+            {
+                switch self {
+                case .forest: return ATHLTHLocalization.string("Forest")
+                case .summit: return ATHLTHLocalization.string("Summit")
+                case .track: return ATHLTHLocalization.string("Track")
+                case .calm: return ATHLTHLocalization.string("Calm")
+                case .strength: return ATHLTHLocalization.string("Strength")
+                default: return rawValue.capitalized
+                }
+            }()
+    }
+
+    var standardArtwork: ATHLTHStandardArtwork? {
         switch self {
-        case .forest: return ATHLTHLocalization.string( "Forest")
-        case .summit: return ATHLTHLocalization.string( "Summit")
-        case .track: return ATHLTHLocalization.string( "Track")
-        case .strength: return ATHLTHLocalization.string( "Strength")
-        case .calm: return ATHLTHLocalization.string( "Calm")
+        case .sprint: return .sprint
+        case .walking: return .walking
+        case .mountain: return .mountain
+        case .progress: return .progress
+        case .relax: return .relax
+        case .running: return .running
+        case .strength: return .strength
+        case .endurance: return .endurance
+        case .recovery: return .recovery
+        case .consistency: return .consistency
+        case .event: return .event
+        case .adventure: return .adventure
+        case .forest, .summit, .track, .calm:
+            return nil
         }
     }
 
     var assetName: String {
+        if let standardArtwork {
+            return standardArtwork.assetName
+        }
+
         switch self {
         case .forest: return "HomeHero"
         case .summit: return "OnboardingHero"
         case .track: return "TrainHero"
-        case .strength: return "StrengthPostWorkoutHero"
         case .calm: return "RecoveryHero"
+        default: return "HomeHero"
         }
+    }
+
+    var resolvedUIImage: UIImage? {
+        if let standardArtwork {
+            return standardArtwork.resolvedUIImage
+        }
+
+        return UIImage(named: assetName)
     }
 }
 
