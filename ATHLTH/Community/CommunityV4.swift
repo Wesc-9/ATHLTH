@@ -2562,27 +2562,13 @@ private struct CommunityReferenceClubCard: View {
 
     @ViewBuilder
     private var groupArtwork: some View {
-        if let raw =
-            group.headerImageURL ??
-            group.imageURL,
-           let url = URL(string: raw) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Image("CommunityHero")
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-        } else {
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
-        }
+        ATHLTHArtworkImage(
+            reference:
+                group.headerImageURL ??
+                group.imageURL,
+            fallbackAssetName:
+                "CommunityHero"
+        )
     }
 }
 
