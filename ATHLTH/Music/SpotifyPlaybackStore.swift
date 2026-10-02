@@ -49,6 +49,25 @@ private struct SpotifyTokenErrorResponse: Decodable {
     }
 }
 
+private struct SpotifyCurrentPlaybackResponse: Decodable {
+    let isPlaying: Bool
+    let item: Track?
+
+    enum CodingKeys: String, CodingKey {
+        case isPlaying = "is_playing"
+        case item
+    }
+
+    struct Track: Decodable {
+        let name: String
+        let artists: [Artist]
+    }
+
+    struct Artist: Decodable {
+        let name: String
+    }
+}
+
 enum SpotifyConnectionState: Equatable {
     case unavailable
     case disconnected
@@ -93,6 +112,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     @Published private(set) var playlists: [SpotifyPlaylistReference] = []
     @Published private(set) var activePlaylist: SpotifyPlaylistReference?
     @Published private(set) var isPlaying = false
+    @Published private(set) var watchTrackTitle: String?
+    @Published private(set) var watchArtistName: String?
     @Published private(set) var lastStartedAt: Date?
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var isRefreshingPlaylists = false
@@ -161,6 +182,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             isConnected: isConnected,
             isPlaying: isPlaying,
             playlistName: activePlaylist?.name,
+            trackTitle: watchTrackTitle,
+            artistName: watchArtistName,
             updatedAt: Date()
         )
     }
@@ -305,6 +328,8 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         playlists = []
         activePlaylist = nil
         isPlaying = false
+        watchTrackTitle = nil
+        watchArtistName = nil
         pendingPlaybackURI = nil
         pendingPlaybackPlaylist = nil
         lastStartedAt = nil
@@ -516,7 +541,172 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     func stopPreviewPlaybackState() {
         activePlaylist = nil
         isPlaying = false
+        watchTrackTitle = nil
+        watchArtistName = nil
         lastStartedAt = nil
+    }
+
+    func handleWatchRemoteCommand(
+        _ kind: WatchSpotifyCommandKind
+    ) async {
+        guard isConfigured,
+              let token = await accessTokenForRequest()
+        else {
+            connectionState = isConfigured
+                ? .disconnected
+                : .unavailable
+            return
+        }
+
+        do {
+            switch kind {
+            case .requestState:
+                try await refreshWatchPlaybackState(
+                    accessToken: token
+                )
+
+            case .pause:
+                try await performWatchPlaybackControl(
+                    path: "pause",
+                    method: "PUT",
+                    accessToken: token
+                )
+                isPlaying = false
+
+            case .resume:
+                try await performWatchPlaybackControl(
+                    path: "play",
+                    method: "PUT",
+                    accessToken: token
+                )
+                isPlaying = true
+
+            case .next:
+                try await performWatchPlaybackControl(
+                    path: "next",
+                    method: "POST",
+                    accessToken: token
+                )
+                try? await Task.sleep(
+                    for: .milliseconds(250)
+                )
+                try await refreshWatchPlaybackState(
+                    accessToken: token
+                )
+            }
+
+            lastErrorMessage = nil
+            connectionState = .connected
+        } catch {
+            lastErrorMessage = error.localizedDescription
+            if isAuthorizationError(error) {
+                connectionState = .disconnected
+            }
+        }
+    }
+
+    private func performWatchPlaybackControl(
+        path: String,
+        method: String,
+        accessToken: String
+    ) async throws {
+        guard let url = URL(
+            string:
+                "https://api.spotify.com/v1/me/player/\(path)"
+        ) else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue(
+            "Bearer \(accessToken)",
+            forHTTPHeaderField: "Authorization"
+        )
+
+        let (_, response) =
+            try await URLSession.shared.data(
+                for: request
+            )
+
+        guard let http =
+                response as? HTTPURLResponse
+        else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        if http.statusCode == 401 {
+            throw SpotifyPlaybackError.authorizationExpired
+        }
+
+        guard (200..<300).contains(
+            http.statusCode
+        ) else {
+            throw SpotifyPlaybackError.httpStatus(
+                http.statusCode
+            )
+        }
+    }
+
+    private func refreshWatchPlaybackState(
+        accessToken: String
+    ) async throws {
+        guard let url = URL(
+            string:
+                "https://api.spotify.com/v1/me/player"
+        ) else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue(
+            "Bearer \(accessToken)",
+            forHTTPHeaderField: "Authorization"
+        )
+
+        let (data, response) =
+            try await URLSession.shared.data(
+                for: request
+            )
+
+        guard let http =
+                response as? HTTPURLResponse
+        else {
+            throw SpotifyPlaybackError.invalidResponse
+        }
+
+        if http.statusCode == 204 {
+            isPlaying = false
+            watchTrackTitle = nil
+            watchArtistName = nil
+            return
+        }
+
+        if http.statusCode == 401 {
+            throw SpotifyPlaybackError.authorizationExpired
+        }
+
+        guard (200..<300).contains(
+            http.statusCode
+        ) else {
+            throw SpotifyPlaybackError.httpStatus(
+                http.statusCode
+            )
+        }
+
+        let playback = try JSONDecoder().decode(
+            SpotifyCurrentPlaybackResponse.self,
+            from: data
+        )
+
+        isPlaying = playback.isPlaying
+        watchTrackTitle =
+            playback.item?.name
+        watchArtistName =
+            playback.item?
+                .artists
+                .first?
+                .name
     }
 
     private func playThroughConnectedRemote(
