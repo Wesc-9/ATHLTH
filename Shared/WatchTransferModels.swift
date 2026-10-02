@@ -899,6 +899,9 @@ struct WatchStrengthCommand: Codable, Hashable {
     var isWarmUp: Bool? = nil
     var exerciseIndex: Int? = nil
     var setIndex: Int? = nil
+    // True only when the strength workout was initiated from the Watch UI.
+    // Older queued commands remain decodable because this is optional.
+    var initiatedOnWatch: Bool? = nil
 }
 
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
