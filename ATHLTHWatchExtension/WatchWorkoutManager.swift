@@ -1113,9 +1113,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
         if sent {
-            publish {
-                self.strengthActionPending =
-                    true
+            if strengthCompanionReachable {
+                publish {
+                    self.strengthActionPending =
+                        true
+                }
+            } else {
+                applyOptimisticStrengthCompletion(
+                    snapshot
+                )
             }
         }
     }
@@ -1125,18 +1131,31 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        sendStrengthCommand(
-            WatchStrengthCommand(
-                id: UUID(),
-                workoutID: snapshot.workoutID,
-                kind: .skipRest,
-                reps: nil,
-                weightKilograms: nil,
-                restSeconds: nil,
-                addRestSeconds: nil,
-                sentAt: Date()
+        let sent =
+            sendStrengthCommand(
+                WatchStrengthCommand(
+                    id: UUID(),
+                    workoutID: snapshot.workoutID,
+                    kind: .skipRest,
+                    reps: nil,
+                    weightKilograms: nil,
+                    restSeconds: nil,
+                    addRestSeconds: nil,
+                    sentAt: Date()
+                )
             )
-        )
+
+        if sent &&
+            !strengthCompanionReachable {
+            publish {
+                var updated = snapshot
+                updated.isResting = false
+                updated.restEndsAt = nil
+                updated.updatedAt = Date()
+                self.strengthSession = updated
+            }
+            persistWorkoutRecoveryState()
+        }
     }
 
     func addStrengthRest(seconds: Int = 30) {
@@ -1144,18 +1163,49 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        sendStrengthCommand(
-            WatchStrengthCommand(
-                id: UUID(),
-                workoutID: snapshot.workoutID,
-                kind: .addRest,
-                reps: nil,
-                weightKilograms: nil,
-                restSeconds: nil,
-                addRestSeconds: max(seconds, 0),
-                sentAt: Date()
+        let addedSeconds =
+            max(seconds, 0)
+        let sent =
+            sendStrengthCommand(
+                WatchStrengthCommand(
+                    id: UUID(),
+                    workoutID: snapshot.workoutID,
+                    kind: .addRest,
+                    reps: nil,
+                    weightKilograms: nil,
+                    restSeconds: nil,
+                    addRestSeconds:
+                        addedSeconds,
+                    sentAt: Date()
+                )
             )
-        )
+
+        if sent &&
+            !strengthCompanionReachable {
+            publish {
+                var updated = snapshot
+                let base =
+                    max(
+                        updated.restEndsAt ??
+                            Date(),
+                        Date()
+                    )
+                updated.isResting =
+                    addedSeconds > 0
+                updated.restEndsAt =
+                    addedSeconds > 0
+                        ? base
+                            .addingTimeInterval(
+                                TimeInterval(
+                                    addedSeconds
+                                )
+                            )
+                        : nil
+                updated.updatedAt = Date()
+                self.strengthSession = updated
+            }
+            persistWorkoutRecoveryState()
+        }
     }
 
     func moveToNextStrengthExercise() {
@@ -1186,11 +1236,142 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
         if sent {
-            publish {
-                self.strengthActionPending =
-                    true
+            if strengthCompanionReachable {
+                publish {
+                    self.strengthActionPending =
+                        true
+                }
+            } else {
+                applyOptimisticNextStrengthExercise(
+                    snapshot
+                )
             }
         }
+    }
+
+    private var strengthCompanionReachable:
+        Bool {
+        WCSession.isSupported() &&
+        WCSession.default.activationState ==
+            .activated &&
+        WCSession.default.isReachable
+    }
+
+    private func applyOptimisticStrengthCompletion(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) {
+        var updated = snapshot
+        updated.completedSets =
+            min(
+                snapshot.completedSets + 1,
+                snapshot.totalSets
+            )
+
+        let nextSetIndex =
+            snapshot.setIndex + 1
+
+        if nextSetIndex <
+            snapshot.setCount {
+            updated.setIndex =
+                nextSetIndex
+            updated.setNumber =
+                nextSetIndex + 1
+            updated.currentExerciseComplete =
+                false
+            updated.allExercisesComplete =
+                false
+        } else {
+            updated.currentExerciseComplete =
+                true
+            updated.setNumber =
+                snapshot.setCount
+            updated.allExercisesComplete =
+                updated.completedSets >=
+                    updated.totalSets
+        }
+
+        if snapshot.draftRestSeconds > 0 &&
+            !updated.allExercisesComplete {
+            updated.isResting = true
+            updated.restEndsAt =
+                Date()
+                    .addingTimeInterval(
+                        TimeInterval(
+                            snapshot
+                                .draftRestSeconds
+                        )
+                    )
+        } else {
+            updated.isResting = false
+            updated.restEndsAt = nil
+        }
+
+        updated.updatedAt = Date()
+
+        publish {
+            self.strengthSession = updated
+            self.strengthActionPending =
+                false
+        }
+        persistWorkoutRecoveryState()
+    }
+
+    private func applyOptimisticNextStrengthExercise(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) {
+        guard let queue =
+                snapshot.exerciseQueue,
+              let next =
+                queue
+                    .first(
+                        where: {
+                            $0.index >
+                            snapshot.exerciseIndex
+                        }
+                    )
+        else {
+            publish {
+                self.strengthActionPending =
+                    false
+            }
+            return
+        }
+
+        var updated = snapshot
+        updated.exerciseIndex =
+            next.index
+        updated.exerciseName =
+            next.name
+        updated.primaryMuscles =
+            next.primaryMuscles
+        updated.setIndex = 0
+        updated.setCount =
+            next.setCount
+        updated.setNumber =
+            next.setCount > 0
+                ? 1
+                : nil
+        updated.currentExerciseComplete =
+            next.setCount == 0
+        updated.hasNextExercise =
+            queue.contains {
+                $0.index >
+                next.index
+            }
+        updated.allExercisesComplete =
+            false
+        updated.isResting = false
+        updated.restEndsAt = nil
+        updated.updatedAt = Date()
+
+        publish {
+            self.strengthSession = updated
+            self.strengthActionPending =
+                false
+        }
+        persistWorkoutRecoveryState()
     }
 
     func requestStrengthSnapshot() {
