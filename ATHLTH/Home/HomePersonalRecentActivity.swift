@@ -346,7 +346,48 @@ struct HomePersonalRecentActivitySection:
 
     private var visibleItems:
         [HomeActivityStreamItem] {
-        Array(stream.prefix(3))
+        guard let first = stream.first else {
+            return []
+        }
+
+        var result:
+            [HomeActivityStreamItem] =
+                [first]
+
+        let needsMine =
+            !first.isMine
+        let needsFollowing =
+            first.isMine
+
+        if needsMine,
+           let mine =
+                stream.first(
+                    where: {
+                        $0.isMine
+                    }
+                ) {
+            result.append(mine)
+        } else if needsFollowing,
+                  let following =
+                    stream.first(
+                        where: {
+                            !$0.isMine
+                        }
+                  ) {
+            result.append(following)
+        }
+
+        for candidate in stream
+        where result.count < 3 &&
+              !result.contains(
+                where: {
+                    $0.id == candidate.id
+                }
+              ) {
+            result.append(candidate)
+        }
+
+        return result
     }
 
     var body: some View {
@@ -1635,15 +1676,15 @@ struct HomePersonalActivityHistoryView:
         )
         .task {
             await load()
+            await social
+                .refreshActivityHistoryFeed()
         }
         .refreshable {
             await load(
                 forceRefresh: true
             )
             await social
-                .refreshHomeFeed(
-                    force: true
-                )
+                .refreshActivityHistoryFeed()
         }
     }
 
