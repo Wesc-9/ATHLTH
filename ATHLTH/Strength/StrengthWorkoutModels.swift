@@ -182,6 +182,41 @@ struct StrengthAdvancedConfiguration:
 
     static let standard =
         StrengthAdvancedConfiguration()
+
+    private static let defaultsKey =
+        "strength.advanced.configuration.v1"
+
+    static func savedDefaults() ->
+        StrengthAdvancedConfiguration {
+        guard let data =
+                UserDefaults.standard.data(
+                    forKey: defaultsKey
+                ),
+              let decoded =
+                try? JSONDecoder().decode(
+                    StrengthAdvancedConfiguration.self,
+                    from: data
+                )
+        else {
+            return .standard
+        }
+
+        return decoded
+    }
+
+    func saveAsDefaults() {
+        guard let data =
+                try? JSONEncoder().encode(self)
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey:
+                Self.defaultsKey
+        )
+    }
 }
 
 struct LinkedHealthWorkoutMetrics: Codable, Hashable {
