@@ -8372,9 +8372,13 @@ struct CommunityGroupDetailView: View {
                     )
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
-                    .background(
-                        Group {
-                            if mine {
+                    .background {
+                        if mine {
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                            .fill(
                                 LinearGradient(
                                     colors: [
                                         ATHLTHTheme
@@ -8387,15 +8391,17 @@ struct CommunityGroupDetailView: View {
                                     endPoint:
                                         .bottomTrailing
                                 )
-                            } else {
+                            )
+                        } else {
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                            .fill(
                                 ATHLTHTheme.card
-                            }
-                        },
-                        in: RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                    )
+                            )
+                        }
+                    }
                     .overlay {
                         RoundedRectangle(
                             cornerRadius: 15,
