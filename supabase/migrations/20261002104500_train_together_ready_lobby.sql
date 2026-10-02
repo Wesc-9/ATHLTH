@@ -1,6 +1,6 @@
 -- Train Together ready lobby and independent participant lifecycle.
--- The shared session carries only coordination state; each participant keeps
--- their own HealthKit/workout session and can finish independently.
+-- The shared session coordinates readiness/start only. Each participant owns
+-- their own HealthKit/workout session and may finish independently.
 
 alter table public.social_workout_sessions
   add column if not exists coordinated_start_at timestamptz;
@@ -20,6 +20,34 @@ alter table public.social_workout_participants
     capture_device is null
     or capture_device in ('iphone','apple_watch')
   );
+
+drop policy if exists social_workout_participants_update_self
+on public.social_workout_participants;
+
+drop policy if exists social_workout_participants_update_member_or_creator
+on public.social_workout_participants;
+
+create policy social_workout_participants_update_member_or_creator
+on public.social_workout_participants for update
+to authenticated
+using (
+  (select auth.uid()) = user_id
+  or exists (
+    select 1
+    from public.social_workout_sessions s
+    where s.id = session_id
+      and s.creator_id = (select auth.uid())
+  )
+)
+with check (
+  (select auth.uid()) = user_id
+  or exists (
+    select 1
+    from public.social_workout_sessions s
+    where s.id = session_id
+      and s.creator_id = (select auth.uid())
+  )
+);
 
 create or replace function private.guard_social_workout_participant()
 returns trigger
@@ -78,25 +106,48 @@ begin
     raise exception 'Workout participant identity fields are immutable';
   end if;
 
+  -- The creator may withdraw an invited/accepted athlete before they start.
+  if actor = creator and actor <> old.user_id then
+    if old.state in ('invited','accepted')
+       and new.state = 'declined'
+       and old.workout_started_at is null
+       and new.ready_at is not distinct from old.ready_at
+       and new.capture_device is not distinct from old.capture_device
+       and new.workout_started_at is not distinct from old.workout_started_at
+       and new.workout_finished_at is not distinct from old.workout_finished_at then
+      new.responded_at := now();
+      return new;
+    end if;
+
+    raise exception 'Creator can only withdraw participants before they start';
+  end if;
+
   if actor <> old.user_id then
     raise exception 'Participants can only update their own workout state';
   end if;
 
   if new.state <> old.state then
-    if old.state <> 'invited'
-       or new.state not in ('accepted','declined') then
-      raise exception 'Invalid workout invitation transition';
+    if old.state = 'invited'
+       and new.state in ('accepted','declined') then
+      if new.ready_at is distinct from old.ready_at
+         or new.capture_device is distinct from old.capture_device
+         or new.workout_started_at is distinct from old.workout_started_at
+         or new.workout_finished_at is distinct from old.workout_finished_at then
+        raise exception 'Accept or decline the invitation before changing workout readiness';
+      end if;
+
+      new.responded_at := now();
+      return new;
     end if;
 
-    if new.ready_at is distinct from old.ready_at
-       or new.capture_device is distinct from old.capture_device
-       or new.workout_started_at is distinct from old.workout_started_at
-       or new.workout_finished_at is distinct from old.workout_finished_at then
-      raise exception 'Accept or decline the invitation before changing workout readiness';
+    if old.state = 'accepted'
+       and new.state = 'declined'
+       and old.workout_started_at is null then
+      new.responded_at := now();
+      return new;
     end if;
 
-    new.responded_at := now();
-    return new;
+    raise exception 'Invalid workout invitation transition';
   end if;
 
   if old.state not in ('creator','accepted') then
@@ -120,6 +171,7 @@ begin
     if new.ready_at is null then
       raise exception 'Participant must be ready before starting';
     end if;
+
     if scheduled_start is null then
       raise exception 'Shared workout has not been started by the creator';
     end if;
