@@ -24,6 +24,119 @@ enum StrengthTrackingMode: String, Codable, Hashable {
     }
 }
 
+struct StrengthAudioCoachConfiguration:
+    Codable,
+    Hashable
+{
+    var enabled = false
+    var language: WatchAudioCoachLanguage = .system
+    var voiceIdentifier: String? = nil
+    var speechRate: Double = 0.48
+    var speechVolume: Double = 1.0
+    var duckOtherAudio = true
+
+    var announceSetComplete = true
+    var announceRestStarted = true
+    var announceRestCountdown = true
+    var announceRestComplete = true
+    var announceNextExercise = true
+    var announceWorkoutStatus = false
+    var workoutStatusIntervalMinutes = 15
+    var restCountdownSeconds = 10
+
+    var watchConfiguration:
+        WatchAudioCoachConfiguration {
+        var configuration =
+            WatchAudioCoachConfiguration.disabled
+
+        configuration.enabled = enabled
+        configuration.language = language
+        configuration.duckOtherAudio =
+            duckOtherAudio
+        configuration.voiceIdentifier =
+            voiceIdentifier
+        configuration.speechRate =
+            Float(
+                min(
+                    max(speechRate, 0.35),
+                    0.65
+                )
+            )
+        configuration.speechVolume =
+            Float(
+                min(
+                    max(speechVolume, 0.2),
+                    1.0
+                )
+            )
+
+        configuration
+            .announceStrengthSetComplete =
+            announceSetComplete
+        configuration
+            .announceStrengthRestStarted =
+            announceRestStarted
+        configuration
+            .announceStrengthRestCountdown =
+            announceRestCountdown
+        configuration
+            .announceStrengthRestComplete =
+            announceRestComplete
+        configuration
+            .announceStrengthNextExercise =
+            announceNextExercise
+        configuration
+            .strengthStatusIntervalSeconds =
+            announceWorkoutStatus
+                ? TimeInterval(
+                    max(
+                        workoutStatusIntervalMinutes,
+                        5
+                    ) * 60
+                )
+                : nil
+        configuration
+            .strengthRestCountdownSeconds =
+            min(
+                max(
+                    restCountdownSeconds,
+                    3
+                ),
+                30
+            )
+
+        return configuration
+    }
+}
+
+struct StrengthRestCueConfiguration:
+    Codable,
+    Hashable
+{
+    var automaticRestTimer = true
+    var defaultRestSeconds = 90
+    var hapticsEnabled = true
+}
+
+struct StrengthAdvancedConfiguration:
+    Codable,
+    Hashable
+{
+    var spotifyPlaylist:
+        SpotifyPlaylistReference? = nil
+    var spotifyAutoplay = false
+    var audioCoach =
+        StrengthAudioCoachConfiguration()
+    var restCues =
+        StrengthRestCueConfiguration()
+    var keepScreenAwake = false
+    var inputMode:
+        WatchStrengthInputMode = .both
+
+    static let standard =
+        StrengthAdvancedConfiguration()
+}
+
 struct LinkedHealthWorkoutMetrics: Codable, Hashable {
     var healthKitWorkoutUUID: UUID?
     var duration: TimeInterval?
@@ -121,6 +234,8 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var endedAt: Date?
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
+    var advancedConfiguration:
+        StrengthAdvancedConfiguration? = nil
 
     var totalCompletedSets: Int {
         exercises
