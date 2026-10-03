@@ -520,3 +520,4 @@ performance-cleanup-head: 7de5686a42a00957fe9b233f9462b00cddf98a83
 performance-cleanup-final-head: ce2e0ae034218dac165bef8d3b64122af0448bd8
 goal-flow-date-plan-picker: 537ae9872fceebb5d1400881e73d42a3bc93cbdf
 Validate 1.5.7 premium strength muscle visuals and figure preference 2026-10-03
+goal-detail-width-fix: 8df9b5938470e8684bd7cf82f2cac7afb7ec957f
