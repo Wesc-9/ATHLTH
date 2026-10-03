@@ -593,11 +593,16 @@ struct GoalDetailView: View {
             if let linkedPlanID = goal.linkedTrainingPlanID {
                 Divider()
                 LabeledContent("Training plan") {
-                    if session.activePlan?.id == linkedPlanID {
-                        Text(session.activePlan?.title ?? "Linked plan")
-                    } else {
-                        Text("Linked plan")
-                    }
+                    Text(
+                        session.trainingPlan(
+                            withID:
+                                linkedPlanID
+                        )?.title ??
+                        ATHLTHLocalization.format(
+                            english: "Linked plan",
+                            norwegian: "Tilknyttet plan"
+                        )
+                    )
                 }
                 .font(.caption)
             }
@@ -864,14 +869,15 @@ struct GoalCreationView: View {
     @State private var exerciseName = "Squat"
     @State private var showingExercisePicker = false
     @State private var activity: GoalActivityFilter = .running
-    @State private var hasDeadline = true
+    @State private var hasDeadline = false
     @State private var deadline = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
+    @State private var showingDeadlinePicker = false
     @State private var coverStyle: GoalCoverStyle = .running
     @State private var whyItMatters = ""
     @State private var notes = ""
     @State private var privacy: GoalPrivacy = .privateOnly
     @State private var makePrimary = true
-    @State private var linkActivePlan = false
+    @State private var selectedTrainingPlanID: UUID?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var automaticTracking = true
@@ -944,6 +950,11 @@ struct GoalCreationView: View {
                         )
                 showingExercisePicker = false
             }
+        }
+        .sheet(
+            isPresented: $showingDeadlinePicker
+        ) {
+            goalDeadlinePickerSheet
         }
     }
 
@@ -1778,6 +1789,8 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 12
         ) {
+            goalTargetDateRow
+
             ForEach(
                 GoalCategory.allCases
             ) { option in
@@ -1947,6 +1960,200 @@ struct GoalCreationView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var goalTargetDateRow: some View {
+        Button {
+            showingDeadlinePicker = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar")
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                    )
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Target date",
+                        norwegian: "Måldato"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Spacer()
+
+                Text(
+                    hasDeadline
+                        ? deadline.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        )
+                        : "—"
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    hasDeadline
+                        ? ATHLTHTheme.primaryText
+                        : ATHLTHTheme.mutedText
+                )
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 58)
+            .background(
+                Color.white.opacity(0.98),
+                in: RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(0.055),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(
+            hasDeadline
+                ? deadline.formatted(
+                    date: .long,
+                    time: .omitted
+                )
+                : ATHLTHLocalization.format(
+                    english: "Open-ended",
+                    norwegian: "Åpent mål"
+                )
+        )
+    }
+
+    private var goalDeadlinePickerSheet:
+        some View {
+        NavigationStack {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Leave the target date empty to keep the goal open-ended.",
+                        norwegian:
+                            "Uten måldato er målet åpent uten sluttdato."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                DatePicker(
+                    "",
+                    selection: $deadline,
+                    in:
+                        Calendar.current
+                            .startOfDay(
+                                for: Date()
+                            )...,
+                    displayedComponents:
+                        .date
+                )
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+
+                Spacer(minLength: 0)
+            }
+            .padding(18)
+            .background(
+                ATHLTHTheme.canvasTop
+                    .ignoresSafeArea()
+            )
+            .navigationTitle(
+                ATHLTHLocalization.format(
+                    english: "Target date",
+                    norwegian: "Måldato"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.format(
+                            english: "No date",
+                            norwegian: "Ingen dato"
+                        )
+                    ) {
+                        hasDeadline = false
+                        showingDeadlinePicker =
+                            false
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.format(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        hasDeadline = true
+                        showingDeadlinePicker =
+                            false
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents(
+            [.medium, .large]
+        )
     }
 
     private func goalCategoryTint(
@@ -2323,6 +2530,19 @@ struct GoalCreationView: View {
                     value: $targetValue
                 )
 
+                if hasDeadline {
+                    goalTrackingNote(
+                        icon: "calendar",
+                        title:
+                            deadline.formatted(
+                                date: .abbreviated,
+                                time: .omitted
+                            ),
+                        detail:
+                            consistencyDeadlineGuidance
+                    )
+                }
+
                 goalTrackingNote(
                     icon: "heart.fill",
                     title:
@@ -2393,51 +2613,6 @@ struct GoalCreationView: View {
             alignment: .leading,
             spacing: 14
         ) {
-            goalInputCard(
-                icon: "calendar",
-                title:
-                    ATHLTHLocalization.format(
-                        english: "Deadline",
-                        norwegian: "Frist"
-                    )
-            ) {
-                VStack(spacing: 10) {
-                    Toggle(
-                        ATHLTHLocalization.format(
-                            english: "Use a target date",
-                            norwegian: "Bruk en måldato"
-                        ),
-                        isOn: $hasDeadline
-                    )
-                    .disabled(
-                        category == .event
-                    )
-                    .font(.subheadline.weight(.semibold))
-
-                    if hasDeadline ||
-                        category == .event {
-                        Divider()
-                            .opacity(0.45)
-
-                        DatePicker(
-                            ATHLTHLocalization.format(
-                                english: "Target date",
-                                norwegian: "Måldato"
-                            ),
-                            selection: $deadline,
-                            in:
-                                Calendar.current
-                                    .startOfDay(
-                                        for: Date()
-                                    )...,
-                            displayedComponents:
-                                .date
-                        )
-                        .font(.subheadline)
-                    }
-                }
-            }
-
             goalInputCard(
                 icon: "photo.fill",
                 title:
@@ -2729,8 +2904,7 @@ struct GoalCreationView: View {
                 )
             }
 
-            if let activePlan =
-                    session.activePlan {
+            if !session.trainingPlans.isEmpty {
                 goalInputCard(
                     icon:
                         "list.bullet.clipboard.fill",
@@ -2740,37 +2914,48 @@ struct GoalCreationView: View {
                             norwegian: "Treningsplan"
                         )
                 ) {
-                    Toggle(
-                        isOn:
-                            $linkActivePlan
+                    Picker(
+                        ATHLTHLocalization.format(
+                            english: "Link goal to plan",
+                            norwegian: "Knytt målet til planen"
+                        ),
+                        selection:
+                            $selectedTrainingPlanID
                     ) {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(
-                                ATHLTHLocalization.format(
-                                    english: "Link this goal",
-                                    norwegian: "Knytt målet til planen"
-                                )
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "No plan",
+                                norwegian: "Ingen plan"
                             )
-                            .font(
-                                .subheadline
-                                    .weight(
-                                        .semibold
-                                    )
-                            )
+                        )
+                        .tag(
+                            Optional<UUID>.none
+                        )
 
+                        ForEach(
+                            session.trainingPlans
+                        ) { plan in
                             Text(
-                                activePlan.title
+                                plan.id ==
+                                    session.activePlan?.id
+                                    ? ATHLTHLocalization.format(
+                                        english:
+                                            "%@ · Active",
+                                        norwegian:
+                                            "%@ · Aktiv",
+                                        plan.title
+                                    )
+                                    : plan.title
                             )
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
+                            .tag(
+                                Optional(plan.id)
                             )
                         }
                     }
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme.accentDeep
+                    )
                 }
             }
         }
@@ -3209,8 +3394,7 @@ struct GoalCreationView: View {
                 title: resolvedTitle,
                 category: category,
                 deadline:
-                    (hasDeadline ||
-                     category == .event)
+                    hasDeadline
                         ? deadline
                         : nil,
                 coverStyle: coverStyle,
@@ -3830,8 +4014,7 @@ struct GoalCreationView: View {
                     "\(previewMilestones.count)"
             )
 
-            if hasDeadline ||
-                category == .event {
+            if hasDeadline {
                 Divider()
                     .padding(
                         .leading,
@@ -3854,9 +4037,12 @@ struct GoalCreationView: View {
                 )
             }
 
-            if linkActivePlan,
-               let activePlan =
-                    session.activePlan {
+            if let selectedTrainingPlanID,
+               let selectedPlan =
+                    session.trainingPlan(
+                        withID:
+                            selectedTrainingPlanID
+                    ) {
                 Divider()
                     .padding(
                         .leading,
@@ -3873,7 +4059,7 @@ struct GoalCreationView: View {
                             norwegian: "Plan"
                         ),
                     value:
-                        activePlan.title
+                        selectedPlan.title
                 )
             }
         }
@@ -4122,6 +4308,53 @@ struct GoalCreationView: View {
         }
     }
 
+    private var consistencyDeadlineGuidance:
+        String {
+        let calendar = Calendar.current
+        let start =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let end =
+            calendar.startOfDay(
+                for: deadline
+            )
+        let days =
+            max(
+                calendar.dateComponents(
+                    [.day],
+                    from: start,
+                    to: end
+                ).day ?? 0,
+                1
+            )
+        let weeks =
+            max(
+                Double(days) / 7.0,
+                1.0 / 7.0
+            )
+        let workouts =
+            max(
+                Int(
+                    targetValue
+                        .rounded()
+                ),
+                1
+            )
+        let perWeek =
+            Double(workouts) /
+            weeks
+
+        return ATHLTHLocalization.format(
+            english:
+                "%d workouts by the target date is about %.1f workouts per week.",
+            norwegian:
+                "%d økter fram til måldato tilsvarer ca. %.1f økter per uke.",
+            workouts,
+            perWeek
+        )
+    }
+
     private var effectiveDataSource:
         GoalDataSource {
         guard
@@ -4255,7 +4488,7 @@ struct GoalCreationView: View {
             dataSource: source,
             target: target,
             milestones: configuredMilestones(createdAt: now),
-            linkedTrainingPlanID: linkActivePlan ? session.activePlan?.id : nil
+            linkedTrainingPlanID: selectedTrainingPlanID
         )
 
         if let imageData,
@@ -4457,34 +4690,27 @@ struct GoalCreationView: View {
         switch category {
         case .event:
             targetValue = 42.195
-            hasDeadline = true
             coverStyle = .event
         case .endurance:
             targetValue = 5
-            hasDeadline = true
             coverStyle = .running
         case .strength:
             targetValue = 100
-            hasDeadline = true
             coverStyle = .strength
         case .body:
             targetValue = max(
                 (health.personalDetails.weightKilograms ?? 84) - 4,
                 1
             )
-            hasDeadline = true
             coverStyle = .progress
         case .consistency:
             targetValue = 12
-            hasDeadline = true
             coverStyle = .consistency
         case .recovery:
             targetValue = 8
-            hasDeadline = false
             coverStyle = .relax
         case .custom:
             targetValue = 1
-            hasDeadline = false
             coverStyle = .adventure
         }
     }
@@ -4902,7 +5128,7 @@ struct GoalEditView: View {
     @State private var notes = ""
     @State private var privacy: GoalPrivacy = .privateOnly
     @State private var makePrimary = false
-    @State private var linkActivePlan = false
+    @State private var selectedTrainingPlanID: UUID?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
     @State private var didLoad = false
@@ -4956,14 +5182,30 @@ struct GoalEditView: View {
                         .lineLimit(2...5)
                 }
 
-                if let activePlan = session.activePlan {
+                if !session.trainingPlans.isEmpty {
                     Section("Training plan") {
-                        Toggle(isOn: $linkActivePlan) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Link current plan")
-                                Text(activePlan.title)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        Picker(
+                            "Linked plan",
+                            selection:
+                                $selectedTrainingPlanID
+                        ) {
+                            Text("No plan")
+                                .tag(
+                                    Optional<UUID>.none
+                                )
+
+                            ForEach(
+                                session.trainingPlans
+                            ) { plan in
+                                Text(
+                                    plan.id ==
+                                        session.activePlan?.id
+                                        ? "\(plan.title) · Active"
+                                        : plan.title
+                                )
+                                .tag(
+                                    Optional(plan.id)
+                                )
                             }
                         }
                     }
@@ -5017,7 +5259,8 @@ struct GoalEditView: View {
         notes = goal.notes ?? ""
         privacy = goal.privacy
         makePrimary = goal.isPrimary
-        linkActivePlan = goal.linkedTrainingPlanID != nil
+        selectedTrainingPlanID =
+            goal.linkedTrainingPlanID
     }
 
     private func save() {
@@ -5030,7 +5273,8 @@ struct GoalEditView: View {
         goal.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         goal.privacy = privacy
         goal.isPrimary = makePrimary
-        goal.linkedTrainingPlanID = linkActivePlan ? session.activePlan?.id : nil
+        goal.linkedTrainingPlanID =
+            selectedTrainingPlanID
 
         if let imageData,
            let filename = try? goalStore.saveImageData(imageData, for: goal.id) {
