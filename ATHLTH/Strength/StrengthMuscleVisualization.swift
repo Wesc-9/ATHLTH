@@ -803,6 +803,31 @@ enum StrengthMuscleResolver {
     }
 }
 
+enum StrengthBodyPresentation:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case neutral
+    case female
+    case male
+
+    var id: String { rawValue }
+
+    fileprivate var horizontalScale:
+        CGFloat
+    {
+        switch self {
+        case .neutral:
+            return 1.0
+        case .female:
+            return 0.965
+        case .male:
+            return 1.035
+        }
+    }
+}
+
 enum StrengthMuscleMapStyle {
     case activation
     case recoveryLoad
@@ -812,6 +837,14 @@ struct StrengthMuscleMapView: View {
     let profile: StrengthMuscleProfile
     var compact = false
     var style: StrengthMuscleMapStyle = .activation
+    var figureStyle:
+        StrengthBodyPresentation = .neutral
+    var activationTint:
+        Color = Color(
+            red: 0.14,
+            green: 0.60,
+            blue: 0.45
+        )
 
     var body: some View {
         HStack(spacing: compact ? 5 : 12) {
@@ -841,7 +874,11 @@ struct StrengthMuscleMapView: View {
             StrengthBodyFigureCanvas(
                 profile: profile,
                 side: side,
-                style: style
+                style: style,
+                figureStyle:
+                    figureStyle,
+                activationTint:
+                    activationTint
             )
 
             if !compact {
@@ -885,6 +922,10 @@ private struct StrengthBodyFigureCanvas:
     let profile: StrengthMuscleProfile
     let side: StrengthBodySide
     let style: StrengthMuscleMapStyle
+    let figureStyle:
+        StrengthBodyPresentation
+    let activationTint:
+        Color
 
     var body: some View {
         Canvas {
@@ -939,6 +980,13 @@ private struct StrengthBodyFigureCanvas:
         .aspectRatio(
             0.48,
             contentMode: .fit
+        )
+        .scaleEffect(
+            x:
+                figureStyle
+                    .horizontalScale,
+            y: 1,
+            anchor: .center
         )
     }
 
@@ -1208,15 +1256,11 @@ private struct StrengthBodyFigureCanvas:
         switch style {
         case .activation:
             fill =
-                Color(
-                    red: 0.14,
-                    green: 0.60,
-                    blue: 0.45
-                )
-                .opacity(
-                    0.26 +
-                    intensity * 0.74
-                )
+                activationTint
+                    .opacity(
+                        0.24 +
+                        intensity * 0.76
+                    )
 
         case .recoveryLoad:
             fill =
