@@ -1,5 +1,4 @@
 import CoreLocation
-import MapKit
 import SwiftUI
 import UIKit
 
@@ -3627,97 +3626,7 @@ private struct HomePersonalWorkoutVisual:
         }
     }
 
-    private func routeRegion(
-        _ coordinates:
-            [CLLocationCoordinate2D]
-    ) -> MKCoordinateRegion {
-        guard let first =
-                coordinates.first
-        else {
-            return MKCoordinateRegion(
-                center:
-                    CLLocationCoordinate2D(
-                        latitude: 0,
-                        longitude: 0
-                    ),
-                span:
-                    MKCoordinateSpan(
-                        latitudeDelta:
-                            0.02,
-                        longitudeDelta:
-                            0.02
-                    )
-            )
-        }
 
-        var minLatitude =
-            first.latitude
-        var maxLatitude =
-            first.latitude
-        var minLongitude =
-            first.longitude
-        var maxLongitude =
-            first.longitude
-
-        for coordinate in
-            coordinates.dropFirst() {
-            minLatitude =
-                min(
-                    minLatitude,
-                    coordinate.latitude
-                )
-            maxLatitude =
-                max(
-                    maxLatitude,
-                    coordinate.latitude
-                )
-            minLongitude =
-                min(
-                    minLongitude,
-                    coordinate.longitude
-                )
-            maxLongitude =
-                max(
-                    maxLongitude,
-                    coordinate.longitude
-                )
-        }
-
-        return MKCoordinateRegion(
-            center:
-                CLLocationCoordinate2D(
-                    latitude:
-                        (
-                            minLatitude +
-                            maxLatitude
-                        ) / 2,
-                    longitude:
-                        (
-                            minLongitude +
-                            maxLongitude
-                        ) / 2
-                ),
-            span:
-                MKCoordinateSpan(
-                    latitudeDelta:
-                        max(
-                            (
-                                maxLatitude -
-                                minLatitude
-                            ) * 1.35,
-                            0.006
-                        ),
-                    longitudeDelta:
-                        max(
-                            (
-                                maxLongitude -
-                                minLongitude
-                            ) * 1.35,
-                            0.006
-                        )
-                )
-        )
-    }
 }
 
 // MARK: - Destinations

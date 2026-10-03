@@ -2339,7 +2339,7 @@ struct StrengthQuickStartSheet: View {
                 VStack(spacing: 14) {
                     QuickTrainingHeroCard(
                         imageName:
-                            "StrengthQuickStartHero",
+                            "TrainHero",
                         title:
                             ATHLTHLocalization.choose(
                                 english:
