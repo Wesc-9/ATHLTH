@@ -293,6 +293,12 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var heartRateZone: Int? = nil
     var heartRateAggregation: ChallengeHeartRateAggregation? = nil
 
+    // Optional presentation metadata. Stored inside the rules JSON so
+    // existing challenge rows remain backwards-compatible.
+    var summary: String? = nil
+    var coverArtworkName: String? = nil
+    var coverImageURL: String? = nil
+
     var startsAt: Date
     var endsAt: Date?
     var allowMultipleAttempts: Bool
