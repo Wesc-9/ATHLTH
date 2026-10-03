@@ -384,12 +384,33 @@ private enum CommunityMatchupPeriod:
 }
 
 private struct CommunityMatchupStats {
+    let activityPoints: Double?
     let workouts: Double?
     let runningKilometers: Double?
     let activeMinutes: Double?
     let strengthWorkouts: Double?
     let personalRecords: Double?
     let challenges: Double?
+
+    var calculatedActivityPoints: Double? {
+        guard let workouts,
+              let activeMinutes else {
+            return nil
+        }
+
+        // Balanced across training types: completing a workout matters,
+        // while duration contributes with a per-workout cap so long sessions
+        // cannot dominate the matchup.
+        let cappedMinutes =
+            min(
+                max(activeMinutes, 0),
+                max(workouts, 0) * 120
+            )
+
+        return
+            max(workouts, 0) * 20 +
+            cappedMinutes / 5
+    }
 }
 
 struct CommunityFriendsVsFriendsDetailView: View {
@@ -670,6 +691,21 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 matchupHeader
 
                 metricRow(
+                    ATHLTHLocalization.choose(
+                        english: "Activity points",
+                        norwegian: "Aktivitetspoeng"
+                    ),
+                    icon: "bolt.circle.fill",
+                    mine:
+                        mine.calculatedActivityPoints,
+                    theirs:
+                        theirs.calculatedActivityPoints,
+                    format: pointsText
+                )
+
+                Divider()
+
+                metricRow(
                     "Workouts",
                     icon:
                         "figure.run.circle.fill",
@@ -913,6 +949,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
             let workouts = health.workouts
 
             return CommunityMatchupStats(
+                activityPoints: nil,
                 workouts:
                     Double(workouts.count),
                 runningKilometers:
@@ -999,6 +1036,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         .performance
             else {
                 return CommunityMatchupStats(
+                    activityPoints: nil,
                     workouts: nil,
                     runningKilometers: nil,
                     activeMinutes: nil,
@@ -1009,6 +1047,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
             }
 
             return CommunityMatchupStats(
+                activityPoints: nil,
                 workouts:
                     Double(
                         performance
@@ -1198,6 +1237,16 @@ struct CommunityFriendsVsFriendsDetailView: View {
 
         return ATHLTHTheme
             .accentDeep
+    }
+
+    private func pointsText(
+        _ value: Double?
+    ) -> String {
+        guard let value else {
+            return "—"
+        }
+
+        return "\(Int(value.rounded())) p"
     }
 
     private func countText(
