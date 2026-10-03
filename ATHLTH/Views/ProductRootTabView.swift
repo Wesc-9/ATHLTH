@@ -243,13 +243,10 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
-    @EnvironmentObject private var notifications: ATHLTHNotificationStore
-    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
@@ -319,126 +316,17 @@ struct ATHLTHHomeView: View {
                     )
 
                     HStack(spacing: 7) {
-                        Button {
-                            showingGlobalSearch = true
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Color.black.opacity(0.20),
-                                    in: Circle()
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            Color.white.opacity(0.30),
-                                            lineWidth: 0.8
-                                        )
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Search ATHLTH")
-
-                        NavigationLink {
-                            MessageInboxDestinationView()
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(
-                                    systemName:
-                                        homeInboxUnreadCount > 0
-                                            ? "tray.full.fill"
-                                            : "tray"
-                                )
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Color.black.opacity(0.20),
-                                    in: Circle()
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            Color.white.opacity(0.30),
-                                            lineWidth: 0.8
-                                        )
-                                }
-
-                                if homeInboxUnreadCount > 0 {
-                                    Text(homeInboxBadgeText)
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(minWidth: 14, minHeight: 14)
-                                        .padding(
-                                            .horizontal,
-                                            homeInboxUnreadCount > 9 ? 2 : 0
-                                        )
-                                        .background(.red, in: Capsule())
-                                        .overlay {
-                                            Capsule()
-                                                .stroke(.white, lineWidth: 1)
-                                        }
-                                        .offset(x: 4, y: -4)
-                                }
+                        HomeHeroUtilityButtons(
+                            challengeInviteUnreadCount:
+                                social.inboxEvents.filter {
+                                    $0.kind == "challenge_invite" &&
+                                    $0.readAt == nil
+                                }.count,
+                            pendingWorkoutImportCount:
+                                health.pendingWorkoutImportCount,
+                            onSearch: {
+                                showingGlobalSearch = true
                             }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            homeInboxUnreadCount > 0
-                                ? "Inbox, \(homeInboxUnreadCount) unread"
-                                : "Inbox"
-                        )
-
-                        NavigationLink {
-                            ATHLTHNotificationCenterView()
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(
-                                    systemName:
-                                        homeNotificationCount > 0
-                                            ? "bell.fill"
-                                            : "bell"
-                                )
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Color.black.opacity(0.20),
-                                    in: Circle()
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            Color.white.opacity(0.30),
-                                            lineWidth: 0.8
-                                        )
-                                }
-
-                                if homeNotificationCount > 0 {
-                                    Text(homeNotificationBadgeText)
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(minWidth: 14, minHeight: 14)
-                                        .padding(
-                                            .horizontal,
-                                            homeNotificationCount > 9 ? 2 : 0
-                                        )
-                                        .background(.red, in: Capsule())
-                                        .overlay {
-                                            Capsule()
-                                                .stroke(.white, lineWidth: 1)
-                                        }
-                                        .offset(x: 4, y: -4)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            homeNotificationCount > 0
-                                ? "Notifications, \(homeNotificationCount) pending"
-                                : "Notifications"
                         )
 
                         NavigationLink {
@@ -877,28 +765,6 @@ struct ATHLTHHomeView: View {
     }
 
 
-
-    private var homeInboxUnreadCount: Int {
-        messaging.unreadCount +
-            messaging.messageRequestCount +
-            social.inboxEvents.filter {
-                $0.kind == "challenge_invite" &&
-                $0.readAt == nil
-            }.count
-    }
-
-    private var homeInboxBadgeText: String {
-        homeInboxUnreadCount > 99 ? "99+" : "\(homeInboxUnreadCount)"
-    }
-
-    private var homeNotificationCount: Int {
-        notifications.notificationCenterUnreadCount +
-            health.pendingWorkoutImportCount
-    }
-
-    private var homeNotificationBadgeText: String {
-        homeNotificationCount > 99 ? "99+" : "\(homeNotificationCount)"
-    }
 
     private var homeStreakCount: Int {
         guard let homeStreakDays,
@@ -3837,6 +3703,162 @@ private struct ATHLTHTrainPlanWorkspaceView: View {
         )
         .navigationTitle("Training Plan")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct HomeHeroUtilityButtons: View {
+    @EnvironmentObject private var notifications:
+        ATHLTHNotificationStore
+    @EnvironmentObject private var messaging:
+        MessagingStore
+
+    let challengeInviteUnreadCount: Int
+    let pendingWorkoutImportCount: Int
+    let onSearch: () -> Void
+
+    private var inboxUnreadCount: Int {
+        messaging.unreadCount +
+            messaging.messageRequestCount +
+            challengeInviteUnreadCount
+    }
+
+    private var notificationCount: Int {
+        notifications.notificationCenterUnreadCount +
+            pendingWorkoutImportCount
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            heroButton(
+                icon: "magnifyingglass",
+                action: onSearch
+            )
+            .accessibilityLabel("Search ATHLTH")
+
+            NavigationLink {
+                MessageInboxDestinationView()
+            } label: {
+                badgeButton(
+                    icon:
+                        inboxUnreadCount > 0
+                            ? "tray.full.fill"
+                            : "tray",
+                    count: inboxUnreadCount
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                inboxUnreadCount > 0
+                    ? "Inbox, \(inboxUnreadCount) unread"
+                    : "Inbox"
+            )
+
+            NavigationLink {
+                ATHLTHNotificationCenterView()
+            } label: {
+                badgeButton(
+                    icon:
+                        notificationCount > 0
+                            ? "bell.fill"
+                            : "bell",
+                    count: notificationCount
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                notificationCount > 0
+                    ? "Notifications, \(notificationCount) pending"
+                    : "Notifications"
+            )
+        }
+    }
+
+    private func heroButton(
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(
+                    Color.black.opacity(0.20),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white.opacity(0.30),
+                            lineWidth: 0.8
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func badgeButton(
+        icon: String,
+        count: Int
+    ) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.white)
+                .frame(width: 36, height: 36)
+                .background(
+                    Color.black.opacity(0.20),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white.opacity(0.30),
+                            lineWidth: 0.8
+                        )
+                }
+
+            if count > 0 {
+                Text(count > 99 ? "99+" : "\(count)")
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        minWidth: 14,
+                        minHeight: 14
+                    )
+                    .padding(
+                        .horizontal,
+                        count > 9 ? 2 : 0
+                    )
+                    .background(
+                        .red,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                .white,
+                                lineWidth: 1
+                            )
+                    }
+                    .offset(x: 4, y: -4)
+            }
+        }
     }
 }
 
