@@ -1830,22 +1830,46 @@ struct RunQuickStartSheet: View {
         if captureDevice == .iPhone {
             switch mode {
             case .free:
-                return "Start Free Run on iPhone"
+                return ATHLTHLocalization.choose(
+                    english: "Start Free Run on iPhone",
+                    norwegian: "Start fri løpeøkt på iPhone"
+                )
             case .route:
-                return "Start Route on iPhone"
+                return ATHLTHLocalization.choose(
+                    english: "Start Route on iPhone",
+                    norwegian: "Start rute på iPhone"
+                )
             case .structured:
-                return "Start Workout on iPhone"
+                return ATHLTHLocalization.choose(
+                    english: "Start Workout on iPhone",
+                    norwegian: "Start treningsøkt på iPhone"
+                )
             }
         }
 
         guard watchConnected else {
-            return "Apple Watch Required"
+            return ATHLTHLocalization.choose(
+                english: "Apple Watch Required",
+                norwegian: "Apple Watch kreves"
+            )
         }
 
         switch mode {
-        case .free: return "Start Free Run on Watch"
-        case .route: return "Start Route on Watch"
-        case .structured: return "Start Workout on Watch"
+        case .free:
+            return ATHLTHLocalization.choose(
+                english: "Start Free Run on Watch",
+                norwegian: "Start fri løpeøkt på Watch"
+            )
+        case .route:
+            return ATHLTHLocalization.choose(
+                english: "Start Route on Watch",
+                norwegian: "Start rute på Watch"
+            )
+        case .structured:
+            return ATHLTHLocalization.choose(
+                english: "Start Workout on Watch",
+                norwegian: "Start treningsøkt på Watch"
+            )
         }
     }
 
