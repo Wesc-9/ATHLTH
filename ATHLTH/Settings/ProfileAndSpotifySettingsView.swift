@@ -823,6 +823,7 @@ struct PersonalHealthProfileView: View {
             VStack(alignment: .leading, spacing: 24) {
                 sourceSection
                 detailsSection
+                figurePreferenceSection
                 privacySection
             }
             .padding(.horizontal, 18)
@@ -988,6 +989,219 @@ struct PersonalHealthProfileView: View {
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
             .padding(.horizontal, 6)
+        }
+    }
+
+    private var figurePreferenceSection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "WORKOUT VISUAL",
+                    norwegian:
+                        "TRENINGSFIGUR"
+                )
+            )
+
+            ATHLTHCard {
+                HStack(
+                    alignment: .center,
+                    spacing: 14
+                ) {
+                    Image(
+                        systemName:
+                            "figure.strengthtraining.traditional"
+                    )
+                    .font(
+                        .system(
+                            size: 20,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .frame(
+                        width: 44,
+                        height: 44
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .champagneSoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Muscle figure",
+                                norwegian:
+                                    "Muskel-figur"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                        Text(
+                            resolvedFigureSourceText
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+
+                    Spacer(
+                        minLength: 8
+                    )
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Muscle figure",
+                            norwegian:
+                                "Muskel-figur"
+                        ),
+                        selection:
+                            $settings
+                                .strengthFigurePreference
+                    ) {
+                        ForEach(
+                            StrengthFigurePreference
+                                .allCases
+                        ) { preference in
+                            Text(
+                                preference.title
+                            )
+                            .tag(preference)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+
+                Divider()
+                    .padding(
+                        .vertical,
+                        12
+                    )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Automatic uses your private ATHLTH health profile, including Apple Health when available. If no sex value is available, ATHLTH uses the neutral figure.",
+                        norwegian:
+                            "Automatisk bruker den private helseprofilen din i ATHLTH, inkludert Apple Health når det finnes data. Hvis kjønn ikke er tilgjengelig, brukes den nøytrale figuren."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+        }
+    }
+
+    private var resolvedFigureSourceText:
+        String {
+        switch settings
+            .strengthFigurePreference {
+        case .female:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Always use the woman figure.",
+                norwegian:
+                    "Bruk alltid kvinnefiguren."
+            )
+
+        case .male:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Always use the man figure.",
+                norwegian:
+                    "Bruk alltid mannsfiguren."
+            )
+
+        case .neutral:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Always use the neutral figure.",
+                norwegian:
+                    "Bruk alltid den nøytrale figuren."
+            )
+
+        case .automatic:
+            let healthSex =
+                session
+                    .onboardingProfile?
+                    .healthSex ??
+                health
+                    .personalDetails
+                    .healthSex
+
+            switch healthSex {
+            case .female:
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Automatic · woman figure from your health profile",
+                    norwegian:
+                        "Automatisk · kvinnefigur fra helseprofilen"
+                )
+
+            case .male:
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Automatic · man figure from your health profile",
+                    norwegian:
+                        "Automatisk · mannsfigur fra helseprofilen"
+                )
+
+            case .other,
+                 .preferNotToSay,
+                 .none:
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Automatic · neutral figure",
+                    norwegian:
+                        "Automatisk · nøytral figur"
+                )
+            }
         }
     }
 
