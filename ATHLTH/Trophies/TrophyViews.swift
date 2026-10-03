@@ -263,9 +263,9 @@ struct ATHLTHTrophyCoreView: View {
                trophy.displayRarity == .epic {
                 ATHLTHTrophyPlateShape()
                     .fill(
-                        trophy.category
-                            .trophyAccent
-                            .opacity(0.22)
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.11)
                     )
                     .blur(
                         radius:
@@ -323,28 +323,33 @@ struct ATHLTHTrophyCoreView: View {
 
             VStack(spacing: size * 0.07) {
                 Text(
-                    trophy.displayRarity
-                        .title
+                    trophy.title
                         .uppercased()
                 )
                 .font(
                     .system(
                         size:
                             max(
-                                6,
-                                size * 0.065
+                                5.5,
+                                size * 0.055
                             ),
                         weight:
                             .bold
                     )
                 )
-                .tracking(size * 0.012)
+                .tracking(size * 0.008)
                 .foregroundStyle(
                     .white.opacity(
                         trophy.isUnlocked
-                            ? 0.82
+                            ? 0.84
                             : 0.42
                     )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.46)
+                .padding(
+                    .horizontal,
+                    size * 0.12
                 )
 
                 ATHLTHMarkShape()
@@ -366,14 +371,8 @@ struct ATHLTHTrophyCoreView: View {
                 )
                 .foregroundStyle(
                     trophy.isUnlocked
-                        ? trophy
-                            .displayRarity ==
-                            .core
-                            ? trophy.category
-                                .trophyAccent
-                                .opacity(0.95)
-                            : Color.white
-                                .opacity(0.80)
+                        ? Color.white
+                            .opacity(0.82)
                         : Color.white
                             .opacity(0.30)
                 )
@@ -404,53 +403,40 @@ struct ATHLTHTrophyCoreView: View {
             case .core:
                 colors = [
                     Color.white.opacity(0.20),
-                    Color.black.opacity(0.26)
+                    Color.black.opacity(0.30)
                 ]
+
             case .rare:
                 colors = [
-                    Color.white.opacity(0.90),
+                    Color.white.opacity(0.92),
                     Color(
-                        red: 0.56,
-                        green: 0.72,
-                        blue: 0.88
+                        red: 0.60,
+                        green: 0.62,
+                        blue: 0.65
                     ),
-                    Color.white.opacity(0.38)
+                    Color.white.opacity(0.34)
                 ]
+
             case .epic:
                 colors = [
-                    Color(
-                        red: 0.76,
-                        green: 0.46,
-                        blue: 1.00
-                    ),
-                    Color(
-                        red: 1.00,
-                        green: 0.63,
-                        blue: 0.20
-                    )
+                    Color.white.opacity(0.50),
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.86),
+                    Color.black.opacity(0.36)
                 ]
+
             case .signature:
                 colors = [
+                    Color.white.opacity(0.88),
+                    ATHLTHTheme
+                        .premiumGold,
                     Color(
-                        red: 0.20,
-                        green: 0.92,
-                        blue: 1.00
-                    ),
-                    Color(
-                        red: 0.98,
-                        green: 0.34,
-                        blue: 0.90
-                    ),
-                    Color(
-                        red: 1.00,
-                        green: 0.84,
+                        red: 0.47,
+                        green: 0.41,
                         blue: 0.28
                     ),
-                    Color(
-                        red: 0.48,
-                        green: 0.55,
-                        blue: 1.00
-                    )
+                    Color.white.opacity(0.62)
                 ]
             }
         }
@@ -506,19 +492,12 @@ struct ATHLTHTrophyCoreView: View {
                 LinearGradient(
                     colors: [
                         Color.white
-                            .opacity(0.56),
-                        Color(
-                            red: 0.79,
-                            green: 0.42,
-                            blue: 1.00
-                        )
-                        .opacity(0.72),
-                        Color(
-                            red: 1.00,
-                            green: 0.57,
-                            blue: 0.18
-                        )
-                        .opacity(0.68)
+                            .opacity(0.48),
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.72),
+                        Color.black
+                            .opacity(0.20)
                     ],
                     startPoint:
                         .topLeading,
@@ -546,27 +525,21 @@ struct ATHLTHTrophyCoreView: View {
                     AngularGradient(
                         colors: [
                             Color.white
-                                .opacity(0.92),
+                                .opacity(0.90),
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(0.82),
                             Color(
-                                red: 0.40,
-                                green: 0.92,
-                                blue: 1.00
-                            )
-                            .opacity(0.76),
-                            Color(
-                                red: 0.66,
-                                green: 0.46,
-                                blue: 1.00
-                            )
-                            .opacity(0.62),
-                            Color(
-                                red: 1.00,
-                                green: 0.80,
-                                blue: 0.34
+                                red: 0.55,
+                                green: 0.50,
+                                blue: 0.39
                             )
                             .opacity(0.68),
                             Color.white
-                                .opacity(0.88)
+                                .opacity(0.72),
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(0.74)
                         ],
                         center: .center
                     ),
@@ -600,13 +573,10 @@ struct ATHLTHTrophyCoreView: View {
                         Color.white
                             .opacity(0.04),
                         Color.white
-                            .opacity(0.86),
-                        Color(
-                            red: 0.56,
-                            green: 0.88,
-                            blue: 1.00
-                        )
-                        .opacity(0.22),
+                            .opacity(0.82),
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.18),
                         .clear
                     ],
                     startPoint:
@@ -661,27 +631,20 @@ struct ATHLTHTrophyCoreView: View {
         case .core:
             return Color.black
                 .opacity(0.18)
+
         case .rare:
-            return Color(
-                red: 0.55,
-                green: 0.72,
-                blue: 0.90
-            )
-            .opacity(0.22)
+            return Color.black
+                .opacity(0.16)
+
         case .epic:
-            return Color(
-                red: 0.63,
-                green: 0.30,
-                blue: 1.00
-            )
-            .opacity(0.48)
+            return ATHLTHTheme
+                .premiumGold
+                .opacity(0.20)
+
         case .signature:
-            return Color(
-                red: 0.34,
-                green: 0.79,
-                blue: 1.00
-            )
-            .opacity(0.44)
+            return ATHLTHTheme
+                .premiumGold
+                .opacity(0.28)
         }
     }
 
@@ -1928,9 +1891,9 @@ struct TrophyCollectionView: View {
         case .collection:
             return ATHLTHLocalization.choose(
                 english:
-                    "Build emblems from Core to Rare, Epic and Signature.",
+                    "Build clean performance emblems that evolve with your training.",
                 norwegian:
-                    "Bygg emblemer fra Core til Rare, Epic og Signature."
+                    "Bygg prestasjonsemblemer som utvikler seg med treningen din."
             )
         case .trophies:
             return ATHLTHLocalization.choose(
@@ -3038,28 +3001,44 @@ struct TrophyCollectionView: View {
                     )
                     .lineLimit(2)
 
-                Text(
-                    trophy.isPrestigeTrophy
-                        ? ATHLTHLocalization.choose(
+                if trophy.isPrestigeTrophy {
+                    Text(
+                        ATHLTHLocalization.choose(
                             english:
                                 "Gold Trophy",
                             norwegian:
                                 "Gullpokal"
                         )
-                        : trophy.stageLabel
-                )
-                .font(
-                    .caption2
-                        .weight(
-                            .semibold
-                        )
-                )
-                .foregroundStyle(
-                    trophy.isUnlocked
-                        ? trophy.category
-                            .trophyAccent
-                        : .secondary
-                )
+                    )
+                    .font(
+                        .caption2
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                } else if trophy.stageLabel
+                    .lowercased() !=
+                    trophy.displayRarity
+                        .title
+                        .lowercased() {
+                    Text(
+                        trophy.stageLabel
+                    )
+                    .font(
+                        .caption2
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
 
                 Label(
                     trophy
@@ -3179,14 +3158,13 @@ struct TrophyCollectionView: View {
             LinearGradient(
                 colors: [
                     Color.white
-                        .opacity(0.98),
-                    trophy.category
-                        .trophyAccent
+                        .opacity(0.985),
+                    Color.black
                         .opacity(
                             trophy
                                 .isUnlocked
-                                ? 0.055
-                                : 0.018
+                                ? 0.018
+                                : 0.010
                         )
                 ],
                 startPoint:
@@ -3206,13 +3184,13 @@ struct TrophyCollectionView: View {
                 style: .continuous
             )
             .stroke(
-                trophy.isUnlocked
-                    ? trophy.category
-                        .trophyAccent
-                        .opacity(0.14)
-                    : Color.black
-                        .opacity(0.045),
-                lineWidth: 1
+                Color.black
+                    .opacity(
+                        trophy.isUnlocked
+                            ? 0.065
+                            : 0.040
+                    ),
+                lineWidth: 0.9
             )
         }
         .shadow(
@@ -3326,19 +3304,37 @@ struct TrophyDetailView: View {
                                     .font(.largeTitle.bold())
                                     .multilineTextAlignment(.center)
 
-                                Text(
-                                    trophy.isPrestigeTrophy
-                                        ? ATHLTHLocalization.choose(
+                                if trophy.isPrestigeTrophy {
+                                    Text(
+                                        ATHLTHLocalization.choose(
                                             english:
                                                 "GOLD TROPHY",
                                             norwegian:
                                                 "GULLPOKAL"
                                         )
-                                        : trophy.stageLabel.uppercased()
-                                )
+                                    )
                                     .font(.caption.bold())
                                     .tracking(1.2)
-                                    .foregroundStyle(ATHLTHTheme.accent)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .premiumGold
+                                    )
+                                } else if trophy.stageLabel
+                                    .lowercased() !=
+                                    trophy.displayRarity
+                                        .title
+                                        .lowercased() {
+                                    Text(
+                                        trophy.stageLabel
+                                            .uppercased()
+                                    )
+                                    .font(.caption.bold())
+                                    .tracking(1.2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                }
 
                                 Text(trophy.subtitle)
                                     .font(.subheadline)
@@ -4294,21 +4290,21 @@ private extension TrophyCategory {
     var trophyAccent: Color {
         switch self {
         case .signature:
-            return Color(red: 0.92, green: 0.72, blue: 0.26)
-        case .walking:
-            return Color(red: 0.28, green: 0.70, blue: 0.48)
-        case .endurance:
-            return Color(red: 0.18, green: 0.64, blue: 0.92)
-        case .strength:
-            return Color(red: 0.90, green: 0.38, blue: 0.22)
-        case .consistency:
-            return Color(red: 0.24, green: 0.72, blue: 0.40)
-        case .goals:
-            return Color(red: 0.50, green: 0.39, blue: 0.92)
-        case .recovery:
-            return Color(red: 0.31, green: 0.70, blue: 0.75)
-        case .challenges:
-            return Color(red: 0.72, green: 0.38, blue: 0.92)
+            return ATHLTHTheme
+                .premiumGold
+
+        case .walking,
+             .endurance,
+             .strength,
+             .consistency,
+             .goals,
+             .recovery,
+             .challenges:
+            return Color(
+                red: 0.24,
+                green: 0.27,
+                blue: 0.30
+            )
         }
     }
 
@@ -4316,27 +4312,43 @@ private extension TrophyCategory {
         switch self {
         case .signature:
             return [
-                Color(red: 0.18, green: 0.16, blue: 0.12),
-                trophyAccent,
-                Color(red: 0.08, green: 0.08, blue: 0.08)
+                Color(
+                    red: 0.16,
+                    green: 0.14,
+                    blue: 0.10
+                ),
+                ATHLTHTheme
+                    .premiumGold,
+                Color(
+                    red: 0.055,
+                    green: 0.055,
+                    blue: 0.06
+                )
             ]
-        case .walking:
+
+        case .walking,
+             .endurance,
+             .strength,
+             .consistency,
+             .goals,
+             .recovery,
+             .challenges:
             return [
-                Color(red: 0.08, green: 0.22, blue: 0.15),
-                trophyAccent,
-                Color(red: 0.06, green: 0.10, blue: 0.08)
-            ]
-        case .strength:
-            return [
-                Color(red: 0.12, green: 0.12, blue: 0.13),
-                trophyAccent.opacity(0.88),
-                Color.black
-            ]
-        default:
-            return [
-                trophyAccent.opacity(0.92),
-                trophyAccent.opacity(0.48),
-                Color.black.opacity(0.90)
+                Color(
+                    red: 0.25,
+                    green: 0.28,
+                    blue: 0.31
+                ),
+                Color(
+                    red: 0.13,
+                    green: 0.145,
+                    blue: 0.16
+                ),
+                Color(
+                    red: 0.055,
+                    green: 0.06,
+                    blue: 0.065
+                )
             ]
         }
     }
