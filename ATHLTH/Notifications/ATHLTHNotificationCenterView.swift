@@ -43,6 +43,7 @@ struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var goals: GoalStore
+    @EnvironmentObject private var trophies: TrophyStore
 
     @State private var selectedWorkoutImportIDs: Set<UUID> = []
     @State private var selectedScope: ATHLTHNotificationScope = .all
@@ -1006,7 +1007,24 @@ struct ATHLTHNotificationCenterView: View {
             }
         } else {
             Group {
-                if hasDestination(item) {
+                if let stageKey =
+                        trophyUnlockStageKey(
+                            for: item
+                        ) {
+                    Button {
+                        markOpened(item)
+                        _ = trophies
+                            .presentReveal(
+                                forStageKey:
+                                    stageKey
+                            )
+                    } label: {
+                        notificationLabel(
+                            item,
+                            showsChevron: true
+                        )
+                    }
+                } else if hasDestination(item) {
                     NavigationLink {
                         notificationDestination(item)
                             .onAppear {
@@ -1057,6 +1075,37 @@ struct ATHLTHNotificationCenterView: View {
                 }
             }
         }
+    }
+
+    private func trophyUnlockStageKey(
+        for item: ATHLTHNotificationItem
+    ) -> String? {
+        guard item.kind == .achievement else {
+            return nil
+        }
+
+        let prefix = "trophy-"
+        let suffix = "-unlocked"
+        let key = item.eventKey
+
+        guard key.hasPrefix(prefix),
+              key.hasSuffix(suffix),
+              key.count >
+                prefix.count +
+                suffix.count
+        else {
+            return nil
+        }
+
+        return String(
+            key
+                .dropFirst(
+                    prefix.count
+                )
+                .dropLast(
+                    suffix.count
+                )
+        )
     }
 
     private func followRequest(
