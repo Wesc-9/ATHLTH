@@ -67,20 +67,15 @@ resize_if_needed() {
   fi
 }
 
-# Full-screen onboarding needs more vertical resolution than the 190 pt
-# dashboard heroes. These limits still exceed what current iPhone/iPad
-# displays need at Retina scale while dramatically reducing decoded memory.
-resize_if_needed   "ATHLTH/Assets.xcassets/OnboardingHero.imageset/ATHLTH_hero_4x_3764x6688.png"   3200
-
+# Keep runtime artwork bounded even when a replacement image was uploaded
+# directly to an image set. The dedicated asset workflow handles format
+# conversion and thumbnails; this build-time guard prevents oversized source
+# pixels from reaching the asset compiler.
 for folder in \
-  "ATHLTH/Assets.xcassets/HomeHero.imageset" \
-  "ATHLTH/Assets.xcassets/TrainHero.imageset" \
-  "ATHLTH/Assets.xcassets/RecoveryHero.imageset" \
-  "ATHLTH/Assets.xcassets/ProgressHero.imageset" \
-  "ATHLTH/Assets.xcassets/CommunityHero.imageset"
+  "ATHLTH/Assets.xcassets/OnboardingHero.imageset"
 do
   while IFS= read -r file; do
-    resize_if_needed "$file" 2400
+    resize_if_needed "$file" 3200
   done < <(
     find "$folder" -maxdepth 1 -type f \
       \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
@@ -88,9 +83,28 @@ do
   )
 done
 
-for file in \
-  "ATHLTH/Assets.xcassets/ProfileHero.imageset/ProfileHero.jpg" \
-  "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset/StrengthPostWorkoutHero.jpg"
+for folder in \
+  "ATHLTH/Assets.xcassets/HomeHero.imageset" \
+  "ATHLTH/Assets.xcassets/TrainHero.imageset" \
+  "ATHLTH/Assets.xcassets/RecoveryHero.imageset" \
+  "ATHLTH/Assets.xcassets/ProgressHero.imageset" \
+  "ATHLTH/Assets.xcassets/CommunityHero.imageset" \
+  "ATHLTH/Assets.xcassets/ProfileHero.imageset" \
+  "ATHLTH/Assets.xcassets/StrengthPostWorkoutHero.imageset" \
+  "ATHLTH/Assets.xcassets/StrengthQuickStartHero.imageset" \
+  ATHLTH/Assets.xcassets/Goal*.imageset
 do
-  resize_if_needed "$file" 2400
+  [ -d "$folder" ] || continue
+  case "$folder" in
+    *Thumbnail.imageset) max_dimension=600 ;;
+    *) max_dimension=2400 ;;
+  esac
+
+  while IFS= read -r file; do
+    resize_if_needed "$file" "$max_dimension"
+  done < <(
+    find "$folder" -maxdepth 1 -type f \
+      \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
+      -print
+  )
 done
