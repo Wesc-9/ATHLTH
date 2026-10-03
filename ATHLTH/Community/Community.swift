@@ -1182,7 +1182,17 @@ private struct CommunityEventListRow: View {
                 }
 
                 Text(
-                    "\(item.event.startsAt.formatted(date: .omitted, time: .shortened)) · \(item.event.meetingName)"
+                    [
+                        item.event.startsAt
+                            .formatted(
+                                date: .omitted,
+                                time: .shortened
+                            ),
+                        item.event.meetingName
+                            .nilIfBlank
+                    ]
+                    .compactMap { $0 }
+                    .joined(separator: " · ")
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1234,6 +1244,16 @@ struct CommunityEventDetailView: View {
 
     private func eventHero(_ item: CommunityEventItem) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            eventCover(item)
+                .frame(height: 178)
+                .frame(maxWidth: .infinity)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+
             Label(
                 item.event.activityType.title.uppercased(),
                 systemImage: item.event.activityType.systemImage
@@ -1278,6 +1298,51 @@ struct CommunityEventDetailView: View {
             Color(.secondarySystemGroupedBackground),
             in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
+    }
+
+    @ViewBuilder
+    private func eventCover(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if let rawURL =
+                item.event.coverImageURL,
+           let url =
+                URL(string: rawURL) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+
+                default:
+                    Image(
+                        item.event
+                            .coverArtworkName ??
+                        CommunityEventCoverPolicy
+                            .defaultArtwork(
+                                for:
+                                    item.event
+                                        .activityType
+                            )
+                    )
+                    .resizable()
+                    .scaledToFill()
+                }
+            }
+        } else {
+            Image(
+                item.event.coverArtworkName ??
+                CommunityEventCoverPolicy
+                    .defaultArtwork(
+                        for:
+                            item.event
+                                .activityType
+                    )
+            )
+            .resizable()
+            .scaledToFill()
+        }
     }
 
     @ViewBuilder
@@ -1361,11 +1426,32 @@ struct CommunityEventDetailView: View {
             Text("Details")
                 .font(.headline)
 
-            eventDetailRow(
-                "Meeting point",
-                value: item.event.meetingName,
-                icon: "mappin.and.ellipse"
-            )
+            if let meeting =
+                    item.event.meetingName
+                        .nilIfBlank {
+                eventDetailRow(
+                    "Meeting point",
+                    value: meeting,
+                    icon:
+                        "mappin.and.ellipse"
+                )
+            } else {
+                eventDetailRow(
+                    ATHLTHLocalization.choose(
+                        english: "Meeting point",
+                        norwegian: "Møtested"
+                    ),
+                    value:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No meeting point",
+                            norwegian:
+                                "Ingen oppmøteplass"
+                        ),
+                    icon:
+                        "video.fill"
+                )
+            }
 
             if let details = item.event.meetingDetails, !details.isEmpty {
                 eventDetailRow(
