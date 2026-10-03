@@ -2558,11 +2558,20 @@ struct ChallengeCreationView: View {
 
                         Text(
                             invitees.isEmpty
-                                ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Choose at least one participant",
-                                    norwegian:
-                                        "Velg minst én deltaker"
+                                ? (
+                                    visibility == .publicProfile
+                                        ? ATHLTHLocalization.choose(
+                                            english:
+                                                "Optional · public users can join",
+                                            norwegian:
+                                                "Valgfritt · offentlige brukere kan bli med"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english:
+                                                "Choose at least one participant",
+                                            norwegian:
+                                                "Velg minst én deltaker"
+                                        )
                                 )
                                 : (
                                     invitees.count == 1
@@ -2926,9 +2935,15 @@ struct ChallengeCreationView: View {
     }
 
     private var creationIsValid: Bool {
-        guard !creatingChallenge,
-              !invitees.isEmpty
-        else {
+        guard !creatingChallenge else {
+            return false
+        }
+
+        if ChallengeCreationPolicy
+            .requiresDirectInvite(
+                visibility: visibility
+            ) &&
+            invitees.isEmpty {
             return false
         }
 
@@ -5159,12 +5174,20 @@ struct ChallengeCreationView: View {
     }
 
     private var automaticTitle: String {
-        "\(sport.title) · \(effectiveScoring.title)"
+        ChallengeCreationPolicy
+            .automaticTitle(
+                sport: sport,
+                scoring: effectiveScoring
+            )
     }
 
     private var resolvedTitle: String {
-        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return clean.isEmpty ? automaticTitle : String(clean.prefix(60))
+        ChallengeCreationPolicy
+            .resolvedTitle(
+                title,
+                sport: sport,
+                scoring: effectiveScoring
+            )
     }
 
     private var resolvedSummary: String? {
@@ -6108,6 +6131,12 @@ struct ChallengeDetailView: View {
 
                         if currentParticipant?.state == .invited {
                             invitationResponseCard(challenge)
+                        } else if currentParticipant == nil &&
+                                    challenge.visibility == .publicProfile &&
+                                    challenge.creatorID != session.profile.userID &&
+                                    challenge.status != .completed &&
+                                    challenge.status != .cancelled {
+                            publicJoinCard(challenge)
                         }
 
                         if challenge.sport == .heartRate &&
@@ -6122,8 +6151,10 @@ struct ChallengeDetailView: View {
                            challenge.rules.route != nil,
                            challenge.rules.targetGhostAllowed,
                            challenge.status == .active,
-                           currentParticipant?.state == .creator ||
-                           currentParticipant?.state == .accepted {
+                           (
+                               currentParticipant?.state == .creator ||
+                               currentParticipant?.state == .accepted
+                           ) {
                             targetGhostCard(challenge)
                         }
 
@@ -6257,6 +6288,67 @@ struct ChallengeDetailView: View {
             } label: {
                 Text("Open Health Profile")
                     .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accent)
+        }
+        .padding()
+        .challengeCard()
+    }
+
+    private func publicJoinCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Open challenge",
+                    norwegian: "Åpen challenge"
+                ),
+                systemImage:
+                    "person.badge.plus"
+            )
+            .font(.headline)
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "This public challenge is open to ATHLTH users. Join to enter the leaderboard and submit qualifying results.",
+                    norwegian:
+                        "Denne offentlige challengen er åpen for ATHLTH-brukere. Bli med for å komme på resultatlisten og registrere tellende resultater."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Button {
+                Task {
+                    let joined =
+                        await social
+                            .joinPublicChallenge(
+                                challenge.id
+                            )
+
+                    if joined {
+                        await social.refresh(
+                            challengeStore:
+                                challenges
+                        )
+                    }
+                }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Join challenge",
+                        norwegian: "Bli med"
+                    ),
+                    systemImage:
+                        "person.crop.circle.badge.plus"
+                )
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accent)
