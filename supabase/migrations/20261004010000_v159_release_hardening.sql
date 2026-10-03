@@ -77,7 +77,7 @@ begin
     return existing_participant;
   end if;
 
-  if public.is_blocked_pair(actor, challenge_creator) then
+  if private.is_blocked(challenge_creator) then
     raise exception 'Challenge is not available';
   end if;
 
