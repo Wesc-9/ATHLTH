@@ -91,6 +91,989 @@ private enum CommunityImageProcessor {
     }
 }
 
+
+private enum CommunityImageCropTarget:
+    String,
+    Identifiable {
+    case clubImage
+    case wideCover
+
+    var id: String { rawValue }
+
+    var aspectRatio: CGFloat {
+        switch self {
+        case .clubImage:
+            return 1
+        case .wideCover:
+            return 16.0 / 7.0
+        }
+    }
+
+    var outputSize: CGSize {
+        switch self {
+        case .clubImage:
+            return CGSize(
+                width: 1_200,
+                height: 1_200
+            )
+        case .wideCover:
+            return CGSize(
+                width: 1_600,
+                height: 700
+            )
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .clubImage:
+            return ATHLTHLocalization.choose(
+                english: "Adjust Club image",
+                norwegian: "Juster Club-bilde"
+            )
+        case .wideCover:
+            return ATHLTHLocalization.choose(
+                english: "Adjust cover image",
+                norwegian: "Juster toppbilde"
+            )
+        }
+    }
+
+    var guidance: String {
+        ATHLTHLocalization.choose(
+            english:
+                "Drag to choose the focus. Pinch or use the slider to zoom.",
+            norwegian:
+                "Dra bildet for å velge fokus. Knip eller bruk skyveknappen for å zoome."
+        )
+    }
+}
+
+private struct CommunityImageCropRequest:
+    Identifiable {
+    let id = UUID()
+    let image: UIImage
+    let target: CommunityImageCropTarget
+}
+
+private extension CommunityImageProcessor {
+    static func cropJPEG(
+        image sourceImage: UIImage,
+        viewportSize: CGSize,
+        offset: CGSize,
+        zoom: CGFloat,
+        outputSize: CGSize,
+        quality: CGFloat = 0.86
+    ) -> Data? {
+        guard viewportSize.width > 0,
+              viewportSize.height > 0,
+              outputSize.width > 0,
+              outputSize.height > 0
+        else {
+            return nil
+        }
+
+        let image = normalizedImage(
+            sourceImage
+        )
+
+        guard let cgImage = image.cgImage else {
+            return nil
+        }
+
+        let sourceSize = CGSize(
+            width: CGFloat(cgImage.width),
+            height: CGFloat(cgImage.height)
+        )
+
+        let baseScale = max(
+            viewportSize.width /
+                sourceSize.width,
+            viewportSize.height /
+                sourceSize.height
+        )
+        let resolvedZoom = max(
+            zoom,
+            1
+        )
+        let displayScale =
+            baseScale * resolvedZoom
+
+        let displayedSize = CGSize(
+            width:
+                sourceSize.width *
+                displayScale,
+            height:
+                sourceSize.height *
+                displayScale
+        )
+
+        let maxOffsetX = max(
+            0,
+            (
+                displayedSize.width -
+                viewportSize.width
+            ) / 2
+        )
+        let maxOffsetY = max(
+            0,
+            (
+                displayedSize.height -
+                viewportSize.height
+            ) / 2
+        )
+
+        let resolvedOffsetX = min(
+            max(
+                offset.width,
+                -maxOffsetX
+            ),
+            maxOffsetX
+        )
+        let resolvedOffsetY = min(
+            max(
+                offset.height,
+                -maxOffsetY
+            ),
+            maxOffsetY
+        )
+
+        let sourceOriginX =
+            (
+                (
+                    displayedSize.width -
+                    viewportSize.width
+                ) / 2 -
+                resolvedOffsetX
+            ) / displayScale
+        let sourceOriginY =
+            (
+                (
+                    displayedSize.height -
+                    viewportSize.height
+                ) / 2 -
+                resolvedOffsetY
+            ) / displayScale
+
+        let sourceCropSize = CGSize(
+            width:
+                viewportSize.width /
+                displayScale,
+            height:
+                viewportSize.height /
+                displayScale
+        )
+
+        let sourceRect = CGRect(
+            x: max(
+                0,
+                min(
+                    sourceOriginX,
+                    sourceSize.width -
+                        sourceCropSize.width
+                )
+            ),
+            y: max(
+                0,
+                min(
+                    sourceOriginY,
+                    sourceSize.height -
+                        sourceCropSize.height
+                )
+            ),
+            width: min(
+                sourceCropSize.width,
+                sourceSize.width
+            ),
+            height: min(
+                sourceCropSize.height,
+                sourceSize.height
+            )
+        )
+        .integral
+
+        guard let cropped =
+                cgImage.cropping(
+                    to: sourceRect
+                )
+        else {
+            return nil
+        }
+
+        let rendererFormat =
+            UIGraphicsImageRendererFormat()
+        rendererFormat.scale = 1
+        rendererFormat.opaque = true
+
+        let renderer =
+            UIGraphicsImageRenderer(
+                size: outputSize,
+                format: rendererFormat
+            )
+
+        let rendered = renderer.image {
+            context in
+
+            UIColor.black.setFill()
+            context.fill(
+                CGRect(
+                    origin: .zero,
+                    size: outputSize
+                )
+            )
+
+            UIImage(
+                cgImage: cropped
+            )
+            .draw(
+                in: CGRect(
+                    origin: .zero,
+                    size: outputSize
+                )
+            )
+        }
+
+        return rendered.jpegData(
+            compressionQuality: quality
+        )
+    }
+
+    static func normalizedImage(
+        _ image: UIImage
+    ) -> UIImage {
+        guard image.imageOrientation != .up
+        else {
+            return image
+        }
+
+        let format =
+            UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        return UIGraphicsImageRenderer(
+            size: image.size,
+            format: format
+        )
+        .image { _ in
+            image.draw(
+                in: CGRect(
+                    origin: .zero,
+                    size: image.size
+                )
+            )
+        }
+    }
+}
+
+private struct CommunityImageCropEditor:
+    View {
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let request: CommunityImageCropRequest
+    let onComplete: (Data) -> Void
+
+    @State private var zoom: CGFloat = 1
+    @State private var committedZoom:
+        CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var committedOffset:
+        CGSize = .zero
+    @State private var viewportSize:
+        CGSize = .zero
+    @State private var saving = false
+    @State private var cropError:
+        String?
+
+    private var clubForest: Color {
+        Color(
+            red: 0.025,
+            green: 0.30,
+            blue: 0.21
+        )
+    }
+
+    private var clubEmerald: Color {
+        Color(
+            red: 0.055,
+            green: 0.49,
+            blue: 0.32
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        clubEmerald
+                            .opacity(0.16)
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 18) {
+                    Text(
+                        request.target
+                            .guidance
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .multilineTextAlignment(
+                        .center
+                    )
+                    .padding(
+                        .horizontal,
+                        24
+                    )
+
+                    cropCanvas
+                        .padding(
+                            .horizontal,
+                            request.target ==
+                                .clubImage
+                                ? 46
+                                : 18
+                        )
+
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(
+                                systemName:
+                                    "minus.magnifyingglass"
+                            )
+                            .foregroundStyle(
+                                clubForest
+                            )
+
+                            Slider(
+                                value: $zoom,
+                                in: 1...4
+                            )
+                            .tint(
+                                clubEmerald
+                            )
+
+                            Image(
+                                systemName:
+                                    "plus.magnifyingglass"
+                            )
+                            .foregroundStyle(
+                                clubForest
+                            )
+                        }
+
+                        HStack {
+                            Button {
+                                withAnimation(
+                                    .easeInOut(
+                                        duration:
+                                            0.18
+                                    )
+                                ) {
+                                    zoom = 1
+                                    committedZoom =
+                                        1
+                                    offset = .zero
+                                    committedOffset =
+                                        .zero
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Reset",
+                                            norwegian:
+                                                "Nullstill"
+                                        ),
+                                    systemImage:
+                                        "arrow.counterclockwise"
+                                )
+                            }
+                            .buttonStyle(
+                                .bordered
+                            )
+                            .tint(
+                                clubForest
+                            )
+
+                            Spacer()
+
+                            Text(
+                                String(
+                                    format:
+                                        "%.1fx",
+                                    zoom
+                                )
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                    .padding(
+                        .horizontal,
+                        22
+                    )
+
+                    Spacer(
+                        minLength: 0
+                    )
+
+                    Button {
+                        useCrop()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if saving {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Use this crop",
+                                        norwegian:
+                                            "Bruk dette utsnittet"
+                                    )
+                            )
+                            .font(.headline)
+
+                            if !saving {
+                                Image(
+                                    systemName:
+                                        "checkmark"
+                                )
+                                .font(
+                                    .caption.bold()
+                                )
+                            }
+                        }
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 52)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    clubForest,
+                                    clubEmerald
+                                ],
+                                startPoint:
+                                    .leading,
+                                endPoint:
+                                    .trailing
+                            ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        18,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        saving ||
+                        viewportSize ==
+                            .zero
+                    )
+                    .padding(
+                        .horizontal,
+                        22
+                    )
+                    .padding(
+                        .bottom,
+                        14
+                    )
+                }
+                .padding(.top, 12)
+            }
+            .navigationTitle(
+                request.target.title
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Cancel",
+                                norwegian:
+                                    "Avbryt"
+                            )
+                    ) {
+                        dismiss()
+                    }
+                    .foregroundStyle(
+                        clubForest
+                    )
+                }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could not crop image",
+                    norwegian:
+                        "Kunne ikke beskjære bildet"
+                ),
+                isPresented: Binding(
+                    get: {
+                        cropError != nil
+                    },
+                    set: {
+                        if !$0 {
+                            cropError = nil
+                        }
+                    }
+                )
+            ) {
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
+            } message: {
+                Text(
+                    cropError ?? ""
+                )
+            }
+            .onChange(of: zoom) {
+                _, newValue in
+
+                guard viewportSize !=
+                        .zero
+                else {
+                    return
+                }
+
+                let clamped =
+                    clampedOffset(
+                        offset,
+                        viewport:
+                            viewportSize,
+                        zoom:
+                            newValue
+                    )
+
+                offset = clamped
+                committedOffset =
+                    clamped
+                committedZoom =
+                    newValue
+            }
+        }
+    }
+
+    private var cropCanvas:
+        some View {
+        GeometryReader {
+            geometry in
+
+            let viewport =
+                cropViewport(
+                    available:
+                        geometry.size
+                )
+
+            ZStack {
+                Color.black
+                    .opacity(0.92)
+
+                Image(
+                    uiImage:
+                        request.image
+                )
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width:
+                        viewport.width,
+                    height:
+                        viewport.height
+                )
+                .scaleEffect(zoom)
+                .offset(offset)
+            }
+            .frame(
+                width: viewport.width,
+                height:
+                    viewport.height
+            )
+            .clipped()
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius:
+                        request.target ==
+                            .clubImage
+                            ? 28
+                            : 22,
+                    style:
+                        .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        request.target ==
+                            .clubImage
+                            ? 28
+                            : 22,
+                    style:
+                        .continuous
+                )
+                .stroke(
+                    Color.white
+                        .opacity(0.82),
+                    lineWidth: 1.2
+                )
+            }
+            .overlay {
+                cropGrid
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius:
+                                request.target ==
+                                    .clubImage
+                                    ? 28
+                                    : 22,
+                            style:
+                                .continuous
+                        )
+                    )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight:
+                    .infinity
+            )
+            .contentShape(
+                Rectangle()
+            )
+            .gesture(
+                DragGesture()
+                    .onChanged {
+                        value in
+
+                        let candidate =
+                            CGSize(
+                                width:
+                                    committedOffset
+                                        .width +
+                                    value
+                                        .translation
+                                        .width,
+                                height:
+                                    committedOffset
+                                        .height +
+                                    value
+                                        .translation
+                                        .height
+                            )
+
+                        offset =
+                            clampedOffset(
+                                candidate,
+                                viewport:
+                                    viewport,
+                                zoom:
+                                    zoom
+                            )
+                    }
+                    .onEnded { _ in
+                        committedOffset =
+                            offset
+                    }
+            )
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onChanged {
+                        value in
+
+                        let next =
+                            min(
+                                max(
+                                    committedZoom *
+                                    value,
+                                    1
+                                ),
+                                4
+                            )
+
+                        zoom = next
+                        offset =
+                            clampedOffset(
+                                committedOffset,
+                                viewport:
+                                    viewport,
+                                zoom:
+                                    next
+                            )
+                    }
+                    .onEnded { _ in
+                        committedZoom =
+                            zoom
+                        committedOffset =
+                            offset
+                    }
+            )
+            .onAppear {
+                viewportSize =
+                    viewport
+                offset =
+                    clampedOffset(
+                        offset,
+                        viewport:
+                            viewport,
+                        zoom: zoom
+                    )
+            }
+            .onChange(
+                of: geometry.size
+            ) { _, _ in
+                viewportSize =
+                    viewport
+                offset =
+                    clampedOffset(
+                        offset,
+                        viewport:
+                            viewport,
+                        zoom: zoom
+                    )
+                committedOffset =
+                    offset
+            }
+        }
+        .aspectRatio(
+            request.target
+                .aspectRatio,
+            contentMode: .fit
+        )
+    }
+
+    private var cropGrid:
+        some View {
+        GeometryReader {
+            geometry in
+
+            Path { path in
+                let width =
+                    geometry.size.width
+                let height =
+                    geometry.size.height
+
+                for fraction in [
+                    CGFloat(1.0 / 3.0),
+                    CGFloat(2.0 / 3.0)
+                ] {
+                    path.move(
+                        to: CGPoint(
+                            x:
+                                width *
+                                fraction,
+                            y: 0
+                        )
+                    )
+                    path.addLine(
+                        to: CGPoint(
+                            x:
+                                width *
+                                fraction,
+                            y: height
+                        )
+                    )
+
+                    path.move(
+                        to: CGPoint(
+                            x: 0,
+                            y:
+                                height *
+                                fraction
+                        )
+                    )
+                    path.addLine(
+                        to: CGPoint(
+                            x: width,
+                            y:
+                                height *
+                                fraction
+                        )
+                    )
+                }
+            }
+            .stroke(
+                Color.white
+                    .opacity(0.24),
+                lineWidth: 0.7
+            )
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func cropViewport(
+        available: CGSize
+    ) -> CGSize {
+        let ratio =
+            request.target
+                .aspectRatio
+
+        guard available.width > 0,
+              available.height > 0
+        else {
+            return .zero
+        }
+
+        let widthFromHeight =
+            available.height * ratio
+
+        if widthFromHeight <=
+            available.width {
+            return CGSize(
+                width:
+                    widthFromHeight,
+                height:
+                    available.height
+            )
+        }
+
+        return CGSize(
+            width:
+                available.width,
+            height:
+                available.width /
+                ratio
+        )
+    }
+
+    private func clampedOffset(
+        _ candidate: CGSize,
+        viewport: CGSize,
+        zoom: CGFloat
+    ) -> CGSize {
+        let imageSize =
+            request.image.size
+
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              viewport.width > 0,
+              viewport.height > 0
+        else {
+            return .zero
+        }
+
+        let baseScale = max(
+            viewport.width /
+                imageSize.width,
+            viewport.height /
+                imageSize.height
+        )
+
+        let displayedWidth =
+            imageSize.width *
+            baseScale *
+            zoom
+        let displayedHeight =
+            imageSize.height *
+            baseScale *
+            zoom
+
+        let maxX = max(
+            0,
+            (
+                displayedWidth -
+                viewport.width
+            ) / 2
+        )
+        let maxY = max(
+            0,
+            (
+                displayedHeight -
+                viewport.height
+            ) / 2
+        )
+
+        return CGSize(
+            width: min(
+                max(
+                    candidate.width,
+                    -maxX
+                ),
+                maxX
+            ),
+            height: min(
+                max(
+                    candidate.height,
+                    -maxY
+                ),
+                maxY
+            )
+        )
+    }
+
+    private func useCrop() {
+        guard !saving else {
+            return
+        }
+
+        saving = true
+
+        guard let data =
+                CommunityImageProcessor
+                    .cropJPEG(
+                        image:
+                            request.image,
+                        viewportSize:
+                            viewportSize,
+                        offset:
+                            offset,
+                        zoom:
+                            zoom,
+                        outputSize:
+                            request.target
+                                .outputSize
+                    )
+        else {
+            saving = false
+            cropError =
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "ATHLTH could not prepare this crop. Try another image.",
+                        norwegian:
+                            "ATHLTH klarte ikke å klargjøre dette utsnittet. Prøv et annet bilde."
+                    )
+            return
+        }
+
+        onComplete(data)
+        saving = false
+        dismiss()
+    }
+}
+
 struct CommunityGroupRecord: Codable, Identifiable, Hashable {
     let id: UUID
     let creatorID: UUID
