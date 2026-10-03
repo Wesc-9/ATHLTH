@@ -2244,26 +2244,60 @@ struct HomeHealthMetricDetailView:
                 }
 
                 ATHLTHCard {
-                    Text("Om dataene")
-                        .font(
-                            .headline
-                                .weight(
-                                    .bold
-                                )
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "About the data",
+                            norwegian: "Om dataene"
+                        )
+                    )
+                    .font(
+                        .headline
+                            .weight(
+                                .bold
+                            )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
+                        metricInfoRow(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "What it is",
+                                    norwegian: "Hva det er"
+                                ),
+                            icon: "info.circle",
+                            text: whatItIs
                         )
 
-                    Text(explanation)
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
+                        Divider()
+                            .opacity(0.55)
+
+                        metricInfoRow(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "How it is measured",
+                                    norwegian: "Hvordan det måles"
+                                ),
+                            icon: "applewatch",
+                            text: howItIsMeasured
                         )
-                        .fixedSize(
-                            horizontal:
-                                false,
-                            vertical: true
+
+                        Divider()
+                            .opacity(0.55)
+
+                        metricInfoRow(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "How to use it in training",
+                                    norwegian: "Hvordan bruke det i trening"
+                                ),
+                            icon: "figure.run",
+                            text: trainingUse
                         )
-                        .padding(.top, 3)
+                    }
+                    .padding(.top, 8)
                 }
             }
             .padding(16)
@@ -2498,21 +2532,157 @@ struct HomeHealthMetricDetailView:
         }
     }
 
-    private var explanation:
-        String {
+    private func metricInfoRow(
+        title: String,
+        icon: String,
+        text: String
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(kind.tint)
+                .frame(
+                    width: 30,
+                    height: 30
+                )
+                .background(
+                    kind.tint.opacity(0.09),
+                    in: RoundedRectangle(
+                        cornerRadius: 9,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+        }
+    }
+
+    private var whatItIs: String {
         switch kind {
         case .sleep:
-            return
-                "Grafen viser reell registrert søvn per dag. Manglende dager vises ikke som konstruerte verdier."
+            return ATHLTHLocalization.choose(
+                english:
+                    "Sleep duration is the amount of sleep recorded for the night. It is most useful as a trend together with how rested you feel.",
+                norwegian:
+                    "Søvn viser hvor mye søvn som er registrert gjennom natten. Det er mest nyttig som en trend sammen med hvordan du faktisk føler deg."
+            )
         case .restingHeartRate:
-            return
-                "Hvilepuls bør vurderes mot din egen historikk. ATHLTH viser utviklingen uten å tolke enkeltmålinger som en medisinsk vurdering."
+            return ATHLTHLocalization.choose(
+                english:
+                    "Resting heart rate is the number of heartbeats per minute while your body is at rest. Your personal baseline matters more than comparing with other people.",
+                norwegian:
+                    "Hvilepuls er antall hjerteslag per minutt når kroppen er i ro. Din egen normalverdi er viktigere enn å sammenligne tallet med andre."
+            )
         case .hrv:
-            return
-                "HRV varierer naturlig fra dag til dag. Det mest nyttige er utviklingen mot din egen nylige baseline."
+            return ATHLTHLocalization.choose(
+                english:
+                    "HRV is the variation in time between consecutive heartbeats. It reflects autonomic nervous-system activity and naturally varies from day to day.",
+                norwegian:
+                    "HRV er variasjonen i tid mellom påfølgende hjerteslag. Den gjenspeiler aktivitet i det autonome nervesystemet og varierer naturlig fra dag til dag."
+            )
         case .load:
-            return
-                "Belastningsgrafen er basert på registrerte treningsminutter. Den er varighetsbasert og later derfor ikke som ulike aktiviteter gir identisk belastning."
+            return ATHLTHLocalization.choose(
+                english:
+                    "Training load summarizes how much recorded training you have accumulated. This view currently uses training duration as its main input.",
+                norwegian:
+                    "Belastning oppsummerer hvor mye registrert trening du har samlet. Denne visningen bruker foreløpig treningsvarighet som hovedgrunnlag."
+            )
+        }
+    }
+
+    private var howItIsMeasured: String {
+        switch kind {
+        case .sleep:
+            return ATHLTHLocalization.choose(
+                english:
+                    "ATHLTH reads compatible sleep records from Apple Health. Apple Watch and other supported sources can contribute these records. Missing nights are left empty rather than estimated.",
+                norwegian:
+                    "ATHLTH leser kompatible søvnregistreringer fra Apple Health. Apple Watch og andre støttede kilder kan bidra med data. Netter uten data blir stående tomme i stedet for å bli estimert."
+            )
+        case .restingHeartRate:
+            return ATHLTHLocalization.choose(
+                english:
+                    "ATHLTH reads resting-heart-rate samples from Apple Health. Apple Watch estimates resting heart rate from periods with little movement and heart-rate measurements collected through the day.",
+                norwegian:
+                    "ATHLTH leser hvilepuls fra Apple Health. Apple Watch beregner hvilepuls fra perioder med lite bevegelse og pulsmålinger som samles gjennom dagen."
+            )
+        case .hrv:
+            return ATHLTHLocalization.choose(
+                english:
+                    "ATHLTH reads HRV samples from Apple Health, reported in milliseconds. Apple Watch can record HRV during suitable periods, including when you are still or during supported sessions.",
+                norwegian:
+                    "ATHLTH leser HRV-målinger fra Apple Health, oppgitt i millisekunder. Apple Watch kan registrere HRV i egnede perioder, blant annet når du er i ro eller under støttede målinger."
+            )
+        case .load:
+            return ATHLTHLocalization.choose(
+                english:
+                    "ATHLTH uses recorded workouts and their duration. A minute of easy walking and a minute of hard intervals are therefore not treated as physiologically identical; the graph is a duration-based overview.",
+                norwegian:
+                    "ATHLTH bruker registrerte treningsøkter og varigheten deres. Ett minutt rolig gange og ett minutt harde intervaller regnes derfor ikke som fysiologisk identiske; grafen er en varighetsbasert oversikt."
+            )
+        }
+    }
+
+    private var trainingUse: String {
+        switch kind {
+        case .sleep:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Use several nights together with energy, soreness and your planned session. Repeatedly short sleep can be a reason to reduce volume or intensity, while one short night does not automatically require a change.",
+                norwegian:
+                    "Se flere netter i sammenheng med energi, muskelømhet og den planlagte økten. Gjentatt kort søvn kan være et signal om å redusere volum eller intensitet, mens én kort natt ikke automatisk betyr at planen må endres."
+            )
+        case .restingHeartRate:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Compare with your recent baseline. A persistent rise together with fatigue, poor sleep or other recovery signals can support choosing an easier session. One isolated value should not drive the decision.",
+                norwegian:
+                    "Sammenlign med din nyere grunnlinje. En vedvarende økning sammen med tretthet, dårlig søvn eller andre restitusjonssignaler kan støtte valget av en lettere økt. Én enkeltmåling bør ikke styre beslutningen alene."
+            )
+        case .hrv:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Look for a multi-day pattern relative to your own baseline. A sustained drop together with other recovery signals can support reducing intensity or volume. A single low HRV value is common and is not a diagnosis.",
+                norwegian:
+                    "Se etter utviklingen over flere dager mot din egen grunnlinje. Et vedvarende fall sammen med andre restitusjonssignaler kan støtte lavere intensitet eller volum. En enkelt lav HRV-måling er vanlig og er ikke en diagnose."
+            )
+        case .load:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Use the trend to see whether recent training volume is rising, stable or falling. Combine it with workout intensity, soreness and recovery before changing your plan.",
+                norwegian:
+                    "Bruk utviklingen til å se om treningsmengden nylig øker, er stabil eller faller. Se den sammen med intensitet, muskelømhet og restitusjon før du endrer planen."
+            )
         }
     }
 }
