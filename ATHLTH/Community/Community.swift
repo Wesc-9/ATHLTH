@@ -1481,19 +1481,21 @@ struct CommunityEventCreateView: View {
     @State private var selectedRouteID: UUID?
     @State private var shareToCommunity = true
     @State private var isCreating = false
+    @State private var selectedCoverArtworkName =
+        CommunityEventCoverPolicy
+            .defaultArtwork(
+                for: .running
+            )
+    @State private var selectedCoverPhoto:
+        PhotosPickerItem?
+    @State private var selectedCoverImageData:
+        Data?
+    @State private var coverWasManuallySelected =
+        false
+    @State private var createError: String?
 
     private var canCreate: Bool {
-        !draft.title
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .isEmpty &&
-        !draft.meetingName
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            .isEmpty &&
-        draft.startsAt > Date() &&
+        draft.isValidForCreation() &&
         !isCreating
     }
 
@@ -1520,6 +1522,25 @@ struct CommunityEventCreateView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         eventHero
+                        eventCoverPicker
+
+                        if let createError {
+                            Text(createError)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .red
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    alignment:
+                                        .leading
+                                )
+                                .padding(
+                                    .horizontal,
+                                    4
+                                )
+                        }
 
                         eventSection(
                             title:
@@ -1699,8 +1720,8 @@ struct CommunityEventCreateView: View {
                                     ),
                                 placeholder:
                                     ATHLTHLocalization.choose(
-                                        english: "Where do you meet?",
-                                        norwegian: "Hvor møtes dere?"
+                                        english: "Optional",
+                                        norwegian: "Valgfritt"
                                     ),
                                 text: $draft.meetingName,
                                 icon:
@@ -2201,6 +2222,62 @@ struct CommunityEventCreateView: View {
                     .ultraThinMaterial
                 )
             }
+            .onChange(
+                of: draft.activityType
+            ) { _, activity in
+                if !coverWasManuallySelected &&
+                    selectedCoverImageData ==
+                        nil {
+                    selectedCoverArtworkName =
+                        CommunityEventCoverPolicy
+                            .defaultArtwork(
+                                for: activity
+                            )
+                }
+            }
+            .onChange(
+                of: selectedCoverPhoto
+            ) { _, item in
+                guard let item else {
+                    return
+                }
+
+                Task {
+                    guard let data =
+                            try? await item
+                                .loadTransferable(
+                                    type: Data.self
+                                ),
+                          let image =
+                            UIImage(data: data),
+                          let jpeg =
+                            image.jpegData(
+                                compressionQuality:
+                                    0.86
+                            )
+                    else {
+                        await MainActor.run {
+                            createError =
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "The selected image could not be read.",
+                                        norwegian:
+                                            "Det valgte bildet kunne ikke leses."
+                                    )
+                        }
+                        return
+                    }
+
+                    await MainActor.run {
+                        selectedCoverImageData =
+                            jpeg
+                        coverWasManuallySelected =
+                            true
+                        createError = nil
+                    }
+                }
+            }
             .sensoryFeedback(
                 .selection,
                 trigger:
@@ -2216,12 +2293,25 @@ struct CommunityEventCreateView: View {
 
     private var eventHero: some View {
         ZStack(alignment: .bottomLeading) {
-            Image(eventArtworkName)
-                .resizable()
-                .scaledToFill()
-                .frame(height: 150)
-                .frame(maxWidth: .infinity)
-                .clipped()
+            Group {
+                if let data =
+                        selectedCoverImageData,
+                   let image =
+                        UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(
+                        selectedCoverArtworkName
+                    )
+                    .resizable()
+                    .scaledToFill()
+                }
+            }
+            .frame(height: 150)
+            .frame(maxWidth: .infinity)
+            .clipped()
 
             LinearGradient(
                 colors: [
@@ -2276,23 +2366,123 @@ struct CommunityEventCreateView: View {
         )
     }
 
-    private var eventArtworkName: String {
-        switch draft.activityType {
-        case .running:
-            return "GoalRunning"
-        case .walking:
-            return "GoalWalking"
-        case .strength:
-            return "GoalStrength"
-        case .cycling:
-            return "GoalAdventure"
-        case .hike:
-            return "GoalMountain"
-        case .groupWorkout:
-            return "GoalConsistency"
-        case .other:
-            return "GoalEvent"
+    private var eventCoverPicker:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 9
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Cover",
+                        norwegian: "Bilde"
+                    ),
+                    systemImage: "photo"
+                )
+                .font(.subheadline.weight(.semibold))
+
+                Spacer()
+
+                PhotosPicker(
+                    selection:
+                        $selectedCoverPhoto,
+                    matching: .images
+                ) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Own photo",
+                            norwegian: "Eget bilde"
+                        ),
+                        systemImage:
+                            "photo.badge.plus"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+            }
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                HStack(spacing: 9) {
+                    ForEach(
+                        CommunityEventCoverPolicy
+                            .standardArtworkOptions,
+                        id: \.self
+                    ) { artwork in
+                        Button {
+                            selectedCoverArtworkName =
+                                artwork
+                            selectedCoverImageData =
+                                nil
+                            selectedCoverPhoto =
+                                nil
+                            coverWasManuallySelected =
+                                true
+                            createError = nil
+                        } label: {
+                            Image(artwork)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(
+                                    width: 82,
+                                    height: 52
+                                )
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            12,
+                                        style:
+                                            .continuous
+                                    )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            12,
+                                        style:
+                                            .continuous
+                                    )
+                                    .stroke(
+                                        selectedCoverImageData ==
+                                                nil &&
+                                            selectedCoverArtworkName ==
+                                                artwork
+                                            ? ATHLTHTheme
+                                                .accent
+                                            : Color
+                                                .black
+                                                .opacity(
+                                                    0.05
+                                                ),
+                                        lineWidth:
+                                            selectedCoverImageData ==
+                                                    nil &&
+                                                selectedCoverArtworkName ==
+                                                    artwork
+                                                ? 2
+                                                : 1
+                                    )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+    }
+
+    private var eventArtworkName: String {
+        selectedCoverArtworkName
     }
 
     private var eventActivityLabel: String {
@@ -2755,6 +2945,7 @@ struct CommunityEventCreateView: View {
 
         Task {
             isCreating = true
+            createError = nil
 
             draft.maxParticipants =
                 limitParticipants
@@ -2771,14 +2962,72 @@ struct CommunityEventCreateView: View {
                 draft.routeTitle = nil
             }
 
+            let requestedEventID = UUID()
+            var uploadedCoverURL: String?
+
+            if let selectedCoverImageData {
+                guard let imageURL =
+                        await community
+                            .uploadEventCover(
+                                eventID:
+                                    requestedEventID,
+                                jpegData:
+                                    selectedCoverImageData
+                            )
+                else {
+                    createError =
+                        community.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english:
+                                "The event image could not be uploaded.",
+                            norwegian:
+                                "Bildet til arrangementet kunne ikke lastes opp."
+                        )
+                    isCreating = false
+                    return
+                }
+
+                uploadedCoverURL =
+                    imageURL
+            }
+
+            draft.coverArtworkName =
+                selectedCoverImageData == nil
+                    ? selectedCoverArtworkName
+                    : nil
+            draft.coverImageURL =
+                uploadedCoverURL
+
             let eventID =
                 await community
                     .createAndReturnID(
-                        draft
+                        draft,
+                        eventID:
+                            requestedEventID
                     )
 
-            if let eventID,
-               shareToCommunity {
+            guard let eventID else {
+                if uploadedCoverURL != nil {
+                    await community
+                        .removeEventCover(
+                            eventID:
+                                requestedEventID
+                        )
+                }
+
+                createError =
+                    community.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The event could not be created.",
+                        norwegian:
+                            "Arrangementet kunne ikke opprettes."
+                    )
+                isCreating = false
+                return
+            }
+
+            if shareToCommunity {
                 _ = await social
                     .shareCommunityEvent(
                         id: eventID,
@@ -2790,15 +3039,16 @@ struct CommunityEventCreateView: View {
                         meetingName:
                             draft.meetingName,
                         visibility:
-                            draft.visibility
+                            draft.visibility,
+                        coverArtworkName:
+                            draft.coverArtworkName,
+                        coverImageURL:
+                            draft.coverImageURL
                     )
             }
 
             isCreating = false
-
-            if eventID != nil {
-                dismiss()
-            }
+            dismiss()
         }
     }
 }
