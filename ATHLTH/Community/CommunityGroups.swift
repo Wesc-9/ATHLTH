@@ -314,8 +314,10 @@ private extension CommunityImageProcessor {
         let rendered = renderer.image {
             context in
 
-            UIColor.black.setFill()
-            context.fill(
+            context.cgContext.setFillColor(
+                UIColor.black.cgColor
+            )
+            context.cgContext.fill(
                 CGRect(
                     origin: .zero,
                     size: outputSize
