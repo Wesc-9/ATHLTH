@@ -1280,12 +1280,13 @@ struct ATHLTHHomeView: View {
                             goal: goal
                         )
                         .frame(
-                            width: 74,
-                            height: 74
+                            width: 90,
+                            height: 90
                         )
+                        .clipped()
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: 16,
+                                cornerRadius: 18,
                                 style:
                                     .continuous
                             )
@@ -1321,7 +1322,7 @@ struct ATHLTHHomeView: View {
                     }
                     .overlay {
                         RoundedRectangle(
-                            cornerRadius: 16,
+                            cornerRadius: 18,
                             style:
                                 .continuous
                         )
@@ -1380,7 +1381,7 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .frame(
-                    minHeight: 74
+                    minHeight: 90
                 )
             }
             .padding(11)
