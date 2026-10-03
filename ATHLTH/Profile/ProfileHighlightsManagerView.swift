@@ -365,18 +365,7 @@ struct ProfileHighlightsManagerView: View {
                     spacing: 4
                 ) {
                     Text(
-                        item.caption?
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .nilIfEmpty ??
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Workout photo",
-                            norwegian:
-                                "Treningsbilde"
-                        )
+                        mediaTitle(item)
                     )
                     .font(
                         .subheadline
@@ -618,6 +607,28 @@ struct ProfileHighlightsManagerView: View {
         )
     }
 
+    private func mediaTitle(
+        _ item:
+            WorkoutMediaRecord
+    ) -> String {
+        if let caption =
+            item.caption?
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                ),
+           !caption.isEmpty {
+            return caption
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Workout photo",
+            norwegian:
+                "Treningsbilde"
+        )
+    }
+
     private func highlightValue(
         _ workout:
             WorkoutSummary
@@ -677,8 +688,3 @@ struct ProfileHighlightsManagerView: View {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
-}
