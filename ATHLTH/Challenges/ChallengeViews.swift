@@ -581,15 +581,15 @@ struct ChallengeCreationView: View {
     @State private var createError: String?
 
     private var clubForest: Color {
-        Color(red: 0.025, green: 0.30, blue: 0.21)
+        Color(red: 0.20, green: 0.26, blue: 0.36)
     }
 
     private var clubEmerald: Color {
-        Color(red: 0.055, green: 0.49, blue: 0.32)
+        Color(red: 0.34, green: 0.43, blue: 0.57)
     }
 
     private var clubMint: Color {
-        Color(red: 0.90, green: 0.96, blue: 0.92)
+        Color(red: 0.91, green: 0.94, blue: 0.98)
     }
 
     var body: some View {
@@ -603,74 +603,44 @@ struct ChallengeCreationView: View {
 
                 VStack(spacing: 0) {
                     VStack(spacing: 10) {
-                        ProgressView(
-                            value: Double(step + 1),
-                            total: 5
-                        )
-                        .tint(clubEmerald)
-
-                        HStack(spacing: 0) {
-                            ForEach(
-                                0..<5,
-                                id: \.self
-                            ) { index in
-                                let label = [
-                                    "Detaljer",
-                                    "Regler",
-                                    "Personer",
-                                    "Tid",
-                                    "Se over"
-                                ][index]
-
-                                HStack(spacing: 5) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(
-                                                index <= step
-                                                    ? clubForest
-                                                    : Color.white.opacity(0.92)
-                                            )
-                                            .frame(
-                                                width: 24,
-                                                height: 24
-                                            )
-
-                                        Text("\(index + 1)")
-                                            .font(
-                                                .caption2.bold()
-                                            )
-                                            .foregroundStyle(
-                                                index <= step
-                                                    ? Color.white
-                                                    : ATHLTHTheme.mutedText
-                                            )
-                                    }
-
-                                    if index == step {
-                                        Text(label)
-                                            .font(
-                                                .caption2.weight(
-                                                    .semibold
-                                                )
-                                            )
-                                            .foregroundStyle(
-                                                clubForest
-                                            )
-                                            .lineLimit(1)
-                                    }
-
-                                    if index < 4 {
-                                        Spacer(minLength: 5)
-                                    }
-                                }
+                        HStack(spacing: 8) {
+                            ForEach(0..<5, id: \.self) { index in
+                                Capsule(style: .continuous)
+                                    .fill(
+                                        index <= step
+                                            ? clubForest
+                                            : Color.primary.opacity(0.09)
+                                    )
+                                    .frame(height: 5)
                             }
+                        }
+
+                        HStack(spacing: 6) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Step %d of 5",
+                                    norwegian: "Steg %d av 5",
+                                    step + 1
+                                )
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(clubForest)
+
+                            Text("·")
+                                .foregroundStyle(.secondary)
+
+                            Text(stepTitle)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
                         }
                     }
                     .padding(.horizontal, 18)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
-                    ScrollView {
+                    ScrollView {                    ScrollView {
                         Group {
                             switch step {
                             case 0: typeStep
@@ -819,132 +789,195 @@ struct ChallengeCreationView: View {
     }
 
     private var typeStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            ZStack(alignment: .bottomLeading) {
-                Image("CommunityHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 144)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        clubForest.opacity(0.82)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Label(
-                        "CHALLENGE",
-                        systemImage: "bolt.fill"
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Challenge name",
+                        norwegian: "Navn på utfordring"
                     )
-                    .font(.caption2.bold())
-                    .tracking(1.0)
+                )
+                .font(.title3.bold())
 
-                    Text(
+                HStack(spacing: 10) {
+                    TextField(
                         ATHLTHLocalization.choose(
-                            english: "New challenge",
-                            norwegian: "Ny utfordring"
-                        )
+                            english: "Give your challenge a name",
+                            norwegian: "Gi utfordringen et navn"
+                        ),
+                        text: $title
                     )
-                    .font(.title2.bold())
+                    .textInputAutocapitalization(.words)
+                    .font(.body.weight(.medium))
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Motivate your community and set a shared goal.",
-                            norwegian: "Motiver fellesskapet og sett et felles mål."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.88))
-                }
-                .foregroundStyle(.white)
-                .padding(16)
-            }
-            .frame(height: 144)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-            )
-            .shadow(
-                color: clubForest.opacity(0.12),
-                radius: 14,
-                y: 6
-            )
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Challenge name")
-                    .font(.headline)
-
-                TextField(
-                    "Give your challenge a name",
-                    text: $title
-                )
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.words)
-
-                Text("Required · this is what participants will see.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("What are you competing in?")
-                .font(.title2.bold())
-                .padding(.top, 4)
-
-            HStack(spacing: 8) {
-                sportButton(.running)
-                sportButton(.strength)
-                sportButton(.heartRate)
-            }
-
-            Text("Scoring")
-                .font(.headline)
-                .padding(.top, 4)
-
-            ForEach(scoringOptions) { option in
-                Button {
-                    scoring = option
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(option.title)
-                                .font(.headline)
-                            Text(scoringSubtitle(option))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
+                    if !title.isEmpty {
+                        Button {
+                            title = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.tertiary)
                         }
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                scoring == option
-                                    ? "checkmark.circle.fill"
-                                    : "circle"
-                        )
-                        .foregroundStyle(
-                            scoring == option
-                                ? ATHLTHTheme.accent
-                                : .secondary
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Clear challenge name",
+                                norwegian: "Tøm navn på utfordring"
+                            )
                         )
                     }
-                    .padding()
-                    .challengeCard()
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 15)
+                .frame(height: 54)
+                .background(
+                    Color.white.opacity(0.96),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.primary.opacity(0.09),
+                        lineWidth: 0.8
+                    )
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Required · this is what participants will see.",
+                        norwegian: "Påkrevd · dette er det deltakerne ser."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "What are you competing in?",
+                        norwegian: "Hva konkurrerer dere i?"
+                    )
+                )
+                .font(.title2.bold())
+
+                HStack(spacing: 10) {
+                    sportButton(.running)
+                    sportButton(.strength)
+                    sportButton(.heartRate)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 11) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Scoring",
+                        norwegian: "Poengberegning"
+                    )
+                )
+                .font(.title3.bold())
+
+                ForEach(scoringOptions) { option in
+                    let selected = scoring == option
+
+                    Button {
+                        scoring = option
+                    } label: {
+                        HStack(spacing: 13) {
+                            Image(systemName: scoringIcon(option))
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(
+                                    selected
+                                        ? clubEmerald
+                                        : clubForest
+                                )
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    selected
+                                        ? clubMint
+                                        : Color.primary.opacity(0.045),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 14,
+                                        style: .continuous
+                                    )
+                                )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(option.title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+
+                                Text(scoringSubtitle(option))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Image(
+                                systemName:
+                                    selected
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                            )
+                            .font(.title3)
+                            .foregroundStyle(
+                                selected
+                                    ? clubEmerald
+                                    : Color.secondary.opacity(0.72)
+                            )
+                        }
+                        .padding(14)
+                        .background(
+                            selected
+                                ? clubMint.opacity(0.72)
+                                : Color.white.opacity(0.96),
+                            in: RoundedRectangle(
+                                cornerRadius: 20,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 20,
+                                style: .continuous
+                            )
+                            .stroke(
+                                selected
+                                    ? clubEmerald.opacity(0.52)
+                                    : Color.primary.opacity(0.07),
+                                lineWidth:
+                                    selected
+                                        ? 1.1
+                                        : 0.8
+                            )
+                        }
+                        .shadow(
+                            color: Color.black.opacity(
+                                selected ? 0.045 : 0.022
+                            ),
+                            radius: 9,
+                            y: 4
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
 
     @ViewBuilder
+    private var rulesStep    @ViewBuilder
     private var rulesStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -2162,25 +2195,17 @@ struct ChallengeCreationView: View {
                         step -= 1
                     }
                 } label: {
-                    Image(
-                        systemName:
-                            "chevron.left"
-                    )
-                    .font(.headline)
-                    .foregroundStyle(
-                        clubForest
-                    )
-                    .frame(
-                        width: 48,
-                        height: 48
-                    )
-                    .background(
-                        Color.white.opacity(0.92),
-                        in: RoundedRectangle(
-                            cornerRadius: 17,
-                            style: .continuous
+                    Image(systemName: "chevron.left")
+                        .font(.headline)
+                        .foregroundStyle(clubForest)
+                        .frame(width: 54, height: 54)
+                        .background(
+                            Color.white.opacity(0.94),
+                            in: RoundedRectangle(
+                                cornerRadius: 22,
+                                style: .continuous
+                            )
                         )
-                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -2196,7 +2221,7 @@ struct ChallengeCreationView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 9) {
                     if creatingChallenge {
                         ProgressView()
                             .tint(.white)
@@ -2222,20 +2247,14 @@ struct ChallengeCreationView: View {
                     )
                     .font(.headline)
 
-                    if step < 4 &&
-                        !creatingChallenge {
-                        Image(
-                            systemName:
-                                "chevron.right"
-                        )
-                        .font(.caption.bold())
+                    if step < 4 && !creatingChallenge {
+                        Image(systemName: "arrow.right")
+                            .font(.subheadline.bold())
                     }
                 }
                 .foregroundStyle(.white)
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 50)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
                 .background(
                     LinearGradient(
                         colors: [
@@ -2245,14 +2264,10 @@ struct ChallengeCreationView: View {
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
-                    in: RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
+                    in: Capsule(style: .continuous)
                 )
                 .opacity(
-                    canContinue &&
-                    !creatingChallenge
+                    canContinue && !creatingChallenge
                         ? 1
                         : 0.34
                 )
@@ -2265,12 +2280,10 @@ struct ChallengeCreationView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(
-            .ultraThinMaterial
-        )
+        .background(.ultraThinMaterial)
     }
 
-    private var scoringOptions: [ATHLTHChallengeScoring] {
+    private var scoringOptions:    private var scoringOptions: [ATHLTHChallengeScoring] {
         switch sport {
         case .running:
             return [.fastestDistance, .farthestInTime, .mostDistance]
@@ -2282,7 +2295,28 @@ struct ChallengeCreationView: View {
     }
 
     private var stepTitle: String {
-        ["Challenge", "Rules", "People", "Schedule", "Review"][step]
+        [
+            ATHLTHLocalization.choose(
+                english: "Basics",
+                norwegian: "Grunnoppsett"
+            ),
+            ATHLTHLocalization.choose(
+                english: "Rules",
+                norwegian: "Regler"
+            ),
+            ATHLTHLocalization.choose(
+                english: "People",
+                norwegian: "Personer"
+            ),
+            ATHLTHLocalization.choose(
+                english: "Schedule",
+                norwegian: "Tid"
+            ),
+            ATHLTHLocalization.choose(
+                english: "Review",
+                norwegian: "Se over"
+            )
+        ][step]
     }
 
     private var canContinue: Bool {
@@ -2754,25 +2788,22 @@ struct ChallengeCreationView: View {
             sport = option
         } label: {
             ZStack(alignment: .topTrailing) {
-                VStack(spacing: 9) {
-                    Image(
-                        systemName:
-                            option.systemImage
-                    )
-                    .font(.title2)
+                VStack(spacing: 10) {
+                    Image(systemName: option.systemImage)
+                        .font(.system(size: 24, weight: .semibold))
 
                     Text(option.title)
-                        .font(.headline)
+                        .font(.subheadline.weight(.bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
                 }
                 .foregroundStyle(
                     selected
                         ? Color.white
                         : clubForest
                 )
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 100
-                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 112)
                 .background(
                     selected
                         ? AnyShapeStyle(
@@ -2781,16 +2812,12 @@ struct ChallengeCreationView: View {
                                     clubForest,
                                     clubEmerald
                                 ],
-                                startPoint:
-                                    .topLeading,
-                                endPoint:
-                                    .bottomTrailing
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
                         )
                         : AnyShapeStyle(
-                            Color.white.opacity(
-                                0.94
-                            )
+                            Color.white.opacity(0.96)
                         ),
                     in: RoundedRectangle(
                         cornerRadius: 22,
@@ -2804,30 +2831,28 @@ struct ChallengeCreationView: View {
                     )
                     .stroke(
                         selected
-                            ? clubEmerald.opacity(
-                                0.72
-                            )
-                            : clubMint,
-                        lineWidth: 1
+                            ? clubEmerald.opacity(0.58)
+                            : Color.primary.opacity(0.07),
+                        lineWidth: selected ? 1.1 : 0.8
                     )
                 }
 
                 if selected {
-                    Image(
-                        systemName:
-                            "checkmark.circle.fill"
-                    )
-                    .foregroundStyle(
-                        clubMint
-                    )
-                    .padding(10)
+                    Image(systemName: "checkmark")
+                        .font(.caption.bold())
+                        .foregroundStyle(clubForest)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            Color.white.opacity(0.94),
+                            in: Circle()
+                        )
+                        .padding(9)
                 }
             }
             .shadow(
-                color:
-                    clubForest.opacity(
-                        selected ? 0.12 : 0.035
-                    ),
+                color: Color.black.opacity(
+                    selected ? 0.07 : 0.025
+                ),
                 radius: 10,
                 y: 4
             )
@@ -2835,7 +2860,7 @@ struct ChallengeCreationView: View {
         .buttonStyle(.plain)
     }
 
-    private func numberField(
+    private func numberField(    private func numberField(
         title: String,
         suffix: String,
         value: Binding<Double>
@@ -2896,27 +2921,75 @@ struct ChallengeCreationView: View {
     private func scoringSubtitle(_ scoring: ATHLTHChallengeScoring) -> String {
         switch scoring {
         case .fastestDistance:
-            return "Fastest qualifying time wins. Choose your course setup in the next step."
+            return ATHLTHLocalization.choose(
+                english: "Fastest qualifying time wins. Choose your course setup in the next step.",
+                norwegian: "Raskeste godkjente tid vinner. Velg løypeoppsett i neste steg."
+            )
         case .farthestInTime:
-            return "Choose a time window. Furthest verified distance wins."
+            return ATHLTHLocalization.choose(
+                english: "Choose a time window. Furthest verified distance wins.",
+                norwegian: "Registrer aktivitet innenfor en tidsperiode. Lengste godkjente distanse vinner."
+            )
         case .mostDistance:
-            return "Every qualifying run adds to the total."
+            return ATHLTHLocalization.choose(
+                english: "Every qualifying run adds to the total.",
+                norwegian: "Hver godkjente løpetur legges til totalen. Lengst samlet distanse vinner."
+            )
         case .fastestRoute:
-            return "Fastest qualifying time on a specific route."
+            return ATHLTHLocalization.choose(
+                english: "Fastest qualifying time on a specific route.",
+                norwegian: "Raskeste godkjente tid på en bestemt rute vinner."
+            )
         case .heaviestWeight:
-            return "Highest qualifying completed set wins."
+            return ATHLTHLocalization.choose(
+                english: "Highest qualifying completed set wins.",
+                norwegian: "Tyngste godkjente fullførte sett vinner."
+            )
         case .mostReps:
-            return "Most reps, optionally at a required weight."
+            return ATHLTHLocalization.choose(
+                english: "Most reps, optionally at a required weight.",
+                norwegian: "Flest repetisjoner vinner, eventuelt med et valgt minimum av vekt."
+            )
         case .exerciseVolume:
-            return "Highest reps × weight volume for one exercise."
+            return ATHLTHLocalization.choose(
+                english: "Highest reps × weight volume for one exercise.",
+                norwegian: "Høyest repetisjoner × vekt for én øvelse vinner."
+            )
         case .workoutVolume:
-            return "Highest total volume in one strength workout."
+            return ATHLTHLocalization.choose(
+                english: "Highest total volume in one strength workout.",
+                norwegian: "Høyest totalvolum i én styrkeøkt vinner."
+            )
         case .heartRateZoneTime:
-            return "Compete on verified time spent in a personal heart-rate zone."
+            return ATHLTHLocalization.choose(
+                english: "Compete on verified time spent in a personal heart-rate zone.",
+                norwegian: "Konkurrer på verifisert tid i en personlig pulssone."
+            )
         }
     }
 
-    private func reviewRow(_ title: String, _ value: String) -> some View {
+    private func scoringIcon(
+        _ scoring: ATHLTHChallengeScoring
+    ) -> String {
+        switch scoring {
+        case .fastestDistance, .fastestRoute:
+            return "trophy.fill"
+        case .farthestInTime:
+            return "clock.fill"
+        case .mostDistance:
+            return "point.topleft.down.to.point.bottomright.curvepath"
+        case .heaviestWeight:
+            return "dumbbell.fill"
+        case .mostReps:
+            return "repeat"
+        case .exerciseVolume, .workoutVolume:
+            return "chart.bar.fill"
+        case .heartRateZoneTime:
+            return "heart.fill"
+        }
+    }
+
+    private func reviewRow(    private func reviewRow(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
                 .foregroundStyle(.secondary)
@@ -4237,13 +4310,13 @@ private extension View {
             .background(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.96),
+                        Color.white.opacity(0.98),
                         Color(
-                            red: 0.90,
-                            green: 0.96,
-                            blue: 0.92
+                            red: 0.91,
+                            green: 0.94,
+                            blue: 0.98
                         )
-                        .opacity(0.32)
+                        .opacity(0.42)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -4260,11 +4333,11 @@ private extension View {
                 )
                 .stroke(
                     Color(
-                        red: 0.77,
-                        green: 0.88,
-                        blue: 0.81
+                        red: 0.79,
+                        green: 0.83,
+                        blue: 0.90
                     )
-                    .opacity(0.52),
+                    .opacity(0.50),
                     lineWidth: 0.8
                 )
             }
