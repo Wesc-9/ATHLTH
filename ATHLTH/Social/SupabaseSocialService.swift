@@ -1333,6 +1333,76 @@ final class SupabaseSocialService: Sendable {
         }
     }
 
+    func uploadChallengeCover(
+        challengeID: UUID,
+        jpegData: Data
+    ) async throws -> String {
+        guard let userID = currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        guard !jpegData.isEmpty,
+              jpegData.count <= 10_485_760
+        else {
+            throw SocialServiceError.invalidWorkoutMedia(
+                "Challenge images must be smaller than 10 MB."
+            )
+        }
+
+        let storagePath =
+            "\(userID.uuidString.lowercased())/" +
+            "challenge-covers/" +
+            "\(challengeID.uuidString.lowercased()).jpg"
+
+        try await client.storage
+            .from("workout-media")
+            .upload(
+                storagePath,
+                data: jpegData,
+                options: FileOptions(
+                    cacheControl: "31536000",
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        let publicURL = try client.storage
+            .from("workout-media")
+            .getPublicURL(path: storagePath)
+
+        var components = URLComponents(
+            url: publicURL,
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(
+                name: "v",
+                value: String(
+                    Int(Date().timeIntervalSince1970)
+                )
+            )
+        ]
+
+        return (components?.url ?? publicURL).absoluteString
+    }
+
+    func removeChallengeCover(
+        challengeID: UUID
+    ) async throws {
+        guard let userID = currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        let storagePath =
+            "\(userID.uuidString.lowercased())/" +
+            "challenge-covers/" +
+            "\(challengeID.uuidString.lowercased()).jpg"
+
+        try await client.storage
+            .from("workout-media")
+            .remove(paths: [storagePath])
+    }
+
     func loadWorkoutMedia(
         for userID: UUID,
         limit: Int = 60
