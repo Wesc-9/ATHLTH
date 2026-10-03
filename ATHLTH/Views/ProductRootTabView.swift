@@ -28,6 +28,26 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     }
 }
 
+private func makeQuickStrengthSession() -> PlannedSession {
+    PlannedSession(
+        id: UUID(),
+        title:
+            ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            ),
+        kind: .strength,
+        scheduledStart: nil,
+        durationMinutes: nil,
+        targetDistanceKilometers: nil,
+        targetPaceSecondsPerKilometer: nil,
+        routeID: nil,
+        exercises: [],
+        notes: nil,
+        runningWorkout: nil
+    )
+}
+
 struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
 
@@ -503,9 +523,69 @@ struct ATHLTHHomeView: View {
                         }
                     }
                 } else if kind == .strength {
-                    StrengthQuickStartSheet { workout in
-                        pendingHomeQuickStartKind = nil
-                        selectedHomeStrengthSession = workout
+                    WorkoutStartOptionsView(
+                        session:
+                            makeQuickStrengthSession(),
+                        trainingDeviceProvider:
+                            watchConnection.isReady
+                                ? .appleWatch
+                                : .none,
+                        watchConnected:
+                            watchConnection.isReady,
+                        defaultCapture:
+                            .automatic,
+                        defaultTracking:
+                            settings
+                                .defaultStrengthTracking
+                    ) {
+                        configuredWorkout,
+                        captureDevice,
+                        trackingMode,
+                        selectedFriends,
+                        audioCoach,
+                        advancedConfiguration in
+
+                        Task { @MainActor in
+                            do {
+                                let didStart =
+                                    try await WorkoutLaunchCoordinator
+                                        .startStrength(
+                                            workout:
+                                                configuredWorkout,
+                                            captureDevice:
+                                                captureDevice,
+                                            trackingMode:
+                                                trackingMode,
+                                            selectedFriends:
+                                                selectedFriends,
+                                            audioCoach:
+                                                audioCoach,
+                                            advancedConfiguration:
+                                                advancedConfiguration,
+                                            session:
+                                                session,
+                                            settings:
+                                                settings,
+                                            social:
+                                                social,
+                                            strengthWorkout:
+                                                strengthWorkout,
+                                            watchConnection:
+                                                watchConnection,
+                                            spotify:
+                                                spotifyPlayback
+                                        )
+
+                                if didStart {
+                                    showingHomeStrengthWorkout =
+                                        true
+                                }
+                            } catch {
+                                homeWatchTransferError =
+                                    error
+                                        .localizedDescription
+                            }
+                        }
                     }
                 } else {
                     QuickWorkoutStartSheet(
@@ -3925,7 +4005,6 @@ struct ATHLTHTrainView: View {
     @State private var showingRunQuickStart = false
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
-    @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
     @State private var selectedStructuredWorkout:
@@ -4184,17 +4263,72 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(
-                isPresented: $showingStrengthQuickStart,
-                onDismiss: {
-                    if let pending = pendingStrengthStartSession {
-                        pendingStrengthStartSession = nil
-                        selectedStrengthSession = pending
-                    }
-                }
+                isPresented:
+                    $showingStrengthQuickStart
             ) {
-                StrengthQuickStartSheet { workout in
-                    pendingStrengthStartSession = workout
-                    showingStrengthQuickStart = false
+                WorkoutStartOptionsView(
+                    session:
+                        makeQuickStrengthSession(),
+                    trainingDeviceProvider:
+                        watchConnection.isReady
+                            ? .appleWatch
+                            : .none,
+                    watchConnected:
+                        watchConnection.isReady,
+                    defaultCapture:
+                        .automatic,
+                    defaultTracking:
+                        settings
+                            .defaultStrengthTracking
+                ) {
+                    configuredWorkout,
+                    captureDevice,
+                    trackingMode,
+                    selectedFriends,
+                    audioCoach,
+                    advancedConfiguration in
+
+                    Task { @MainActor in
+                        do {
+                            let didStart =
+                                try await WorkoutLaunchCoordinator
+                                    .startStrength(
+                                        workout:
+                                            configuredWorkout,
+                                        captureDevice:
+                                            captureDevice,
+                                        trackingMode:
+                                            trackingMode,
+                                        selectedFriends:
+                                            selectedFriends,
+                                        audioCoach:
+                                            audioCoach,
+                                        advancedConfiguration:
+                                            advancedConfiguration,
+                                        session:
+                                            session,
+                                        settings:
+                                            settings,
+                                        social:
+                                            social,
+                                        strengthWorkout:
+                                            strengthWorkout,
+                                        watchConnection:
+                                            watchConnection,
+                                        spotify:
+                                            spotifyPlayback
+                                    )
+
+                            if didStart {
+                                showingStrengthWorkout =
+                                    true
+                            }
+                        } catch {
+                            watchTransferError =
+                                error
+                                    .localizedDescription
+                        }
+                    }
                 }
             }
             .sheet(item: $pendingRunningTemplate) { workout in
