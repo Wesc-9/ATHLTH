@@ -800,7 +800,7 @@ final class StrengthWorkoutStore: ObservableObject {
             advancedConfiguration:
                 advancedConfiguration,
             allowsLiveExerciseBuilding:
-                false
+                exerciseLogs.isEmpty
         )
 
         currentExerciseIndex = 0
