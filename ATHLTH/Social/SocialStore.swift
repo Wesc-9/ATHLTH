@@ -2168,31 +2168,64 @@ final class SocialStore: ObservableObject {
         activityType: CommunityEventActivity,
         startsAt: Date,
         meetingName: String,
-        visibility: ProfileVisibility
+        visibility: ProfileVisibility,
+        coverArtworkName: String? = nil,
+        coverImageURL: String? = nil
     ) async -> Bool {
+        var metadata: [String: String] = [
+            "event_id": id.uuidString,
+            "activity_type":
+                activityType.rawValue,
+            "starts_at":
+                ISO8601DateFormatter()
+                    .string(from: startsAt)
+        ]
+
+        let cleanMeeting =
+            meetingName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        if !cleanMeeting.isEmpty {
+            metadata["meeting_name"] =
+                cleanMeeting
+        }
+
+        if let coverArtworkName,
+           !coverArtworkName.isEmpty {
+            metadata["cover_artwork"] =
+                coverArtworkName
+        }
+
+        if let coverImageURL,
+           !coverImageURL.isEmpty {
+            metadata["cover_image_url"] =
+                coverImageURL
+        }
+
         do {
             try await service.publishActivity(
-                eventKey: "event-\(id.uuidString)-shared",
+                eventKey:
+                    "event-\(id.uuidString)-shared",
                 kind: "event",
                 title: "Shared an event",
                 subtitle: title,
-                metadata: [
-                    "event_id": id.uuidString,
-                    "activity_type": activityType.rawValue,
-                    "starts_at": ISO8601DateFormatter()
-                        .string(from: startsAt),
-                    "meeting_name": meetingName
-                ],
+                metadata: metadata,
                 visibility: visibility
             )
 
-            if let refreshed = try? await service.loadFeed() {
-                feed = scopedFeed(refreshed)
+            if let refreshed =
+                try? await service
+                    .loadFeed() {
+                feed =
+                    scopedFeed(
+                        refreshed
+                    )
             }
 
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
             return false
         }
     }
