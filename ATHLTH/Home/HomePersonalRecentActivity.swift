@@ -1081,6 +1081,7 @@ private struct HomeFollowingHorizontalWorkoutCard:
             spacing: 0
         ) {
             HomeFollowingWorkoutArtwork(
+                item: item,
                 activity: activity,
                 height: 106
             )
@@ -1770,6 +1771,7 @@ private struct HomeFollowingFeaturedWorkoutCard:
             spacing: 0
         ) {
             HomeFollowingWorkoutArtwork(
+                item: item,
                 activity: activity,
                 height: 132
             )
@@ -2202,10 +2204,73 @@ private enum HomeFollowingWorkoutPresentation {
 
 private struct HomeFollowingWorkoutArtwork:
     View {
+    let item: SocialFeedItem
     let activity: WorkoutActivity
     let height: CGFloat
 
+    private var strengthMuscleProfile:
+        StrengthMuscleProfile {
+        guard activity == .strength,
+              let raw =
+                item.activity
+                    .metadata?["muscle_groups"],
+              !raw.isEmpty
+        else {
+            return .empty
+        }
+
+        var scores:
+            [StrengthMuscleRegion: Double] =
+                [:]
+
+        for muscle in
+            raw.split(separator: "|") {
+            let regions =
+                StrengthMuscleResolver
+                    .regions(
+                        for:
+                            String(muscle)
+                    )
+
+            for region in regions {
+                scores[
+                    region,
+                    default: 0
+                ] += 1
+            }
+        }
+
+        return StrengthMuscleProfile(
+            activations:
+                scores.map {
+                    StrengthMuscleActivation(
+                        region: $0.key,
+                        score: $0.value
+                    )
+                }
+        )
+    }
+
     var body: some View {
+        Group {
+            if activity == .strength {
+                HomeStrengthMuscleArtwork(
+                    profile:
+                        strengthMuscleProfile,
+                    height: height,
+                    figureStyle:
+                        .neutral
+                )
+            } else {
+                genericArtwork
+            }
+        }
+        .frame(height: height)
+        .clipped()
+    }
+
+    private var genericArtwork:
+        some View {
         ZStack {
             LinearGradient(
                 colors: artworkColors,
@@ -2215,55 +2280,29 @@ private struct HomeFollowingWorkoutArtwork:
                     .bottomTrailing
             )
 
-            if activity == .strength {
-                Image(
-                    systemName:
-                        "figure.strengthtraining.traditional"
+            Image(
+                systemName:
+                    activity.icon
+            )
+            .font(
+                .system(
+                    size:
+                        min(
+                            height * 0.68,
+                            104
+                        ),
+                    weight: .medium
                 )
-                .font(
-                    .system(
-                        size:
-                            min(
-                                height * 0.66,
-                                100
-                            ),
-                        weight: .medium
-                    )
+            )
+            .symbolRenderingMode(
+                .hierarchical
+            )
+            .foregroundStyle(
+                Color.white.opacity(
+                    0.16
                 )
-                .symbolRenderingMode(
-                    .hierarchical
-                )
-                .foregroundStyle(
-                    Color.white.opacity(
-                        0.18
-                    )
-                )
-                .offset(x: 90)
-            } else {
-                Image(
-                    systemName:
-                        activity.icon
-                )
-                .font(
-                    .system(
-                        size:
-                            min(
-                                height * 0.68,
-                                104
-                            ),
-                        weight: .medium
-                    )
-                )
-                .symbolRenderingMode(
-                    .hierarchical
-                )
-                .foregroundStyle(
-                    Color.white.opacity(
-                        0.16
-                    )
-                )
-                .offset(x: 92)
-            }
+            )
+            .offset(x: 92)
 
             LinearGradient(
                 colors: [
@@ -2280,27 +2319,11 @@ private struct HomeFollowingWorkoutArtwork:
                     .bottom
             )
         }
-        .frame(height: height)
     }
 
     private var artworkColors:
         [Color] {
-        if activity == .strength {
-            return [
-                Color(
-                    red: 0.21,
-                    green: 0.18,
-                    blue: 0.11
-                ),
-                Color(
-                    red: 0.07,
-                    green: 0.07,
-                    blue: 0.08
-                )
-            ]
-        }
-
-        return [
+        [
             ATHLTHTheme.accentDeep,
             Color(
                 red: 0.05,
@@ -2310,6 +2333,7 @@ private struct HomeFollowingWorkoutArtwork:
         ]
     }
 }
+
 
 // MARK: - See all
 
@@ -3311,6 +3335,7 @@ private struct HomeFollowingSocialFeedCard: View {
                 )
             } label: {
                 HomeFollowingWorkoutArtwork(
+                    item: item,
                     activity: activity,
                     height: 190
                 )
@@ -3648,6 +3673,7 @@ private struct HomeFollowingHistoryCard:
             spacing: 0
         ) {
             HomeFollowingWorkoutArtwork(
+                item: item,
                 activity: activity,
                 height: 150
             )
@@ -3834,6 +3860,113 @@ private struct HomeFollowingHistoryCard:
             in: Capsule()
         )
         .lineLimit(1)
+    }
+}
+
+private struct HomeStrengthMuscleArtwork:
+    View {
+    let profile: StrengthMuscleProfile
+    let height: CGFloat
+    var figureStyle:
+        StrengthBodyPresentation =
+            .neutral
+
+    private let activationTint =
+        Color(
+            red: 0.94,
+            green: 0.55,
+            blue: 0.22
+        )
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.997,
+                            green: 0.989,
+                            blue: 0.970
+                        ),
+                        Color(
+                            red: 0.980,
+                            green: 0.964,
+                            blue: 0.930
+                        )
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        activationTint
+                            .opacity(0.12),
+                        activationTint
+                            .opacity(0.035),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 4,
+                    endRadius:
+                        max(
+                            proxy.size.width *
+                                0.62,
+                            110
+                        )
+                )
+
+                StrengthMuscleMapView(
+                    profile: profile,
+                    compact: true,
+                    figureStyle:
+                        figureStyle,
+                    activationTint:
+                        activationTint
+                )
+                .frame(
+                    width:
+                        min(
+                            max(
+                                height * 1.62,
+                                154
+                            ),
+                            proxy.size.width -
+                                12
+                        ),
+                    height:
+                        max(
+                            height + 18,
+                            124
+                        )
+                )
+                .offset(y: 9)
+                .opacity(0.99)
+
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.24),
+                        Color.clear,
+                        Color.black
+                            .opacity(0.025)
+                    ],
+                    startPoint:
+                        .top,
+                    endPoint:
+                        .bottom
+                )
+            }
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
+            .clipped()
+        }
+        .frame(height: height)
+        .clipped()
     }
 }
 
@@ -4026,141 +4159,12 @@ private struct HomePersonalWorkoutVisual:
 
     private var strengthBackground:
         some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(
-                        red: 0.995,
-                        green: 0.990,
-                        blue: 0.978
-                    ),
-                    Color(
-                        red: 0.972,
-                        green: 0.966,
-                        blue: 0.948
-                    )
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [
-                    strengthActivationTint
-                        .opacity(0.16),
-                    strengthActivationTint
-                        .opacity(0.045),
-                    Color.clear
-                ],
-                center:
-                    UnitPoint(
-                        x: 0.72,
-                        y: 0.48
-                    ),
-                startRadius: 4,
-                endRadius:
-                    max(
-                        height * 0.90,
-                        130
-                    )
-            )
-
-            if !muscleProfile
-                .activations
-                .isEmpty {
-                HStack(
-                    spacing: 0
-                ) {
-                    Spacer(
-                        minLength:
-                            height < 125
-                                ? 54
-                                : 66
-                    )
-
-                    StrengthMuscleMapView(
-                        profile:
-                            muscleProfile,
-                        compact: true,
-                        figureStyle:
-                            strengthFigureStyle,
-                        activationTint:
-                            strengthActivationTint
-                    )
-                    .frame(
-                        width:
-                            min(
-                                height * 1.14,
-                                214
-                            ),
-                        height:
-                            max(
-                                height - 10,
-                                120
-                            )
-                    )
-                    .padding(
-                        .trailing,
-                        8
-                    )
-                    .opacity(0.98)
-                }
-
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.70),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .center
-                )
-            } else {
-                Image(
-                    "StrengthPostWorkoutHero"
-                )
-                .resizable()
-                .scaledToFill()
-                .saturation(0.72)
-                .contrast(0.92)
-                .opacity(0.88)
-
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.66),
-                        Color.white
-                            .opacity(0.14),
-                        Color(
-                            red: 0.92,
-                            green: 0.78,
-                            blue: 0.57
-                        )
-                        .opacity(0.10)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                )
-            }
-
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.20),
-                    Color.clear,
-                    Color.black
-                        .opacity(0.035)
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            )
-        }
+        HomeStrengthMuscleArtwork(
+            profile: muscleProfile,
+            height: height,
+            figureStyle:
+                strengthFigureStyle
+        )
     }
 
     private var routeMap:
@@ -4394,6 +4398,7 @@ private struct HomeFollowingWorkoutDetailView:
             ScrollView {
                 VStack(spacing: 14) {
                     HomeFollowingWorkoutArtwork(
+                        item: item,
                         activity: activity,
                         height: 210
                     )
