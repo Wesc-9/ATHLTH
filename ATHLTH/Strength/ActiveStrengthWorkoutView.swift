@@ -1504,6 +1504,18 @@ struct ActiveStrengthWorkoutView: View {
                     ATHLTHTheme
                         .accentDeep
                 )
+                .clipShape(
+                    Capsule()
+                )
+                .shadow(
+                    color:
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.16),
+                    radius: 14,
+                    x: 0,
+                    y: 7
+                )
             }
         }
     }
@@ -1513,95 +1525,70 @@ struct ActiveStrengthWorkoutView: View {
         value: Binding<Double>,
         suffix: String
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
-        ) {
-            Text(title)
-                .font(
-                    .caption
-                        .weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-
-            HStack(
-                alignment:
-                    .firstTextBaseline,
-                spacing: 5
-            ) {
-                TextField(
-                    "0",
-                    value: value,
-                    format:
-                        .number
-                        .precision(
-                            .fractionLength(
-                                0...1
-                            )
-                        )
-                )
-                .keyboardType(
-                    .decimalPad
-                )
-                .font(
-                    .system(
-                        size: 26,
-                        weight: .bold,
-                        design: .rounded
+        premiumSetInputField(
+            title: title,
+            suffix: suffix,
+            decrement: {
+                value.wrappedValue =
+                    max(
+                        0,
+                        value.wrappedValue - 0.5
                     )
-                )
-                .monospacedDigit()
-                .multilineTextAlignment(
-                    .leading
-                )
-
-                Text(suffix)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
+            },
+            increment: {
+                value.wrappedValue =
+                    min(
+                        999.5,
+                        value.wrappedValue + 0.5
                     )
             }
-        }
-        .padding(14)
-        .frame(
-            maxWidth: .infinity
-        )
-        .background(
-            Color.black
-                .opacity(0.025),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 16,
-                    style: .continuous
+        ) {
+            TextField(
+                "0",
+                value: value,
+                format:
+                    .number
+                    .precision(
+                        .fractionLength(
+                            0...1
+                        )
+                    )
+            )
+            .keyboardType(.decimalPad)
+            .font(
+                .system(
+                    size: 28,
+                    weight: .bold,
+                    design: .rounded
                 )
-        )
+            )
+            .monospacedDigit()
+            .multilineTextAlignment(.leading)
+        }
     }
 
     private func focusedIntegerField(
         title: String,
         value: Binding<Int>
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
+        premiumSetInputField(
+            title: title,
+            suffix: nil,
+            decrement: {
+                value.wrappedValue =
+                    max(
+                        0,
+                        value.wrappedValue - 1
+                    )
+            },
+            increment: {
+                value.wrappedValue =
+                    min(
+                        999,
+                        value.wrappedValue + 1
+                    )
+            }
         ) {
-            Text(title)
-                .font(
-                    .caption
-                        .weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-
             TextField(
                 "0",
                 value: value,
@@ -1610,25 +1597,182 @@ struct ActiveStrengthWorkoutView: View {
             .keyboardType(.numberPad)
             .font(
                 .system(
-                    size: 26,
+                    size: 28,
                     weight: .bold,
                     design: .rounded
                 )
             )
             .monospacedDigit()
+            .multilineTextAlignment(.leading)
+        }
+    }
+
+    private func premiumSetInputField<Content: View>(
+        title: String,
+        suffix: String?,
+        decrement: @escaping () -> Void,
+        increment: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack(spacing: 6) {
+                Capsule()
+                    .fill(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .frame(
+                        width: 3,
+                        height: 14
+                    )
+
+                Text(title)
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+            }
+
+            HStack(spacing: 8) {
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 5
+                ) {
+                    content()
+                        .frame(
+                            minWidth: 34
+                        )
+
+                    if let suffix {
+                        Text(suffix)
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                    }
+                }
+
+                Spacer(minLength: 2)
+
+                VStack(spacing: 3) {
+                    Button(action: increment) {
+                        Image(
+                            systemName:
+                                "chevron.up"
+                        )
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .bold
+                            )
+                        )
+                        .frame(
+                            width: 34,
+                            height: 27
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                        .frame(width: 22)
+
+                    Button(action: decrement) {
+                        Image(
+                            systemName:
+                                "chevron.down"
+                        )
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .bold
+                            )
+                        )
+                        .frame(
+                            width: 34,
+                            height: 27
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .background(
+                    .white.opacity(0.78),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.18),
+                        lineWidth: 0.8
+                    )
+                }
+            }
         }
         .padding(14)
         .frame(
             maxWidth: .infinity
         )
         .background(
-            Color.black
-                .opacity(0.025),
+            LinearGradient(
+                colors: [
+                    .white.opacity(0.92),
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.055)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in:
                 RoundedRectangle(
-                    cornerRadius: 16,
+                    cornerRadius: 18,
                     style: .continuous
                 )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.12),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.035),
+            radius: 12,
+            x: 0,
+            y: 6
         )
     }
 
