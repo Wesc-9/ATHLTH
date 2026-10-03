@@ -120,7 +120,7 @@ final class StrengthWorkoutStore: ObservableObject {
             .filter(\.isFinished)
             .sorted { $0.startedAt < $1.startedAt }
 
-        let thresholds = [10, 25, 50, 250]
+        let thresholds = [10, 25, 50, 100, 250, 500]
         var reachedAt: [Int: Date] = [:]
 
         for (index, workout) in completed.enumerated() {
@@ -133,7 +133,10 @@ final class StrengthWorkoutStore: ObservableObject {
         let volumeThresholds = [
             10_000,
             50_000,
+            100_000,
             250_000,
+            500_000,
+            1_000_000,
             2_500_000
         ]
         var volumeReachedAt: [Int: Date] = [:]
@@ -172,6 +175,82 @@ final class StrengthWorkoutStore: ObservableObject {
             }
             .min()
 
+        let workingSetThresholds = [
+            1_000,
+            2_500
+        ]
+        let workingRepThresholds = [
+            25_000
+        ]
+        let singleWorkoutVolumeThresholds = [
+            10_000,
+            20_000
+        ]
+
+        var workingSetCount = 0
+        var workingSetCountReachedAt: [Int: Date] = [:]
+        var totalWorkingRepetitions = 0
+        var workingRepetitionCountReachedAt: [Int: Date] = [:]
+        var maxWorkoutVolumeKilograms = 0.0
+        var workoutVolumeReachedAt: [Int: Date] = [:]
+
+        for workout in completed {
+            let workoutDate =
+                workout.endedAt ??
+                workout.startedAt
+            let workoutVolume =
+                max(
+                    workout.totalVolumeKilograms,
+                    0
+                )
+
+            maxWorkoutVolumeKilograms =
+                max(
+                    maxWorkoutVolumeKilograms,
+                    workoutVolume
+                )
+
+            for threshold in singleWorkoutVolumeThresholds
+            where workoutVolumeReachedAt[threshold] == nil &&
+                    workoutVolume >= Double(threshold) {
+                workoutVolumeReachedAt[threshold] =
+                    workoutDate
+            }
+
+            for exercise in workout.exercises {
+                for set in exercise.sets
+                where set.countsTowardTrainingLoad {
+                    guard let reps =
+                            set.completedReps,
+                          reps > 0
+                    else {
+                        continue
+                    }
+
+                    workingSetCount += 1
+                    totalWorkingRepetitions += reps
+
+                    let setDate =
+                        set.completedAt ??
+                        workoutDate
+
+                    for threshold in workingSetThresholds
+                    where workingSetCountReachedAt[threshold] == nil &&
+                            workingSetCount >= threshold {
+                        workingSetCountReachedAt[threshold] =
+                            setDate
+                    }
+
+                    for threshold in workingRepThresholds
+                    where workingRepetitionCountReachedAt[threshold] == nil &&
+                            totalWorkingRepetitions >= threshold {
+                        workingRepetitionCountReachedAt[threshold] =
+                            setDate
+                    }
+                }
+            }
+        }
+
         return TrophyStrengthSnapshot(
             completedWorkoutCount: completed.count,
             workoutCountReachedAt: reachedAt,
@@ -179,7 +258,19 @@ final class StrengthWorkoutStore: ObservableObject {
             totalVolumeKilograms:
                 totalVolumeKilograms,
             volumeReachedAt:
-                volumeReachedAt
+                volumeReachedAt,
+            completedWorkingSetCount:
+                workingSetCount,
+            workingSetCountReachedAt:
+                workingSetCountReachedAt,
+            totalWorkingRepetitions:
+                totalWorkingRepetitions,
+            workingRepetitionCountReachedAt:
+                workingRepetitionCountReachedAt,
+            maxWorkoutVolumeKilograms:
+                maxWorkoutVolumeKilograms,
+            workoutVolumeReachedAt:
+                workoutVolumeReachedAt
         )
     }
 
