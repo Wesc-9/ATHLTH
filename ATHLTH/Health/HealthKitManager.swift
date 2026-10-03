@@ -2633,6 +2633,20 @@ final class HealthKitManager: ObservableObject {
         return stats
     }
 
+    func performanceWorkoutHistory(
+        forceRefresh: Bool = false
+    ) async throws -> [WorkoutSummary] {
+        let workouts =
+            try await fetchAllWorkoutsCached(
+                forceRefresh:
+                    forceRefresh
+            )
+
+        return workouts.map(
+            WorkoutSummary.init
+        )
+    }
+
     func personalRecords(
         forceRefresh: Bool = false
     ) async throws -> [HealthPersonalRecord] {
