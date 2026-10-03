@@ -2057,15 +2057,32 @@ final class SocialStore: ObservableObject {
         where challenge.creatorID == currentUserID &&
                 challenge.createdAt >= activationDate {
             do {
+                var metadata: [String: String] = [
+                    "challenge_id": challenge.id.uuidString,
+                    "sport": challenge.sport.rawValue
+                ]
+
+                if let summary = challenge.rules.summary,
+                   !summary.isEmpty {
+                    metadata["summary"] = summary
+                }
+
+                if let artwork = challenge.rules.coverArtworkName,
+                   !artwork.isEmpty {
+                    metadata["cover_artwork"] = artwork
+                }
+
+                if let imageURL = challenge.rules.coverImageURL,
+                   !imageURL.isEmpty {
+                    metadata["cover_image_url"] = imageURL
+                }
+
                 try await service.publishActivity(
                     eventKey: "challenge-\(challenge.id.uuidString)-created",
                     kind: "challenge",
                     title: "Challenge created",
                     subtitle: challenge.title,
-                    metadata: [
-                        "challenge_id": challenge.id.uuidString,
-                        "sport": challenge.sport.rawValue
-                    ],
+                    metadata: metadata,
                     visibility: configuredVisibility
                 )
             } catch {
