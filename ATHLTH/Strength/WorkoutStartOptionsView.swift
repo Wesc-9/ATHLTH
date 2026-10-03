@@ -130,7 +130,19 @@ struct WorkoutStartOptionsView: View {
                 VStack(spacing: 12) {
                     strengthIntroCard
 
-                    exerciseSelectionCard
+                    if trackingMode == .advanced {
+                        exerciseSelectionCard
+                            .transition(
+                                .opacity
+                                    .combined(
+                                        with:
+                                            .move(
+                                                edge:
+                                                    .top
+                                            )
+                                    )
+                            )
+                    }
 
                     ATHLTHCard {
                         HStack(spacing: 8) {
