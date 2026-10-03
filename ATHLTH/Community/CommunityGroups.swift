@@ -6957,7 +6957,9 @@ struct CommunityGroupDetailView: View {
                 }
                 .padding(18)
             }
+            .frame(maxWidth: .infinity)
             .frame(minHeight: 184)
+            .clipped()
             .overlay {
                 RoundedRectangle(
                     cornerRadius: 24,
