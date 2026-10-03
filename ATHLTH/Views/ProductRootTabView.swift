@@ -503,9 +503,70 @@ struct ATHLTHHomeView: View {
                         }
                     }
                 } else if kind == .strength {
-                    StrengthQuickStartSheet { workout in
-                        pendingHomeQuickStartKind = nil
-                        selectedHomeStrengthSession = workout
+                    WorkoutStartOptionsView(
+                        session:
+                            homeFreestyleStrengthSession,
+                        trainingDeviceProvider:
+                            watchConnection.isReady
+                                ? .appleWatch
+                                : .none,
+                        watchConnected:
+                            watchConnection.isReady,
+                        defaultCapture:
+                            .automatic,
+                        defaultTracking:
+                            settings
+                                .defaultStrengthTracking
+                    ) {
+                        configuredWorkout,
+                        captureDevice,
+                        trackingMode,
+                        selectedFriends,
+                        audioCoach,
+                        advancedConfiguration in
+
+                        Task { @MainActor in
+                            do {
+                                let didStart =
+                                    try await WorkoutLaunchCoordinator
+                                        .startStrength(
+                                            workout:
+                                                configuredWorkout,
+                                            captureDevice:
+                                                captureDevice,
+                                            trackingMode:
+                                                trackingMode,
+                                            selectedFriends:
+                                                selectedFriends,
+                                            audioCoach:
+                                                audioCoach,
+                                            advancedConfiguration:
+                                                advancedConfiguration,
+                                            session:
+                                                session,
+                                            settings:
+                                                settings,
+                                            social:
+                                                social,
+                                            strengthWorkout:
+                                                strengthWorkout,
+                                            watchConnection:
+                                                watchConnection,
+                                            spotify:
+                                                spotifyPlayback
+                                        )
+
+                                if didStart {
+                                    pendingHomeQuickStartKind =
+                                        nil
+                                    showingHomeStrengthWorkout =
+                                        true
+                                }
+                            } catch {
+                                homeWatchTransferError =
+                                    error.localizedDescription
+                            }
+                        }
                     }
                 } else {
                     QuickWorkoutStartSheet(
@@ -3925,7 +3986,6 @@ struct ATHLTHTrainView: View {
     @State private var showingRunQuickStart = false
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
-    @State private var pendingStrengthStartSession: PlannedSession?
     @State private var showingCustomQuickStart = false
     @State private var showingStrengthWorkout = false
     @State private var selectedStructuredWorkout:
@@ -4184,17 +4244,73 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(
-                isPresented: $showingStrengthQuickStart,
-                onDismiss: {
-                    if let pending = pendingStrengthStartSession {
-                        pendingStrengthStartSession = nil
-                        selectedStrengthSession = pending
-                    }
-                }
+                isPresented:
+                    $showingStrengthQuickStart
             ) {
-                StrengthQuickStartSheet { workout in
-                    pendingStrengthStartSession = workout
-                    showingStrengthQuickStart = false
+                WorkoutStartOptionsView(
+                    session:
+                        quickStrengthSession,
+                    trainingDeviceProvider:
+                        watchConnection.isReady
+                            ? .appleWatch
+                            : .none,
+                    watchConnected:
+                        watchConnection.isReady,
+                    defaultCapture:
+                        .automatic,
+                    defaultTracking:
+                        settings
+                            .defaultStrengthTracking
+                ) {
+                    configuredWorkout,
+                    captureDevice,
+                    trackingMode,
+                    selectedFriends,
+                    audioCoach,
+                    advancedConfiguration in
+
+                    Task { @MainActor in
+                        do {
+                            let didStart =
+                                try await WorkoutLaunchCoordinator
+                                    .startStrength(
+                                        workout:
+                                            configuredWorkout,
+                                        captureDevice:
+                                            captureDevice,
+                                        trackingMode:
+                                            trackingMode,
+                                        selectedFriends:
+                                            selectedFriends,
+                                        audioCoach:
+                                            audioCoach,
+                                        advancedConfiguration:
+                                            advancedConfiguration,
+                                        session:
+                                            session,
+                                        settings:
+                                            settings,
+                                        social:
+                                            social,
+                                        strengthWorkout:
+                                            strengthWorkout,
+                                        watchConnection:
+                                            watchConnection,
+                                        spotify:
+                                            spotifyPlayback
+                                    )
+
+                            if didStart {
+                                showingStrengthQuickStart =
+                                    false
+                                showingStrengthWorkout =
+                                    true
+                            }
+                        } catch {
+                            watchTransferError =
+                                error.localizedDescription
+                        }
+                    }
                 }
             }
             .sheet(item: $pendingRunningTemplate) { workout in
@@ -5111,6 +5227,28 @@ struct ATHLTHTrainView: View {
         case .mobility, .recovery, .custom:
             break
         }
+    }
+
+    private var quickStrengthSession:
+        PlannedSession {
+        PlannedSession(
+            id: UUID(),
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                ),
+            kind: .strength,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes:
+                "Freestyle gym session",
+            runningWorkout: nil
+        )
     }
 
     private var quickStartDeviceTitle: String {
