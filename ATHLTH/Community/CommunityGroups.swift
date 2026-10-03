@@ -1,8 +1,95 @@
 import Foundation
+import ImageIO
 import PhotosUI
 import Supabase
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
+
+
+private enum CommunityImageProcessor {
+    static func prepareJPEG(
+        _ data: Data,
+        maxPixelSize: Int,
+        quality: CGFloat
+    ) async -> Data? {
+        await Task.detached(
+            priority: .userInitiated
+        ) {
+            guard let source =
+                    CGImageSourceCreateWithData(
+                        data as CFData,
+                        nil
+                    )
+            else {
+                return nil
+            }
+
+            let thumbnailOptions:
+                [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways:
+                    true,
+                kCGImageSourceCreateThumbnailWithTransform:
+                    true,
+                kCGImageSourceThumbnailMaxPixelSize:
+                    maxPixelSize,
+                kCGImageSourceShouldCacheImmediately:
+                    false
+            ]
+
+            guard let image =
+                    CGImageSourceCreateThumbnailAtIndex(
+                        source,
+                        0,
+                        thumbnailOptions as CFDictionary
+                    )
+            else {
+                return nil
+            }
+
+            func encode(
+                _ compression: CGFloat
+            ) -> Data? {
+                let output = NSMutableData()
+                guard let destination =
+                        CGImageDestinationCreateWithData(
+                            output as CFMutableData,
+                            UTType.jpeg.identifier as CFString,
+                            1,
+                            nil
+                        )
+                else {
+                    return nil
+                }
+
+                CGImageDestinationAddImage(
+                    destination,
+                    image,
+                    [
+                        kCGImageDestinationLossyCompressionQuality:
+                            compression
+                    ] as CFDictionary
+                )
+
+                guard CGImageDestinationFinalize(
+                    destination
+                ) else {
+                    return nil
+                }
+
+                return output as Data
+            }
+
+            if let encoded = encode(quality),
+               encoded.count <= 5_242_880 {
+                return encoded
+            }
+
+            return encode(0.62)
+        }
+        .value
+    }
+}
 
 struct CommunityGroupRecord: Codable, Identifiable, Hashable {
     let id: UUID
@@ -9426,20 +9513,28 @@ struct CommunityGroupCreateView: View {
 
                 Task {
                     do {
-                        guard
-                            let data = try await item
-                                .loadTransferable(type: Data.self),
-                            let jpeg =
-                                prepareCreateClubImageData(data)
+                        guard let data = try await item
+                            .loadTransferable(type: Data.self)
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that image. Try another photo."
                             return
                         }
 
-                        await MainActor.run {
-                            selectedImageData = jpeg
+                        guard let jpeg =
+                                await CommunityImageProcessor
+                                    .prepareJPEG(
+                                        data,
+                                        maxPixelSize: 1_600,
+                                        quality: 0.80
+                                    )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that image. Try another photo."
+                            return
                         }
+
+                        selectedImageData = jpeg
                     } catch {
                         groups.errorMessage =
                             error.localizedDescription
@@ -9536,56 +9631,6 @@ struct CommunityGroupCreateView: View {
             )
             .stroke(ATHLTHTheme.border, lineWidth: 1)
         }
-    }
-
-    private func prepareCreateClubImageData(
-        _ data: Data
-    ) -> Data? {
-        guard let image = UIImage(data: data) else {
-            return nil
-        }
-
-        let maxDimension: CGFloat = 1_600
-        let longest = max(
-            image.size.width,
-            image.size.height
-        )
-        let scale = min(
-            1,
-            maxDimension / max(longest, 1)
-        )
-        let targetSize = CGSize(
-            width: max(1, image.size.width * scale),
-            height: max(1, image.size.height * scale)
-        )
-
-        let format =
-            UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
-
-        let resized = UIGraphicsImageRenderer(
-            size: targetSize,
-            format: format
-        ).image { _ in
-            image.draw(
-                in: CGRect(
-                    origin: .zero,
-                    size: targetSize
-                )
-            )
-        }
-
-        if let jpeg = resized.jpegData(
-            compressionQuality: 0.80
-        ),
-        jpeg.count <= 5_242_880 {
-            return jpeg
-        }
-
-        return resized.jpegData(
-            compressionQuality: 0.62
-        )
     }
 
     private var joinModeDescription: String {
@@ -10007,19 +10052,28 @@ struct CommunityGroupSettingsView: View {
 
                 Task {
                     do {
-                        guard
-                            let data = try await item
-                                .loadTransferable(type: Data.self),
-                            let jpeg = prepareGroupImageData(data)
+                        guard let data = try await item
+                            .loadTransferable(type: Data.self)
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that image. Try another photo."
                             return
                         }
 
-                        await MainActor.run {
-                            selectedImageData = jpeg
+                        guard let jpeg =
+                                await CommunityImageProcessor
+                                    .prepareJPEG(
+                                        data,
+                                        maxPixelSize: 1_600,
+                                        quality: 0.80
+                                    )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that image. Try another photo."
+                            return
                         }
+
+                        selectedImageData = jpeg
                     } catch {
                         groups.errorMessage =
                             error.localizedDescription
@@ -10033,20 +10087,29 @@ struct CommunityGroupSettingsView: View {
 
                 Task {
                     do {
-                        guard
-                            let data = try await item
-                                .loadTransferable(type: Data.self),
-                            let jpeg = prepareGroupImageData(data)
+                        guard let data = try await item
+                            .loadTransferable(type: Data.self)
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that header image. Try another photo."
                             return
                         }
 
-                        await MainActor.run {
-                            selectedHeaderImageData = jpeg
-                            selectedHeaderArtwork = nil
+                        guard let jpeg =
+                                await CommunityImageProcessor
+                                    .prepareJPEG(
+                                        data,
+                                        maxPixelSize: 1_600,
+                                        quality: 0.80
+                                    )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that header image. Try another photo."
+                            return
                         }
+
+                        selectedHeaderImageData = jpeg
+                        selectedHeaderArtwork = nil
                     } catch {
                         groups.errorMessage =
                             error.localizedDescription
@@ -10317,53 +10380,6 @@ struct CommunityGroupSettingsView: View {
         }
     }
 
-    private func prepareGroupImageData(
-        _ data: Data
-    ) -> Data? {
-        guard let image = UIImage(data: data) else {
-            return nil
-        }
-
-        let maxDimension: CGFloat = 1_600
-        let longest = max(
-            image.size.width,
-            image.size.height
-        )
-        let scale = min(
-            1,
-            maxDimension / max(longest, 1)
-        )
-        let targetSize = CGSize(
-            width: max(1, image.size.width * scale),
-            height: max(1, image.size.height * scale)
-        )
-
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-
-        let resized = UIGraphicsImageRenderer(
-            size: targetSize,
-            format: format
-        ).image { _ in
-            image.draw(
-                in: CGRect(
-                    origin: .zero,
-                    size: targetSize
-                )
-            )
-        }
-
-        if let jpeg = resized.jpegData(
-            compressionQuality: 0.80
-        ),
-        jpeg.count <= 5_242_880 {
-            return jpeg
-        }
-
-        return resized.jpegData(
-            compressionQuality: 0.62
-        )
-    }
 }
 
 private struct CommunityGroupProfileAvatar: View {
@@ -11323,15 +11339,23 @@ private struct CommunityContentCoverPicker: View {
 
             Task {
                 do {
-                    guard
-                        let data = try await item
-                            .loadTransferable(
-                                type: Data.self
-                            ),
-                        let jpeg =
-                            prepareCommunityCoverImageData(
-                                data
-                            )
+                    guard let data = try await item
+                        .loadTransferable(
+                            type: Data.self
+                        )
+                    else {
+                        imageError =
+                            "ATHLTH could not prepare that image."
+                        return
+                    }
+
+                    guard let jpeg =
+                            await CommunityImageProcessor
+                                .prepareJPEG(
+                                    data,
+                                    maxPixelSize: 1_800,
+                                    quality: 0.82
+                                )
                     else {
                         imageError =
                             "ATHLTH could not prepare that image."
@@ -11348,61 +11372,6 @@ private struct CommunityContentCoverPicker: View {
             }
         }
     }
-}
-
-private func prepareCommunityCoverImageData(
-    _ data: Data
-) -> Data? {
-    guard let image = UIImage(data: data) else {
-        return nil
-    }
-
-    let maxDimension: CGFloat = 1_800
-    let longest = max(
-        image.size.width,
-        image.size.height
-    )
-    let scale = min(
-        1,
-        maxDimension / max(longest, 1)
-    )
-    let targetSize = CGSize(
-        width: max(
-            1,
-            image.size.width * scale
-        ),
-        height: max(
-            1,
-            image.size.height * scale
-        )
-    )
-
-    let format =
-        UIGraphicsImageRendererFormat.default()
-    format.scale = 1
-
-    let resized = UIGraphicsImageRenderer(
-        size: targetSize,
-        format: format
-    ).image { _ in
-        image.draw(
-            in: CGRect(
-                origin: .zero,
-                size: targetSize
-            )
-        )
-    }
-
-    if let jpeg = resized.jpegData(
-        compressionQuality: 0.82
-    ),
-    jpeg.count <= 5_242_880 {
-        return jpeg
-    }
-
-    return resized.jpegData(
-        compressionQuality: 0.62
-    )
 }
 
 struct CommunityGroupEventCreateView: View {
