@@ -248,7 +248,7 @@ struct GoalDetailView: View {
     var body: some View {
         Group {
             if let goal {
-                ScrollView {
+                ScrollView(.vertical) {
                     VStack(spacing: 18) {
                         hero(goal)
                         progressCard(goal)
@@ -274,8 +274,12 @@ struct GoalDetailView: View {
 
                         actionsCard(goal)
                     }
+                    .containerRelativeFrame(
+                        .horizontal
+                    )
                     .padding(.bottom, 30)
                 }
+                .scrollIndicators(.hidden)
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
                 .safeAreaInset(
                     edge: .bottom,
@@ -344,7 +348,10 @@ struct GoalDetailView: View {
     private func hero(_ goal: ATHLTHGoal) -> some View {
         ZStack(alignment: .bottomLeading) {
             GoalCoverView(goal: goal)
-                .frame(height: 300)
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
                 .clipped()
 
             LinearGradient(
@@ -386,7 +393,11 @@ struct GoalDetailView: View {
             .foregroundStyle(.white)
             .padding(20)
         }
+        .frame(
+            maxWidth: .infinity
+        )
         .frame(height: 300)
+        .clipped()
     }
 
     private func progressCard(_ goal: ATHLTHGoal) -> some View {
@@ -431,6 +442,7 @@ struct GoalDetailView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .goalCard()
         .padding(.horizontal)
     }
@@ -467,6 +479,7 @@ struct GoalDetailView: View {
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .goalCard()
         .padding(.horizontal)
     }
@@ -613,6 +626,7 @@ struct GoalDetailView: View {
             .font(.caption)
         }
         .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .goalCard()
         .padding(.horizontal)
     }
