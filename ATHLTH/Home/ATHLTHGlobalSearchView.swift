@@ -84,6 +84,46 @@ struct ATHLTHGlobalSearchView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var searchGraphite: Color {
+        Color(
+            red: 0.12,
+            green: 0.14,
+            blue: 0.18
+        )
+    }
+
+    private var searchCoolAccent: Color {
+        Color(
+            red: 0.36,
+            green: 0.64,
+            blue: 0.82
+        )
+    }
+
+    private var searchSocialAccent: Color {
+        Color(
+            red: 0.39,
+            green: 0.35,
+            blue: 0.74
+        )
+    }
+
+    private var searchRouteAccent: Color {
+        Color(
+            red: 0.23,
+            green: 0.67,
+            blue: 0.49
+        )
+    }
+
+    private var searchWarmAccent: Color {
+        Color(
+            red: 0.70,
+            green: 0.53,
+            blue: 0.25
+        )
+    }
+
     private var normalizedQuery: String {
         searchKey(cleanQuery)
     }
@@ -116,9 +156,39 @@ struct ATHLTHGlobalSearchView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.vitality.opacity(0.28)
+                Color(
+                    red: 0.985,
+                    green: 0.984,
+                    blue: 0.978
                 )
+                .ignoresSafeArea()
+
+                RadialGradient(
+                    colors: [
+                        searchCoolAccent
+                            .opacity(0.10),
+                        Color.clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 12,
+                    endRadius: 360
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
+                RadialGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.065),
+                        Color.clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 18,
+                    endRadius: 320
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 14) {
@@ -186,55 +256,94 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var searchHeader: some View {
-        ZStack {
+        HStack(spacing: 12) {
             Text(
                 ATHLTHLocalization.format(
                     english: "Search",
                     norwegian: "Søk"
                 )
             )
-            .font(.system(size: 24, weight: .bold, design: .rounded))
-            .foregroundStyle(ATHLTHTheme.primaryText)
+            .font(
+                .system(
+                    size: 27,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .primaryText
+            )
 
-            HStack {
-                Spacer()
+            Spacer()
 
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            .ultraThinMaterial,
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.primary.opacity(0.07),
-                                    lineWidth: 1
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.format(
-                        english: "Close search",
-                        norwegian: "Lukk søk"
+            Button {
+                dismiss()
+            } label: {
+                Image(
+                    systemName: "xmark"
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .bold
                     )
                 )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .frame(
+                    width: 40,
+                    height: 40
+                )
+                .background(
+                    Color.white
+                        .opacity(0.78),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.primary
+                                .opacity(0.065),
+                            lineWidth: 0.8
+                        )
+                }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(0.035),
+                    radius: 8,
+                    y: 3
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.format(
+                    english: "Close search",
+                    norwegian: "Lukk søk"
+                )
+            )
         }
-        .frame(height: 40)
+        .frame(height: 44)
     }
 
     private var premiumSearchField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+        HStack(spacing: 11) {
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 18,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                searchGraphite
+            )
 
             TextField(
                 ATHLTHLocalization.format(
@@ -243,8 +352,19 @@ struct ATHLTHGlobalSearchView: View {
                 ),
                 text: $query
             )
-            .font(.subheadline)
-            .textInputAutocapitalization(.never)
+            .font(
+                .system(
+                    size: 15,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .primaryText
+            )
+            .textInputAutocapitalization(
+                .never
+            )
             .autocorrectionDisabled()
             .submitLabel(.search)
             .focused($searchFocused)
@@ -254,95 +374,203 @@ struct ATHLTHGlobalSearchView: View {
                     query = ""
                     searchFocused = true
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
-                        .foregroundStyle(.tertiary)
+                    Image(
+                        systemName:
+                            "xmark.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 17
+                        )
+                    )
+                    .foregroundStyle(
+                        .tertiary
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
                     ATHLTHLocalization.format(
-                        english: "Clear search",
-                        norwegian: "Tøm søk"
+                        english:
+                            "Clear search",
+                        norwegian:
+                            "Tøm søk"
                     )
                 )
             }
         }
-        .padding(.horizontal, 15)
-        .frame(height: 48)
+        .padding(
+            .horizontal,
+            16
+        )
+        .frame(height: 54)
         .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
+            Color.white
+                .opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 19,
                 style: .continuous
             )
             .stroke(
-                searchFocused
-                    ? ATHLTHTheme.accent.opacity(0.30)
-                    : Color.primary.opacity(0.065),
-                lineWidth: 1
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(
+                                searchFocused
+                                    ? 0.30
+                                    : 0.18
+                            ),
+                        Color.white
+                            .opacity(0.62),
+                        searchCoolAccent
+                            .opacity(
+                                searchFocused
+                                    ? 0.34
+                                    : 0.20
+                            )
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth:
+                    searchFocused
+                        ? 1.25
+                        : 0.9
             )
         }
         .shadow(
-            color: Color.black.opacity(searchFocused ? 0.055 : 0.025),
-            radius: searchFocused ? 11 : 7,
-            y: 4
+            color:
+                Color.black
+                    .opacity(
+                        searchFocused
+                            ? 0.055
+                            : 0.032
+                    ),
+            radius:
+                searchFocused
+                    ? 13
+                    : 9,
+            y: 5
+        )
+        .shadow(
+            color:
+                searchCoolAccent
+                    .opacity(
+                        searchFocused
+                            ? 0.08
+                            : 0.035
+                    ),
+            radius: 16,
+            x: 5,
+            y: 0
         )
         .animation(
-            .easeOut(duration: 0.16),
+            .easeOut(
+                duration: 0.16
+            ),
             value: searchFocused
         )
     }
 
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(ATHLTHGlobalSearchScope.allCases) { item in
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 8) {
+                ForEach(
+                    ATHLTHGlobalSearchScope
+                        .allCases
+                ) { item in
                     Button {
-                        withAnimation(.easeInOut(duration: 0.16)) {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.16
+                            )
+                        ) {
                             scope = item
                         }
                     } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: item.icon)
-                                .font(.system(size: 10, weight: .bold))
+                        HStack(spacing: 6) {
+                            Image(
+                                systemName:
+                                    item.icon
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .bold
+                                )
+                            )
 
-                            Text(item.localizedTitle)
-                                .lineLimit(1)
+                            Text(
+                                item.localizedTitle
+                            )
+                            .lineLimit(1)
                         }
-                        .font(.caption.weight(.semibold))
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
                         .foregroundStyle(
                             scope == item
                                 ? Color.white
-                                : ATHLTHTheme.primaryText
+                                : ATHLTHTheme
+                                    .primaryText
                         )
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
+                        .padding(
+                            .horizontal,
+                            13
+                        )
+                        .frame(height: 36)
                         .background(
                             scope == item
-                                ? ATHLTHTheme.accentDeep
-                                : ATHLTHTheme.card.opacity(0.90),
+                                ? searchGraphite
+                                : Color.white
+                                    .opacity(0.86),
                             in: Capsule()
                         )
                         .overlay {
-                            if scope != item {
-                                Capsule()
-                                    .stroke(
-                                        Color.primary.opacity(0.065),
-                                        lineWidth: 1
-                                    )
-                            }
+                            Capsule()
+                                .stroke(
+                                    scope == item
+                                        ? Color.white
+                                            .opacity(0.10)
+                                        : Color.primary
+                                            .opacity(0.055),
+                                    lineWidth: 0.8
+                                )
                         }
+                        .shadow(
+                            color:
+                                Color.black
+                                    .opacity(
+                                        scope == item
+                                            ? 0.055
+                                            : 0.018
+                                    ),
+                            radius:
+                                scope == item
+                                    ? 7
+                                    : 4,
+                            y: 2
+                        )
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.vertical, 2)
+            .padding(
+                .vertical,
+                2
+            )
         }
     }
 
@@ -436,16 +664,25 @@ struct ATHLTHGlobalSearchView: View {
         .padding(.trailing, 4)
         .frame(height: 34)
         .background(
-            ATHLTHTheme.card,
+            Color.white
+                .opacity(0.86),
             in: Capsule()
         )
         .overlay {
             Capsule()
                 .stroke(
-                    Color.primary.opacity(0.055),
-                    lineWidth: 1
+                    Color.primary
+                        .opacity(0.050),
+                    lineWidth: 0.8
                 )
         }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.018),
+            radius: 5,
+            y: 2
+        )
     }
 
     @ViewBuilder
@@ -470,7 +707,7 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: "person.3.fill",
-                            tint: .indigo,
+                            tint: searchSocialAccent,
                             title: group.name,
                             subtitle: groupSubtitle(group)
                         )
@@ -484,7 +721,7 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: event.event.activityType.systemImage,
-                            tint: .purple,
+                            tint: searchCoolAccent,
                             title: event.event.title,
                             subtitle:
                                 ATHLTHLocalization.format(
@@ -507,7 +744,7 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: challenge.sport.systemImage,
-                            tint: .orange,
+                            tint: searchWarmAccent,
                             title: challenge.title,
                             subtitle:
                                 ATHLTHLocalization.format(
@@ -540,17 +777,49 @@ struct ATHLTHGlobalSearchView: View {
 
         if !visibleRoutes.isEmpty {
             VStack(alignment: .leading, spacing: 9) {
-                searchSectionTitle(
-                    useNearby
-                        ? ATHLTHLocalization.format(
-                            english: "Routes nearby",
-                            norwegian: "Ruter i nærheten"
-                        )
-                        : ATHLTHLocalization.format(
-                            english: "Routes to explore",
-                            norwegian: "Ruter å utforske"
-                        )
-                )
+                HStack {
+                    searchSectionTitle(
+                        useNearby
+                            ? ATHLTHLocalization.format(
+                                english: "Routes nearby",
+                                norwegian: "Ruter i nærheten"
+                            )
+                            : ATHLTHLocalization.format(
+                                english: "Routes to explore",
+                                norwegian: "Ruter å utforske"
+                            )
+                    )
+
+                    Spacer()
+
+                    if routes.routes.count > 3 {
+                        Button {
+                            withAnimation(
+                                .easeInOut(
+                                    duration: 0.16
+                                )
+                            ) {
+                                scope = .routes
+                            }
+                        } label: {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "See all",
+                                    norwegian: "Se alle"
+                                )
+                            )
+                            .font(
+                                .caption.weight(
+                                    .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                searchCoolAccent
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
 
                 ForEach(visibleRoutes) { route in
                     NavigationLink {
@@ -558,7 +827,7 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: "map.fill",
-                            tint: .green,
+                            tint: searchRouteAccent,
                             title: route.title,
                             subtitle: routeDiscoverySubtitle(
                                 route,
@@ -812,11 +1081,23 @@ struct ATHLTHGlobalSearchView: View {
         .allowsHitTesting(false)
     }
 
-    private func searchSectionTitle(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 11, weight: .bold))
-            .tracking(1.65)
-            .foregroundStyle(ATHLTHTheme.mutedText)
+    private func searchSectionTitle(
+        _ title: String
+    ) -> some View {
+        Text(
+            title.uppercased()
+        )
+        .font(
+            .system(
+                size: 10.5,
+                weight: .bold
+            )
+        )
+        .tracking(1.9)
+        .foregroundStyle(
+            ATHLTHTheme
+                .mutedText
+        )
     }
 
     private var searchEmptyState: some View {
@@ -1631,23 +1912,51 @@ struct ATHLTHGlobalSearchView: View {
             subtitle: subtitle
         )
         .background(
-            ATHLTHTheme.card.opacity(0.96),
-            in: RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.96),
+                    tint
+                        .opacity(0.045)
+                ],
+                startPoint:
+                    .leading,
+                endPoint:
+                    .trailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 18,
+                cornerRadius: 19,
                 style: .continuous
             )
-            .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            .stroke(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.78),
+                        tint
+                            .opacity(0.10)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                ),
+                lineWidth: 0.8
+            )
         }
         .shadow(
-            color: Color.black.opacity(0.022),
-            radius: 8,
-            y: 3
+            color:
+                Color.black
+                    .opacity(0.026),
+            radius: 9,
+            y: 4
         )
     }
 
