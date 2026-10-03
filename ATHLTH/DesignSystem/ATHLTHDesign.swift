@@ -1283,6 +1283,10 @@ private final class ATHLTHRemoteArtworkCache {
             cost: cost
         )
     }
+
+    func removeAll() {
+        images.removeAllObjects()
+    }
 }
 
 private struct ATHLTHRemoteArtworkImage: View {
@@ -1358,6 +1362,13 @@ struct ATHLTHArtworkImage: View {
     let reference: String?
     var fallbackAssetName: String = "CommunityHero"
     var maxPixelSize: Int = 900
+
+    @MainActor
+    static func clearRemoteCache() {
+        ATHLTHRemoteArtworkCache
+            .shared
+            .removeAll()
+    }
 
     var body: some View {
         Group {
