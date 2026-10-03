@@ -792,8 +792,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                     of: " in ",
                     options: .backwards,
                     range:
-                        postedRange.upperBound
-                        ..<message.endIndex
+                        postedRange.upperBound..<message.endIndex
                 )
         else {
             return message
@@ -801,18 +800,15 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
 
         let athlete =
             message[
-                message.startIndex
-                ..<postedRange.lowerBound
+                message.startIndex..<postedRange.lowerBound
             ]
         let result =
             message[
-                postedRange.upperBound
-                ..<inRange.lowerBound
+                postedRange.upperBound..<inRange.lowerBound
             ]
         let challenge =
             message[
-                inRange.upperBound
-                ..<message.endIndex
+                inRange.upperBound..<message.endIndex
             ]
 
         return
