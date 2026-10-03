@@ -1067,11 +1067,28 @@ struct ATHLTHHomeView: View {
         if let ratio = load.ratio,
            ratio.isFinite,
            ratio > 0 {
-            return String(
-                format: "%.2f×",
-                locale: Locale.current,
-                ratio
-            )
+            switch ratio {
+            case ..<0.75:
+                return ATHLTHLocalization.choose(
+                    english: "Low",
+                    norwegian: "Lav"
+                )
+            case 0.75...1.25:
+                return ATHLTHLocalization.choose(
+                    english: "Normal",
+                    norwegian: "Normal"
+                )
+            case 1.25...1.50:
+                return ATHLTHLocalization.choose(
+                    english: "Elevated",
+                    norwegian: "Økt"
+                )
+            default:
+                return ATHLTHLocalization.choose(
+                    english: "High",
+                    norwegian: "Høy"
+                )
+            }
         }
 
         guard load.acuteMinutes > 0
