@@ -903,6 +903,7 @@ struct RunQuickStartSheet: View {
         GhostQuickStartDraft()
     @State private var didLoadAudioCoachDefaults = false
     @State private var didLoadGuidanceDefaults = false
+    @State private var didResolveSetupMode = false
     @State private var isAdvancedSetup = false
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
@@ -1147,6 +1148,15 @@ struct RunQuickStartSheet: View {
                 }
             }
             .task {
+                if !didResolveSetupMode {
+                    isAdvancedSetup =
+                        settings
+                            .resolvedAdvancedSetup(
+                                for: .running
+                            )
+                    didResolveSetupMode = true
+                }
+
                 if !didLoadAudioCoachDefaults {
                     audioCoachDraft.load(from: settings)
                     didLoadAudioCoachDefaults = true
@@ -1231,7 +1241,14 @@ struct RunQuickStartSheet: View {
 
     private var runSetupModeButton: some View {
         Button {
-            isAdvancedSetup.toggle()
+            let nextMode =
+                !isAdvancedSetup
+            isAdvancedSetup =
+                nextMode
+            settings.recordAdvancedSetup(
+                nextMode,
+                for: .running
+            )
         } label: {
             HStack(spacing: 6) {
                 Image(
