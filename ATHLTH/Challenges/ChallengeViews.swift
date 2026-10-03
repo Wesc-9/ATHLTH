@@ -2304,7 +2304,10 @@ struct ChallengeCreationView: View {
                     selectedCoverImageData == nil
                         ? selectedCoverArtworkName
                         : nil,
-                customImageData: selectedCoverImageData
+                customImageData: selectedCoverImageData,
+                startsAt: startsAt,
+                endsAt: hasEnd ? endsAt : nil,
+                participantCount: invitees.count + 1
             )
 
             reviewRow("Starts", startsAt.formatted(date: .abbreviated, time: .shortened))
@@ -3469,6 +3472,9 @@ private struct ChallengeReviewCard: View {
     let verification: ChallengeVerificationPolicy
     let coverArtworkName: String?
     let customImageData: Data?
+    let startsAt: Date
+    let endsAt: Date?
+    let participantCount: Int
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -3514,6 +3520,35 @@ private struct ChallengeReviewCard: View {
                 Text("\(scoring.title) · \(verification.title)")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.76))
+
+                HStack(spacing: 12) {
+                    Label(
+                        startsAt.formatted(
+                            date: .abbreviated,
+                            time: .omitted
+                        ),
+                        systemImage: "calendar"
+                    )
+
+                    if let endsAt {
+                        Text("–")
+                        Text(
+                            endsAt.formatted(
+                                date: .abbreviated,
+                                time: .omitted
+                            )
+                        )
+                    }
+
+                    Spacer()
+
+                    Label(
+                        "\(participantCount)",
+                        systemImage: "person.2.fill"
+                    )
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.84))
             }
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
