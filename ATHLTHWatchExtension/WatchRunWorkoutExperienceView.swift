@@ -100,6 +100,12 @@ struct WatchRunWorkoutExperienceView: View {
                         automatic:
                             isAutoPaused
                     )
+                } else if
+                    workoutManager.kind ==
+                        .walking {
+                    alwaysOnWalkingContent(
+                        compact: compact
+                    )
                 } else {
                     alwaysOnRunningContent(
                         compact: compact
@@ -121,6 +127,276 @@ struct WatchRunWorkoutExperienceView: View {
         .background(
             Color.black
                 .ignoresSafeArea()
+        )
+    }
+
+    private func alwaysOnWalkingContent(
+        compact: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 5 : 7
+        ) {
+            alwaysOnHeader(
+                compact: compact
+            )
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            // Walking is intentionally distance-first. Pace remains
+            // available as a quiet secondary metric instead of competing
+            // with the primary progress signal.
+            VStack(
+                alignment: .leading,
+                spacing: compact ? 0 : 1
+            ) {
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 4
+                ) {
+                    Text(
+                        distanceKilometersText
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 33
+                                    : 39,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.80)
+
+                    Text("km")
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 10
+                                        : 11,
+                                weight: .semibold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.54
+                            )
+                        )
+                }
+
+                Text("DISTANCE")
+                    .font(
+                        .system(
+                            size: 7.5,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1.15)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.43
+                        )
+                    )
+            }
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            HStack(
+                alignment:
+                    .firstTextBaseline
+            ) {
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 4
+                ) {
+                    Image(
+                        systemName: "clock"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.46
+                        )
+                    )
+
+                    Text(
+                        durationText(
+                            workoutManager
+                                .elapsedTime
+                        )
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 14
+                                    : 16,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                Spacer()
+
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 4
+                ) {
+                    Image(
+                        systemName:
+                            "heart.fill"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.52
+                        )
+                    )
+
+                    Text(
+                        heartRateText
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 14
+                                    : 16,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+
+                    Text("bpm")
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 7
+                                        : 8,
+                                weight: .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.48
+                            )
+                        )
+                }
+            }
+
+            HStack(spacing: 5) {
+                Image(
+                    systemName:
+                        "figure.walk"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    WatchTheme
+                        .accent
+                        .opacity(0.58)
+                )
+
+                Text("WALK")
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7.5
+                                    : 8.5,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.95)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.52
+                        )
+                    )
+
+                Spacer()
+
+                if let pace =
+                        workoutManager
+                            .currentPaceSecondsPerKilometer {
+                    Text(
+                        paceText(pace) +
+                        " /km"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.48
+                        )
+                    )
+                }
+            }
+            .padding(.top, 1)
+
+            Capsule()
+                .fill(
+                    WatchTheme
+                        .accent
+                        .opacity(0.34)
+                )
+                .frame(height: 1.5)
+        }
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
+        )
+        .padding(
+            .vertical,
+            compact ? 6 : 8
         )
     }
 
