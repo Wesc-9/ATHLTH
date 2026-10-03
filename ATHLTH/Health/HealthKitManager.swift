@@ -1238,6 +1238,12 @@ final class HealthKitManager: ObservableObject {
             startDate: trendStart,
             endDate: now
         )
+        async let respiratoryTask = dailyAverageQuantities(
+            identifier: .respiratoryRate,
+            unit: HKUnit.count().unitDivided(by: .minute()),
+            startDate: trendStart,
+            endDate: now
+        )
         async let trendWorkoutsTask = fetchWorkouts(
             startDate: trendStart,
             endDate: now
@@ -1250,6 +1256,7 @@ final class HealthKitManager: ObservableObject {
         let sleepByDay = (try? await sleepTask) ?? [:]
         let hrvByDay = (try? await hrvTask) ?? [:]
         let restingByDay = (try? await restingTask) ?? [:]
+        let respiratoryByDay = (try? await respiratoryTask) ?? [:]
         let trendWorkouts = (try? await trendWorkoutsTask) ?? []
         let chronicWorkouts = (try? await chronicWorkoutsTask) ?? []
 
@@ -1281,6 +1288,8 @@ final class HealthKitManager: ObservableObject {
                     hrvMilliseconds: hrvByDay[normalizedDay],
                     restingHeartRate:
                         restingByDay[normalizedDay],
+                    respiratoryRate:
+                        respiratoryByDay[normalizedDay],
                     trainingMinutes:
                         trainingMinutesByDay[normalizedDay] ?? 0
                 )
