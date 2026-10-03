@@ -1467,28 +1467,37 @@ struct PerformanceStatsView: View {
 
     private var editorialRunningPRCard:
         some View {
-        ZStack {
-            Image("GoalSprint")
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 174)
-                .clipped()
-                .accessibilityHidden(true)
+        VStack(spacing: 0) {
+            ZStack(
+                alignment: .bottomLeading
+            ) {
+                Image("GoalSprint")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 138)
+                    .clipped()
+                    .accessibilityHidden(
+                        true
+                    )
 
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.88),
-                    Color.black.opacity(0.58)
-                ],
-                startPoint:
-                    .bottomLeading,
-                endPoint:
-                    .topTrailing
-            )
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.62)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-            VStack(spacing: 8) {
-                HStack(spacing: 10) {
+                HStack(
+                    alignment: .bottom,
+                    spacing: 10
+                ) {
                     Image(
                         systemName:
                             "figure.run"
@@ -1499,14 +1508,16 @@ struct PerformanceStatsView: View {
                             weight: .bold
                         )
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(
+                        .white
+                    )
                     .frame(
-                        width: 34,
-                        height: 34
+                        width: 38,
+                        height: 38
                     )
                     .background(
-                        Color.white
-                            .opacity(0.12),
+                        Color.black
+                            .opacity(0.32),
                         in: Circle()
                     )
 
@@ -1521,301 +1532,489 @@ struct PerformanceStatsView: View {
                             )
                         )
                         .font(
-                            .system(
-                                size: 15,
-                                weight: .bold
-                            )
+                            .headline
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            .white
                         )
 
                         Text(
                             text(
-                                "GPS-verified personal records.",
-                                "GPS-verifiserte personlige rekorder."
+                                "Verified records and ATHLTH training milestones.",
+                                "Verifiserte rekorder og ATHLTH-milepæler."
                             )
                         )
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(
-                            .white.opacity(
-                                0.72
-                            )
+                            .white
+                                .opacity(
+                                    0.84
+                                )
                         )
                     }
 
                     Spacer()
-                }
-                .foregroundStyle(.white)
 
-                HStack(spacing: 0) {
+                    sourceBadge(
+                        title:
+                            text(
+                                "HEALTH + ATHLTH",
+                                "HEALTH + ATHLTH"
+                            ),
+                        icon:
+                            "checkmark.seal.fill"
+                    )
+                }
+                .padding(14)
+            }
+            .frame(height: 138)
+
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    Text(
+                        text(
+                            "Personal bests",
+                            "Personlige rekorder"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                    Spacer()
+
+                    Text(
+                        text(
+                            "From your history",
+                            "Fra historikken din"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .flexible(),
+                            spacing: 8
+                        ),
+                        GridItem(
+                            .flexible(),
+                            spacing: 8
+                        )
+                    ],
+                    spacing: 8
+                ) {
                     ForEach(
                         Array(
-                            runningItems
-                                .prefix(4)
+                            runningDisplayItems
                                 .enumerated()
                         ),
                         id: \.offset
                     ) {
                         index,
                         item in
-                        editorialPRCell(
-                            item,
-                            index: index
-                        )
 
-                        if index < 3 {
-                            Rectangle()
-                                .fill(
-                                    Color.white
-                                        .opacity(
-                                            0.18
-                                        )
+                        lightPRMetric(
+                            item,
+                            source:
+                                runningMetricSource(
+                                    index
                                 )
-                                .frame(
-                                    width: 0.7,
-                                    height: 58
-                                )
-                        }
+                        )
                     }
                 }
-                .padding(
-                    .horizontal,
-                    8
-                )
-                .padding(
-                    .vertical,
-                    8
-                )
-                .background(
-                    Color.black.opacity(
-                        0.26
-                    ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.white
-                            .opacity(0.14),
-                        lineWidth: 0.8
-                    )
-                }
             }
-            .padding(12)
+            .padding(14)
         }
-        .frame(height: 174)
+        .background(
+            Color.white.opacity(
+                0.94
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
+                )
+        )
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
         .shadow(
             color:
-                Color.black.opacity(0.12),
-            radius: 16,
-            y: 8
+                Color.black
+                    .opacity(0.055),
+            radius: 14,
+            y: 6
         )
     }
 
-    private func editorialPRCell(
-        _ item: PerformanceMetricItem,
-        index: Int
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-            Text(
-                [
-                    "1 km",
-                    "1 mile",
-                    "5 km",
-                    "10 km"
-                ][
-                    min(
-                        max(index, 0),
-                        3
-                    )
-                ]
-            )
-            .font(
-                .system(
-                    size: 9,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(0.80)
-            )
-
-            Text(item.value)
-                .font(
-                    .system(
-                        size: 17,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.60)
-
-            Text(
-                item.detail
-                    .components(
-                        separatedBy:
-                            " · "
-                    )
-                    .first ??
-                item.detail
-            )
-            .font(
-                .system(
-                    size: 9,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                .white.opacity(0.68)
-            )
-            .lineLimit(1)
-            .minimumScaleFactor(0.60)
-
-            Capsule()
-                .fill(item.tint)
-                .frame(
-                    height: 3
-                )
-                .padding(.top, 4)
-        }
-        .padding(.horizontal, 7)
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
+    private var runningDisplayItems:
+        [PerformanceMetricItem] {
+        Array(
+            runningItems
+                .prefix(6)
+        ) + [
+            longestRunItem,
+            bestWeeklyRunningDistanceItem,
+            mostRunsInWeekItem,
+            bestRunningMonthItem
+        ]
     }
+
+    private func runningMetricSource(
+        _ index: Int
+    ) -> String {
+        index < 7
+            ? text(
+                "Verified",
+                "Verifisert"
+            )
+            : "ATHLTH"
+    }
+
 
     private var editorialStrengthPRCard:
         some View {
-        ZStack {
-            Image("GoalStrength")
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 174)
-                .clipped()
-                .accessibilityHidden(true)
+        VStack(spacing: 0) {
+            ZStack(
+                alignment: .bottomLeading
+            ) {
+                Image("GoalStrength")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 138)
+                    .clipped()
+                    .accessibilityHidden(
+                        true
+                    )
 
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.90),
-                    Color.black.opacity(0.62)
-                ],
-                startPoint: .bottomLeading,
-                endPoint: .topTrailing
-            )
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.64)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
 
-            VStack(spacing: 8) {
-                HStack(spacing: 10) {
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.indigo)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            Color.white.opacity(0.12),
-                            in: Circle()
+                HStack(
+                    alignment: .bottom,
+                    spacing: 10
+                ) {
+                    Image(
+                        systemName:
+                            "dumbbell.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .bold
                         )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        Color.black
+                            .opacity(0.32),
+                        in: Circle()
+                    )
 
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
                         Text(
                             text(
                                 "Strength records",
                                 "Styrke-rekorder"
                             )
                         )
-                        .font(.system(size: 15, weight: .bold))
+                        .font(
+                            .headline
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
 
                         Text(
                             text(
-                                "Personal records from strength workouts.",
-                                "Personlige rekorder fra styrkeøkter."
+                                "Records calculated from completed ATHLTH sets.",
+                                "Rekorder beregnet fra fullførte ATHLTH-sett."
                             )
                         )
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .font(.caption)
+                        .foregroundStyle(
+                            .white
+                                .opacity(
+                                    0.84
+                                )
+                        )
                     }
 
                     Spacer()
+
+                    sourceBadge(
+                        title: "ATHLTH",
+                        icon:
+                            "sparkles"
+                    )
                 }
-                .foregroundStyle(.white)
+                .padding(14)
+            }
+            .frame(height: 138)
 
-                HStack(spacing: 0) {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    Text(
+                        text(
+                            "Strength bests",
+                            "Styrkerekorder"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                    Spacer()
+
+                    Text(
+                        text(
+                            "From completed workouts",
+                            "Fra fullførte økter"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .flexible(),
+                            spacing: 8
+                        ),
+                        GridItem(
+                            .flexible(),
+                            spacing: 8
+                        )
+                    ],
+                    spacing: 8
+                ) {
                     ForEach(
-                        Array(strengthItems.prefix(4).enumerated()),
+                        Array(
+                            strengthDisplayItems
+                                .enumerated()
+                        ),
                         id: \.offset
-                    ) { index, item in
-                        editorialStrengthPRCell(item)
+                    ) {
+                        _,
+                        item in
 
-                        if index < 3 {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.18))
-                                .frame(width: 0.7, height: 58)
-                        }
+                        lightPRMetric(
+                            item,
+                            source:
+                                "ATHLTH"
+                        )
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
-                .background(
-                    Color.black.opacity(0.28),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.white.opacity(0.14),
-                        lineWidth: 0.8
-                    )
-                }
             }
-            .padding(12)
+            .padding(14)
         }
-        .frame(height: 174)
+        .background(
+            Color.white.opacity(
+                0.94
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
+                )
+        )
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
         .shadow(
-            color: Color.black.opacity(0.12),
-            radius: 16,
-            y: 8
+            color:
+                Color.black
+                    .opacity(0.055),
+            radius: 14,
+            y: 6
         )
     }
 
-    private func editorialStrengthPRCell(
-        _ item: PerformanceMetricItem
+    private var strengthDisplayItems:
+        [PerformanceMetricItem] {
+        Array(
+            strengthItems
+                .prefix(6)
+        ) + [
+            longestStrengthWorkoutItem,
+            mostStrengthSetsItem,
+            mostStrengthRepsItem,
+            mostStrengthExercisesItem,
+            bestWeeklyStrengthVolumeItem,
+            mostStrengthCaloriesItem
+        ]
+    }
+
+    private func sourceBadge(
+        title: String,
+        icon: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .system(
+                size: 8,
+                weight: .bold
+            )
+        )
+        .tracking(0.45)
+        .foregroundStyle(.white)
+        .padding(
+            .horizontal,
+            8
+        )
+        .frame(height: 26)
+        .background(
+            Color.black
+                .opacity(0.28),
+            in: Capsule()
+        )
+    }
+
+    private func lightPRMetric(
+        _ item:
+            PerformanceMetricItem,
+        source: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            HStack {
+                Image(
+                    systemName:
+                        item.icon
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight:
+                            .semibold
+                    )
+                )
+                .foregroundStyle(
+                    item.tint
+                )
+                .frame(
+                    width: 28,
+                    height: 28
+                )
+                .background(
+                    item.tint
+                        .opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 9,
+                            style:
+                                .continuous
+                        )
+                )
+
+                Spacer()
+
+                Text(source)
+                    .font(
+                        .system(
+                            size: 7.5,
+                            weight:
+                                .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
             Text(item.title)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.80))
+                .font(
+                    .system(
+                        size: 10,
+                        weight:
+                            .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
                 .lineLimit(1)
-                .minimumScaleFactor(0.68)
+                .minimumScaleFactor(
+                    0.72
+                )
 
             Text(item.value)
                 .font(
@@ -1826,28 +2025,78 @@ struct PerformanceStatsView: View {
                     )
                 )
                 .monospacedDigit()
-                .foregroundStyle(.white)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
                 .lineLimit(1)
-                .minimumScaleFactor(0.58)
+                .minimumScaleFactor(
+                    0.58
+                )
 
             Text(
                 item.detail
-                    .components(separatedBy: " · ")
-                    .first ?? item.detail
             )
-            .font(.system(size: 8.5, weight: .medium))
-            .foregroundStyle(.white.opacity(0.68))
+            .font(
+                .system(
+                    size: 8.5,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
             .lineLimit(1)
-            .minimumScaleFactor(0.58)
+            .minimumScaleFactor(
+                0.64
+            )
 
             Capsule()
-                .fill(item.tint)
+                .fill(
+                    item.tint
+                )
                 .frame(height: 3)
-                .padding(.top, 3)
         }
-        .padding(.horizontal, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(11)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 126,
+            alignment: .topLeading
+        )
+        .background(
+            LinearGradient(
+                colors: [
+                    item.tint
+                        .opacity(0.055),
+                    Color.white
+                        .opacity(0.94)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                item.tint
+                    .opacity(0.09),
+                lineWidth: 0.7
+            )
+        }
     }
+
 
     private var editorialTrainingVolumeCard:
         some View {
@@ -4430,6 +4679,594 @@ struct PerformanceStatsView: View {
                 tint: ATHLTHTheme.accentDeep
             )
         ]
+    }
+
+    private var bestWeeklyRunningDistanceItem:
+        PerformanceMetricItem {
+        let grouped =
+            Dictionary(
+                grouping:
+                    resolvedPerformanceWorkouts
+                        .filter {
+                            $0.activity ==
+                                .running
+                        }
+            ) {
+                weekBucket(
+                    for:
+                        $0.startDate
+                )
+            }
+
+        let best =
+            grouped
+                .map {
+                    key,
+                    workouts in
+                    (
+                        key,
+                        workouts.reduce(
+                            0.0
+                        ) {
+                            $0 +
+                            max(
+                                $1.distanceMeters ??
+                                    0,
+                                0
+                            )
+                        }
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon:
+                "calendar.badge.checkmark",
+            title:
+                text(
+                    "Best weekly distance",
+                    "Beste ukesdistanse"
+                ),
+            value:
+                formatDistance(
+                    best?.1
+                ),
+            detail:
+                best.map {
+                    weekLabel($0.0)
+                } ??
+                text(
+                    "No running history yet",
+                    "Ingen løpehistorikk ennå"
+                ),
+            tint: .green
+        )
+    }
+
+    private var mostRunsInWeekItem:
+        PerformanceMetricItem {
+        let grouped =
+            Dictionary(
+                grouping:
+                    resolvedPerformanceWorkouts
+                        .filter {
+                            $0.activity ==
+                                .running
+                        }
+            ) {
+                weekBucket(
+                    for:
+                        $0.startDate
+                )
+            }
+
+        let best =
+            grouped.max {
+                $0.value.count <
+                $1.value.count
+            }
+
+        return PerformanceMetricItem(
+            icon:
+                "calendar.badge.plus",
+            title:
+                text(
+                    "Most runs in a week",
+                    "Flest løpeøkter på én uke"
+                ),
+            value:
+                best.map {
+                    $0.value.count
+                        .formatted()
+                } ?? "—",
+            detail:
+                best.map {
+                    weekLabel($0.key)
+                } ??
+                text(
+                    "No running history yet",
+                    "Ingen løpehistorikk ennå"
+                ),
+            tint: .cyan
+        )
+    }
+
+    private var bestRunningMonthItem:
+        PerformanceMetricItem {
+        let calendar =
+            Calendar.current
+        let running =
+            resolvedPerformanceWorkouts
+                .filter {
+                    $0.activity ==
+                        .running
+                }
+
+        let grouped =
+            Dictionary(
+                grouping: running
+            ) {
+                DateComponents(
+                    year:
+                        calendar.component(
+                            .year,
+                            from:
+                                $0.startDate
+                        ),
+                    month:
+                        calendar.component(
+                            .month,
+                            from:
+                                $0.startDate
+                        )
+                )
+            }
+
+        let best =
+            grouped
+                .map {
+                    key,
+                    workouts in
+                    (
+                        key,
+                        workouts.reduce(
+                            0.0
+                        ) {
+                            $0 +
+                            max(
+                                $1.distanceMeters ??
+                                    0,
+                                0
+                            )
+                        }
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon:
+                "calendar",
+            title:
+                text(
+                    "Best running month",
+                    "Beste løpemåned"
+                ),
+            value:
+                formatDistance(
+                    best?.1
+                ),
+            detail:
+                best.map {
+                    monthLabel($0.0)
+                } ??
+                text(
+                    "No running history yet",
+                    "Ingen løpehistorikk ennå"
+                ),
+            tint: .orange
+        )
+    }
+
+    private var finishedStrengthWorkouts:
+        [StrengthWorkoutLog] {
+        strengthWorkout
+            .workoutHistory
+            .filter(\.isFinished)
+    }
+
+    private var longestStrengthWorkoutItem:
+        PerformanceMetricItem {
+        let best =
+            finishedStrengthWorkouts
+                .compactMap {
+                    workout ->
+                        (
+                            StrengthWorkoutLog,
+                            TimeInterval
+                        )? in
+
+                    let duration =
+                        workout
+                            .healthMetrics
+                            .duration ??
+                        workout
+                            .endedAt
+                            .map {
+                                $0.timeIntervalSince(
+                                    workout
+                                        .startedAt
+                                )
+                            }
+
+                    guard let duration,
+                          duration > 0
+                    else {
+                        return nil
+                    }
+
+                    return (
+                        workout,
+                        duration
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon: "clock.fill",
+            title:
+                text(
+                    "Longest strength workout",
+                    "Lengste styrkeøkt"
+                ),
+            value:
+                formatDuration(
+                    best?.1
+                ),
+            detail:
+                best.map {
+                    formatDate(
+                        $0.0
+                            .startedAt
+                    )
+                } ??
+                text(
+                    "No completed workout yet",
+                    "Ingen fullført økt ennå"
+                ),
+            tint: .indigo
+        )
+    }
+
+    private var mostStrengthSetsItem:
+        PerformanceMetricItem {
+        let best =
+            finishedStrengthWorkouts
+                .max {
+                    $0.totalCompletedSets <
+                    $1.totalCompletedSets
+                }
+
+        return PerformanceMetricItem(
+            icon: "list.number",
+            title:
+                text(
+                    "Most sets in a workout",
+                    "Flest sett i én økt"
+                ),
+            value:
+                best.map {
+                    $0.totalCompletedSets
+                        .formatted()
+                } ?? "—",
+            detail:
+                best.map {
+                    formatDate(
+                        $0.startedAt
+                    )
+                } ??
+                text(
+                    "No completed workout yet",
+                    "Ingen fullført økt ennå"
+                ),
+            tint: .blue
+        )
+    }
+
+    private var mostStrengthRepsItem:
+        PerformanceMetricItem {
+        let best =
+            finishedStrengthWorkouts
+                .map {
+                    workout in
+                    (
+                        workout,
+                        workout.exercises
+                            .flatMap(\.sets)
+                            .filter(
+                                \.isCompleted
+                            )
+                            .reduce(0) {
+                                $0 +
+                                max(
+                                    $1.completedReps ??
+                                        0,
+                                    0
+                                )
+                            }
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon:
+                "repeat.circle.fill",
+            title:
+                text(
+                    "Most reps in a workout",
+                    "Flest reps i én økt"
+                ),
+            value:
+                best.map {
+                    $0.1.formatted()
+                } ?? "—",
+            detail:
+                best.map {
+                    formatDate(
+                        $0.0
+                            .startedAt
+                    )
+                } ??
+                text(
+                    "No completed workout yet",
+                    "Ingen fullført økt ennå"
+                ),
+            tint: .purple
+        )
+    }
+
+    private var mostStrengthExercisesItem:
+        PerformanceMetricItem {
+        let best =
+            finishedStrengthWorkouts
+                .map {
+                    workout in
+                    (
+                        workout,
+                        workout.exercises
+                            .filter(
+                                \.isCompleted
+                            )
+                            .count
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon:
+                "square.grid.2x2.fill",
+            title:
+                text(
+                    "Most exercises in a workout",
+                    "Flest øvelser i én økt"
+                ),
+            value:
+                best.map {
+                    $0.1.formatted()
+                } ?? "—",
+            detail:
+                best.map {
+                    formatDate(
+                        $0.0
+                            .startedAt
+                    )
+                } ??
+                text(
+                    "No completed workout yet",
+                    "Ingen fullført økt ennå"
+                ),
+            tint: .teal
+        )
+    }
+
+    private var bestWeeklyStrengthVolumeItem:
+        PerformanceMetricItem {
+        let grouped =
+            Dictionary(
+                grouping:
+                    finishedStrengthWorkouts
+            ) {
+                weekBucket(
+                    for:
+                        $0.startedAt
+                )
+            }
+
+        let best =
+            grouped
+                .map {
+                    key,
+                    workouts in
+                    (
+                        key,
+                        workouts.reduce(
+                            0.0
+                        ) {
+                            $0 +
+                            max(
+                                $1.totalVolumeKilograms,
+                                0
+                            )
+                        }
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon:
+                "chart.bar.fill",
+            title:
+                text(
+                    "Best weekly volume",
+                    "Høyeste ukesvolum"
+                ),
+            value:
+                best.map {
+                    formatKilograms(
+                        $0.1
+                    )
+                } ?? "—",
+            detail:
+                best.map {
+                    weekLabel($0.0)
+                } ??
+                text(
+                    "No completed workouts yet",
+                    "Ingen fullførte økter ennå"
+                ),
+            tint:
+                ATHLTHTheme
+                    .accentDeep
+        )
+    }
+
+    private var mostStrengthCaloriesItem:
+        PerformanceMetricItem {
+        let best =
+            finishedStrengthWorkouts
+                .compactMap {
+                    workout ->
+                        (
+                            StrengthWorkoutLog,
+                            Double
+                        )? in
+
+                    guard let calories =
+                            workout
+                                .healthMetrics
+                                .activeCalories,
+                          calories > 0
+                    else {
+                        return nil
+                    }
+
+                    return (
+                        workout,
+                        calories
+                    )
+                }
+                .max {
+                    $0.1 <
+                    $1.1
+                }
+
+        return PerformanceMetricItem(
+            icon: "flame.fill",
+            title:
+                text(
+                    "Most active calories",
+                    "Flest aktive kalorier"
+                ),
+            value:
+                best.map {
+                    "\(Int($0.1.rounded())) kcal"
+                } ?? "—",
+            detail:
+                best.map {
+                    formatDate(
+                        $0.0
+                            .startedAt
+                    )
+                } ??
+                text(
+                    "No calorie record yet",
+                    "Ingen kalorirekord ennå"
+                ),
+            tint: .orange
+        )
+    }
+
+    private func weekBucket(
+        for date: Date
+    ) -> Date {
+        Calendar.current
+            .dateInterval(
+                of: .weekOfYear,
+                for: date
+            )?
+            .start ??
+            Calendar.current
+                .startOfDay(
+                    for: date
+                )
+    }
+
+    private func weekLabel(
+        _ start: Date
+    ) -> String {
+        let calendar =
+            Calendar.current
+        let end =
+            calendar.date(
+                byAdding: .day,
+                value: 6,
+                to: start
+            ) ?? start
+
+        return
+            start.formatted(
+                .dateTime
+                    .day()
+                    .month(
+                        .abbreviated
+                    )
+            ) +
+            " – " +
+            end.formatted(
+                .dateTime
+                    .day()
+                    .month(
+                        .abbreviated
+                    )
+            )
+    }
+
+    private func monthLabel(
+        _ components:
+            DateComponents
+    ) -> String {
+        guard let date =
+                Calendar.current
+                    .date(
+                        from:
+                            components
+                    )
+        else {
+            return "—"
+        }
+
+        return date.formatted(
+            .dateTime
+                .month(.wide)
+                .year()
+        )
     }
 
     private var recoveryItems: [PerformanceMetricItem] {
