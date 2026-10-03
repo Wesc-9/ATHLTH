@@ -276,13 +276,27 @@ struct GoalDetailView: View {
 
                         actionsCard(goal)
                     }
-                    .containerRelativeFrame(
-                        .horizontal
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
                     )
                     .padding(.bottom, 30)
                 }
                 .scrollIndicators(.hidden)
-                .background(Color(.systemGroupedBackground).ignoresSafeArea())
+                .contentMargins(
+                    .top,
+                    0,
+                    for: .scrollContent
+                )
+                .ignoresSafeArea(
+                    edges: .top
+                )
+                .background(
+                    Color(
+                        .systemGroupedBackground
+                    )
+                    .ignoresSafeArea()
+                )
                 .safeAreaInset(
                     edge: .bottom,
                     spacing: 0
@@ -345,60 +359,181 @@ struct GoalDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
+        )
+        .toolbarColorScheme(
+            .dark,
+            for: .navigationBar
+        )
     }
 
     private func hero(_ goal: ATHLTHGoal) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            GoalCoverView(goal: goal)
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
-                .clipped()
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            GoalCoverView(
+                goal: goal
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .clipped()
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.82)],
+                stops: [
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.04),
+                        location: 0
+                    ),
+                    .init(
+                        color:
+                            Color.clear,
+                        location: 0.34
+                    ),
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.48),
+                        location: 0.72
+                    ),
+                    .init(
+                        color:
+                            Color.black
+                                .opacity(0.84),
+                        location: 1
+                    )
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
                 HStack(spacing: 8) {
                     if goal.isPrimary {
-                        Label("PRIMARY", systemImage: "star.fill")
-                            .font(.caption2.bold())
-                            .tracking(1)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(.white.opacity(0.18), in: Capsule())
+                        Label(
+                            "PRIMARY",
+                            systemImage:
+                                "star.fill"
+                        )
+                        .font(
+                            .caption2.bold()
+                        )
+                        .tracking(1)
+                        .padding(
+                            .horizontal,
+                            9
+                        )
+                        .padding(
+                            .vertical,
+                            5
+                        )
+                        .background(
+                            .white.opacity(
+                                0.18
+                            ),
+                            in: Capsule()
+                        )
                     }
 
-                    Text(goal.category.title.uppercased())
-                        .font(.caption2.bold())
-                        .tracking(1)
+                    Text(
+                        goal.category
+                            .title
+                            .uppercased()
+                    )
+                    .font(
+                        .caption2.bold()
+                    )
+                    .tracking(1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.72
+                    )
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
 
                 Text(goal.title)
-                    .font(.system(size: 32, weight: .bold))
+                    .font(
+                        .system(
+                            size: 32,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
                     .lineLimit(2)
+                    .minimumScaleFactor(
+                        0.78
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
 
-                if let deadline = goal.deadline {
+                if let deadline =
+                    goal.deadline {
                     HStack(spacing: 6) {
-                        Image(systemName: "calendar")
-                        Text(deadline.formatted(.dateTime.day().month(.wide).year()))
+                        Image(
+                            systemName:
+                                "calendar"
+                        )
+                        Text(
+                            deadline
+                                .formatted(
+                                    .dateTime
+                                        .day()
+                                        .month(
+                                            .wide
+                                        )
+                                        .year()
+                                )
+                        )
                         Text("·")
-                        Text(deadline, style: .relative)
+                        Text(
+                            deadline,
+                            style:
+                                .relative
+                        )
                     }
                     .font(.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.78
+                    )
                 }
             }
             .foregroundStyle(.white)
-            .padding(20)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .padding(
+                .horizontal,
+                20
+            )
+            .padding(
+                .bottom,
+                22
+            )
         }
         .frame(
-            maxWidth: .infinity
+            maxWidth: .infinity,
+            alignment: .leading
         )
-        .frame(height: 300)
+        .frame(height: 322)
         .clipped()
     }
 
