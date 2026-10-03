@@ -1,6 +1,7 @@
 import CoreLocation
 import MapKit
 import SwiftUI
+import UIKit
 
 // MARK: - Home activity stream
 
@@ -3261,8 +3262,8 @@ private struct HomePersonalWorkoutVisual:
     let phoneWorkout: PhoneWorkout?
     let height: CGFloat
 
-    @State private var detail:
-        WorkoutDetail?
+    @State private var loadedRoute: [CLLocation] = []
+    @State private var routePreviewImage: UIImage?
 
     private var localRoute:
         [CLLocation] {
@@ -3278,7 +3279,7 @@ private struct HomePersonalWorkoutVisual:
             return localRoute
         }
 
-        return detail?.route ?? []
+        return loadedRoute
     }
 
     private var muscleProfile:
@@ -3343,7 +3344,7 @@ private struct HomePersonalWorkoutVisual:
         .frame(height: height)
         .clipped()
         .task(id: workout.id) {
-            await loadDetailIfNeeded()
+            await loadRoutePreviewIfNeeded()
         }
     }
 
@@ -3458,40 +3459,21 @@ private struct HomePersonalWorkoutVisual:
 
     private var routeMap:
         some View {
-        Map(
-            initialPosition:
-                .region(
-                    routeRegion(
-                        resolvedRoute
-                            .map(
-                                \.coordinate
-                            )
-                    )
-                )
-        ) {
-            MapPolyline(
-                coordinates:
-                    resolvedRoute
-                        .map(
-                            \.coordinate
-                        )
-            )
-            .stroke(
-                ATHLTHTheme.accent,
-                lineWidth: 5
-            )
+        ZStack {
+            if let routePreviewImage {
+                Image(uiImage: routePreviewImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                genericBackground
+            }
         }
-        .allowsHitTesting(false)
         .overlay {
             LinearGradient(
                 colors: [
-                    Color.black.opacity(
-                        0.08
-                    ),
+                    Color.black.opacity(0.08),
                     Color.clear,
-                    Color.black.opacity(
-                        0.18
-                    )
+                    Color.black.opacity(0.18)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -3546,19 +3528,50 @@ private struct HomePersonalWorkoutVisual:
     }
 
     @MainActor
-    private func loadDetailIfNeeded()
+    private func loadRoutePreviewIfNeeded()
         async {
-        guard isOutdoorActivity,
-              localRoute.count < 2,
-              detail == nil
-        else {
+        guard isOutdoorActivity else {
             return
         }
 
-        detail =
-            await health.workoutDetail(
+        let route: [CLLocation]
+        if localRoute.count >= 2 {
+            route = localRoute
+        } else {
+            route = await health.workoutRoute(
                 for: workout.id
             )
+        }
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        loadedRoute = route
+
+        let coordinates =
+            HomeActivityRouteSanitizer
+                .sampledCoordinates(
+                    from: route,
+                    maximumCount: 96
+                )
+
+        guard coordinates.count >= 2 else {
+            return
+        }
+
+        let rendered =
+            await HomeActivityRouteSnapshotRendererV2
+                .shared
+                .image(
+                    coordinates: coordinates
+                )
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        routePreviewImage = rendered
     }
 
     private var isOutdoorActivity:

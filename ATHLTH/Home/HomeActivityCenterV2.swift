@@ -3319,7 +3319,7 @@ private struct HomeActivityRoutePreviewV2: View {
 }
 
 @MainActor
-private final class
+final class
     HomeActivityRouteSnapshotRendererV2 {
     static let shared =
         HomeActivityRouteSnapshotRendererV2()

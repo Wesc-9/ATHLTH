@@ -95,6 +95,8 @@ final class HealthKitManager: ObservableObject {
     private var observerQueries: [HKObserverQuery] = []
     private var refreshRequestedWhileRunning = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
+    private var workoutRouteCache:
+        [UUID: (route: [CLLocation], generatedAt: Date)] = [:]
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
     private var runningRoutePerformanceCache:
         [UUID: RunningRoutePerformanceEntry] = [:]
@@ -3044,6 +3046,28 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    func workoutRoute(for workoutID: UUID) async -> [CLLocation] {
+        if let cached = workoutRouteCache[workoutID],
+           Date().timeIntervalSince(cached.generatedAt) < 600 {
+            return cached.route
+        }
+
+        let workout: HKWorkout?
+        if let cachedWorkout = workoutObjects[workoutID] {
+            workout = cachedWorkout
+        } else {
+            workout = try? await workoutForChallenge(uuid: workoutID)
+            if let workout {
+                workoutObjects[workout.uuid] = workout
+            }
+        }
+
+        guard let workout else { return [] }
+        let route = (try? await fetchRoute(for: workout)) ?? []
+        workoutRouteCache[workoutID] = (route, Date())
+        return route
+    }
+
     func workoutDetail(for workoutID: UUID) async -> WorkoutDetail {
         let workout: HKWorkout?
 
@@ -3722,6 +3746,7 @@ final class HealthKitManager: ObservableObject {
 
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
+        workoutRouteCache.removeAll(keepingCapacity: true)
         profilePerformanceCache = nil
         personalRecordsCache = nil
         invalidateTrophySnapshotCache()
