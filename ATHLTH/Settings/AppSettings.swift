@@ -112,6 +112,45 @@ enum TimeFormatPreference: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum StrengthFigurePreference:
+    String,
+    CaseIterable,
+    Identifiable,
+    Codable
+{
+    case automatic
+    case neutral
+    case female
+    case male
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic:
+            return ATHLTHLocalization.choose(
+                english: "Automatic",
+                norwegian: "Automatisk"
+            )
+        case .neutral:
+            return ATHLTHLocalization.choose(
+                english: "Neutral",
+                norwegian: "Nøytral"
+            )
+        case .female:
+            return ATHLTHLocalization.choose(
+                english: "Woman",
+                norwegian: "Kvinne"
+            )
+        case .male:
+            return ATHLTHLocalization.choose(
+                english: "Man",
+                norwegian: "Mann"
+            )
+        }
+    }
+}
+
 enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     case system
     case light
@@ -378,6 +417,10 @@ final class AppSettingsStore: ObservableObject {
     @Published var measurementPreference: MeasurementPreference { didSet { persist() } }
     @Published var timeFormatPreference: TimeFormatPreference { didSet { persist() } }
     @Published var appearance: AppAppearance { didSet { persist() } }
+    @Published var strengthFigurePreference:
+        StrengthFigurePreference {
+        didSet { persist() }
+    }
 
     @Published var profileVisibility: ProfileVisibility { didSet { persist() } }
     @Published var defaultActivityVisibility: ProfileVisibility { didSet { persist() } }
@@ -552,6 +595,14 @@ final class AppSettingsStore: ObservableObject {
                 : .twelveHour)
 
         appearance = .light
+        strengthFigurePreference =
+            StrengthFigurePreference(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.strengthFigurePreference"
+                    ) ?? ""
+            ) ?? .automatic
 
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .publicProfile
         defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
@@ -865,6 +916,11 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(measurementPreference.rawValue, forKey: "settings.measurement")
         defaults.set(timeFormatPreference.rawValue, forKey: "settings.timeFormat")
         defaults.set(appearance.rawValue, forKey: "settings.appearance")
+        defaults.set(
+            strengthFigurePreference.rawValue,
+            forKey:
+                "settings.strengthFigurePreference"
+        )
 
         defaults.set(profileVisibility.rawValue, forKey: "settings.profileVisibility")
         defaults.set(defaultActivityVisibility.rawValue, forKey: "settings.defaultActivityVisibility")
