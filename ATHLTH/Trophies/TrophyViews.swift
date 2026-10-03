@@ -59,6 +59,19 @@ struct ATHLTHTrophyCoreView: View {
         !reduceTransparency
     }
 
+    private var usesPrestigeTilt: Bool {
+        trophy.isUnlocked &&
+        trophy.isPrestigeTrophy &&
+        settings.achievementEffects ==
+            .full &&
+        !reduceMotion
+    }
+
+    private var usesInteractiveTilt: Bool {
+        usesSignatureTilt ||
+        usesPrestigeTilt
+    }
+
     private var showsSignatureSheen: Bool {
         trophy.isUnlocked &&
         !trophy.isPrestigeTrophy &&
@@ -151,9 +164,13 @@ struct ATHLTHTrophyCoreView: View {
                 )
                 .rotation3DEffect(
                     .degrees(
-                        usesSignatureTilt
-                            ? -tilt.y * 4.5
-                            : 0
+                        usesPrestigeTilt
+                            ? -tilt.y * 5.2
+                            : usesSignatureTilt
+                                ? -tilt.y * 4.5
+                                : trophy.isPrestigeTrophy
+                                    ? -3.5
+                                    : 0
                     ),
                     axis:
                         (
@@ -164,9 +181,13 @@ struct ATHLTHTrophyCoreView: View {
                 )
                 .rotation3DEffect(
                     .degrees(
-                        usesSignatureTilt
-                            ? tilt.x * 5.5
-                            : 0
+                        usesPrestigeTilt
+                            ? tilt.x * 7.0
+                            : usesSignatureTilt
+                                ? tilt.x * 5.5
+                                : trophy.isPrestigeTrophy
+                                    ? 5.0
+                                    : 0
                     ),
                     axis:
                         (
@@ -176,18 +197,18 @@ struct ATHLTHTrophyCoreView: View {
                         )
                 )
                 .onAppear {
-                    if usesSignatureTilt {
+                    if usesInteractiveTilt {
                         tilt.begin()
                     }
                 }
                 .onDisappear {
-                    if usesSignatureTilt {
+                    if usesInteractiveTilt {
                         tilt.end()
                     }
                 }
                 .onChange(
                     of:
-                        usesSignatureTilt
+                        usesInteractiveTilt
                 ) {
                     _, enabled in
                     if enabled {
@@ -943,6 +964,59 @@ struct ATHLTHTrophyCoreView: View {
             .uppercased()
 
         return ZStack {
+            // Soft ground shadow plus a dark offset silhouette create depth
+            // without bringing a 3D engine into the workout app.
+            Ellipse()
+                .fill(
+                    Color.black.opacity(
+                        trophy.isUnlocked
+                            ? 0.30
+                            : 0.14
+                    )
+                )
+                .frame(
+                    width: size * 0.66,
+                    height: size * 0.14
+                )
+                .blur(
+                    radius: size * 0.035
+                )
+                .offset(
+                    y: size * 0.47
+                )
+
+            Image(
+                systemName: "trophy.fill"
+            )
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(
+                trophy.isUnlocked
+                    ? Color(
+                        red: 0.34,
+                        green: 0.19,
+                        blue: 0.035
+                    )
+                    : Color(
+                        .systemGray3
+                    )
+            )
+            .padding(
+                .horizontal,
+                size * 0.035
+            )
+            .padding(
+                .vertical,
+                size * 0.01
+            )
+            .offset(
+                x: size * 0.035,
+                y: size * 0.035
+            )
+            .blur(
+                radius: size * 0.004
+            )
+
             Image(
                 systemName: "trophy.fill"
             )
@@ -954,15 +1028,20 @@ struct ATHLTHTrophyCoreView: View {
                         colors: [
                             Color(
                                 red: 1.0,
-                                green: 0.88,
-                                blue: 0.46
+                                green: 0.94,
+                                blue: 0.66
+                            ),
+                            Color(
+                                red: 0.93,
+                                green: 0.68,
+                                blue: 0.18
                             ),
                             ATHLTHTheme
                                 .premiumGold,
                             Color(
-                                red: 0.58,
-                                green: 0.36,
-                                blue: 0.08
+                                red: 0.47,
+                                green: 0.27,
+                                blue: 0.045
                             )
                         ],
                         startPoint:
@@ -993,6 +1072,66 @@ struct ATHLTHTrophyCoreView: View {
                 .vertical,
                 size * 0.01
             )
+            .shadow(
+                color:
+                    trophy.isUnlocked
+                        ? ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.28)
+                        : .clear,
+                radius: size * 0.06,
+                y: size * 0.04
+            )
+
+            if trophy.isUnlocked &&
+                !reduceTransparency {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color.white
+                            .opacity(0.72),
+                        Color.white
+                            .opacity(0.08),
+                        .clear
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+                .frame(
+                    width: size * 0.78,
+                    height: size * 1.04
+                )
+                .rotationEffect(
+                    .degrees(-16)
+                )
+                .offset(
+                    x:
+                        usesPrestigeTilt
+                            ? tilt.x *
+                                size * 0.08
+                            : -size * 0.08
+                )
+                .mask(
+                    Image(
+                        systemName:
+                            "trophy.fill"
+                    )
+                    .resizable()
+                    .scaledToFit()
+                    .padding(
+                        .horizontal,
+                        size * 0.035
+                    )
+                    .padding(
+                        .vertical,
+                        size * 0.01
+                    )
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
+            }
 
             if trophy.isUnlocked {
                 VStack(
@@ -1429,6 +1568,7 @@ struct TrophyCollectionView: View {
         TrophyHubTab
     @State private var filter:
         TrophyCollectionFilter = .all
+    @State private var showingShelfPicker = false
 
     init(
         startInCabinet: Bool = false
@@ -1524,6 +1664,202 @@ struct TrophyCollectionView: View {
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .sheet(
+            isPresented:
+                $showingShelfPicker
+        ) {
+            shelfPickerSheet
+                .presentationDetents(
+                    [.medium, .large]
+                )
+                .presentationDragIndicator(
+                    .visible
+                )
+        }
+    }
+
+    private var shelfPickerCandidates:
+        [TrophyProgressItem] {
+        unlocked.filter {
+            !trophies
+                .isShowcased($0.id)
+        }
+    }
+
+    private var shelfPickerSheet:
+        some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose an award",
+                                norwegian:
+                                    "Velg en utmerkelse"
+                            )
+                        )
+                        .font(
+                            .title2
+                                .weight(.bold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Achievements and trophies are shown together, rarest first.",
+                                norwegian:
+                                    "Achievements og pokaler vises samlet, fra sjeldnest til vanligst."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    if shelfPickerCandidates
+                        .isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No unlocked awards available",
+                                norwegian:
+                                    "Ingen ledige utmerkelser"
+                            ),
+                            systemImage:
+                                "trophy",
+                            description: Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Unlock another achievement or trophy to add it here.",
+                                    norwegian:
+                                        "Lås opp en ny achievement eller pokal for å legge den til her."
+                                )
+                            )
+                        )
+                        .padding(.top, 28)
+                    } else {
+                        ForEach(
+                            [
+                                TrophyRarity
+                                    .signature,
+                                .epic,
+                                .rare,
+                                .core
+                            ],
+                            id: \.self
+                        ) { rarity in
+                            let items =
+                                shelfPickerCandidates
+                                    .filter {
+                                        $0
+                                            .displayRarity ==
+                                        rarity
+                                    }
+
+                            if !items.isEmpty {
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 8
+                                ) {
+                                    HStack {
+                                        Text(
+                                            rarity
+                                                .title
+                                                .uppercased()
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .bold
+                                                )
+                                        )
+                                        .tracking(1.1)
+
+                                        Spacer()
+
+                                        Text(
+                                            items.count
+                                                .formatted()
+                                        )
+                                        .font(
+                                            .caption2
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                    }
+                                    .foregroundStyle(
+                                        rarity ==
+                                            .signature
+                                            ? ATHLTHTheme
+                                                .premiumGold
+                                            : ATHLTHTheme
+                                                .primaryText
+                                    )
+
+                                    ForEach(
+                                        items
+                                    ) {
+                                        item in
+                                        cabinetPickerRow(
+                                            item
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(
+                Color(
+                    .systemGroupedBackground
+                )
+            )
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Trophy shelf",
+                    norwegian:
+                        "Trofehylle"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        showingShelfPicker =
+                            false
+                    }
+                }
+            }
+        }
     }
 
     private var heroEyebrow:
@@ -2359,11 +2695,15 @@ struct TrophyCollectionView: View {
                 )
             )
         } else {
-            VStack(spacing: 8) {
-                Image(
-                    systemName:
-                        "plus"
-                )
+            Button {
+                showingShelfPicker =
+                    true
+            } label: {
+                VStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            "plus"
+                    )
                 .font(
                     .system(
                         size: 18,
@@ -2421,6 +2761,16 @@ struct TrophyCollectionView: View {
                         )
                 )
             }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Double tap to choose an unlocked achievement or trophy.",
+                    norwegian:
+                        "Dobbelttrykk for å velge en opplåst achievement eller pokal."
+                )
+            )
         }
     }
 
@@ -2439,8 +2789,8 @@ struct TrophyCollectionView: View {
                 .showcaseLimit
 
         return Button {
-            guard selected ||
-                !limitReached
+            guard !selected,
+                  !limitReached
             else {
                 return
             }
@@ -2455,6 +2805,7 @@ struct TrophyCollectionView: View {
                         trophy.id
                     )
             }
+            showingShelfPicker = false
         } label: {
             HStack(spacing: 10) {
                 ATHLTHTrophyCoreView(
@@ -2489,14 +2840,7 @@ struct TrophyCollectionView: View {
                     .lineLimit(1)
 
                     Text(
-                        trophy.isPrestigeTrophy
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Gold Trophy",
-                                norwegian:
-                                    "Gullpokal"
-                            )
-                            : trophy.stageLabel
+                        "\(trophy.awardClass.title) · \(trophy.displayRarity.title)"
                     )
                     .font(.caption2)
                     .foregroundStyle(
