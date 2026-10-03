@@ -1,0 +1,155 @@
+name: Optimize ATHLTH runtime artwork
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.5.7
+    paths:
+      - ".github/workflows/optimize-runtime-assets.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v1.5.7
+          fetch-depth: 0
+
+      - name: Install Pillow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .asset-venv
+          .asset-venv/bin/python -m pip install --quiet pillow
+
+      - name: Optimize standard artwork and thumbnails
+        shell: bash
+        run: |
+          set -euo pipefail
+          .asset-venv/bin/python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps
+          import json
+
+          assets = Path("ATHLTH/Assets.xcassets")
+          standard = [
+              "GoalSprint", "GoalWalking", "GoalMountain", "GoalProgress",
+              "GoalRelax", "GoalRunning", "GoalStrength", "GoalEndurance",
+              "GoalRecovery", "GoalConsistency", "GoalEvent", "GoalAdventure",
+          ]
+          duplicate_fallback = {
+              "GoalStrength": "TrainHero",
+              "GoalEndurance": "StrengthPostWorkoutHero",
+              "GoalConsistency": "ProgressHero",
+              "GoalEvent": "CommunityHero",
+          }
+
+          def candidates(folder: Path):
+              return sorted(
+                  p for p in folder.iterdir()
+                  if p.is_file()
+                  and p.name != "Contents.json"
+                  and p.suffix.lower() in {".png", ".jpg", ".jpeg"}
+              )
+
+          def source_for(asset_name: str):
+              folder = assets / f"{asset_name}.imageset"
+              values = candidates(folder)
+              return values[0] if values else None
+
+          def write_contents(folder: Path, filename: str | None):
+              folder.mkdir(parents=True, exist_ok=True)
+              image = {"idiom": "universal"}
+              if filename:
+                  image["filename"] = filename
+              (folder / "Contents.json").write_text(
+                  json.dumps(
+                      {"images": [image], "info": {"author": "xcode", "version": 1}},
+                      indent=2,
+                  ) + "\n"
+              )
+
+          def opened_rgb(path: Path):
+              original = Image.open(path)
+              image = ImageOps.exif_transpose(original)
+              if image.mode in ("RGBA", "LA"):
+                  background = Image.new("RGB", image.size, "white")
+                  alpha = image.getchannel("A")
+                  background.paste(image.convert("RGB"), mask=alpha)
+                  image = background
+              elif image.mode != "RGB":
+                  image = image.convert("RGB")
+              return original, image
+
+          for name in standard:
+              folder = assets / f"{name}.imageset"
+              fallback = duplicate_fallback.get(name)
+              source = source_for(fallback) if fallback else source_for(name)
+              if source is None:
+                  print(f"Skipping {name}: no source image")
+                  continue
+
+              original, image = opened_rgb(source)
+              try:
+                  if not fallback:
+                      full = image.copy()
+                      full.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+                      target = folder / "runtime.jpg"
+                      full.save(
+                          target,
+                          "JPEG",
+                          quality=86,
+                          optimize=True,
+                          progressive=True,
+                          subsampling=1,
+                      )
+                      for candidate in candidates(folder):
+                          if candidate != target:
+                              candidate.unlink()
+                      write_contents(folder, target.name)
+                      thumbnail_source = target
+                  else:
+                      for candidate in candidates(folder):
+                          candidate.unlink()
+                      write_contents(folder, None)
+                      thumbnail_source = source
+
+                  with Image.open(thumbnail_source) as thumb_original:
+                      thumb = ImageOps.exif_transpose(thumb_original).convert("RGB")
+                      thumb.thumbnail((480, 480), Image.Resampling.LANCZOS)
+                      thumb_folder = assets / f"{name}Thumbnail.imageset"
+                      thumb_target = thumb_folder / "thumbnail.jpg"
+                      thumb_folder.mkdir(parents=True, exist_ok=True)
+                      thumb.save(
+                          thumb_target,
+                          "JPEG",
+                          quality=80,
+                          optimize=True,
+                          progressive=True,
+                          subsampling=1,
+                      )
+                      write_contents(thumb_folder, thumb_target.name)
+              finally:
+                  original.close()
+
+          print("Optimized ATHLTH standard artwork and generated picker thumbnails.")
+          PY
+
+      - name: Commit optimized runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet ATHLTH/Assets.xcassets; then
+            echo "Runtime artwork is already optimized."
+            exit 0
+          fi
+          git config user.name "ATHLTH Performance Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ATHLTH/Assets.xcassets
+          git commit -m "Optimize standard artwork assets"
+          git push origin HEAD:release/v1.5.7

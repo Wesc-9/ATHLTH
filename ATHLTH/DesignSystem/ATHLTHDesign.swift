@@ -1060,17 +1060,27 @@ enum ATHLTHStandardArtwork: String, CaseIterable, Identifiable, Codable, Hashabl
 
     var fallbackAssetName: String {
         switch self {
-        case .sprint, .running, .endurance:
+        case .sprint, .running:
             return "TrainHero"
-        case .walking, .progress, .consistency:
+        case .endurance:
+            return "StrengthPostWorkoutHero"
+        case .walking, .progress:
             return "HomeHero"
-        case .mountain, .adventure, .event:
+        case .consistency:
+            return "ProgressHero"
+        case .mountain, .adventure:
             return "OnboardingHero"
+        case .event:
+            return "CommunityHero"
         case .relax, .recovery:
             return "RecoveryHero"
         case .strength:
-            return "StrengthPostWorkoutHero"
+            return "TrainHero"
         }
+    }
+
+    var thumbnailAssetName: String {
+        "\(assetName)Thumbnail"
     }
 
     var reference: String {
@@ -1117,6 +1127,18 @@ enum ATHLTHStandardArtwork: String, CaseIterable, Identifiable, Codable, Hashabl
         return UIImage(
             named: fallbackAssetName
         )
+    }
+
+    var resolvedThumbnailUIImage: UIImage? {
+        if let image = UIImage(
+            named: thumbnailAssetName
+        ),
+        image.size.width > 8,
+        image.size.height > 8 {
+            return image
+        }
+
+        return resolvedUIImage
     }
 }
 
@@ -1176,7 +1198,7 @@ struct ATHLTHStandardArtworkPicker: View {
             .horizontal,
             showsIndicators: false
         ) {
-            HStack(spacing: 10) {
+            LazyHStack(spacing: 10) {
                 ForEach(
                     ATHLTHStandardArtwork
                         .allCases
@@ -1193,7 +1215,7 @@ struct ATHLTHStandardArtworkPicker: View {
                         ) {
                             if let image =
                                     artwork
-                                        .resolvedUIImage {
+                                        .resolvedThumbnailUIImage {
                                 Image(
                                     uiImage:
                                         image
