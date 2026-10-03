@@ -2549,19 +2549,48 @@ private struct ATHLTHTrainingSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Strength") {
+            Section {
                 Picker(
-                    "Strength tracking",
-                    selection: $settings.defaultStrengthTracking
+                    ATHLTHLocalization.choose(
+                        english: "Default workout setup",
+                        norwegian: "Standard oppsett"
+                    ),
+                    selection:
+                        $settings
+                            .workoutSetupPreference
                 ) {
-                    ForEach(StrengthTrackingPreference.allCases) { preference in
-                        Text(preference.title).tag(preference)
+                    ForEach(
+                        WorkoutSetupPreference
+                            .allCases
+                    ) { preference in
+                        Text(preference.title)
+                            .tag(preference)
                     }
                 }
 
-                Text(strengthTrackingDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    settings
+                        .workoutSetupPreference
+                        .subtitle
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Workout setup",
+                        norwegian: "Oppsett av økt"
+                    )
+                )
+            } footer: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This controls the starting mode only. You can still switch between Basic and Advanced for an individual workout without changing the preference.",
+                        norwegian:
+                            "Dette styrer bare hvilken modus økten åpner i. Du kan fortsatt bytte mellom Basic og Avansert for en enkeltøkt uten å endre standardvalget."
+                    )
+                )
             }
 
             Section {
@@ -2682,20 +2711,6 @@ private struct ATHLTHTrainingSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var strengthTrackingDescription: String {
-        switch settings.defaultStrengthTracking {
-        case .simple:
-            return ATHLTHLocalization.choose(
-                english: "Simple keeps strength logging fast with a lighter set and rep workflow.",
-                norwegian: "Enkel gjør styrkelogging rask med en lettere flyt for sett og repetisjoner."
-            )
-        case .advanced:
-            return ATHLTHLocalization.choose(
-                english: "Advanced enables the full strength workflow with more detailed workout tracking.",
-                norwegian: "Avansert gir full styrkeflyt med mer detaljert treningsregistrering."
-            )
-        }
-    }
 }
 
 private struct ATHLTHAchievementSettingsView:
