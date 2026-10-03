@@ -332,7 +332,8 @@ struct ATHLTHCommunityV4View: View {
                 )
             } label: {
                 CommunityReferenceWeeklyChallengeCard(
-                    challenge: weekly
+                    challenge: weekly,
+                    profiles: social.visibleProfiles
                 )
             }
             .buttonStyle(.plain)
@@ -1170,15 +1171,245 @@ private struct CommunityReferenceHeader: View {
 }
 
 private struct CommunityReferenceWeeklyChallengeCard: View {
+    @EnvironmentObject private var store:
+        OfficialWeeklyChallengeStore
+
     let challenge: OfficialWeeklyChallenge
+    let profiles: [SocialProfileCard]
+
+    private var participantProfiles:
+        [SocialProfileCard] {
+        let ids =
+            store.participantIDs(
+                for: challenge.id
+            )
+
+        return ids.compactMap { id in
+            profiles.first {
+                $0.userID == id
+            }
+        }
+    }
+
+    private var daysRemaining: Int {
+        max(
+            Calendar.current
+                .dateComponents(
+                    [.day],
+                    from: Date(),
+                    to: challenge.endsAt
+                )
+                .day ?? 0,
+            0
+        )
+    }
 
     var body: some View {
-        OfficialWeeklyChallengeArtwork(
-            challenge: challenge
-        )
-        .frame(maxWidth: .infinity)
+        ZStack(alignment: .bottomLeading) {
+            OfficialWeeklyChallengeArtwork(
+                challenge: challenge
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "WEEKLY CHALLENGE",
+                        norwegian:
+                            "UKENS CHALLENGE"
+                    ),
+                    systemImage: "trophy.fill"
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.8)
+                .foregroundStyle(
+                    Color(
+                        red: 0.43,
+                        green: 0.31,
+                        blue: 0.08
+                    )
+                )
+                .padding(.horizontal, 11)
+                .frame(height: 25)
+                .background(
+                    ATHLTHTheme
+                        .champagneSoft
+                        .opacity(0.96),
+                    in: Capsule()
+                )
+
+                Text(challenge.title)
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                    .shadow(
+                        color: .black.opacity(0.46),
+                        radius: 5,
+                        y: 1
+                    )
+
+                Text(challenge.subtitle)
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.96)
+                    )
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(
+                        maxWidth: 260,
+                        alignment: .leading
+                    )
+                    .shadow(
+                        color: .black.opacity(0.50),
+                        radius: 4,
+                        y: 1
+                    )
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    HStack(spacing: -8) {
+                        ForEach(
+                            participantProfiles
+                                .prefix(4)
+                        ) { profile in
+                            CommunityReferenceAvatar(
+                                url:
+                                    profile.avatarURL
+                                        .flatMap(URL.init(string:)),
+                                fallback:
+                                    profile
+                                        .resolvedName,
+                                size: 28
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        .white,
+                                        lineWidth: 1.5
+                                    )
+                            }
+                        }
+
+                        if store.participantCount(
+                            for: challenge.id
+                        ) > 4 {
+                            Text(
+                                "+\(store.participantCount(for: challenge.id) - 4)"
+                            )
+                            .font(
+                                .caption2.weight(
+                                    .bold
+                                )
+                            )
+                            .foregroundStyle(.white)
+                            .frame(
+                                width: 30,
+                                height: 30
+                            )
+                            .background(
+                                Color.black
+                                    .opacity(0.45),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        .white.opacity(
+                                            0.85
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            }
+                        }
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Label(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "%d participating",
+                                norwegian:
+                                    "%d deltar",
+                                store.participantCount(
+                                    for: challenge.id
+                                )
+                            ),
+                            systemImage:
+                                "person.2.fill"
+                        )
+
+                        Label(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "%d days left",
+                                norwegian:
+                                    "%d dager igjen",
+                                daysRemaining
+                            ),
+                            systemImage: "clock"
+                        )
+                    }
+                    .font(
+                        .caption2.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .white.opacity(0.96)
+                    )
+
+                    Spacer(minLength: 6)
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        .white,
+                        in: Circle()
+                    )
+                }
+            }
+            .padding(11)
+        }
         .frame(height: 142)
-        .clipped()
+        .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 22,
@@ -1201,13 +1432,6 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .opacity(0.08),
             radius: 12,
             y: 5
-        )
-        .accessibilityLabel(
-            ATHLTHLocalization.format(
-                english: "Weekly challenge: %@",
-                norwegian: "Ukens challenge: %@",
-                challenge.title
-            )
         )
     }
 }
