@@ -10,6 +10,7 @@ final class MessagingStore: ObservableObject {
     @Published var errorMessage: String?
 
     private let service: SupabaseMessagingService
+    private var lastRefreshAt: Date?
 
     init(service: SupabaseMessagingService = SupabaseMessagingService()) {
         self.service = service
@@ -131,8 +132,21 @@ final class MessagingStore: ObservableObject {
         )
     }
 
-    func refresh() async {
-        guard currentUserID != nil, !isRefreshing else { return }
+    func refresh(
+        force: Bool = false
+    ) async {
+        guard currentUserID != nil,
+              !isRefreshing
+        else {
+            return
+        }
+
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < 60,
+           !conversations.isEmpty {
+            return
+        }
 
         isRefreshing = true
         errorMessage = nil
@@ -144,6 +158,7 @@ final class MessagingStore: ObservableObject {
 
             conversations = try await conversationsTask
             recentMessages = try await messagesTask
+            lastRefreshAt = Date()
         } catch is CancellationError {
             return
         } catch {

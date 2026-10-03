@@ -334,6 +334,8 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private var lastPublishedLocationAt: Date?
     private var lastPublishedDistanceMeters: Double?
     private var lastPublishedElapsedSeconds: TimeInterval?
+    private var lastOnlineRefreshAt: Date?
+    private var lastVisibleSessionsRefreshAt: Date?
 
     private let onlineHeartbeatInterval: Duration = .seconds(45)
     private let liveRefreshInterval: Duration = .seconds(3)
@@ -400,9 +402,18 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
     }
 
-    func refreshOnlineUsers() async {
+    func refreshOnlineUsers(
+        force: Bool = false
+    ) async {
         guard currentUserID != nil else {
             onlineUserIDs.removeAll()
+            return
+        }
+
+        if !force,
+           let lastOnlineRefreshAt,
+           Date().timeIntervalSince(lastOnlineRefreshAt) < 30,
+           !onlineUserIDs.isEmpty {
             return
         }
 
@@ -426,6 +437,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     }
                     .map(\.userID)
             )
+            lastOnlineRefreshAt = Date()
         } catch is CancellationError {
             return
         } catch {
@@ -433,9 +445,20 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
     }
 
-    func refreshVisibleLiveSessions() async {
+    func refreshVisibleLiveSessions(
+        force: Bool = false
+    ) async {
         guard currentUserID != nil else {
             visibleLiveSessions = []
+            return
+        }
+
+        if !force,
+           let lastVisibleSessionsRefreshAt,
+           Date().timeIntervalSince(
+                lastVisibleSessionsRefreshAt
+           ) < 20,
+           !visibleLiveSessions.isEmpty {
             return
         }
 
@@ -460,6 +483,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
             visibleLiveSessions =
                 rows.filter(\.isActive)
+            lastVisibleSessionsRefreshAt = Date()
 
             if selectedLiveGhostSessionID == nil,
                let restoredID =

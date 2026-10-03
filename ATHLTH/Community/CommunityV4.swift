@@ -1050,12 +1050,16 @@ struct ATHLTHCommunityV4View: View {
                 force: force
             )
         async let messageRefresh: Void =
-            messaging.refresh()
+            messaging.refresh(force: force)
         async let onlineRefresh: Void =
-            realtime.refreshOnlineUsers()
+            realtime.refreshOnlineUsers(
+                force: force
+            )
         async let liveRefresh: Void =
             realtime
-                .refreshVisibleLiveSessions()
+                .refreshVisibleLiveSessions(
+                    force: force
+                )
 
         _ = await (
             eventRefresh,
