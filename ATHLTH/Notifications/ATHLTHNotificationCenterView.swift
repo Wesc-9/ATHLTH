@@ -1520,25 +1520,43 @@ struct ATHLTHNotificationCenterView: View {
         _ item: ATHLTHNotificationItem
     ) -> String {
         if isChallengeItem(item) {
-            return "CHALLENGE"
+            return ATHLTHLocalization.choose(
+                english: "CHALLENGE",
+                norwegian: "CHALLENGE"
+            )
         }
 
         switch item.kind {
         case .milestoneReached,
              .goalCompleted:
-            return "PROGRESS"
+            return ATHLTHLocalization.choose(
+                english: "PROGRESS",
+                norwegian: "FREMGANG"
+            )
         case .personalRecord:
-            return "PERFORMANCE"
+            return ATHLTHLocalization.choose(
+                english: "PERFORMANCE",
+                norwegian: "PRESTASJON"
+            )
         case .achievement:
-            return "ACHIEVEMENT"
+            return ATHLTHLocalization.choose(
+                english: "ACHIEVEMENT",
+                norwegian: "PRESTASJON"
+            )
         case .social:
-            return "SOCIAL"
+            return ATHLTHLocalization.choose(
+                english: "SOCIAL",
+                norwegian: "SOSIALT"
+            )
         case .system:
             return "ATHLTH"
         case .challenge:
             return "CHALLENGE"
         case .workoutCompleted:
-            return "ACTIVITY"
+            return ATHLTHLocalization.choose(
+                english: "ACTIVITY",
+                norwegian: "AKTIVITET"
+            )
         }
     }
 
@@ -1585,17 +1603,35 @@ struct ATHLTHNotificationCenterView: View {
         let status: String
         switch challenge.status {
         case .draft:
-            status = "Draft"
+            status = ATHLTHLocalization.choose(
+                english: "Draft",
+                norwegian: "Utkast"
+            )
         case .invited:
-            status = "Invitation"
+            status = ATHLTHLocalization.choose(
+                english: "Invitation",
+                norwegian: "Invitasjon"
+            )
         case .upcoming:
-            status = "Upcoming"
+            status = ATHLTHLocalization.choose(
+                english: "Upcoming",
+                norwegian: "Kommende"
+            )
         case .active:
-            status = "Active"
+            status = ATHLTHLocalization.choose(
+                english: "Active",
+                norwegian: "Aktiv"
+            )
         case .completed:
-            status = "Completed"
+            status = ATHLTHLocalization.choose(
+                english: "Completed",
+                norwegian: "Fullført"
+            )
         case .cancelled:
-            status = "Cancelled"
+            status = ATHLTHLocalization.choose(
+                english: "Cancelled",
+                norwegian: "Avbrutt"
+            )
         }
 
         if challenge.status == .completed ||
@@ -1604,7 +1640,16 @@ struct ATHLTHNotificationCenterView: View {
         }
 
         if let endsAt = challenge.rules.endsAt {
-            return "\(status) · ends \(endsAt.formatted(.dateTime.day().month(.abbreviated)))"
+            return ATHLTHLocalization.format(
+                english: "%@ · ends %@",
+                norwegian: "%@ · avsluttes %@",
+                status,
+                endsAt.formatted(
+                    .dateTime
+                        .day()
+                        .month(.abbreviated)
+                )
+            )
         }
 
         return status
@@ -1614,25 +1659,43 @@ struct ATHLTHNotificationCenterView: View {
         _ item: ATHLTHNotificationItem
     ) -> String {
         if item.challengeID != nil {
-            return "View challenge"
+            return ATHLTHLocalization.choose(
+                english: "View challenge",
+                norwegian: "Se challenge"
+            )
         }
 
         if item.goalID != nil {
-            return "View goal"
+            return ATHLTHLocalization.choose(
+                english: "View goal",
+                norwegian: "Se mål"
+            )
         }
 
         if item.kind == .achievement {
-            return "View trophies"
+            return ATHLTHLocalization.choose(
+                english: "View trophies",
+                norwegian: "Se trofeer"
+            )
         }
 
         switch item.socialEventKind?.lowercased() {
         case "reaction":
-            return "View activity"
+            return ATHLTHLocalization.choose(
+                english: "View activity",
+                norwegian: "Se aktivitet"
+            )
         case "friend_accepted",
              "follow_accepted":
-            return "View following"
+            return ATHLTHLocalization.choose(
+                english: "View following",
+                norwegian: "Se følger"
+            )
         default:
-            return "Open"
+            return ATHLTHLocalization.choose(
+                english: "Open",
+                norwegian: "Åpne"
+            )
         }
     }
 
@@ -1643,19 +1706,33 @@ struct ATHLTHNotificationCenterView: View {
             max(Date().timeIntervalSince(date), 0)
 
         if interval < 60 {
-            return "Now"
+            return ATHLTHLocalization.choose(
+                english: "Now",
+                norwegian: "Nå"
+            )
         }
 
         if interval < 3_600 {
-            return "\(max(Int(interval / 60), 1))m"
+            return ATHLTHLocalization.format(
+                english: "%dm",
+                norwegian: "%d min",
+                max(Int(interval / 60), 1)
+            )
         }
 
         if interval < 86_400 {
-            return "\(max(Int(interval / 3_600), 1))h"
+            return ATHLTHLocalization.format(
+                english: "%dh",
+                norwegian: "%d t",
+                max(Int(interval / 3_600), 1)
+            )
         }
 
         if Calendar.current.isDateInYesterday(date) {
-            return "Yesterday"
+            return ATHLTHLocalization.choose(
+                english: "Yesterday",
+                norwegian: "I går"
+            )
         }
 
         return date.formatted(
