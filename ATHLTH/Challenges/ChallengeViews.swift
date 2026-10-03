@@ -640,7 +640,7 @@ struct ChallengeCreationView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 8)
 
-                    ScrollView {                    ScrollView {
+                    ScrollView {
                         Group {
                             switch step {
                             case 0: typeStep
@@ -977,7 +977,6 @@ struct ChallengeCreationView: View {
     }
 
     @ViewBuilder
-    private var rulesStep    @ViewBuilder
     private var rulesStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -2283,7 +2282,7 @@ struct ChallengeCreationView: View {
         .background(.ultraThinMaterial)
     }
 
-    private var scoringOptions:    private var scoringOptions: [ATHLTHChallengeScoring] {
+    private var scoringOptions: [ATHLTHChallengeScoring] {
         switch sport {
         case .running:
             return [.fastestDistance, .farthestInTime, .mostDistance]
@@ -2860,7 +2859,7 @@ struct ChallengeCreationView: View {
         .buttonStyle(.plain)
     }
 
-    private func numberField(    private func numberField(
+    private func numberField(
         title: String,
         suffix: String,
         value: Binding<Double>
@@ -2989,7 +2988,7 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private func reviewRow(    private func reviewRow(_ title: String, _ value: String) -> some View {
+    private func reviewRow(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
                 .foregroundStyle(.secondary)
