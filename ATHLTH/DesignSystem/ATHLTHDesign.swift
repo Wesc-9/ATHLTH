@@ -1425,6 +1425,11 @@ struct ATHLTHStandardArtworkPicker: View {
                                 )
                                 .resizable()
                                 .scaledToFill()
+                                .scaleEffect(
+                                    1.14,
+                                    anchor:
+                                        .trailing
+                                )
                             } else {
                                 ATHLTHTheme
                                     .accentSoft
@@ -1493,6 +1498,7 @@ struct ATHLTHStandardArtworkPicker: View {
                             width: 116,
                             height: 76
                         )
+                        .clipped()
                         .clipShape(
                             RoundedRectangle(
                                 cornerRadius: 15,
