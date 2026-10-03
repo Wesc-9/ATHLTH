@@ -1254,8 +1254,8 @@ private final class ATHLTHRemoteArtworkCache {
     private let images = NSCache<NSString, UIImage>()
 
     private init() {
-        images.countLimit = 48
-        images.totalCostLimit = 48 * 1_024 * 1_024
+        images.countLimit = 28
+        images.totalCostLimit = 28 * 1_024 * 1_024
     }
 
     func image(
@@ -1357,6 +1357,7 @@ private struct ATHLTHRemoteArtworkImage: View {
 struct ATHLTHArtworkImage: View {
     let reference: String?
     var fallbackAssetName: String = "CommunityHero"
+    var maxPixelSize: Int = 900
 
     var body: some View {
         Group {
@@ -1381,7 +1382,8 @@ struct ATHLTHArtworkImage: View {
                     url: url,
                     fallbackAssetName:
                         fallbackAssetName,
-                    maxPixelSize: 900
+                    maxPixelSize:
+                        maxPixelSize
                 )
             } else {
                 Image(fallbackAssetName)
