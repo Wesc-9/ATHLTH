@@ -386,7 +386,7 @@ struct WatchRunWorkoutExperienceView: View {
                 0
             )
 
-        VStack(
+        return VStack(
             alignment: .leading,
             spacing: compact ? 5 : 7
         ) {
