@@ -28,6 +28,7 @@ struct ATHLTHTrophyCoreView: View {
     let trophy: TrophyProgressItem
     var size: CGFloat = 112
     var showLabel = false
+    var showActivityIconInside = true
     var inscription: TrophyInscription? = nil
     var athleteName: String? = nil
 
@@ -359,23 +360,25 @@ struct ATHLTHTrophyCoreView: View {
                         height: size * 0.27
                     )
 
-                Image(
-                    systemName:
-                        trophy.systemImage
-                )
-                .font(
-                    .system(
-                        size: size * 0.11,
-                        weight: .semibold
+                if showActivityIconInside {
+                    Image(
+                        systemName:
+                            trophy.systemImage
                     )
-                )
-                .foregroundStyle(
-                    trophy.isUnlocked
-                        ? Color.white
-                            .opacity(0.82)
-                        : Color.white
-                            .opacity(0.30)
-                )
+                    .font(
+                        .system(
+                            size: size * 0.11,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        trophy.isUnlocked
+                            ? Color.white
+                                .opacity(0.82)
+                            : Color.white
+                                .opacity(0.30)
+                    )
+                }
             }
 
             lockedOverlay
@@ -2944,9 +2947,7 @@ struct TrophyCollectionView: View {
             TrophyProgressItem
     ) -> some View {
         VStack(spacing: 10) {
-            ZStack(
-                alignment: .topTrailing
-            ) {
+            if trophy.isPrestigeTrophy {
                 ATHLTHTrophyCoreView(
                     trophy:
                         trophy,
@@ -2958,30 +2959,64 @@ struct TrophyCollectionView: View {
                                     trophy.id
                             )
                 )
+            } else {
+                VStack(spacing: 4) {
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                Color.black
+                                    .opacity(0.065),
+                                lineWidth: 4
+                            )
 
-                if !trophy.isPrestigeTrophy &&
-                   !trophy.isComplete {
-                    AchievementProgressRing(
-                        progress:
-                            trophy.progress,
-                        rarity:
-                            trophy
-                                .displayRarity,
-                        lineWidth: 3.5
-                    )
+                        Circle()
+                            .trim(
+                                from: 0,
+                                to:
+                                    trophy.isComplete
+                                        ? 1
+                                        : trophy.progress
+                            )
+                            .stroke(
+                                AngularGradient(
+                                    colors:
+                                        trophy
+                                            .displayRarity
+                                            .progressPalette,
+                                    center: .center
+                                ),
+                                style:
+                                    StrokeStyle(
+                                        lineWidth: 4,
+                                        lineCap:
+                                            .round
+                                    )
+                            )
+                            .rotationEffect(
+                                .degrees(-90)
+                            )
+
+                        ATHLTHTrophyCoreView(
+                            trophy:
+                                trophy,
+                            size: 86,
+                            showActivityIconInside:
+                                false,
+                            inscription:
+                                trophies
+                                    .inscription(
+                                        for:
+                                            trophy.id
+                                    )
+                        )
+                    }
                     .frame(
-                        width: 34,
-                        height: 34
+                        width: 112,
+                        height: 112
                     )
-                    .padding(4)
-                    .background(
-                        Color.black
-                            .opacity(0.62),
-                        in: Circle()
-                    )
-                    .offset(
-                        x: 10,
-                        y: -2
+
+                    collectionActivityBadge(
+                        trophy
                     )
                 }
             }
@@ -3200,6 +3235,73 @@ struct TrophyCollectionView: View {
             y: 7
         )
     }
+    private func collectionActivityBadge(
+        _ trophy:
+            TrophyProgressItem
+    ) -> some View {
+        Image(
+            systemName:
+                trophy.systemImage
+        )
+        .font(
+            .system(
+                size: 13,
+                weight: .bold
+            )
+        )
+        .foregroundStyle(
+            trophy.isUnlocked
+                ? Color.white
+                : Color.white
+                    .opacity(0.46)
+        )
+        .frame(
+            width: 30,
+            height: 30
+        )
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(
+                        red: 0.20,
+                        green: 0.22,
+                        blue: 0.24
+                    ),
+                    Color(
+                        red: 0.08,
+                        green: 0.09,
+                        blue: 0.10
+                    )
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: Circle()
+        )
+        .overlay {
+            Circle()
+                .stroke(
+                    trophy.isUnlocked
+                        ? ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.56)
+                        : Color.white
+                            .opacity(0.18),
+                    lineWidth: 1
+                )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.10),
+            radius: 5,
+            y: 2
+        )
+        .accessibilityHidden(true)
+    }
+
 }
 
 private enum TrophyHubTab:
