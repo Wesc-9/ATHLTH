@@ -12482,56 +12482,6 @@ struct CommunityGroupSettingsView: View {
                     .offset(y: 24)
 
                 HStack(spacing: 8) {
-                    Spacer()
-
-                    PhotosPicker(
-                        selection:
-                            $selectedHeaderPhoto,
-                        matching: .images
-                    ) {
-                        Image(
-                            systemName:
-                                "photo.on.rectangle.angled"
-                        )
-                        .font(
-                            .system(
-                                size: 13,
-                                weight:
-                                    .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .frame(
-                            width: 34,
-                            height: 34
-                        )
-                        .background(
-                            clubForest
-                                .opacity(
-                                    0.92
-                                ),
-                            in: Circle()
-                        )
-                    }
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Change header image",
-                            norwegian:
-                                "Bytt headerbilde"
-                        )
-                    )
-                }
-                .padding(10)
-            }
-            .padding(
-                .bottom,
-                22
-            )
-
-            HStack(spacing: 8) {
                 PhotosPicker(
                     selection:
                         $selectedPhoto,
@@ -12550,19 +12500,83 @@ struct CommunityGroupSettingsView: View {
                     )
                 }
 
-                if let selectedImageData,
-                   let image =
-                    UIImage(
-                        data:
-                            selectedImageData
-                    ) {
-                    Button {
-                        cropRequest =
-                            CommunityImageCropRequest(
-                                image: image,
-                                target:
-                                    .clubImage
-                            )
+                PhotosPicker(
+                    selection:
+                        $selectedHeaderPhoto,
+                    matching: .images
+                ) {
+                    compactActionChip(
+                        title:
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Header",
+                                    norwegian:
+                                        "Header"
+                                ),
+                        icon:
+                            "photo.on.rectangle.angled"
+                    )
+                }
+
+                if selectedImageData != nil ||
+                    selectedHeaderImageData != nil {
+                    Menu {
+                        if let selectedImageData,
+                           let image =
+                            UIImage(
+                                data:
+                                    selectedImageData
+                            ) {
+                            Button {
+                                cropRequest =
+                                    CommunityImageCropRequest(
+                                        image: image,
+                                        target:
+                                            .clubImage
+                                    )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Crop Club image",
+                                            norwegian:
+                                                "Juster Club-bilde"
+                                        ),
+                                    systemImage:
+                                        "crop"
+                                )
+                            }
+                        }
+
+                        if let selectedHeaderImageData,
+                           let image =
+                            UIImage(
+                                data:
+                                    selectedHeaderImageData
+                            ) {
+                            Button {
+                                cropRequest =
+                                    CommunityImageCropRequest(
+                                        image: image,
+                                        target:
+                                            .wideCover
+                                    )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Crop header",
+                                            norwegian:
+                                                "Juster header"
+                                        ),
+                                    systemImage:
+                                        "crop"
+                                )
+                            }
+                        }
                     } label: {
                         compactActionChip(
                             title:
@@ -12576,39 +12590,175 @@ struct CommunityGroupSettingsView: View {
                             icon: "crop"
                         )
                     }
-                    .buttonStyle(.plain)
-                }
-
-                if let selectedHeaderImageData,
-                   let image =
-                    UIImage(
-                        data:
-                            selectedHeaderImageData
-                    ) {
-                    Button {
-                        cropRequest =
-                            CommunityImageCropRequest(
-                                image: image,
-                                target:
-                                    .wideCover
-                            )
-                    } label: {
-                        compactActionChip(
-                            title:
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Header crop",
-                                        norwegian:
-                                            "Header-utsnitt"
-                                    ),
-                            icon: "crop.rotate"
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
 
                 Spacer()
+
+                Menu {
+                    if selectedImageData != nil {
+                        Button(
+                            role: .destructive
+                        ) {
+                            selectedImageData =
+                                nil
+                            selectedPhoto = nil
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Remove Club image",
+                                        norwegian:
+                                            "Fjern Club-bilde"
+                                    ),
+                                systemImage:
+                                    "trash"
+                            )
+                        }
+                    } else if currentGroup
+                        .imageURL != nil {
+                        Button(
+                            role: .destructive
+                        ) {
+                            Task {
+                                saving = true
+                                let removed =
+                                    await groups
+                                        .removeGroupImage(
+                                            currentGroup
+                                        )
+                                saving = false
+
+                                if !removed {
+                                    saveError =
+                                        groups
+                                            .errorMessage
+                                }
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Remove Club image",
+                                        norwegian:
+                                            "Fjern Club-bilde"
+                                    ),
+                                systemImage:
+                                    "trash"
+                            )
+                        }
+                    }
+
+                    if selectedHeaderImageData != nil ||
+                        (
+                            selectedHeaderArtwork !=
+                                nil &&
+                            currentGroup
+                                .headerImageURL !=
+                                selectedHeaderArtwork?
+                                    .reference
+                        ) {
+                        Button(
+                            role: .destructive
+                        ) {
+                            selectedHeaderImageData =
+                                nil
+                            selectedHeaderPhoto = nil
+                            selectedHeaderArtwork =
+                                ATHLTHStandardArtwork(
+                                    reference:
+                                        currentGroup
+                                            .headerImageURL
+                                )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Reset header changes",
+                                        norwegian:
+                                            "Tilbakestill header"
+                                    ),
+                                systemImage:
+                                    "arrow.counterclockwise"
+                            )
+                        }
+                    } else if currentGroup
+                        .headerImageURL != nil {
+                        Button(
+                            role: .destructive
+                        ) {
+                            Task {
+                                saving = true
+                                let removed =
+                                    await groups
+                                        .removeGroupHeaderImage(
+                                            currentGroup
+                                        )
+                                if removed {
+                                    selectedHeaderArtwork =
+                                        nil
+                                    selectedHeaderImageData =
+                                        nil
+                                } else {
+                                    saveError =
+                                        groups
+                                            .errorMessage
+                                }
+                                saving = false
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Remove header",
+                                        norwegian:
+                                            "Fjern header"
+                                    ),
+                                systemImage:
+                                    "trash"
+                            )
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        width: 34,
+                        height: 34
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.92),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                clubSage
+                                    .opacity(
+                                        0.52
+                                    ),
+                                lineWidth:
+                                    0.8
+                            )
+                    }
+                }
+                .disabled(saving)
             }
 
             HStack {
