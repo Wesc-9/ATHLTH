@@ -704,7 +704,7 @@ struct WorkoutStartOptionsView: View {
     private var strengthIntroCard: some View {
         ZStack {
             Image(
-                "StrengthQuickStartHero"
+                "TrainHero"
             )
             .resizable()
             .scaledToFill()
