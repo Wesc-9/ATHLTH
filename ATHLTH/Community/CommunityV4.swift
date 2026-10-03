@@ -147,20 +147,6 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
-    private var shouldShowDiscoveryNow: Bool {
-        (
-            groups.joinedGroups.isEmpty &&
-            !publicDiscoveryGroups.isEmpty
-        ) ||
-        (
-            activeChallenges.isEmpty &&
-            !publicDiscoveryChallenges.isEmpty
-        ) ||
-        (
-            joinedUpcomingEvents.isEmpty &&
-            !publicDiscoveryEvents.isEmpty
-        )
-    }
 
     var body: some View {
         NavigationStack {
@@ -194,9 +180,8 @@ struct ATHLTHCommunityV4View: View {
 
                     CommunityReferenceQuickActions()
 
-                    referenceDiscoveryNowSection
                     referenceRecentActivitySection
-                    referenceMyClubsSection
+                    referenceDiscoverySection
                     referenceUpcomingSection
                 }
                 .padding(.horizontal, 14)
@@ -347,8 +332,7 @@ struct ATHLTHCommunityV4View: View {
                 )
             } label: {
                 CommunityReferenceWeeklyChallengeCard(
-                    challenge: weekly,
-                    profiles: social.visibleProfiles
+                    challenge: weekly
                 )
             }
             .buttonStyle(.plain)
@@ -381,162 +365,6 @@ struct ATHLTHCommunityV4View: View {
             )
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var referenceDiscoveryNowSection: some View {
-        if shouldShowDiscoveryNow {
-            VStack(alignment: .leading, spacing: 8) {
-                CommunityReferenceSectionTitle(
-                    title: "Discovery now",
-                    destinationTitle:
-                        ATHLTHLocalization.choose(
-                            english: "Explore",
-                            norwegian: "Utforsk"
-                        ),
-                    destination: {
-                        AnyView(
-                            CommunityDiscoveryView()
-                        )
-                    }
-                )
-
-                VStack(spacing: 0) {
-                    if groups.joinedGroups.isEmpty,
-                       let group =
-                            publicDiscoveryGroups.first {
-                        NavigationLink {
-                            CommunityGroupDetailView(
-                                group: group
-                            )
-                        } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "PUBLIC CLUB",
-                                        norwegian:
-                                            "OFFENTLIG KLUBB"
-                                    ),
-                                title: group.name,
-                                detail:
-                                    group.locationName
-                                        .isEmpty
-                                        ? group.summary
-                                        : group.locationName,
-                                icon:
-                                    "person.3.fill",
-                                tint: .green
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if activeChallenges.isEmpty,
-                       let challenge =
-                            publicDiscoveryChallenges
-                                .first {
-                        if groups.joinedGroups.isEmpty &&
-                            !publicDiscoveryGroups
-                                .isEmpty {
-                            CommunityDiscoveryDivider()
-                        }
-
-                        NavigationLink {
-                            ChallengeDetailView(
-                                challengeID:
-                                    challenge.id
-                            )
-                        } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "PUBLIC CHALLENGE",
-                                        norwegian:
-                                            "OFFENTLIG CHALLENGE"
-                                    ),
-                                title:
-                                    challenge.title,
-                                detail:
-                                    challenge.sport.title,
-                                icon:
-                                    challenge
-                                        .sport
-                                        .systemImage,
-                                tint: .orange
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if joinedUpcomingEvents.isEmpty,
-                       let event =
-                            publicDiscoveryEvents.first {
-                        if (
-                            groups.joinedGroups.isEmpty &&
-                            !publicDiscoveryGroups
-                                .isEmpty
-                        ) ||
-                        (
-                            activeChallenges.isEmpty &&
-                            !publicDiscoveryChallenges
-                                .isEmpty
-                        ) {
-                            CommunityDiscoveryDivider()
-                        }
-
-                        NavigationLink {
-                            CommunityEventDetailView(
-                                eventID: event.id
-                            )
-                        } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "PUBLIC EVENT",
-                                        norwegian:
-                                            "OFFENTLIG EVENT"
-                                    ),
-                                title:
-                                    event.event.title,
-                                detail:
-                                    event.event
-                                        .startsAt
-                                        .formatted(
-                                            date:
-                                                .abbreviated,
-                                            time:
-                                                .shortened
-                                        ),
-                                icon: "calendar",
-                                tint: .blue
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .background(
-                    Color.white.opacity(0.88),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.black.opacity(0.04),
-                        lineWidth: 0.7
-                    )
-                }
-            }
-        }
     }
 
     private var referenceRecentActivitySection: some View {
@@ -584,63 +412,176 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
-    @ViewBuilder
-    private var referenceMyClubsSection: some View {
-        if !groups.joinedGroups.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                CommunityReferenceSectionTitle(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "My clubs",
-                            norwegian: "Mine klubber"
-                        ),
-                    destinationTitle:
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        ),
-                    destination: {
-                        AnyView(
-                            CommunityGroupsView()
-                        )
-                    }
-                )
+    private var referenceDiscoverySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CommunityReferenceSectionTitle(
+                title: "Discovery",
+                destinationTitle:
+                    ATHLTHLocalization.choose(
+                        english: "Explore",
+                        norwegian: "Utforsk"
+                    ),
+                destination: {
+                    AnyView(
+                        CommunityDiscoveryView()
+                    )
+                }
+            )
 
-                ScrollView(
-                    .horizontal,
-                    showsIndicators: false
-                ) {
-                    HStack(spacing: 9) {
-                        ForEach(
-                            Array(
-                                groups
-                                    .joinedGroups
-                                    .prefix(8)
+            let hasGroup =
+                !publicDiscoveryGroups.isEmpty
+            let hasChallenge =
+                !publicDiscoveryChallenges.isEmpty
+            let hasEvent =
+                !publicDiscoveryEvents.isEmpty
+
+            if hasGroup ||
+                hasChallenge ||
+                hasEvent {
+                VStack(spacing: 0) {
+                    if let group =
+                            publicDiscoveryGroups.first {
+                        NavigationLink {
+                            CommunityGroupDetailView(
+                                group: group
                             )
-                        ) { group in
-                            NavigationLink {
-                                CommunityGroupDetailView(
-                                    group: group
-                                )
-                            } label: {
-                                CommunityReferenceClubCard(
-                                    group: group,
-                                    memberCount:
-                                        groups
-                                            .members(
-                                                in: group.id
-                                            )
-                                            .count
-                                )
-                            }
-                            .buttonStyle(.plain)
+                        } label: {
+                            CommunityDiscoveryNowRow(
+                                eyebrow:
+                                    ATHLTHLocalization.choose(
+                                        english: "PUBLIC CLUB",
+                                        norwegian: "OFFENTLIG KLUBB"
+                                    ),
+                                title: group.name,
+                                detail:
+                                    group.locationName
+                                        .isEmpty
+                                        ? group.summary
+                                        : group.locationName,
+                                icon: "person.3.fill",
+                                tint: .green
+                            )
                         }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let challenge =
+                            publicDiscoveryChallenges.first {
+                        if hasGroup {
+                            CommunityDiscoveryDivider()
+                        }
+
+                        NavigationLink {
+                            ChallengeDetailView(
+                                challengeID:
+                                    challenge.id
+                            )
+                        } label: {
+                            CommunityDiscoveryNowRow(
+                                eyebrow:
+                                    ATHLTHLocalization.choose(
+                                        english: "PUBLIC CHALLENGE",
+                                        norwegian: "OFFENTLIG CHALLENGE"
+                                    ),
+                                title:
+                                    challenge.title,
+                                detail:
+                                    challenge.sport.title,
+                                icon:
+                                    challenge
+                                        .sport
+                                        .systemImage,
+                                tint: .orange
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let event =
+                            publicDiscoveryEvents.first {
+                        if hasGroup ||
+                            hasChallenge {
+                            CommunityDiscoveryDivider()
+                        }
+
+                        NavigationLink {
+                            CommunityEventDetailView(
+                                eventID:
+                                    event.id
+                            )
+                        } label: {
+                            CommunityDiscoveryNowRow(
+                                eyebrow:
+                                    ATHLTHLocalization.choose(
+                                        english: "PUBLIC EVENT",
+                                        norwegian: "OFFENTLIG EVENT"
+                                    ),
+                                title:
+                                    event.event.title,
+                                detail:
+                                    event.event.startsAt
+                                        .formatted(
+                                            date: .abbreviated,
+                                            time: .shortened
+                                        ),
+                                icon: "calendar",
+                                tint: .blue
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .contentMargins(
-                    .horizontal,
-                    0,
-                    for: .scrollContent
+                .background(
+                    Color.white.opacity(0.88),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.black.opacity(0.04),
+                        lineWidth: 0.7
+                    )
+                }
+            } else {
+                NavigationLink {
+                    CommunityDiscoveryView()
+                } label: {
+                    CommunityDiscoveryNowRow(
+                        eyebrow:
+                            ATHLTHLocalization.choose(
+                                english: "DISCOVERY",
+                                norwegian: "DISCOVERY"
+                            ),
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Explore the community",
+                                norwegian: "Utforsk fellesskapet"
+                            ),
+                        detail:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Find public clubs, events and challenges.",
+                                norwegian:
+                                    "Finn offentlige klubber, events og challenges."
+                            ),
+                        icon: "sparkles",
+                        tint:
+                            ATHLTHTheme.premiumGold
+                    )
+                }
+                .buttonStyle(.plain)
+                .background(
+                    Color.white.opacity(0.88),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
                 )
             }
         }
@@ -1229,279 +1170,15 @@ private struct CommunityReferenceHeader: View {
 }
 
 private struct CommunityReferenceWeeklyChallengeCard: View {
-    @EnvironmentObject private var store:
-        OfficialWeeklyChallengeStore
-
     let challenge: OfficialWeeklyChallenge
-    let profiles: [SocialProfileCard]
-
-    private var participantProfiles:
-        [SocialProfileCard] {
-        let ids =
-            store.participantIDs(
-                for: challenge.id
-            )
-
-        return ids.compactMap { id in
-            profiles.first {
-                $0.userID == id
-            }
-        }
-    }
-
-    private var daysRemaining: Int {
-        max(
-            Calendar.current
-                .dateComponents(
-                    [.day],
-                    from: Date(),
-                    to: challenge.endsAt
-                )
-                .day ?? 0,
-            0
-        )
-    }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            OfficialWeeklyChallengeArtwork(
-                challenge: challenge
-            )
-
-            // Keep the artwork in full colour. Only a very light scrim is
-            // used near the text so the image stays vivid while labels remain
-            // readable on bright photos.
-            LinearGradient(
-                stops: [
-                    .init(
-                        color:
-                            Color.black.opacity(0.01),
-                        location: 0
-                    ),
-                    .init(
-                        color:
-                            Color.black.opacity(0.04),
-                        location: 0.58
-                    ),
-                    .init(
-                        color:
-                            Color.black.opacity(0.30),
-                        location: 1
-                    )
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.07),
-                    Color.clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "WEEKLY CHALLENGE",
-                        norwegian:
-                            "UKENS CHALLENGE"
-                    ),
-                    systemImage: "trophy.fill"
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold
-                    )
-                )
-                .tracking(0.8)
-                .foregroundStyle(
-                    Color(
-                        red: 0.43,
-                        green: 0.31,
-                        blue: 0.08
-                    )
-                )
-                .padding(.horizontal, 11)
-                .frame(height: 25)
-                .background(
-                    ATHLTHTheme
-                        .champagneSoft
-                        .opacity(0.96),
-                    in: Capsule()
-                )
-
-                Text(challenge.title)
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                    .shadow(
-                        color: .black.opacity(0.46),
-                        radius: 5,
-                        y: 1
-                    )
-
-                Text(challenge.subtitle)
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .medium
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.96)
-                    )
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(
-                        maxWidth: 260,
-                        alignment: .leading
-                    )
-                    .shadow(
-                        color: .black.opacity(0.50),
-                        radius: 4,
-                        y: 1
-                    )
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: 10) {
-                    HStack(spacing: -8) {
-                        ForEach(
-                            participantProfiles
-                                .prefix(4)
-                        ) { profile in
-                            CommunityReferenceAvatar(
-                                url:
-                                    profile.avatarURL
-                                        .flatMap(URL.init(string:)),
-                                fallback:
-                                    profile
-                                        .resolvedName,
-                                size: 28
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        .white,
-                                        lineWidth: 1.5
-                                    )
-                            }
-                        }
-
-                        if store.participantCount(
-                            for: challenge.id
-                        ) > 4 {
-                            Text(
-                                "+\(store.participantCount(for: challenge.id) - 4)"
-                            )
-                            .font(
-                                .caption2.weight(
-                                    .bold
-                                )
-                            )
-                            .foregroundStyle(.white)
-                            .frame(
-                                width: 30,
-                                height: 30
-                            )
-                            .background(
-                                Color.black
-                                    .opacity(0.45),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        .white.opacity(
-                                            0.85
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            }
-                        }
-                    }
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Label(
-                            ATHLTHLocalization.format(
-                                english:
-                                    "%d participating",
-                                norwegian:
-                                    "%d deltar",
-                                store.participantCount(
-                                    for: challenge.id
-                                )
-                            ),
-                            systemImage:
-                                "person.2.fill"
-                        )
-
-                        Label(
-                            ATHLTHLocalization.format(
-                                english:
-                                    "%d days left",
-                                norwegian:
-                                    "%d dager igjen",
-                                daysRemaining
-                            ),
-                            systemImage: "clock"
-                        )
-                    }
-                    .font(
-                        .caption2.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.96)
-                    )
-
-                    Spacer(minLength: 6)
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .frame(
-                        width: 36,
-                        height: 36
-                    )
-                    .background(
-                        .white,
-                        in: Circle()
-                    )
-                }
-            }
-            .padding(11)
-        }
-        .frame(height: 142)
+        OfficialWeeklyChallengeArtwork(
+            challenge: challenge
+        )
         .frame(maxWidth: .infinity)
+        .frame(height: 142)
+        .clipped()
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 22,
@@ -1524,6 +1201,13 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .opacity(0.08),
             radius: 12,
             y: 5
+        )
+        .accessibilityLabel(
+            ATHLTHLocalization.format(
+                english: "Weekly challenge: %@",
+                norwegian: "Ukens challenge: %@",
+                challenge.title
+            )
         )
     }
 }
@@ -2839,18 +2523,25 @@ private struct CommunityReferenceQuickActions: View {
             .buttonStyle(.plain)
 
             NavigationLink {
-                CommunityDiscoveryView()
+                SocialHubView(
+                    initialTab: .discover
+                )
             } label: {
                 tile(
-                    title: "Discovery",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Find friends",
+                            norwegian: "Finn venner"
+                        ),
                     detail:
                         ATHLTHLocalization.choose(
-                            english: "Explore",
-                            norwegian: "Finn nytt"
+                            english: "People",
+                            norwegian: "Personer"
                         ),
-                    icon: "sparkles",
+                    icon:
+                        "person.badge.plus",
                     tint:
-                        ATHLTHTheme.premiumGold
+                        ATHLTHTheme.accentDeep
                 )
             }
             .buttonStyle(.plain)
