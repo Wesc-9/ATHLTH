@@ -4062,15 +4062,6 @@ private struct HomePersonalWorkoutVisual:
         }
     }
 
-    private var strengthActivationTint:
-        Color {
-        Color(
-            red: 0.91,
-            green: 0.54,
-            blue: 0.24
-        )
-    }
-
     var body: some View {
         ZStack {
             background
