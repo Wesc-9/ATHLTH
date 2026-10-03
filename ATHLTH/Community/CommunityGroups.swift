@@ -11839,6 +11839,9 @@ struct CommunityGroupSettingsView: View {
     @State private var membersCanCreateContent: Bool
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var cropRequest:
+        CommunityImageCropRequest?
+    @State private var saveError: String?
     @State private var selectedHeaderPhoto: PhotosPickerItem?
     @State private var selectedHeaderImageData: Data?
     @State private var selectedHeaderArtwork:
@@ -11900,6 +11903,38 @@ struct CommunityGroupSettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .tint(ATHLTHTheme.accent)
+
+                            if let selectedImageData,
+                               let image =
+                                UIImage(
+                                    data:
+                                        selectedImageData
+                                ) {
+                                Button {
+                                    cropRequest =
+                                        CommunityImageCropRequest(
+                                            image: image,
+                                            target:
+                                                .clubImage
+                                        )
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Crop",
+                                            norwegian:
+                                                "Utsnitt"
+                                        ),
+                                        systemImage:
+                                            "crop"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(
+                                    ATHLTHTheme
+                                        .accent
+                                )
+                            }
 
                             if selectedImageData != nil {
                                 Button(role: .destructive) {
@@ -11998,6 +12033,38 @@ struct CommunityGroupSettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .tint(ATHLTHTheme.accent)
+
+                            if let selectedHeaderImageData,
+                               let image =
+                                UIImage(
+                                    data:
+                                        selectedHeaderImageData
+                                ) {
+                                Button {
+                                    cropRequest =
+                                        CommunityImageCropRequest(
+                                            image: image,
+                                            target:
+                                                .wideCover
+                                        )
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Crop",
+                                            norwegian:
+                                                "Utsnitt"
+                                        ),
+                                        systemImage:
+                                            "crop"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(
+                                    ATHLTHTheme
+                                        .accent
+                                )
+                            }
 
                             if selectedHeaderImageData != nil ||
                                 selectedHeaderArtwork != nil {
@@ -12232,30 +12299,59 @@ struct CommunityGroupSettingsView: View {
 
                 Task {
                     do {
-                        guard let data = try await item
-                            .loadTransferable(type: Data.self)
+                        guard let data =
+                                try await item
+                                    .loadTransferable(
+                                        type:
+                                            Data.self
+                                    )
                         else {
-                            groups.errorMessage =
-                                "ATHLTH could not prepare that image. Try another photo."
+                            saveError =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH could not prepare that Club image. Try another photo.",
+                                    norwegian:
+                                        "ATHLTH klarte ikke å klargjøre Club-bildet. Prøv et annet bilde."
+                                )
+                            selectedPhoto = nil
                             return
                         }
 
-                        guard let jpeg =
+                        guard let prepared =
                                 await CommunityImageProcessor
                                     .prepareJPEG(
                                         data,
-                                        maxPixelSize: 1_600,
-                                        quality: 0.80
-                                    )
+                                        maxPixelSize:
+                                            2_400,
+                                        quality: 0.92
+                                    ),
+                              let image =
+                                UIImage(
+                                    data:
+                                        prepared
+                                )
                         else {
-                            groups.errorMessage =
-                                "ATHLTH could not prepare that image. Try another photo."
+                            saveError =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH could not prepare that Club image. Try another photo.",
+                                    norwegian:
+                                        "ATHLTH klarte ikke å klargjøre Club-bildet. Prøv et annet bilde."
+                                )
+                            selectedPhoto = nil
                             return
                         }
 
-                        selectedImageData = jpeg
+                        selectedPhoto = nil
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .clubImage
+                            )
                     } catch {
-                        groups.errorMessage =
+                        selectedPhoto = nil
+                        saveError =
                             error.localizedDescription
                     }
                 }
@@ -12267,34 +12363,105 @@ struct CommunityGroupSettingsView: View {
 
                 Task {
                     do {
-                        guard let data = try await item
-                            .loadTransferable(type: Data.self)
+                        guard let data =
+                                try await item
+                                    .loadTransferable(
+                                        type:
+                                            Data.self
+                                    )
                         else {
-                            groups.errorMessage =
-                                "ATHLTH could not prepare that header image. Try another photo."
+                            saveError =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH could not prepare that header image. Try another photo.",
+                                    norwegian:
+                                        "ATHLTH klarte ikke å klargjøre headerbildet. Prøv et annet bilde."
+                                )
+                            selectedHeaderPhoto = nil
                             return
                         }
 
-                        guard let jpeg =
+                        guard let prepared =
                                 await CommunityImageProcessor
                                     .prepareJPEG(
                                         data,
-                                        maxPixelSize: 1_600,
-                                        quality: 0.80
-                                    )
+                                        maxPixelSize:
+                                            2_400,
+                                        quality: 0.92
+                                    ),
+                              let image =
+                                UIImage(
+                                    data:
+                                        prepared
+                                )
                         else {
-                            groups.errorMessage =
-                                "ATHLTH could not prepare that header image. Try another photo."
+                            saveError =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH could not prepare that header image. Try another photo.",
+                                    norwegian:
+                                        "ATHLTH klarte ikke å klargjøre headerbildet. Prøv et annet bilde."
+                                )
+                            selectedHeaderPhoto = nil
                             return
                         }
 
-                        selectedHeaderImageData = jpeg
-                        selectedHeaderArtwork = nil
+                        selectedHeaderPhoto = nil
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .wideCover
+                            )
                     } catch {
-                        groups.errorMessage =
+                        selectedHeaderPhoto = nil
+                        saveError =
                             error.localizedDescription
                     }
                 }
+            }
+            .fullScreenCover(
+                item: $cropRequest
+            ) { request in
+                CommunityImageCropEditor(
+                    request: request
+                ) { croppedData in
+                    switch request.target {
+                    case .clubImage:
+                        selectedImageData =
+                            croppedData
+                    case .wideCover:
+                        selectedHeaderImageData =
+                            croppedData
+                        selectedHeaderArtwork =
+                            nil
+                    }
+                }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could not save Club image",
+                    norwegian:
+                        "Kunne ikke lagre Club-bildet"
+                ),
+                isPresented: Binding(
+                    get: {
+                        saveError != nil
+                    },
+                    set: {
+                        if !$0 {
+                            saveError = nil
+                        }
+                    }
+                )
+            ) {
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
+            } message: {
+                Text(saveError ?? "")
             }
             .confirmationDialog(
                 ATHLTHLocalization.format(
@@ -12420,6 +12587,15 @@ struct CommunityGroupSettingsView: View {
 
         if saved {
             dismiss()
+        } else {
+            saveError =
+                groups.errorMessage ??
+                ATHLTHLocalization.choose(
+                    english:
+                        "ATHLTH could not save the Club changes.",
+                    norwegian:
+                        "ATHLTH klarte ikke å lagre Club-endringene."
+                )
         }
     }
 
