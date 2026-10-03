@@ -289,10 +289,9 @@ enum ProfileFeaturedRecordKind:
                     )
                 }
 
-        let source =
-            decoded.isEmpty
-                ? defaultSelection
-                : decoded
+        // Keep the profile empty until the user explicitly chooses
+        // which personal records should be featured.
+        let source = decoded
 
         var seen:
             Set<ProfileFeaturedRecordKind> = []
