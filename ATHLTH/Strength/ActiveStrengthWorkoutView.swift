@@ -120,9 +120,9 @@ struct ActiveStrengthWorkoutView: View {
                     placement:
                         .topBarTrailing
                 ) {
-                    // Empty strength sessions stay live-buildable after
-                    // the timer starts. Sessions that already contain planned
-                    // exercises keep their fixed exercise queue.
+                    // Adding exercises while the timer is running is reserved
+                    // for explicit freestyle / no-plan workouts. Planned
+                    // sessions stay distraction-free once training starts.
                     if strength
                         .activeWorkout?
                         .allowsLiveExerciseBuilding ==
