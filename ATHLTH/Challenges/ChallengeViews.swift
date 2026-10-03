@@ -611,15 +611,17 @@ struct ChallengeCreationView: View {
 
                         HStack(spacing: 0) {
                             ForEach(
-                                Array([
+                                0..<5,
+                                id: \.self
+                            ) { index in
+                                let label = [
                                     "Detaljer",
                                     "Regler",
                                     "Personer",
                                     "Tid",
                                     "Se over"
-                                ].enumerated()),
-                                id: \.offset
-                            ) { index, label in
+                                ][index]
+
                                 HStack(spacing: 5) {
                                     ZStack {
                                         Circle()
