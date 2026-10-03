@@ -384,6 +384,62 @@ enum AchievementEffectPreference:
     }
 }
 
+enum WorkoutSetupPreference: String, CaseIterable, Identifiable {
+    case lastUsed
+    case basic
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .lastUsed:
+            return ATHLTHLocalization.choose(
+                english: "Last used",
+                norwegian: "Sist brukt"
+            )
+        case .basic:
+            return "Basic"
+        case .advanced:
+            return ATHLTHLocalization.choose(
+                english: "Advanced",
+                norwegian: "Avansert"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .lastUsed:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Run and strength remember their own most recently used setup.",
+                norwegian:
+                    "Løping og styrke husker hver sin sist brukte oppsettsmodus."
+            )
+        case .basic:
+            return ATHLTHLocalization.choose(
+                english:
+                    "New run and strength workouts always open in Basic.",
+                norwegian:
+                    "Nye løpe- og styrkeøkter åpner alltid i Basic."
+            )
+        case .advanced:
+            return ATHLTHLocalization.choose(
+                english:
+                    "New run and strength workouts always open in Advanced.",
+                norwegian:
+                    "Nye løpe- og styrkeøkter åpner alltid i Avansert."
+            )
+        }
+    }
+}
+
+enum WorkoutSetupActivity {
+    case running
+    case strength
+}
+
 enum IntegrationKind: String, CaseIterable, Identifiable {
     case appleHealth
     case appleWatch
@@ -439,6 +495,28 @@ final class AppSettingsStore: ObservableObject {
     @Published var trainingDeviceProvider: TrainingDeviceProvider { didSet { persist() } }
     @Published var preferredWorkoutCapture: WorkoutCapturePreference { didSet { persist() } }
     @Published var defaultStrengthTracking: StrengthTrackingPreference { didSet { persist() } }
+    @Published var workoutSetupPreference:
+        WorkoutSetupPreference {
+        didSet {
+            switch workoutSetupPreference {
+            case .lastUsed:
+                defaultStrengthTracking =
+                    lastStrengthAdvancedSetup
+                        ? .advanced
+                        : .simple
+            case .basic:
+                defaultStrengthTracking = .simple
+            case .advanced:
+                defaultStrengthTracking = .advanced
+            }
+
+            persist()
+        }
+    }
+    @Published private(set) var lastRunAdvancedSetup:
+        Bool { didSet { persist() } }
+    @Published private(set) var lastStrengthAdvancedSetup:
+        Bool { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
@@ -664,7 +742,49 @@ final class AppSettingsStore: ObservableObject {
         trainingDeviceProvider = resolvedProvider
         preferredWorkoutCapture = resolvedCapture
 
-        defaultStrengthTracking = StrengthTrackingPreference(rawValue: defaults.string(forKey: "settings.defaultStrengthTracking") ?? "") ?? .simple
+        let legacyStrengthTracking =
+            StrengthTrackingPreference(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.defaultStrengthTracking"
+                    ) ?? ""
+            ) ?? .simple
+
+        workoutSetupPreference =
+            WorkoutSetupPreference(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.workoutSetupPreference"
+                    ) ?? ""
+            ) ?? .lastUsed
+
+        lastRunAdvancedSetup =
+            defaults.object(
+                forKey:
+                    "settings.lastRunAdvancedSetup"
+            ) as? Bool ?? false
+
+        lastStrengthAdvancedSetup =
+            defaults.object(
+                forKey:
+                    "settings.lastStrengthAdvancedSetup"
+            ) as? Bool ??
+            (legacyStrengthTracking == .advanced)
+
+        switch workoutSetupPreference {
+        case .lastUsed:
+            defaultStrengthTracking =
+                lastStrengthAdvancedSetup
+                    ? .advanced
+                    : .simple
+        case .basic:
+            defaultStrengthTracking = .simple
+        case .advanced:
+            defaultStrengthTracking = .advanced
+        }
+
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? false
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         externalWorkoutImportMode = ExternalWorkoutImportMode(
@@ -939,6 +1059,18 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(trainingDeviceProvider.rawValue, forKey: "settings.trainingDeviceProvider")
         defaults.set(preferredWorkoutCapture.rawValue, forKey: "settings.preferredWorkoutCapture")
         defaults.set(defaultStrengthTracking.rawValue, forKey: "settings.defaultStrengthTracking")
+        defaults.set(
+            workoutSetupPreference.rawValue,
+            forKey: "settings.workoutSetupPreference"
+        )
+        defaults.set(
+            lastRunAdvancedSetup,
+            forKey: "settings.lastRunAdvancedSetup"
+        )
+        defaults.set(
+            lastStrengthAdvancedSetup,
+            forKey: "settings.lastStrengthAdvancedSetup"
+        )
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(externalWorkoutImportMode.rawValue, forKey: "settings.externalWorkoutImportMode")
@@ -1167,6 +1299,45 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
+    }
+
+    func resolvedAdvancedSetup(
+        for activity: WorkoutSetupActivity
+    ) -> Bool {
+        switch workoutSetupPreference {
+        case .basic:
+            return false
+        case .advanced:
+            return true
+        case .lastUsed:
+            switch activity {
+            case .running:
+                return lastRunAdvancedSetup
+            case .strength:
+                return lastStrengthAdvancedSetup
+            }
+        }
+    }
+
+    func recordAdvancedSetup(
+        _ advanced: Bool,
+        for activity: WorkoutSetupActivity
+    ) {
+        guard workoutSetupPreference == .lastUsed
+        else {
+            return
+        }
+
+        switch activity {
+        case .running:
+            lastRunAdvancedSetup = advanced
+        case .strength:
+            lastStrengthAdvancedSetup = advanced
+            defaultStrengthTracking =
+                advanced
+                    ? .advanced
+                    : .simple
+        }
     }
 
     var routeAlertConfiguration: WatchRouteAlertConfiguration {
