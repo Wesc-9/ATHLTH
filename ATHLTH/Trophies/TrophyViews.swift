@@ -261,22 +261,66 @@ struct ATHLTHTrophyCoreView: View {
     private var emblemArtwork: some View {
         ZStack {
             if trophy.isUnlocked &&
-               trophy.displayRarity == .epic {
+               trophy.displayRarity >= .epic {
                 ATHLTHTrophyPlateShape()
                     .fill(
                         ATHLTHTheme
                             .premiumGold
-                            .opacity(0.11)
+                            .opacity(
+                                trophy.displayRarity == .signature
+                                    ? 0.15
+                                    : 0.10
+                            )
                     )
                     .blur(
                         radius:
-                            size * 0.12
+                            size * 0.14
                     )
-                    .scaleEffect(1.08)
+                    .scaleEffect(1.075)
             }
 
             ATHLTHTrophyPlateShape()
                 .fill(artworkGradient)
+                .overlay {
+                    ATHLTHTrophyPlateShape()
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(
+                                        color:
+                                            Color.white
+                                                .opacity(0.18),
+                                        location: 0
+                                    ),
+                                    .init(
+                                        color:
+                                            Color.clear,
+                                        location: 0.30
+                                    ),
+                                    .init(
+                                        color:
+                                            Color.black
+                                                .opacity(0.18),
+                                        location: 0.72
+                                    ),
+                                    .init(
+                                        color:
+                                            Color.white
+                                                .opacity(0.05),
+                                        location: 1
+                                    )
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            )
+                        )
+                        .padding(
+                            size * 0.012
+                        )
+                        .blendMode(.softLight)
+                }
                 .overlay {
                     ATHLTHTrophyPlateShape()
                         .stroke(
@@ -285,8 +329,22 @@ struct ATHLTHTrophyCoreView: View {
                                 trophy
                                     .displayRarity ==
                                     .signature
-                                    ? 1.7
-                                    : 1.1
+                                    ? 2.0
+                                    : 1.25
+                        )
+                }
+                .overlay {
+                    ATHLTHTrophyPlateShape()
+                        .stroke(
+                            Color.white.opacity(
+                                trophy.isUnlocked
+                                    ? 0.18
+                                    : 0.07
+                            ),
+                            lineWidth: 0.75
+                        )
+                        .padding(
+                            size * 0.034
                         )
                 }
 
@@ -310,19 +368,49 @@ struct ATHLTHTrophyCoreView: View {
 
             ATHLTHTrophyPlateShape()
                 .fill(
-                    Color.black.opacity(
-                        trophy.isUnlocked
-                            ? trophy
-                                .displayRarity ==
-                                .core
-                                ? 0.22
-                                : 0.09
-                            : 0.035
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(
+                                trophy.isUnlocked
+                                    ? 0.16
+                                    : 0.04
+                            ),
+                            Color.black.opacity(
+                                trophy.isUnlocked
+                                    ? 0.04
+                                    : 0.02
+                            ),
+                            Color.black.opacity(
+                                trophy.isUnlocked
+                                    ? 0.22
+                                    : 0.05
+                            )
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
                     )
                 )
-                .padding(size * 0.10)
+                .padding(size * 0.083)
+                .overlay {
+                    ATHLTHTrophyPlateShape()
+                        .stroke(
+                            Color.white.opacity(
+                                trophy.isUnlocked
+                                    ? 0.09
+                                    : 0.03
+                            ),
+                            lineWidth: 0.7
+                        )
+                        .padding(
+                            size * 0.083
+                        )
+                }
 
-            VStack(spacing: size * 0.07) {
+            VStack(
+                spacing: size * 0.052
+            ) {
                 Text(
                     trophy.title
                         .uppercased()
@@ -332,57 +420,136 @@ struct ATHLTHTrophyCoreView: View {
                         size:
                             max(
                                 5.5,
-                                size * 0.055
+                                size * 0.048
                             ),
                         weight:
-                            .bold
+                            .semibold,
+                        design:
+                            .rounded
                     )
                 )
-                .tracking(size * 0.008)
+                .tracking(size * 0.010)
                 .foregroundStyle(
                     .white.opacity(
                         trophy.isUnlocked
-                            ? 0.84
-                            : 0.42
+                            ? 0.78
+                            : 0.38
                     )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.46)
+                .minimumScaleFactor(0.44)
                 .padding(
                     .horizontal,
-                    size * 0.12
+                    size * 0.13
                 )
 
                 ATHLTHMarkShape()
-                    .fill(markColor)
+                    .fill(
+                        trophy.isUnlocked
+                            ? LinearGradient(
+                                colors: [
+                                    Color.white,
+                                    Color(
+                                        red: 0.96,
+                                        green: 0.93,
+                                        blue: 0.84
+                                    )
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    markColor,
+                                    markColor
+                                ],
+                                startPoint:
+                                    .top,
+                                endPoint:
+                                    .bottom
+                            )
+                    )
                     .frame(
-                        width: size * 0.38,
-                        height: size * 0.27
+                        width: size * 0.49,
+                        height: size * 0.34
+                    )
+                    .shadow(
+                        color:
+                            Color.black.opacity(
+                                trophy.isUnlocked
+                                    ? 0.34
+                                    : 0.10
+                            ),
+                        radius:
+                            size * 0.015,
+                        y:
+                            size * 0.008
                     )
 
                 if showActivityIconInside {
-                    Image(
-                        systemName:
-                            trophy.systemImage
-                    )
-                    .font(
-                        .system(
-                            size: size * 0.11,
-                            weight: .semibold
+                    ZStack {
+                        Circle()
+                            .fill(
+                                Color.white.opacity(
+                                    trophy.isUnlocked
+                                        ? 0.075
+                                        : 0.025
+                                )
+                            )
+
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(
+                                    trophy.isUnlocked
+                                        ? 0.12
+                                        : 0.04
+                                ),
+                                lineWidth: 0.7
+                            )
+
+                        Image(
+                            systemName:
+                                trophy.systemImage
                         )
-                    )
-                    .foregroundStyle(
-                        trophy.isUnlocked
-                            ? Color.white
-                                .opacity(0.82)
-                            : Color.white
-                                .opacity(0.30)
+                        .font(
+                            .system(
+                                size:
+                                    size * 0.073,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            trophy.isUnlocked
+                                ? Color.white
+                                    .opacity(0.62)
+                                : Color.white
+                                    .opacity(0.24)
+                        )
+                    }
+                    .frame(
+                        width: size * 0.17,
+                        height: size * 0.17
                     )
                 }
             }
 
             lockedOverlay
         }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    trophy.isUnlocked
+                        ? 0.30
+                        : 0.10
+                ),
+            radius:
+                size * 0.055,
+            y:
+                size * 0.035
+        )
         .shadow(
             color:
                 achievementShadowColor,
@@ -4159,15 +4326,71 @@ struct TrophyUnlockRevealView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    .black,
-                    unlock.category.trophyAccent.opacity(0.28),
-                    .black
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.025,
+                            green: 0.027,
+                            blue: 0.030
+                        ),
+                        Color(
+                            red: 0.075,
+                            green: 0.073,
+                            blue: 0.068
+                        ),
+                        Color.black
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        unlock.category
+                            .trophyAccent
+                            .opacity(0.22),
+                        unlock.category
+                            .trophyAccent
+                            .opacity(0.055),
+                        Color.clear
+                    ],
+                    center:
+                        UnitPoint(
+                            x: 0.54,
+                            y: 0.42
+                        ),
+                    startRadius: 20,
+                    endRadius: 360
+                )
+
+                RadialGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.095),
+                        Color.clear
+                    ],
+                    center:
+                        UnitPoint(
+                            x: 0.50,
+                            y: 0.30
+                        ),
+                    startRadius: 8,
+                    endRadius: 280
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.20),
+                        Color.clear,
+                        Color.black.opacity(0.44)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
             .ignoresSafeArea()
 
             if showsParticles {
