@@ -41,6 +41,7 @@ struct RecoveryTrendDay: Identifiable, Equatable {
     let sleepDuration: TimeInterval?
     let hrvMilliseconds: Double?
     let restingHeartRate: Double?
+    let respiratoryRate: Double?
     let trainingMinutes: Double
 }
 
