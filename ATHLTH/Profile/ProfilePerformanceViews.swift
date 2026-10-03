@@ -1588,17 +1588,53 @@ struct PerformanceStatsView: View {
 
                     Spacer()
 
-                    Text(
-                        text(
-                            "From your history",
-                            "Fra historikken din"
+                    NavigationLink {
+                        PerformanceRecordCollectionView(
+                            title:
+                                text(
+                                    "Running records",
+                                    "Løperekorder"
+                                ),
+                            subtitle:
+                                text(
+                                    "Verified records and ATHLTH-calculated milestones from your full running history.",
+                                    "Verifiserte rekorder og ATHLTH-beregnede milepæler fra hele løpehistorikken din."
+                                ),
+                            imageName:
+                                "GoalSprint",
+                            items:
+                                runningDisplayItems,
+                            sources:
+                                runningDisplayItems
+                                    .indices
+                                    .map(
+                                        runningMetricSource
+                                    )
                         )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(
+                                text(
+                                    "View all",
+                                    "Se alle"
+                                )
+                            )
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                        }
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
                 }
 
                 LazyVGrid(
@@ -1616,7 +1652,7 @@ struct PerformanceStatsView: View {
                 ) {
                     ForEach(
                         Array(
-                            runningDisplayItems
+                            runningSummaryItems
                                 .enumerated()
                         ),
                         id: \.offset
@@ -1671,6 +1707,17 @@ struct PerformanceStatsView: View {
             radius: 14,
             y: 6
         )
+    }
+
+    private var runningSummaryItems:
+        [PerformanceMetricItem] {
+        Array(
+            runningItems
+                .prefix(4)
+        ) + [
+            longestRunItem,
+            bestWeeklyRunningDistanceItem
+        ]
     }
 
     private var runningDisplayItems:
@@ -1817,17 +1864,55 @@ struct PerformanceStatsView: View {
 
                     Spacer()
 
-                    Text(
-                        text(
-                            "From completed workouts",
-                            "Fra fullførte økter"
+                    NavigationLink {
+                        PerformanceRecordCollectionView(
+                            title:
+                                text(
+                                    "Strength records",
+                                    "Styrkerekorder"
+                                ),
+                            subtitle:
+                                text(
+                                    "ATHLTH records calculated from your completed strength workouts and working sets.",
+                                    "ATHLTH-rekorder beregnet fra fullførte styrkeøkter og arbeidssett."
+                                ),
+                            imageName:
+                                "GoalStrength",
+                            items:
+                                strengthDisplayItems,
+                            sources:
+                                Array(
+                                    repeating:
+                                        "ATHLTH",
+                                    count:
+                                        strengthDisplayItems
+                                            .count
+                                )
                         )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(
+                                text(
+                                    "View all",
+                                    "Se alle"
+                                )
+                            )
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                        }
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
                 }
 
                 LazyVGrid(
@@ -1845,7 +1930,7 @@ struct PerformanceStatsView: View {
                 ) {
                     ForEach(
                         Array(
-                            strengthDisplayItems
+                            strengthSummaryItems
                                 .enumerated()
                         ),
                         id: \.offset
@@ -1898,6 +1983,17 @@ struct PerformanceStatsView: View {
             radius: 14,
             y: 6
         )
+    }
+
+    private var strengthSummaryItems:
+        [PerformanceMetricItem] {
+        Array(
+            strengthItems
+                .prefix(4)
+        ) + [
+            longestStrengthWorkoutItem,
+            bestWeeklyStrengthVolumeItem
+        ]
     }
 
     private var strengthDisplayItems:
@@ -4809,19 +4905,16 @@ struct PerformanceStatsView: View {
             Dictionary(
                 grouping: running
             ) {
-                DateComponents(
-                    year:
-                        calendar.component(
-                            .year,
-                            from:
-                                $0.startDate
-                        ),
-                    month:
-                        calendar.component(
-                            .month,
-                            from:
-                                $0.startDate
-                        )
+                calendar
+                    .dateInterval(
+                        of: .month,
+                        for:
+                            $0.startDate
+                    )?
+                    .start ??
+                calendar.startOfDay(
+                    for:
+                        $0.startDate
                 )
             }
 
@@ -5249,20 +5342,9 @@ struct PerformanceStatsView: View {
     }
 
     private func monthLabel(
-        _ components:
-            DateComponents
+        _ date: Date
     ) -> String {
-        guard let date =
-                Calendar.current
-                    .date(
-                        from:
-                            components
-                    )
-        else {
-            return "—"
-        }
-
-        return date.formatted(
+        date.formatted(
             .dateTime
                 .month(.wide)
                 .year()
@@ -5649,6 +5731,291 @@ struct PerformanceStatsView: View {
                 "%.1f kg",
             kilograms
         )
+    }
+}
+
+private struct PerformanceRecordCollectionView:
+    View {
+    let title: String
+    let subtitle: String
+    let imageName: String
+    let items:
+        [PerformanceMetricItem]
+    let sources: [String]
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.14)
+            )
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    hero
+
+                    LazyVGrid(
+                        columns: [
+                            GridItem(
+                                .flexible(),
+                                spacing: 10
+                            ),
+                            GridItem(
+                                .flexible(),
+                                spacing: 10
+                            )
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(
+                            Array(
+                                items
+                                    .enumerated()
+                            ),
+                            id: \.offset
+                        ) {
+                            index,
+                            item in
+
+                            recordCard(
+                                item,
+                                source:
+                                    sources
+                                        .indices
+                                        .contains(
+                                            index
+                                        )
+                                    ? sources[
+                                        index
+                                    ]
+                                    : "ATHLTH"
+                            )
+                        }
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    16
+                )
+                .padding(.top, 10)
+                .padding(
+                    .bottom,
+                    40
+                )
+                .frame(
+                    maxWidth: 760
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+            }
+            .scrollIndicators(
+                .hidden
+            )
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    private var hero:
+        some View {
+        GeometryReader {
+            proxy in
+
+            ZStack(
+                alignment:
+                    .bottomLeading
+            ) {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width:
+                            proxy.size
+                                .width,
+                        height:
+                            proxy.size
+                                .height
+                    )
+                    .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.66)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(title)
+                        .font(
+                            .title2
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .white
+                                .opacity(
+                                    0.86
+                                )
+                        )
+                        .fixedSize(
+                            horizontal:
+                                false,
+                            vertical:
+                                true
+                        )
+                }
+                .padding(16)
+            }
+        }
+        .frame(height: 176)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+    }
+
+    private func recordCard(
+        _ item:
+            PerformanceMetricItem,
+        source: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Image(
+                    systemName:
+                        item.icon
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight:
+                            .semibold
+                    )
+                )
+                .foregroundStyle(
+                    item.tint
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    item.tint
+                        .opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style:
+                                .continuous
+                        )
+                )
+
+                Spacer()
+
+                Text(source)
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+            }
+
+            Text(item.title)
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(2)
+
+            Text(item.value)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.62
+                )
+
+            Text(item.detail)
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+                .lineLimit(2)
+
+            Spacer(
+                minLength: 0
+            )
+
+            Capsule()
+                .fill(item.tint)
+                .frame(height: 3)
+        }
+        .padding(13)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 154,
+            alignment: .topLeading
+        )
+        .background(
+            Color.white
+                .opacity(0.92),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                item.tint
+                    .opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
     }
 }
 
