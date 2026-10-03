@@ -11986,420 +11986,180 @@ struct CommunityGroupSettingsView: View {
         groups.group(for: group.id) ?? group
     }
 
+    private var clubForest: Color {
+        Color(
+            red: 0.025,
+            green: 0.30,
+            blue: 0.21
+        )
+    }
+
+    private var clubEmerald: Color {
+        Color(
+            red: 0.055,
+            green: 0.49,
+            blue: 0.32
+        )
+    }
+
+    private var clubMint: Color {
+        Color(
+            red: 0.90,
+            green: 0.96,
+            blue: 0.92
+        )
+    }
+
+    private var clubSage: Color {
+        Color(
+            red: 0.77,
+            green: 0.88,
+            blue: 0.81
+        )
+    }
+
     var body: some View {
-        let photoButtonTitle =
-            selectedImageData == nil
-                ? "Choose Photo"
-                : "Change Photo"
-
-        return NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 14) {
-                        groupImagePreview
-
-                        HStack(spacing: 10) {
-                            PhotosPicker(
-                                selection: $selectedPhoto,
-                                matching: .images
-                            ) {
-                                Label(
-                                    photoButtonTitle,
-                                    systemImage: "photo"
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(ATHLTHTheme.accent)
-
-                            if let selectedImageData,
-                               let image =
-                                UIImage(
-                                    data:
-                                        selectedImageData
-                                ) {
-                                Button {
-                                    cropRequest =
-                                        CommunityImageCropRequest(
-                                            image: image,
-                                            target:
-                                                .clubImage
-                                        )
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Crop",
-                                            norwegian:
-                                                "Utsnitt"
-                                        ),
-                                        systemImage:
-                                            "crop"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(
-                                    ATHLTHTheme
-                                        .accent
-                                )
-                            }
-
-                            if selectedImageData != nil {
-                                Button(role: .destructive) {
-                                    selectedImageData = nil
-                                    selectedPhoto = nil
-                                } label: {
-                                    Label(
-                                        "Remove",
-                                        systemImage: "trash"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                            } else if currentGroup.imageURL != nil {
-                                Button(role: .destructive) {
-                                    Task {
-                                        saving = true
-                                        _ = await groups.removeGroupImage(
-                                            currentGroup
-                                        )
-                                        saving = false
-                                    }
-                                } label: {
-                                    Label(
-                                        "Remove",
-                                        systemImage: "trash"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(saving)
-                            }
-                        }
-
-                        Text(
-                            "The Club image is the square identity used on the Club page and in Community."
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        clubEmerald.opacity(
+                            0.14
                         )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                } header: {
-                    Text("Club image")
-                }
+                )
+                .ignoresSafeArea()
 
-                Section {
+                ScrollView {
                     VStack(
                         alignment: .leading,
                         spacing: 14
                     ) {
-                        groupHeaderImagePreview
+                        compactMediaCard
+                        clubIdentityCard
+                        clubSetupCard
+                        permissionsCard
 
-                        Text("ATHLTH images")
-                            .font(
-                                .caption
-                                    .weight(
-                                        .semibold
-                                    )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-
-                        ATHLTHStandardArtworkPicker(
-                            selection:
-                                Binding(
-                                    get: {
-                                        selectedHeaderArtwork
-                                    },
-                                    set: {
-                                        artwork in
-                                        selectedHeaderArtwork =
-                                            artwork
-                                        if artwork != nil {
-                                            selectedHeaderPhoto =
-                                                nil
-                                            selectedHeaderImageData =
-                                                nil
-                                        }
-                                    }
-                                )
-                        )
-
-                        HStack(spacing: 10) {
-                            PhotosPicker(
-                                selection: $selectedHeaderPhoto,
-                                matching: .images
-                            ) {
-                                Label(
-                                    selectedHeaderImageData == nil
-                                        ? "Upload Header"
-                                        : "Change Header",
-                                    systemImage: "photo.on.rectangle.angled"
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(ATHLTHTheme.accent)
-
-                            if let selectedHeaderImageData,
-                               let image =
-                                UIImage(
-                                    data:
-                                        selectedHeaderImageData
-                                ) {
-                                Button {
-                                    cropRequest =
-                                        CommunityImageCropRequest(
-                                            image: image,
-                                            target:
-                                                .wideCover
-                                        )
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Crop",
-                                            norwegian:
-                                                "Utsnitt"
-                                        ),
-                                        systemImage:
-                                            "crop"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(
-                                    ATHLTHTheme
-                                        .accent
-                                )
-                            }
-
-                            if selectedHeaderImageData != nil ||
-                                selectedHeaderArtwork != nil {
-                                Button(role: .destructive) {
-                                    if selectedHeaderImageData != nil ||
-                                        currentGroup.headerImageURL !=
-                                            selectedHeaderArtwork?
-                                                .reference {
-                                        selectedHeaderImageData =
-                                            nil
-                                        selectedHeaderPhoto =
-                                            nil
-                                        selectedHeaderArtwork =
-                                            nil
-                                    } else {
-                                        Task {
-                                            saving = true
-                                            _ = await groups
-                                                .removeGroupHeaderImage(
-                                                    currentGroup
-                                                )
-                                            selectedHeaderArtwork =
-                                                nil
-                                            saving = false
-                                        }
-                                    }
-                                } label: {
-                                    Label(
-                                        "Remove",
-                                        systemImage: "trash"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(saving)
-                            } else if currentGroup.headerImageURL != nil {
-                                Button(role: .destructive) {
-                                    Task {
-                                        saving = true
-                                        _ = await groups.removeGroupHeaderImage(
-                                            currentGroup
-                                        )
-                                        saving = false
-                                    }
-                                } label: {
-                                    Label(
-                                        "Remove",
-                                        systemImage: "trash"
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(saving)
-                            }
+                        if groups.isOwner(
+                            of: currentGroup
+                        ) {
+                            dangerCard
                         }
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Choose one of the shared ATHLTH images or upload your own. This wide image is used only as the Club header.",
-                                norwegian:
-                                    "Velg ett av standardbildene i ATHLTH eller last opp ditt eget. Dette brede bildet brukes kun som header for Club-en."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
+                    .frame(maxWidth: 760)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                } header: {
-                    Text(
+                }
+                .scrollIndicators(.hidden)
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club Settings",
+                    norwegian:
+                        "Klubbinnstillinger"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
                         ATHLTHLocalization.choose(
                             english:
-                                "Club header image",
+                                "Cancel",
                             norwegian:
-                                "Headerbilde"
+                                "Avbryt"
                         )
-                    )
-                }
-
-                Section("Featured Club Challenge") {
-                    Picker(
-                        "Club Challenge",
-                        selection: $selectedFeaturedChallengeID
                     ) {
-                        Text("None")
-                            .tag(nil as UUID?)
-
-                        ForEach(availableFeaturedChallenges) {
-                            challenge in
-                            Text(challenge.title)
-                                .tag(challenge.id as UUID?)
-                        }
-                    }
-
-                    Text(
-                        "The selected challenge gets the premium Club Challenge card at the top of Overview. Owner and Admin can change it at any time."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Club") {
-                    TextField("Club name", text: $name)
-
-                    TextField(
-                        "Location (optional)",
-                        text: $locationName
-                    )
-                    .textContentType(.location)
-
-                    Text(
-                        "Shown in the Club header and Club discovery when provided."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                    TextField(
-                        "Description",
-                        text: $summary,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
-                }
-
-                Section("Visibility") {
-                    Picker(
-                        "Club visibility",
-                        selection: $visibility
-                    ) {
-                        Label("Public", systemImage: "globe")
-                            .tag("public")
-                        Label("Private", systemImage: "lock.fill")
-                            .tag("private")
-                    }
-                    .pickerStyle(.segmented)
-
-                    Text(
-                        visibility == "public"
-                            ? "Public groups appear in Discover."
-                            : "Private groups stay hidden from Discover."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Membership") {
-                    Picker(
-                        "Who can join",
-                        selection: $joinMode
-                    ) {
-                        if visibility == "public" {
-                            Text("Open")
-                                .tag("open")
-                        }
-
-                        Text("Approval required")
-                            .tag("approval")
-                        Text("Invite only")
-                            .tag("invite_only")
-                    }
-
-                    Text(joinModeDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Member permissions") {
-                    Toggle(
-                        "Members can create events & challenges",
-                        isOn: $membersCanCreateContent
-                    )
-
-                    Text(
-                        membersCanCreateContent
-                            ? "Members can create events and challenges. Owner, Admin and Contributor can always create them."
-                            : "Only Owner and Admin can create events and challenges."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                if groups.isOwner(of: currentGroup) {
-                    Section {
-                        Button(
-                            "Delete Club",
-                            role: .destructive
-                        ) {
-                            showingDeleteConfirmation = true
-                        }
-                        .disabled(saving || deleting)
-                    } footer: {
-                        Text(
-                            "Only the Owner can delete the group. Deleting it permanently removes messages, updates, events, challenges and memberships."
-                        )
-                    }
-                }
-            }
-            .navigationTitle("Club Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Saving…" : "Save") {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button {
                         Task {
                             await saveChanges()
                         }
+                    } label: {
+                        Text(
+                            saving
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Saving…",
+                                        norwegian:
+                                            "Lagrer…"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Save",
+                                        norwegian:
+                                            "Lagre"
+                                    )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .padding(
+                            .horizontal,
+                            17
+                        )
+                        .frame(height: 38)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    clubForest,
+                                    clubEmerald
+                                ],
+                                startPoint:
+                                    .leading,
+                                endPoint:
+                                    .trailing
+                            ),
+                            in: Capsule()
+                        )
+                        .opacity(
+                            canSave
+                                ? 1
+                                : 0.35
+                        )
                     }
-                    .disabled(
-                        name.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).count < 2 ||
-                        saving ||
-                        deleting
-                    )
+                    .buttonStyle(.plain)
+                    .disabled(!canSave)
                 }
             }
-            .onChange(of: visibility) { _, value in
+            .onChange(
+                of: visibility
+            ) { _, value in
                 if value == "private" &&
                     joinMode == "open" {
-                    joinMode = "invite_only"
+                    joinMode =
+                        "invite_only"
                 }
             }
-            .onChange(of: selectedPhoto) { _, item in
+            .onChange(
+                of: selectedPhoto
+            ) { _, item in
                 guard let item else {
                     return
                 }
@@ -12463,7 +12223,9 @@ struct CommunityGroupSettingsView: View {
                     }
                 }
             }
-            .onChange(of: selectedHeaderPhoto) { _, item in
+            .onChange(
+                of: selectedHeaderPhoto
+            ) { _, item in
                 guard let item else {
                     return
                 }
@@ -12484,7 +12246,8 @@ struct CommunityGroupSettingsView: View {
                                     norwegian:
                                         "ATHLTH klarte ikke å klargjøre headerbildet. Prøv et annet bilde."
                                 )
-                            selectedHeaderPhoto = nil
+                            selectedHeaderPhoto =
+                                nil
                             return
                         }
 
@@ -12509,7 +12272,8 @@ struct CommunityGroupSettingsView: View {
                                     norwegian:
                                         "ATHLTH klarte ikke å klargjøre headerbildet. Prøv et annet bilde."
                                 )
-                            selectedHeaderPhoto = nil
+                            selectedHeaderPhoto =
+                                nil
                             return
                         }
 
@@ -12572,22 +12336,33 @@ struct CommunityGroupSettingsView: View {
             }
             .confirmationDialog(
                 ATHLTHLocalization.format(
-                    english: "Delete %@?",
-                    norwegian: "Slette %@?",
+                    english:
+                        "Delete %@?",
+                    norwegian:
+                        "Slette %@?",
                     currentGroup.name
                 ),
-                isPresented: $showingDeleteConfirmation,
-                titleVisibility: .visible
+                isPresented:
+                    $showingDeleteConfirmation,
+                titleVisibility:
+                    .visible
             ) {
                 Button(
-                    "Delete Club",
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Delete Club",
+                        norwegian:
+                            "Slett Club"
+                    ),
                     role: .destructive
                 ) {
                     Task {
                         deleting = true
-                        let deleted = await groups.deleteGroup(
-                            currentGroup
-                        )
+                        let deleted =
+                            await groups
+                                .deleteGroup(
+                                    currentGroup
+                                )
                         deleting = false
 
                         if deleted {
@@ -12596,12 +12371,957 @@ struct CommunityGroupSettingsView: View {
                     }
                 }
 
-                Button("Cancel", role: .cancel) {}
+                Button(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Cancel",
+                        norwegian:
+                            "Avbryt"
+                    ),
+                    role: .cancel
+                ) {}
             } message: {
                 Text(
-                    "This cannot be undone. All group content will be permanently removed."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This cannot be undone. All Club content will be permanently removed.",
+                        norwegian:
+                            "Dette kan ikke angres. Alt innhold i Club-en blir slettet permanent."
+                    )
                 )
             }
+        }
+    }
+
+    private var canSave: Bool {
+        name.trimmingCharacters(
+            in:
+                .whitespacesAndNewlines
+        ).count >= 2 &&
+        !saving &&
+        !deleting
+    }
+
+    private var compactMediaCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club identity",
+                    norwegian:
+                        "Club-identitet"
+                ),
+                systemImage:
+                    "photo.on.rectangle.angled"
+            )
+
+            ZStack(
+                alignment:
+                    .bottomLeading
+            ) {
+                groupHeaderImagePreview
+                    .frame(height: 112)
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        clubForest
+                            .opacity(0.28)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style:
+                            .continuous
+                    )
+                )
+
+                groupImagePreview
+                    .frame(
+                        width: 72,
+                        height: 72
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.white,
+                            lineWidth: 2
+                        )
+                    }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(
+                                    0.10
+                                ),
+                        radius: 8,
+                        y: 4
+                    )
+                    .padding(
+                        .leading,
+                        12
+                    )
+                    .offset(y: 24)
+
+                HStack(spacing: 8) {
+                    Spacer()
+
+                    PhotosPicker(
+                        selection:
+                            $selectedHeaderPhoto,
+                        matching: .images
+                    ) {
+                        Image(
+                            systemName:
+                                "photo.on.rectangle.angled"
+                        )
+                        .font(
+                            .system(
+                                size: 13,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+                        .background(
+                            clubForest
+                                .opacity(
+                                    0.92
+                                ),
+                            in: Circle()
+                        )
+                    }
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Change header image",
+                            norwegian:
+                                "Bytt headerbilde"
+                        )
+                    )
+                }
+                .padding(10)
+            }
+            .padding(
+                .bottom,
+                22
+            )
+
+            HStack(spacing: 8) {
+                PhotosPicker(
+                    selection:
+                        $selectedPhoto,
+                    matching: .images
+                ) {
+                    compactActionChip(
+                        title:
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Club image",
+                                    norwegian:
+                                        "Club-bilde"
+                                ),
+                        icon: "photo"
+                    )
+                }
+
+                if let selectedImageData,
+                   let image =
+                    UIImage(
+                        data:
+                            selectedImageData
+                    ) {
+                    Button {
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .clubImage
+                            )
+                    } label: {
+                        compactActionChip(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Crop",
+                                        norwegian:
+                                            "Utsnitt"
+                                    ),
+                            icon: "crop"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let selectedHeaderImageData,
+                   let image =
+                    UIImage(
+                        data:
+                            selectedHeaderImageData
+                    ) {
+                    Button {
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .wideCover
+                            )
+                    } label: {
+                        compactActionChip(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Header crop",
+                                        norwegian:
+                                            "Header-utsnitt"
+                                    ),
+                            icon: "crop.rotate"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+            }
+
+            HStack {
+                Text(
+                    "ATHLTH images"
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+
+                Spacer()
+            }
+
+            ATHLTHStandardArtworkPicker(
+                selection:
+                    Binding(
+                        get: {
+                            selectedHeaderArtwork
+                        },
+                        set: {
+                            artwork in
+
+                            selectedHeaderArtwork =
+                                artwork
+                            if artwork != nil {
+                                selectedHeaderPhoto =
+                                    nil
+                                selectedHeaderImageData =
+                                    nil
+                            }
+                        }
+                    )
+            )
+        }
+        .padding(14)
+        .background(
+            Color.white
+                .opacity(0.95),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.46
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.05
+                ),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    private var clubIdentityCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club details",
+                    norwegian:
+                        "Club-detaljer"
+                ),
+                systemImage:
+                    "pencil.line"
+            )
+            .padding(
+                .bottom,
+                8
+            )
+
+            compactTextFieldRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Name",
+                            norwegian:
+                                "Navn"
+                        ),
+                text: $name,
+                icon:
+                    "textformat"
+            )
+
+            Divider()
+                .opacity(0.55)
+
+            compactTextFieldRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Location",
+                            norwegian:
+                                "Sted"
+                        ),
+                text:
+                    $locationName,
+                icon:
+                    "location.fill"
+            )
+            .textContentType(
+                .location
+            )
+
+            Divider()
+                .opacity(0.55)
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Bio",
+                        norwegian:
+                            "Bio"
+                    ),
+                    systemImage:
+                        "quote.bubble.fill"
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Describe your Club",
+                        norwegian:
+                            "Beskriv Club-en"
+                    ),
+                    text: $summary,
+                    axis: .vertical
+                )
+                .lineLimit(1...3)
+                .font(.subheadline)
+            }
+            .padding(
+                .vertical,
+                11
+            )
+        }
+        .padding(
+            .horizontal,
+            14
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            Color.white
+                .opacity(0.95),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.40
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var clubSetupCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club setup",
+                    norwegian:
+                        "Club-oppsett"
+                ),
+                systemImage:
+                    "slider.horizontal.3"
+            )
+            .padding(
+                .bottom,
+                8
+            )
+
+            Picker(
+                selection:
+                    $selectedFeaturedChallengeID
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "None",
+                        norwegian:
+                            "Ingen"
+                    )
+                )
+                .tag(nil as UUID?)
+
+                ForEach(
+                    availableFeaturedChallenges
+                ) {
+                    challenge in
+
+                    Text(
+                        challenge.title
+                    )
+                    .tag(
+                        challenge.id
+                            as UUID?
+                    )
+                }
+            } label: {
+                compactSettingLabel(
+                    icon:
+                        "trophy.fill",
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Featured challenge",
+                                norwegian:
+                                    "Fremhevet challenge"
+                            )
+                )
+            }
+            .pickerStyle(.menu)
+            .tint(
+                ATHLTHTheme
+                    .primaryText
+            )
+            .frame(
+                minHeight: 52
+            )
+
+            Divider()
+                .opacity(0.55)
+
+            Picker(
+                selection:
+                    $joinMode
+            ) {
+                if visibility ==
+                    "public" {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Open",
+                                norwegian:
+                                    "Åpen"
+                            )
+                    )
+                    .tag("open")
+                }
+
+                Text(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Approval required",
+                            norwegian:
+                                "Godkjenning"
+                        )
+                )
+                .tag("approval")
+
+                Text(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Invite only",
+                            norwegian:
+                                "Kun invitasjon"
+                        )
+                )
+                .tag(
+                    "invite_only"
+                )
+            } label: {
+                compactSettingLabel(
+                    icon:
+                        "person.2.fill",
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Membership",
+                                norwegian:
+                                    "Medlemskap"
+                            )
+                )
+            }
+            .pickerStyle(.menu)
+            .tint(
+                ATHLTHTheme
+                    .primaryText
+            )
+            .frame(
+                minHeight: 52
+            )
+
+            Divider()
+                .opacity(0.55)
+
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                compactSettingLabel(
+                    icon:
+                        "globe",
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Visibility",
+                                norwegian:
+                                    "Synlighet"
+                            )
+                )
+
+                Picker(
+                    "",
+                    selection:
+                        $visibility
+                ) {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Public",
+                                norwegian:
+                                    "Offentlig"
+                            )
+                    )
+                    .tag("public")
+
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Private",
+                                norwegian:
+                                    "Privat"
+                            )
+                    )
+                    .tag("private")
+                }
+                .pickerStyle(
+                    .segmented
+                )
+                .labelsHidden()
+            }
+            .padding(
+                .vertical,
+                10
+            )
+        }
+        .padding(
+            .horizontal,
+            14
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            Color.white
+                .opacity(0.95),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.40
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var permissionsCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Permissions",
+                    norwegian:
+                        "Tillatelser"
+                ),
+                systemImage:
+                    "person.badge.key.fill"
+            )
+            .padding(
+                .bottom,
+                6
+            )
+
+            Toggle(
+                isOn:
+                    $membersCanCreateContent
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Members can create content",
+                            norwegian:
+                                "Medlemmer kan opprette innhold"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Events and challenges",
+                            norwegian:
+                                "Events og challenges"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+            }
+            .tint(
+                clubEmerald
+            )
+            .padding(
+                .vertical,
+                8
+            )
+        }
+        .padding(
+            .horizontal,
+            14
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            Color.white
+                .opacity(0.95),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.40
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var dangerCard:
+        some View {
+        Button(
+            role: .destructive
+        ) {
+            showingDeleteConfirmation =
+                true
+        } label: {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "trash"
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Delete Club",
+                        norwegian:
+                            "Slett Club"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(
+                            .semibold
+                        )
+                )
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 48)
+            .background(
+                Color.red
+                    .opacity(0.06),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style:
+                            .continuous
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            saving || deleting
+        )
+    }
+
+    private func sectionTitle(
+        _ title: String,
+        systemImage: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(
+                systemName:
+                    systemImage
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 28,
+                height: 28
+            )
+            .background(
+                clubMint,
+                in: Circle()
+            )
+
+            Text(title)
+                .font(
+                    .headline
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+        }
+    }
+
+    private func compactActionChip(
+        title: String,
+        icon: String
+    ) -> some View {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .caption
+                .weight(
+                    .semibold
+                )
+        )
+        .foregroundStyle(
+            clubForest
+        )
+        .padding(
+            .horizontal,
+            10
+        )
+        .frame(height: 34)
+        .background(
+            clubMint,
+            in: Capsule()
+        )
+    }
+
+    private func compactTextFieldRow(
+        title: String,
+        text: Binding<String>,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(width: 18)
+
+            TextField(
+                title,
+                text: text
+            )
+            .font(.subheadline)
+        }
+        .frame(
+            minHeight: 48
+        )
+    }
+
+    private func compactSettingLabel(
+        icon: String,
+        title: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(width: 18)
+
+            Text(title)
+                .font(
+                    .subheadline
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
         }
     }
 
@@ -12730,14 +13450,11 @@ struct CommunityGroupSettingsView: View {
                 groupImagePlaceholder
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 150)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
         )
+        .clipped()
         .overlay {
             ZStack {
                 LinearGradient(
@@ -12793,17 +13510,20 @@ struct CommunityGroupSettingsView: View {
                 groupHeaderImagePlaceholder
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 160)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+        .clipped()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 18,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 18,
                 style: .continuous
             )
             .stroke(
