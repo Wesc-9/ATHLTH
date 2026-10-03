@@ -689,6 +689,7 @@ struct ChallengeCreationView: View {
     @State private var shareToCommunity = true
     @State private var creatingChallenge = false
     @State private var createError: String?
+    @State private var showingInvitePicker = false
 
     private var clubForest: Color {
         Color(red: 0.20, green: 0.26, blue: 0.36)
@@ -711,63 +712,22 @@ struct ChallengeCreationView: View {
                 )
                 .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    VStack(spacing: 10) {
-                        HStack(spacing: 8) {
-                            ForEach(0..<5, id: \.self) { index in
-                                Capsule(style: .continuous)
-                                    .fill(
-                                        index <= step
-                                            ? clubForest
-                                            : Color.primary.opacity(0.09)
-                                    )
-                                    .frame(height: 5)
-                            }
-                        }
-
-                        HStack(spacing: 6) {
-                            Text(
-                                ATHLTHLocalization.format(
-                                    english: "Step %d of 5",
-                                    norwegian: "Steg %d av 5",
-                                    step + 1
-                                )
-                            )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(clubForest)
-
-                            Text("·")
-                                .foregroundStyle(.secondary)
-
-                            Text(stepTitle)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-
-                            Spacer()
-                        }
+                ScrollView {
+                    VStack(spacing: 16) {
+                        creationHero
+                        creationChallengeSection
+                        creationRulesSection
+                        creationParticipantsSection
+                        creationCommunitySection
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
-                    ScrollView {
-                        Group {
-                            switch step {
-                            case 0: typeStep
-                            case 1: rulesStep
-                            case 2: peopleStep
-                            case 3: scheduleStep
-                            default: reviewStep
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
-                        .padding(.bottom, 18)
-                    }
-                    .scrollIndicators(.hidden)
-
-                    footer
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
                 }
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(
+                    .interactively
+                )
             }
             .navigationTitle(
                 preselectedRouteID == nil
@@ -782,7 +742,10 @@ struct ChallengeCreationView: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
                     Button(
                         ATHLTHLocalization.choose(
                             english: "Cancel",
@@ -791,133 +754,311 @@ struct ChallengeCreationView: View {
                     ) {
                         dismiss()
                     }
-                    .foregroundStyle(clubForest)
+                    .foregroundStyle(
+                        clubForest
+                    )
                 }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button {
+                        Task {
+                            await createChallenge()
+                        }
+                    } label: {
+                        Text(
+                            creatingChallenge
+                                ? ATHLTHLocalization.choose(
+                                    english: "Creating…",
+                                    norwegian: "Oppretter…"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Create",
+                                    norwegian: "Opprett"
+                                )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    }
+                    .disabled(
+                        !creationIsValid ||
+                        creatingChallenge
+                    )
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .opacity(0.32)
+
+                    Button {
+                        Task {
+                            await createChallenge()
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if creatingChallenge {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+
+                            Text(
+                                creatingChallenge
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Creating…",
+                                        norwegian: "Oppretter…"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Create challenge",
+                                        norwegian: "Opprett utfordring"
+                                    )
+                            )
+                            .font(.headline)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    clubForest,
+                                    clubEmerald
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: Capsule(
+                                style: .continuous
+                            )
+                        )
+                        .opacity(
+                            creationIsValid &&
+                            !creatingChallenge
+                                ? 1
+                                : 0.34
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        !creationIsValid ||
+                        creatingChallenge
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+                .background(.ultraThinMaterial)
             }
             .task {
                 if social.mutualFollows.isEmpty {
                     await social.refresh()
                 }
 
-                if invitees.isEmpty && !preselectedFriends.isEmpty {
-                    invitees = preselectedFriends.map(challengeParticipant)
+                if invitees.isEmpty &&
+                    !preselectedFriends.isEmpty {
+                    invitees =
+                        preselectedFriends.map(
+                            challengeParticipant
+                        )
                 }
             }
             .onChange(of: sport) { _, newSport in
                 if !coverWasManuallySelected &&
                     selectedCoverImageData == nil {
                     selectedCoverArtworkName =
-                        defaultCoverArtwork(for: newSport)
+                        defaultCoverArtwork(
+                            for: newSport
+                        )
                 }
 
                 switch newSport {
                 case .running:
-                    scoring = .fastestDistance
-                    verificationPolicy = .verifiedRequired
+                    scoring =
+                        .fastestDistance
+                    verificationPolicy =
+                        .verifiedRequired
 
                 case .strength:
-                    scoring = .heaviestWeight
-                    usesSpecificRoute = false
+                    scoring =
+                        .heaviestWeight
+                    usesSpecificRoute =
+                        false
                     selectedRouteID = nil
                     verificationPolicy =
                         .verifiedPreferredManualAllowed
 
                 case .heartRate:
-                    scoring = .heartRateZoneTime
-                    usesSpecificRoute = false
+                    scoring =
+                        .heartRateZoneTime
+                    usesSpecificRoute =
+                        false
                     selectedRouteID = nil
                     gpsRequired = false
-                    verificationPolicy = .verifiedRequired
-                    allowMultipleAttempts = true
+                    verificationPolicy =
+                        .verifiedRequired
+                    allowMultipleAttempts =
+                        true
                 }
             }
-            .onChange(of: selectedCoverPhoto) { _, item in
-                guard let item else { return }
+            .onChange(
+                of: selectedCoverPhoto
+            ) { _, item in
+                guard let item else {
+                    return
+                }
 
                 Task {
                     guard let data =
-                            try? await item.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data),
-                          let jpeg = image.jpegData(compressionQuality: 0.86)
+                            try? await item
+                                .loadTransferable(
+                                    type: Data.self
+                                ),
+                          let image =
+                            UIImage(data: data),
+                          let jpeg =
+                            image.jpegData(
+                                compressionQuality:
+                                    0.86
+                            )
                     else {
                         await MainActor.run {
                             createError =
                                 ATHLTHLocalization.choose(
-                                    english: "The selected image could not be read.",
-                                    norwegian: "Det valgte bildet kunne ikke leses."
+                                    english:
+                                        "The selected image could not be read.",
+                                    norwegian:
+                                        "Det valgte bildet kunne ikke leses."
                                 )
                         }
                         return
                     }
 
                     await MainActor.run {
-                        selectedCoverImageData = jpeg
-                        coverWasManuallySelected = true
+                        selectedCoverImageData =
+                            jpeg
+                        coverWasManuallySelected =
+                            true
                     }
                 }
             }
-            .sensoryFeedback(.selection, trigger: sport)
-            .sensoryFeedback(.selection, trigger: scoring)
-            .onChange(of: scoring) { _, newScoring in
-                guard sport == .running else {
-                    return
-                }
-
-                verificationPolicy = .verifiedRequired
-
-                if newScoring != .fastestDistance {
-                    usesSpecificRoute = false
-                    selectedRouteID = nil
-                }
-            }
-            .onChange(of: usesSpecificRoute) { _, enabled in
-                if enabled {
-                    gpsRequired = true
-                    allowTreadmill = false
-        allowTargetGhost = true
-                } else {
-                    selectedRouteID = nil
-                }
-            }
-            .onChange(of: gpsRequired) { _, required in
-                if required {
-                    allowTreadmill = false
-                }
-            }
-            .onChange(of: heartRateAggregation) { _, aggregation in
-                if aggregation == .totalChallenge {
-                    allowMultipleAttempts = true
-                }
-            }
-            .onChange(of: selectedRouteID) { _, routeID in
-                guard let routeID,
-                      let route = session.savedRoutes.first(where: { $0.id == routeID }),
-                      let first = route.coordinates.first
+            .sensoryFeedback(
+                .selection,
+                trigger: sport
+            )
+            .sensoryFeedback(
+                .selection,
+                trigger: scoring
+            )
+            .onChange(
+                of: scoring
+            ) { _, newScoring in
+                guard sport == .running
                 else {
                     return
                 }
 
-                meetupCoordinate = CLLocationCoordinate2D(
-                    latitude: first.latitude,
-                    longitude: first.longitude
-                )
+                verificationPolicy =
+                    .verifiedRequired
+
+                if newScoring !=
+                    .fastestDistance {
+                    usesSpecificRoute =
+                        false
+                    selectedRouteID = nil
+                }
+            }
+            .onChange(
+                of: usesSpecificRoute
+            ) { _, enabled in
+                if enabled {
+                    gpsRequired = true
+                    allowTreadmill =
+                        false
+                    allowTargetGhost =
+                        true
+                } else {
+                    selectedRouteID =
+                        nil
+                }
+            }
+            .onChange(
+                of: gpsRequired
+            ) { _, required in
+                if required {
+                    allowTreadmill =
+                        false
+                }
+            }
+            .onChange(
+                of: heartRateAggregation
+            ) { _, aggregation in
+                if aggregation ==
+                    .totalChallenge {
+                    allowMultipleAttempts =
+                        true
+                }
+            }
+            .onChange(
+                of: selectedRouteID
+            ) { _, routeID in
+                guard
+                    let routeID,
+                    let route =
+                        session.savedRoutes
+                            .first(
+                                where: {
+                                    $0.id ==
+                                        routeID
+                                }
+                            ),
+                    let first =
+                        route.coordinates
+                            .first
+                else {
+                    return
+                }
+
+                meetupCoordinate =
+                    CLLocationCoordinate2D(
+                        latitude:
+                            first.latitude,
+                        longitude:
+                            first.longitude
+                    )
                 mapPosition = .region(
                     MKCoordinateRegion(
-                        center: meetupCoordinate!,
-                        span: MKCoordinateSpan(
-                            latitudeDelta: 0.02,
-                            longitudeDelta: 0.02
-                        )
+                        center:
+                            meetupCoordinate!,
+                        span:
+                            MKCoordinateSpan(
+                                latitudeDelta:
+                                    0.02,
+                                longitudeDelta:
+                                    0.02
+                            )
                     )
                 )
             }
+            .sheet(
+                isPresented:
+                    $showingInvitePicker
+            ) {
+                creationInvitePicker
+            }
             .alert(
                 ATHLTHLocalization.choose(
-                    english: "Could not complete challenge",
-                    norwegian: "Kunne ikke fullføre utfordringen"
+                    english:
+                        "Could not complete challenge",
+                    norwegian:
+                        "Kunne ikke fullføre utfordringen"
                 ),
                 isPresented: Binding(
-                    get: { createError != nil },
+                    get: {
+                        createError != nil
+                    },
                     set: { shown in
                         if !shown {
                             createError = nil
@@ -925,13 +1066,2386 @@ struct ChallengeCreationView: View {
                     }
                 )
             ) {
-                Button("OK", role: .cancel) {
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {
                     createError = nil
                 }
             } message: {
                 Text(createError ?? "")
             }
         }
+    }
+
+    private var creationHero: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let data =
+                        selectedCoverImageData,
+                   let image =
+                        UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ChallengeCoverArtworkView(
+                        sport: sport,
+                        artworkName:
+                            selectedCoverArtworkName,
+                        remoteURL: nil
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .clear,
+                    .black.opacity(0.34)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Label(
+                creationHeroLabel,
+                systemImage:
+                    sport.systemImage
+            )
+            .font(
+                .caption.weight(.semibold)
+            )
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                .ultraThinMaterial,
+                in: Capsule()
+            )
+            .padding(14)
+        }
+        .frame(height: 160)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.32),
+                lineWidth: 0.8
+            )
+        }
+        .overlay(
+            alignment: .topTrailing
+        ) {
+            HStack(spacing: 8) {
+                Menu {
+                    ForEach(
+                        challengeCoverArtworkOptions,
+                        id: \.self
+                    ) { artwork in
+                        Button {
+                            selectedCoverArtworkName =
+                                artwork
+                            selectedCoverImageData =
+                                nil
+                            selectedCoverPhoto =
+                                nil
+                            coverWasManuallySelected =
+                                true
+                        } label: {
+                            Label(
+                                artwork
+                                    .replacingOccurrences(
+                                        of: "Goal",
+                                        with: ""
+                                    ),
+                                systemImage:
+                                    selectedCoverArtworkName ==
+                                        artwork &&
+                                    selectedCoverImageData ==
+                                        nil
+                                        ? "checkmark.circle.fill"
+                                        : "photo"
+                            )
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "photo.stack.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        .ultraThinMaterial,
+                        in: Circle()
+                    )
+                }
+
+                PhotosPicker(
+                    selection:
+                        $selectedCoverPhoto,
+                    matching: .images
+                ) {
+                    Image(
+                        systemName:
+                            "photo.badge.plus"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        .ultraThinMaterial,
+                        in: Circle()
+                    )
+                }
+            }
+            .padding(12)
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.06),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    private var creationHeroLabel: String {
+        switch sport {
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running challenge",
+                norwegian: "Løpechallenge"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength challenge",
+                norwegian: "Styrkechallenge"
+            )
+        case .heartRate:
+            return ATHLTHLocalization.choose(
+                english: "Heart-rate challenge",
+                norwegian: "Pulschallenge"
+            )
+        }
+    }
+
+    private var creationChallengeSection:
+        some View {
+        creationSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Challenge",
+                    norwegian: "Utfordring"
+                ),
+            icon: "trophy.fill"
+        ) {
+            creationTextField(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Challenge name",
+                        norwegian: "Navn på utfordring"
+                    ),
+                placeholder:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Optional name",
+                        norwegian:
+                            "Valgfritt navn"
+                    ),
+                text: Binding(
+                    get: { title },
+                    set: {
+                        title =
+                            String(
+                                $0.prefix(60)
+                            )
+                    }
+                ),
+                icon: "textformat"
+            )
+
+            if title
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "If left empty, ATHLTH uses “\(automaticTitle)”.",
+                        norwegian:
+                            "Står feltet tomt, brukes «\(automaticTitle)»."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 50)
+            }
+
+            creationDivider
+
+            creationTextField(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Description",
+                        norwegian: "Beskrivelse"
+                    ),
+                placeholder:
+                    ATHLTHLocalization.choose(
+                        english: "Optional",
+                        norwegian: "Valgfritt"
+                    ),
+                text: Binding(
+                    get: {
+                        challengeSummary
+                    },
+                    set: {
+                        challengeSummary =
+                            String(
+                                $0.prefix(160)
+                            )
+                    }
+                ),
+                icon: "text.alignleft",
+                axis: .vertical
+            )
+
+            creationDivider
+
+            Menu {
+                ForEach(
+                    ATHLTHChallengeSport
+                        .allCases
+                ) { option in
+                    Button {
+                        sport = option
+                    } label: {
+                        Label(
+                            option.title,
+                            systemImage:
+                                option.systemImage
+                        )
+                    }
+                }
+            } label: {
+                creationSelectionRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Activity",
+                            norwegian: "Aktivitet"
+                        ),
+                    value: sport.title,
+                    icon: sport.systemImage
+                )
+            }
+            .buttonStyle(.plain)
+
+            creationDivider
+
+            Menu {
+                ForEach(
+                    scoringOptions
+                ) { option in
+                    Button {
+                        scoring = option
+                    } label: {
+                        Label(
+                            option.title,
+                            systemImage:
+                                scoringIcon(
+                                    option
+                                )
+                        )
+                    }
+                }
+            } label: {
+                creationSelectionRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Scoring",
+                            norwegian: "Poengberegning"
+                        ),
+                    value:
+                        effectiveScoring.title,
+                    icon:
+                        scoringIcon(
+                            effectiveScoring
+                        ),
+                    subtitle:
+                        scoringSubtitle(
+                            effectiveScoring
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var creationRulesSection:
+        some View {
+        creationSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Rules",
+                    norwegian: "Regler"
+                ),
+            icon: "gearshape.fill"
+        ) {
+            switch sport {
+            case .running:
+                creationRunningRules
+            case .strength:
+                creationStrengthRules
+            case .heartRate:
+                creationHeartRateRules
+            }
+
+            creationDivider
+
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Period",
+                        norwegian: "Periode"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                HStack(spacing: 10) {
+                    creationDateControl(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Starts",
+                                norwegian: "Starter"
+                            ),
+                        selection: $startsAt,
+                        range: Date()...
+                    )
+
+                    if hasEnd {
+                        creationDateControl(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Ends",
+                                    norwegian: "Slutter"
+                                ),
+                            selection: $endsAt,
+                            range: startsAt...
+                        )
+                    }
+                }
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Set an end date",
+                        norwegian: "Sett sluttdato"
+                    ),
+                    isOn: $hasEnd
+                )
+                .font(.subheadline)
+                .tint(clubForest)
+            }
+
+            creationDivider
+
+            DisclosureGroup(
+                isExpanded:
+                    $advancedRules
+            ) {
+                creationAdvancedRules
+                    .padding(.top, 12)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Advanced rules",
+                        norwegian: "Avanserte regler"
+                    ),
+                    systemImage:
+                        "slider.horizontal.3"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+            }
+
+            creationDivider
+
+            DisclosureGroup(
+                isExpanded:
+                    $meetupEnabled
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    creationTextField(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Meetup name",
+                                norwegian: "Møtested"
+                            ),
+                        placeholder:
+                            ATHLTHLocalization.choose(
+                                english: "Optional",
+                                norwegian: "Valgfritt"
+                            ),
+                        text:
+                            $meetupPlaceName,
+                        icon:
+                            "mappin.and.ellipse"
+                    )
+
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Meet at",
+                            norwegian: "Møtetid"
+                        ),
+                        selection:
+                            $meetupAt,
+                        in: Date()...,
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
+                    )
+                    .datePickerStyle(.compact)
+
+                    MeetupLocationPicker(
+                        coordinate:
+                            $meetupCoordinate,
+                        position:
+                            $mapPosition
+                    )
+
+                    if selectedRouteID !=
+                        nil {
+                        Button {
+                            guard
+                                let routeID =
+                                    selectedRouteID,
+                                let route =
+                                    session
+                                        .savedRoutes
+                                        .first(
+                                            where: {
+                                                $0.id ==
+                                                    routeID
+                                            }
+                                        ),
+                                let first =
+                                    route
+                                        .coordinates
+                                        .first
+                            else {
+                                return
+                            }
+
+                            let coordinate =
+                                CLLocationCoordinate2D(
+                                    latitude:
+                                        first.latitude,
+                                    longitude:
+                                        first.longitude
+                                )
+
+                            meetupCoordinate =
+                                coordinate
+                            mapPosition =
+                                .region(
+                                    MKCoordinateRegion(
+                                        center:
+                                            coordinate,
+                                        span:
+                                            MKCoordinateSpan(
+                                                latitudeDelta:
+                                                    0.015,
+                                                longitudeDelta:
+                                                    0.015
+                                            )
+                                    )
+                                )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Use route start",
+                                    norwegian:
+                                        "Bruk rutestart"
+                                ),
+                                systemImage:
+                                    "location.fill"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Check-in is explicit. ATHLTH does not continuously share participants’ live location.",
+                            norwegian:
+                                "Innsjekking er aktiv. ATHLTH deler ikke deltakernes posisjon kontinuerlig."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+                .padding(.top, 12)
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Meet and train together",
+                        norwegian: "Møtes og trene sammen"
+                    ),
+                    systemImage:
+                        "person.2.wave.2"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var creationRunningRules:
+        some View {
+        if scoring ==
+            .fastestDistance {
+            Menu {
+                Button {
+                    usesSpecificRoute =
+                        false
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Run anywhere",
+                            norwegian: "Løp hvor som helst"
+                        ),
+                        systemImage:
+                            "figure.run"
+                    )
+                }
+
+                Button {
+                    usesSpecificRoute =
+                        true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Specific route",
+                            norwegian: "Bestemt rute"
+                        ),
+                        systemImage:
+                            "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+                }
+            } label: {
+                creationSelectionRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Course",
+                            norwegian: "Løype"
+                        ),
+                    value:
+                        usesSpecificRoute
+                            ? ATHLTHLocalization.choose(
+                                english: "Specific route",
+                                norwegian: "Bestemt rute"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Run anywhere",
+                                norwegian: "Løp hvor som helst"
+                            ),
+                    icon:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+            }
+            .buttonStyle(.plain)
+
+            creationDivider
+
+            if usesSpecificRoute {
+                creationRoutePicker
+            } else {
+                creationNumberRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Distance",
+                            norwegian: "Distanse"
+                        ),
+                    value:
+                        $targetDistanceKm,
+                    suffix: "km",
+                    icon: "mappin"
+                )
+            }
+        }
+
+        if scoring ==
+            .farthestInTime {
+            creationNumberRow(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Time window",
+                        norwegian: "Tidsvindu"
+                    ),
+                value:
+                    $targetDurationMinutes,
+                suffix:
+                    ATHLTHLocalization.choose(
+                        english: "min",
+                        norwegian: "min"
+                    ),
+                icon: "clock.fill"
+            )
+        }
+
+        if scoring !=
+            .fastestDistance ||
+            !usesSpecificRoute {
+            creationDivider
+
+            HStack(spacing: 12) {
+                Image(
+                    systemName:
+                        "location.fill"
+                )
+                .foregroundStyle(
+                    clubEmerald
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    clubMint,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style:
+                            .continuous
+                    )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "GPS verification",
+                            norwegian:
+                                "GPS-verifisering"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Running results must come from ATHLTH or a qualifying Apple Health workout.",
+                            norwegian:
+                                "Løperesultater må komme fra ATHLTH eller en godkjent Apple Health-økt."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                Spacer()
+
+                Toggle(
+                    "",
+                    isOn: $gpsRequired
+                )
+                .labelsHidden()
+                .tint(clubForest)
+            }
+        } else {
+            creationDivider
+
+            creationSelectionRow(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Verification",
+                        norwegian: "Verifisering"
+                    ),
+                value:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "GPS / verified run",
+                        norwegian:
+                            "GPS / registrert løp"
+                    ),
+                icon:
+                    "checkmark.shield.fill",
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Specific-route attempts always require GPS.",
+                        norwegian:
+                            "Forsøk på bestemt rute krever alltid GPS."
+                    )
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var creationStrengthRules:
+        some View {
+        if scoring != .workoutVolume {
+            creationTextField(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Exercise",
+                        norwegian: "Øvelse"
+                    ),
+                placeholder:
+                    ATHLTHLocalization.choose(
+                        english: "Exercise",
+                        norwegian: "Øvelse"
+                    ),
+                text: $exerciseName,
+                icon: "dumbbell.fill"
+            )
+
+            creationDivider
+        }
+
+        if scoring == .mostReps {
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Require a specific weight",
+                        norwegian:
+                            "Krev en bestemt vekt"
+                    )
+                )
+                .font(.subheadline)
+                Spacer()
+                Toggle(
+                    "",
+                    isOn:
+                        $requiredWeightEnabled
+                )
+                .labelsHidden()
+                .tint(clubForest)
+            }
+
+            if requiredWeightEnabled {
+                creationDivider
+
+                creationNumberRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Required weight",
+                            norwegian:
+                                "Påkrevd vekt"
+                        ),
+                    value:
+                        $requiredWeightKg,
+                    suffix: "kg",
+                    icon:
+                        "scalemass.fill"
+                )
+            }
+
+            creationDivider
+        }
+
+        Menu {
+            ForEach(
+                ChallengeVerificationPolicy
+                    .allCases
+            ) { policy in
+                Button {
+                    verificationPolicy =
+                        policy
+                } label: {
+                    Text(policy.title)
+                }
+            }
+        } label: {
+            creationSelectionRow(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Verification",
+                        norwegian: "Verifisering"
+                    ),
+                value:
+                    verificationPolicy.title,
+                icon:
+                    "checkmark.shield.fill",
+                subtitle:
+                    verificationPolicy
+                        .subtitle
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var creationHeartRateRules:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Heart-rate zone",
+                    norwegian: "Pulssone"
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            HStack(spacing: 7) {
+                ForEach(
+                    1...5,
+                    id: \.self
+                ) { zone in
+                    Button {
+                        heartRateZone = zone
+                    } label: {
+                        VStack(spacing: 3) {
+                            Text("Z\(zone)")
+                                .font(
+                                    .subheadline
+                                        .weight(.bold)
+                                )
+                            Text(
+                                heartRateZonePercentText(
+                                    zone
+                                )
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .medium
+                                )
+                            )
+                        }
+                        .foregroundStyle(
+                            heartRateZone ==
+                                zone
+                                ? Color.white
+                                : clubForest
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity,
+                            minHeight: 54
+                        )
+                        .background(
+                            heartRateZone ==
+                                zone
+                                ? clubForest
+                                : clubMint,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        14,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if let maximumHeartRateBPM {
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Zone %d · %@",
+                        norwegian:
+                            "Sone %d · %@",
+                        heartRateZone,
+                        heartRateZoneBPMText(
+                            zone:
+                                heartRateZone,
+                            maxHR:
+                                maximumHeartRateBPM
+                        )
+                    )
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+            } else {
+                NavigationLink {
+                    PersonalHealthProfileView()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Set maximum heart rate",
+                            norwegian:
+                                "Sett makspuls"
+                        ),
+                        systemImage:
+                            "heart.text.square"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(clubForest)
+            }
+
+            creationDivider
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Leaderboard",
+                    norwegian: "Toppliste"
+                ),
+                selection:
+                    $heartRateAggregation
+            ) {
+                ForEach(
+                    ChallengeHeartRateAggregation
+                        .allCases
+                ) { aggregation in
+                    Text(
+                        aggregation.title
+                    )
+                    .tag(aggregation)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(
+                heartRateAggregation
+                    .subtitle
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var creationAdvancedRules:
+        some View {
+        switch sport {
+        case .running:
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                if scoring ==
+                    .fastestDistance {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Timing",
+                            norwegian: "Tidtaking"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Picker(
+                        "Timing",
+                        selection:
+                            $timeBasis
+                    ) {
+                        ForEach(
+                            ChallengeTimeBasis
+                                .allCases
+                        ) { basis in
+                            Text(basis.title)
+                                .tag(basis)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if scoring ==
+                    .fastestDistance &&
+                    !usesSpecificRoute {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Distance tolerance",
+                                    norwegian:
+                                        "Distanseavvik"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "±\(distanceTolerancePercent.formatted(.number.precision(.fractionLength(0...1))))%"
+                            )
+                            .monospacedDigit()
+                        }
+                        .font(
+                            .subheadline
+                        )
+
+                        Slider(
+                            value:
+                                $distanceTolerancePercent,
+                            in: 0.5...5,
+                            step: 0.5
+                        )
+                    }
+                }
+
+                if scoring ==
+                    .fastestDistance &&
+                    usesSpecificRoute {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Allowed route deviation",
+                                    norwegian:
+                                        "Tillatt ruteavvik"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "\(Int(allowedRouteDeviationPercent))%"
+                            )
+                            .monospacedDigit()
+                        }
+
+                        Slider(
+                            value:
+                                allowedRouteDeviationBinding,
+                            in: 2...20,
+                            step: 1
+                        )
+
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Start / finish tolerance",
+                                    norwegian:
+                                        "Start-/måltoleranse"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "\(Int(startFinishToleranceMeters)) m"
+                            )
+                            .monospacedDigit()
+                        }
+
+                        Slider(
+                            value:
+                                $startFinishToleranceMeters,
+                            in: 25...500,
+                            step: 25
+                        )
+
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Route direction",
+                                norwegian:
+                                    "Ruteretning"
+                            ),
+                            selection:
+                                $routeDirection
+                        ) {
+                            ForEach(
+                                ChallengeRouteDirection
+                                    .allCases
+                            ) { direction in
+                                Text(
+                                    direction.title
+                                )
+                                .tag(direction)
+                            }
+                        }
+                        .pickerStyle(
+                            .segmented
+                        )
+
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Allow target ghost",
+                                norwegian:
+                                    "Tillat Target Ghost"
+                            ),
+                            isOn:
+                                $allowTargetGhost
+                        )
+                    }
+                }
+
+                if !usesSpecificRoute {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Allow treadmill",
+                            norwegian:
+                                "Tillat tredemølle"
+                        ),
+                        isOn:
+                            $allowTreadmill
+                    )
+                    .disabled(gpsRequired)
+                }
+
+                creationAttemptControls
+
+                Button {
+                    resetRunningAdvancedRules()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Reset to recommended",
+                            norwegian:
+                                "Tilbakestill til anbefalt"
+                        ),
+                        systemImage:
+                            "arrow.counterclockwise"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
+            }
+
+        case .strength:
+            creationAttemptControls
+
+        case .heartRate:
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Personal zones",
+                        norwegian: "Personlige soner"
+                    ),
+                    systemImage:
+                        "person.crop.circle.badge.checkmark"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Each participant is scored against their own private maximum heart rate.",
+                        norwegian:
+                            "Hver deltaker måles mot sin egen private makspuls."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if heartRateAggregation !=
+                    .totalChallenge {
+                    creationAttemptControls
+                }
+            }
+        }
+    }
+
+    private var creationAttemptControls:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Allow multiple attempts",
+                    norwegian:
+                        "Tillat flere forsøk"
+                ),
+                isOn:
+                    $allowMultipleAttempts
+            )
+
+            if allowMultipleAttempts &&
+                sport == .running {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Attempt policy",
+                        norwegian:
+                            "Hvilket forsøk teller"
+                    ),
+                    selection:
+                        $attemptPolicy
+                ) {
+                    ForEach(
+                        ChallengeAttemptPolicy
+                            .allCases
+                    ) { policy in
+                        Text(
+                            policy.title
+                        )
+                        .tag(policy)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Maximum attempts",
+                        norwegian:
+                            "Maks forsøk"
+                    ),
+                    selection:
+                        $attemptLimit
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Unlimited",
+                            norwegian:
+                                "Ubegrenset"
+                        )
+                    )
+                    .tag(0)
+                    Text("3")
+                        .tag(3)
+                    Text("5")
+                        .tag(5)
+                }
+            }
+        }
+    }
+
+    private var creationRoutePicker:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            if let route =
+                    selectedRoute {
+                if route.coordinates.count >=
+                    2 {
+                    Map(
+                        initialPosition:
+                            .region(
+                                challengeRegion(
+                                    for: route
+                                )
+                            )
+                    ) {
+                        MapPolyline(
+                            coordinates:
+                                route.coordinates
+                                    .map(
+                                        \.coordinate
+                                    )
+                        )
+                        .stroke(
+                            clubForest,
+                            lineWidth: 5
+                        )
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 130)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 17,
+                            style:
+                                .continuous
+                        )
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(route.title)
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                        Text(
+                            String(
+                                format:
+                                    "%.1f km",
+                                route
+                                    .distanceKilometers
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    NavigationLink {
+                        ChallengeRouteSelectionView(
+                            selectedRouteID:
+                                $selectedRouteID
+                        )
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Change",
+                                norwegian: "Bytt"
+                            )
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+            } else {
+                NavigationLink {
+                    ChallengeRouteSelectionView(
+                        selectedRouteID:
+                            $selectedRouteID
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Choose route",
+                            norwegian: "Velg rute"
+                        ),
+                        systemImage: "map.fill"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(clubForest)
+            }
+        }
+    }
+
+    private var creationParticipantsSection:
+        some View {
+        creationSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Participants",
+                    norwegian: "Deltakere"
+                ),
+            icon: "person.2.fill"
+        ) {
+            Button {
+                showingInvitePicker =
+                    true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "person.badge.plus"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        clubMint,
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style:
+                                .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Invite friends",
+                                norwegian:
+                                    "Inviter venner"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            .primary
+                        )
+
+                        Text(
+                            invitees.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Choose at least one participant",
+                                    norwegian:
+                                        "Velg minst én deltaker"
+                                )
+                                : ATHLTHLocalization.counted(
+                                    invitees.count,
+                                    englishSingular:
+                                        "1 invited",
+                                    englishPlural:
+                                        "%d invited",
+                                    norwegianSingular:
+                                        "1 invitert",
+                                    norwegianPlural:
+                                        "%d invitert"
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    creationInviteeAvatars
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            creationDivider
+
+            Menu {
+                Button {
+                    visibility =
+                        .publicProfile
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Public",
+                            norwegian: "Offentlig"
+                        ),
+                        systemImage: "globe"
+                    )
+                }
+
+                Button {
+                    visibility =
+                        .friends
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Followers",
+                            norwegian: "Følgere"
+                        ),
+                        systemImage:
+                            "person.2.fill"
+                    )
+                }
+
+                Button {
+                    visibility =
+                        .privateOnly
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Private",
+                            norwegian: "Privat"
+                        ),
+                        systemImage:
+                            "lock.fill"
+                    )
+                }
+            } label: {
+                creationSelectionRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Who can see it",
+                            norwegian:
+                                "Hvem kan se det"
+                        ),
+                    value:
+                        creationVisibilityTitle,
+                    icon:
+                        creationVisibilityIcon,
+                    subtitle:
+                        creationVisibilitySubtitle
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var creationInviteeAvatars:
+        some View {
+        if invitees.isEmpty {
+            Circle()
+                .fill(
+                    clubMint
+                )
+                .frame(
+                    width: 34,
+                    height: 34
+                )
+                .overlay {
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        clubForest
+                    )
+                }
+        } else {
+            HStack(spacing: -9) {
+                ForEach(
+                    Array(
+                        invitees.prefix(3)
+                    )
+                ) { participant in
+                    if let profile =
+                        social.mutualFollows
+                            .first(
+                                where: {
+                                    $0.userID ==
+                                        participant
+                                            .userID
+                                }
+                            ) {
+                        SocialAvatar(
+                            profile: profile,
+                            size: 34
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                    } else {
+                        Circle()
+                            .fill(
+                                clubMint
+                            )
+                            .frame(
+                                width: 34,
+                                height: 34
+                            )
+                            .overlay {
+                                Text(
+                                    participant
+                                        .displayName
+                                        .prefix(1)
+                                        .uppercased()
+                                )
+                                .font(
+                                    .caption
+                                        .bold()
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                            }
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white,
+                                        lineWidth: 2
+                                    )
+                            }
+                    }
+                }
+
+                if invitees.count > 3 {
+                    Circle()
+                        .fill(
+                            clubForest
+                        )
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+                        .overlay {
+                            Text(
+                                "+\(invitees.count - 3)"
+                            )
+                            .font(
+                                .caption2
+                                    .bold()
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        }
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                }
+            }
+        }
+    }
+
+    private var creationCommunitySection:
+        some View {
+        creationSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Community",
+                    norwegian: "Fellesskap"
+                ),
+            icon: "person.3.fill"
+        ) {
+            HStack(spacing: 12) {
+                Image(
+                    systemName:
+                        "megaphone.fill"
+                )
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    clubMint,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style:
+                            .continuous
+                    )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Share to Community activity",
+                            norwegian:
+                                "Del til Community-aktivitet"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "People who can see the challenge can also discover it in Community.",
+                            norwegian:
+                                "Utfordringen kan vises i Community for dem som har tilgang."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer(
+                    minLength: 8
+                )
+
+                Toggle(
+                    "",
+                    isOn:
+                        $shareToCommunity
+                )
+                .labelsHidden()
+                .tint(clubForest)
+            }
+        }
+    }
+
+    private var creationVisibilityTitle:
+        String {
+        switch visibility {
+        case .publicProfile:
+            return ATHLTHLocalization.choose(
+                english: "Public",
+                norwegian: "Offentlig"
+            )
+        case .friends:
+            return ATHLTHLocalization.choose(
+                english: "Followers",
+                norwegian: "Følgere"
+            )
+        case .privateOnly:
+            return ATHLTHLocalization.choose(
+                english: "Private",
+                norwegian: "Privat"
+            )
+        }
+    }
+
+    private var creationVisibilityIcon:
+        String {
+        switch visibility {
+        case .publicProfile:
+            return "globe"
+        case .friends:
+            return "person.2.fill"
+        case .privateOnly:
+            return "lock.fill"
+        }
+    }
+
+    private var creationVisibilitySubtitle:
+        String {
+        switch visibility {
+        case .publicProfile:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Signed-in ATHLTH users can discover the challenge.",
+                norwegian:
+                    "Innloggede ATHLTH-brukere kan oppdage utfordringen."
+            )
+        case .friends:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Limited to your ATHLTH network.",
+                norwegian:
+                    "Begrenset til ATHLTH-nettverket ditt."
+            )
+        case .privateOnly:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Only invited participants can access it.",
+                norwegian:
+                    "Kun inviterte deltakere får tilgang."
+            )
+        }
+    }
+
+    private var creationIsValid: Bool {
+        guard !creatingChallenge,
+              !invitees.isEmpty
+        else {
+            return false
+        }
+
+        if hasEnd &&
+            endsAt <= startsAt {
+            return false
+        }
+
+        if meetupEnabled &&
+            meetupCoordinate == nil {
+            return false
+        }
+
+        switch sport {
+        case .running:
+            if scoring ==
+                .fastestDistance {
+                return usesSpecificRoute
+                    ? selectedRouteID != nil
+                    : targetDistanceKm > 0
+            }
+
+            if scoring ==
+                .farthestInTime {
+                return targetDurationMinutes >
+                    0
+            }
+
+            return true
+
+        case .strength:
+            if scoring !=
+                .workoutVolume &&
+                exerciseName
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .isEmpty {
+                return false
+            }
+
+            return true
+
+        case .heartRate:
+            return maximumHeartRateBPM !=
+                nil &&
+                (1...5).contains(
+                    heartRateZone
+                )
+        }
+    }
+
+    private var creationInvitePicker:
+        some View {
+        NavigationStack {
+            List {
+                if social.mutualFollows
+                    .isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No people available",
+                            norwegian:
+                                "Ingen å invitere ennå"
+                        ),
+                        systemImage:
+                            "person.2.slash",
+                        description: Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Follow each other before sending a challenge.",
+                                norwegian:
+                                    "Dere må følge hverandre før du kan sende en challenge."
+                            )
+                        )
+                    )
+
+                    NavigationLink {
+                        SocialHubView(
+                            initialTab:
+                                .discover
+                        )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Find people",
+                                norwegian:
+                                    "Finn personer"
+                            ),
+                            systemImage:
+                                "person.badge.plus"
+                        )
+                    }
+                } else {
+                    ForEach(
+                        social.mutualFollows
+                    ) { friend in
+                        Button {
+                            toggleFriend(friend)
+                        } label: {
+                            HStack(
+                                spacing: 12
+                            ) {
+                                SocialAvatar(
+                                    profile:
+                                        friend,
+                                    size: 42
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        friend
+                                            .resolvedName
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        .primary
+                                    )
+
+                                    Text(
+                                        friend
+                                            .usernameLabel
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        invitees
+                                            .contains(
+                                                where: {
+                                                    $0.userID ==
+                                                        friend
+                                                            .userID
+                                                }
+                                            )
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                )
+                                .font(.title3)
+                                .foregroundStyle(
+                                    invitees
+                                        .contains(
+                                            where: {
+                                                $0.userID ==
+                                                    friend
+                                                        .userID
+                                            }
+                                        )
+                                        ? clubForest
+                                        : .secondary
+                                )
+                            }
+                            .contentShape(
+                                Rectangle()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Invite friends",
+                    norwegian:
+                        "Inviter venner"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        showingInvitePicker =
+                            false
+                    }
+                }
+            }
+        }
+    }
+
+    private func creationSection<
+        Content: View
+    >(
+        title: String,
+        icon: String,
+        @ViewBuilder content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            Label(
+                title,
+                systemImage: icon
+            )
+            .font(.headline)
+            .foregroundStyle(
+                clubForest
+            )
+
+            content()
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.93),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.025),
+            radius: 9,
+            y: 3
+        )
+    }
+
+    private var creationDivider:
+        some View {
+        Divider()
+            .opacity(0.42)
+            .padding(.leading, 50)
+    }
+
+    private func creationTextField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        icon: String,
+        axis: Axis = .horizontal
+    ) -> some View {
+        HStack(
+            alignment:
+                axis == .vertical
+                    ? .top
+                    : .center,
+            spacing: 12
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                clubMint,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                TextField(
+                    placeholder,
+                    text: text,
+                    axis: axis
+                )
+                .font(.body)
+                .lineLimit(
+                    axis == .vertical
+                        ? 2...4
+                        : 1...1
+                )
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func creationSelectionRow(
+        title: String,
+        value: String,
+        icon: String,
+        subtitle: String? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                clubMint,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .primary
+                    )
+
+                if let subtitle,
+                   !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            HStack(spacing: 7) {
+                Text(value)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .lineLimit(1)
+
+                Image(
+                    systemName:
+                        "chevron.down"
+                )
+                .font(.caption.bold())
+            }
+            .foregroundStyle(
+                clubForest
+            )
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                clubMint,
+                in: Capsule()
+            )
+        }
+    }
+
+    private func creationNumberRow(
+        title: String,
+        value: Binding<Double>,
+        suffix: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                clubMint,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
+
+            Text(title)
+                .font(.subheadline)
+
+            Spacer()
+
+            HStack(spacing: 5) {
+                TextField(
+                    "0",
+                    value: value,
+                    format:
+                        .number
+                            .precision(
+                                .fractionLength(
+                                    0...2
+                                )
+                            )
+                )
+                .keyboardType(
+                    .decimalPad
+                )
+                .multilineTextAlignment(
+                    .trailing
+                )
+                .frame(width: 70)
+
+                Text(suffix)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .secondary
+                    )
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                clubMint,
+                in: Capsule()
+            )
+        }
+    }
+
+    private func creationDateControl<
+        R: RangeExpression
+    >(
+        title: String,
+        selection: Binding<Date>,
+        range: R
+    ) -> some View
+    where R.Bound == Date {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+
+            DatePicker(
+                "",
+                selection: selection,
+                in: range,
+                displayedComponents: [
+                    .date,
+                    .hourAndMinute
+                ]
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+        }
+        .padding(12)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            Color.primary.opacity(0.035),
+            in: RoundedRectangle(
+                cornerRadius: 15,
+                style: .continuous
+            )
+        )
     }
 
     private var typeStep: some View {
