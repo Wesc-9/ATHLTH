@@ -500,6 +500,343 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         case readAt = "read_at"
         case pushNotifiedAt = "push_notified_at"
     }
+
+    var localizedTitle: String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return title
+        }
+
+        switch kind.lowercased() {
+        case "friend_request",
+             "follow_request":
+            return "Ny følgeforespørsel"
+
+        case "friend_accepted",
+             "follow_accepted":
+            return "Følgeforespørsel godkjent"
+
+        case "challenge_invite":
+            return "Ny challenge"
+
+        case "challenge_result":
+            return "Nytt challenge-resultat"
+
+        case "reaction":
+            return "Ny reaksjon"
+
+        case "workout_invite":
+            return "Tren sammen"
+
+        case "workout_invite_accepted":
+            return title == "Workout starting"
+                ? "Økten starter"
+                : "Treningspartner ble med"
+
+        case "message_request":
+            let prefix = "Message request from "
+            if title.hasPrefix(prefix) {
+                return "Meldingsforespørsel fra " +
+                    String(title.dropFirst(prefix.count))
+            }
+            return "Meldingsforespørsel"
+
+        case "message_request_accepted":
+            return "Meldingsforespørsel godtatt"
+
+        case "mention":
+            return "Du ble nevnt"
+
+        case "group_update":
+            let suffix = " update"
+            if title.hasSuffix(suffix) {
+                return "Oppdatering · " +
+                    String(title.dropLast(suffix.count))
+            }
+            return title
+
+        case "group_event":
+            let newPrefix = "New event in "
+            if title.hasPrefix(newPrefix) {
+                return "Nytt event i " +
+                    String(title.dropFirst(newPrefix.count))
+            }
+
+            switch title {
+            case "Event cancelled":
+                return "Event avlyst"
+            case "Event updated":
+                return "Event oppdatert"
+            case "You have a spot":
+                return "Du har fått plass"
+            default:
+                return title
+            }
+
+        case "group_challenge":
+            let newPrefix = "New challenge in "
+            if title.hasPrefix(newPrefix) {
+                return "Ny challenge i " +
+                    String(title.dropFirst(newPrefix.count))
+            }
+
+            switch title {
+            case "Challenge cancelled":
+                return "Challenge avlyst"
+            case "Challenge updated":
+                return "Challenge oppdatert"
+            default:
+                return title
+            }
+
+        case "group_invite":
+            return "Gruppeinvitasjon"
+
+        case "group_join_request":
+            return "Ny forespørsel om medlemskap"
+
+        case "group_join_approved":
+            let prefix = "You joined "
+            if title.hasPrefix(prefix) {
+                return "Du ble med i " +
+                    String(title.dropFirst(prefix.count))
+            }
+            return title
+
+        default:
+            return title
+        }
+    }
+
+    var localizedMessage: String {
+        guard ATHLTHLocalization.isNorwegian else {
+            return message
+        }
+
+        switch kind.lowercased() {
+        case "friend_request",
+             "follow_request":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " wants to follow you on ATHLTH.",
+                norwegian:
+                    " vil følge deg på ATHLTH."
+            )
+
+        case "friend_accepted",
+             "follow_accepted":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " accepted your follow request.",
+                norwegian:
+                    " godkjente følgeforespørselen din."
+            )
+
+        case "challenge_invite":
+            return message.replacingOccurrences(
+                of: " challenged you: ",
+                with: " utfordret deg: "
+            )
+
+        case "challenge_result":
+            return localizedChallengeResultMessage
+
+        case "reaction":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " reacted to your ATHLTH activity.",
+                norwegian:
+                    " reagerte på ATHLTH-aktiviteten din."
+            )
+
+        case "workout_invite":
+            return message.replacingOccurrences(
+                of:
+                    " invited you to train together: ",
+                with:
+                    " inviterte deg til å trene sammen: "
+            )
+
+        case "workout_invite_accepted":
+            if title == "Workout starting" {
+                return "Tren sammen-økten din starter nå."
+            }
+
+            return message.replacingOccurrences(
+                of: " accepted your invite for ",
+                with:
+                    " godtok invitasjonen din til "
+            )
+
+        case "message",
+             "message_request":
+            return message == "Shared something with you"
+                ? "Delte noe med deg"
+                : message
+
+        case "message_request_accepted":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " accepted your message request.",
+                norwegian:
+                    " godtok meldingsforespørselen din."
+            )
+
+        case "mention":
+            return message
+                .replacingOccurrences(
+                    of:
+                        " mentioned you in a message.",
+                    with:
+                        " nevnte deg i en melding."
+                )
+                .replacingOccurrences(
+                    of: " mentioned you in ",
+                    with: " nevnte deg i "
+                )
+
+        case "group_message",
+             "group_update":
+            // Group message/announcement bodies are user-authored.
+            return message
+
+        case "group_event":
+            let important =
+                replacingSuffix(
+                    in: message,
+                    english:
+                        " has important changes.",
+                    norwegian:
+                        " har viktige endringer."
+                )
+
+            let prefix = "A spot opened up for "
+            let suffix = ". You are now going."
+            if message.hasPrefix(prefix),
+               message.hasSuffix(suffix) {
+                let start =
+                    message.index(
+                        message.startIndex,
+                        offsetBy:
+                            prefix.count
+                    )
+                let end =
+                    message.index(
+                        message.endIndex,
+                        offsetBy:
+                            -suffix.count
+                    )
+                let eventTitle =
+                    String(
+                        message[start..<end]
+                    )
+                return
+                    "Det ble ledig plass på \(eventTitle). Du er nå påmeldt."
+            }
+
+            return important
+
+        case "group_challenge":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " has important changes.",
+                norwegian:
+                    " har viktige endringer."
+            )
+
+        case "group_invite":
+            let prefix = "You were invited to "
+            if message.hasPrefix(prefix) {
+                return "Du ble invitert til " +
+                    String(
+                        message.dropFirst(
+                            prefix.count
+                        )
+                    )
+            }
+            return message
+
+        case "group_join_request":
+            return replacingSuffix(
+                in: message,
+                english:
+                    " has a new membership request.",
+                norwegian:
+                    " har en ny forespørsel om medlemskap."
+            )
+
+        case "group_join_approved":
+            return message ==
+                "Your membership request was approved."
+                ? "Forespørselen om medlemskap ble godkjent."
+                : message
+
+        default:
+            return message
+        }
+    }
+
+    private var localizedChallengeResultMessage:
+        String {
+        guard
+            let postedRange =
+                message.range(
+                    of: " posted "
+                ),
+            let inRange =
+                message.range(
+                    of: " in ",
+                    options: .backwards,
+                    range:
+                        postedRange.upperBound
+                        ..<message.endIndex
+                )
+        else {
+            return message
+        }
+
+        let athlete =
+            message[
+                message.startIndex
+                ..<postedRange.lowerBound
+            ]
+        let result =
+            message[
+                postedRange.upperBound
+                ..<inRange.lowerBound
+            ]
+        let challenge =
+            message[
+                inRange.upperBound
+                ..<message.endIndex
+            ]
+
+        return
+            "\(athlete) registrerte \(result) i \(challenge)"
+    }
+
+    private func replacingSuffix(
+        in value: String,
+        english: String,
+        norwegian: String
+    ) -> String {
+        guard value.hasSuffix(english)
+        else {
+            return value
+        }
+
+        return
+            String(
+                value.dropLast(
+                    english.count
+                )
+            ) +
+            norwegian
+    }
 }
 
 struct SocialFriendProfile: Hashable {
