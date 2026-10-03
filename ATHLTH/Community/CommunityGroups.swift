@@ -12633,10 +12633,37 @@ struct CommunityGroupEventCreateView: View {
     @State private var saving = false
     @State private var creationError: String?
 
+    private var clubForest: Color {
+        Color(red: 0.025, green: 0.30, blue: 0.21)
+    }
+
+    private var clubEmerald: Color {
+        Color(red: 0.055, green: 0.49, blue: 0.32)
+    }
+
+    private var clubMint: Color {
+        Color(red: 0.90, green: 0.96, blue: 0.92)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Cover image") {
+                Section {
+                    eventCreationHero
+                        .listRowInsets(
+                            EdgeInsets()
+                        )
+                        .listRowBackground(
+                            Color.clear
+                        )
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Cover image",
+                        norwegian: "Toppbilde"
+                    )
+                ) {
                     CommunityContentCoverPicker(
                         selectedPhoto: $selectedPhoto,
                         imageData: $imageData,
@@ -12647,7 +12674,12 @@ struct CommunityGroupEventCreateView: View {
                     )
                 }
 
-                Section("Event") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Event",
+                        norwegian: "Arrangement"
+                    )
+                ) {
                     TextField(
                         "Title",
                         text: $title
@@ -12674,7 +12706,12 @@ struct CommunityGroupEventCreateView: View {
                     draft: $activityDraft
                 )
 
-                Section("Meet") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Meet",
+                        norwegian: "Oppmøte"
+                    )
+                ) {
                     TextField(
                         "Meeting point (optional)",
                         text: $meetingName
@@ -12707,15 +12744,41 @@ struct CommunityGroupEventCreateView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Group Event")
+            .scrollContentBackground(
+                .hidden
+            )
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        clubEmerald.opacity(
+                            0.14
+                        )
+                )
+                .ignoresSafeArea()
+            )
+            .tint(clubForest)
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Create Event",
+                    norwegian: "Opprett arrangement"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(
                     placement: .cancellationAction
                 ) {
-                    Button("Cancel") {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
+                    .foregroundStyle(
+                        clubForest
+                    )
                 }
 
                 ToolbarItem(
@@ -12723,8 +12786,14 @@ struct CommunityGroupEventCreateView: View {
                 ) {
                     Button(
                         saving
-                            ? "Creating…"
-                            : "Create"
+                            ? ATHLTHLocalization.choose(
+                                english: "Creating…",
+                                norwegian: "Oppretter…"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Create",
+                                norwegian: "Opprett"
+                            )
                     ) {
                         createEvent()
                     }
@@ -12752,6 +12821,97 @@ struct CommunityGroupEventCreateView: View {
                 Text(creationError ?? "")
             }
         }
+    }
+
+    private var eventCreationHero:
+        some View {
+        ZStack(alignment: .bottomLeading) {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 136)
+                .frame(
+                    maxWidth: .infinity
+                )
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    clubForest.opacity(0.84)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "EVENT",
+                        norwegian: "ARRANGEMENT"
+                    ),
+                    systemImage:
+                        "calendar.badge.plus"
+                )
+                .font(
+                    .caption2.bold()
+                )
+                .tracking(1.0)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Bring the Club together",
+                        norwegian:
+                            "Samle fellesskapet"
+                    )
+                )
+                .font(.title3.bold())
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Plan a session, place and route in one flow.",
+                        norwegian:
+                            "Planlegg økt, sted og rute i én flyt."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .white.opacity(0.88)
+                )
+            }
+            .foregroundStyle(.white)
+            .padding(15)
+        }
+        .frame(height: 136)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.22),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.12
+                ),
+            radius: 13,
+            y: 6
+        )
     }
 
     private var canCreate: Bool {
