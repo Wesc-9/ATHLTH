@@ -170,21 +170,22 @@ struct GoalCoverView: View {
     let goal: ATHLTHGoal
 
     var body: some View {
-        Group {
-            if let url = goalStore.imageURL(for: goal),
-               let data = try? Data(contentsOf: url),
-               let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if let image =
-                        goal.coverStyle
-                            .resolvedUIImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
+        GeometryReader { proxy in
+            Group {
+                if let url = goalStore.imageURL(for: goal),
+                   let data = try? Data(contentsOf: url),
+                   let image = UIImage(data: data) {
+                    coverImage(
+                        Image(uiImage: image),
+                        size: proxy.size
+                    )
+                } else if let image =
+                            goal.coverStyle
+                                .resolvedUIImage {
+                    coverImage(
+                        Image(uiImage: image),
+                        size: proxy.size
+                    )
                     .overlay {
                         LinearGradient(
                             colors: [
@@ -201,8 +202,41 @@ struct GoalCoverView: View {
                             .foregroundStyle(.white.opacity(0.16))
                             .padding(22)
                     }
+                } else {
+                    LinearGradient(
+                        colors: coverColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                }
             }
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
+            .clipped()
         }
+        .clipped()
+    }
+
+    private func coverImage(
+        _ image: Image,
+        size: CGSize
+    ) -> some View {
+        image
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFill()
+            .frame(
+                width: size.width,
+                height: size.height
+            )
+            .clipped()
     }
 
     private var coverColors: [Color] {
@@ -279,6 +313,9 @@ struct GoalDetailView: View {
                     .frame(
                         maxWidth: .infinity,
                         alignment: .leading
+                    )
+                    .containerRelativeFrame(
+                        .horizontal
                     )
                     .padding(.bottom, 30)
                 }
@@ -377,9 +414,9 @@ struct GoalDetailView: View {
                 goal: goal
             )
             .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
+                maxWidth: .infinity
             )
+            .frame(height: 322)
             .clipped()
 
             LinearGradient(
