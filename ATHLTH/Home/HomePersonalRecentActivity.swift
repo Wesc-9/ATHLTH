@@ -877,9 +877,9 @@ struct HomePersonalRecentActivitySection:
                     .lowercased()
 
             return eventKey ==
-                    "workout-(workoutID)" ||
+                    "workout-\(workoutID)" ||
                    eventKey ==
-                    "strength-workout-(workoutID)"
+                    "strength-workout-\(workoutID)"
         }
     }
 }
