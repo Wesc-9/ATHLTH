@@ -13409,6 +13409,8 @@ private struct CommunityContentCoverPicker: View {
     let placeholderIcon: String
 
     @State private var imageError: String?
+    @State private var cropRequest:
+        CommunityImageCropRequest?
 
     var body: some View {
         let photoButtonTitle =
@@ -13426,10 +13428,6 @@ private struct CommunityContentCoverPicker: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .scaleEffect(
-                            1.16,
-                            anchor: .trailing
-                        )
                 } else if let selectedArtwork,
                           let image =
                             selectedArtwork
@@ -13521,6 +13519,31 @@ private struct CommunityContentCoverPicker: View {
                 }
                 .buttonStyle(.bordered)
 
+                if let imageData,
+                   let image =
+                    UIImage(
+                        data: imageData
+                    ) {
+                    Button {
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .wideCover
+                            )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Crop",
+                                norwegian: "Utsnitt"
+                            ),
+                            systemImage:
+                                "crop"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 if imageData != nil ||
                     selectedArtwork != nil {
                     Button(
@@ -13565,41 +13588,67 @@ private struct CommunityContentCoverPicker: View {
 
             Task {
                 do {
-                    guard let data = try await item
-                        .loadTransferable(
-                            type: Data.self
-                        )
-                    else {
-                        imageError =
-                            "ATHLTH could not prepare that image."
-                        return
-                    }
-
-                    guard let jpeg =
-                            await CommunityImageProcessor
-                                .prepareJPEG(
-                                    data,
-                                    maxPixelSize: 1_800,
-                                    quality: 0.82
+                    guard let data =
+                            try await item
+                                .loadTransferable(
+                                    type:
+                                        Data.self
                                 )
                     else {
                         imageError =
                             "ATHLTH could not prepare that image."
+                        selectedPhoto = nil
                         return
                     }
 
-                    imageData = jpeg
-                    selectedArtwork = nil
+                    guard let prepared =
+                            await CommunityImageProcessor
+                                .prepareJPEG(
+                                    data,
+                                    maxPixelSize:
+                                        2_400,
+                                    quality: 0.92
+                                ),
+                          let image =
+                            UIImage(
+                                data:
+                                    prepared
+                            )
+                    else {
+                        imageError =
+                            "ATHLTH could not prepare that image."
+                        selectedPhoto = nil
+                        return
+                    }
+
+                    selectedPhoto = nil
                     imageError = nil
+                    cropRequest =
+                        CommunityImageCropRequest(
+                            image: image,
+                            target:
+                                .wideCover
+                        )
                 } catch {
+                    selectedPhoto = nil
                     imageError =
                         error.localizedDescription
                 }
             }
         }
+        .fullScreenCover(
+            item: $cropRequest
+        ) { request in
+            CommunityImageCropEditor(
+                request: request
+            ) { croppedData in
+                imageData = croppedData
+                selectedArtwork = nil
+                imageError = nil
+            }
+        }
     }
 }
-
 struct CommunityGroupEventCreateView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var groups:
