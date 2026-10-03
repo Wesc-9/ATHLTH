@@ -3168,7 +3168,9 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func workoutDetail(for workout: HKWorkout) async -> WorkoutDetail {
-        async let routeTask = fetchRoute(for: workout)
+        async let routeTask = workoutRoute(
+            for: workout.uuid
+        )
         async let heartTask = fetchHeartRateStats(for: workout)
         async let stepsTask = workoutQuantity(
             identifier: .stepCount,
@@ -3225,7 +3227,7 @@ final class HealthKitManager: ObservableObject {
             workout: workout
         )
 
-        let route = (try? await routeTask) ?? []
+        let route = await routeTask
         let heartStats = (try? await heartTask) ?? (nil, nil)
         let workoutLocation = storedWorkoutLocation(for: workout)
 
