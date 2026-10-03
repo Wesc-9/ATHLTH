@@ -6074,7 +6074,7 @@ struct ProfileRecordShowcasePickerView:
                 accent:
                     ATHLTHTheme
                         .premiumGold
-                        .opacity(0.24)
+                        .opacity(0.22)
             )
 
             ScrollView {
@@ -6082,61 +6082,125 @@ struct ProfileRecordShowcasePickerView:
                     alignment: .leading,
                     spacing: 16
                 ) {
+                    showcaseHero
+
                     VStack(
                         alignment: .leading,
-                        spacing: 5
+                        spacing: 10
                     ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Your record showcase",
-                                norwegian:
-                                    "Dine utvalgte rekorder"
-                            )
-                        )
-                        .font(
-                            .title2.weight(
-                                .bold
-                            )
-                        )
+                        HStack {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 2
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Your profile showcase",
+                                        norwegian:
+                                            "Din rekordhylle"
+                                    )
+                                )
+                                .font(
+                                    .headline
+                                        .weight(
+                                            .bold
+                                        )
+                                )
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Choose up to four verified records to feature on your profile.",
-                                norwegian:
-                                    "Velg opptil fire verifiserte rekorder som skal vises på profilen din."
-                            )
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "These are the records visitors see on your profile.",
+                                        norwegian:
+                                            "Dette er rekordene andre ser på profilen din."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
 
-                        Text(
-                            "\(selection.count)/\(ProfileFeaturedRecordKind.showcaseLimit)"
-                        )
-                        .font(
-                            .caption.weight(
-                                .bold
+                            Spacer()
+
+                            Text(
+                                "\(selection.count)/\(ProfileFeaturedRecordKind.showcaseLimit)"
                             )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .padding(
+                                .horizontal,
+                                10
+                            )
+                            .frame(height: 28)
+                            .background(
+                                ATHLTHTheme
+                                    .accentSoft,
+                                in: Capsule()
+                            )
+                        }
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(
+                                    .flexible(),
+                                    spacing: 10
+                                ),
+                                GridItem(
+                                    .flexible(),
+                                    spacing: 10
+                                )
+                            ],
+                            spacing: 10
+                        ) {
+                            ForEach(
+                                0..<ProfileFeaturedRecordKind
+                                    .showcaseLimit,
+                                id: \.self
+                            ) {
+                                index in
+
+                                showcaseSlot(
+                                    index
+                                )
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        Color.white
+                            .opacity(0.90),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 24,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 24,
+                            style:
+                                .continuous
                         )
-                        .foregroundStyle(
+                        .stroke(
                             ATHLTHTheme
-                                .accentDeep
+                                .border
+                                .opacity(
+                                    0.60
+                                ),
+                            lineWidth: 0.8
                         )
-                        .padding(
-                            .horizontal,
-                            9
-                        )
-                        .frame(height: 26)
-                        .background(
-                            ATHLTHTheme
-                                .accentSoft,
-                            in: Capsule()
-                        )
-                        .padding(.top, 3)
                     }
 
                     if candidates.isEmpty {
@@ -6158,21 +6222,79 @@ struct ProfileRecordShowcasePickerView:
                                 )
                             )
                         )
-                        .padding(.top, 34)
+                        .padding(.top, 22)
                     } else {
-                        VStack(spacing: 9) {
-                            ForEach(
-                                candidates
-                            ) { kind in
-                                showcaseRow(kind)
+                        VStack(
+                            alignment: .leading,
+                            spacing: 10
+                        ) {
+                            HStack {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Available records",
+                                        norwegian:
+                                            "Tilgjengelige rekorder"
+                                    )
+                                )
+                                .font(
+                                    .headline
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+
+                                Spacer()
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Tap to add or remove",
+                                        norwegian:
+                                            "Trykk for å velge"
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(
+                                        .flexible(),
+                                        spacing: 10
+                                    ),
+                                    GridItem(
+                                        .flexible(),
+                                        spacing: 10
+                                    )
+                                ],
+                                spacing: 10
+                            ) {
+                                ForEach(
+                                    candidates
+                                ) { kind in
+                                    showcaseCard(
+                                        kind
+                                    )
+                                }
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 40)
-                .frame(maxWidth: 700)
+                .padding(
+                    .horizontal,
+                    16
+                )
+                .padding(.top, 12)
+                .padding(
+                    .bottom,
+                    40
+                )
+                .frame(maxWidth: 720)
                 .frame(
                     maxWidth: .infinity
                 )
@@ -6191,7 +6313,8 @@ struct ProfileRecordShowcasePickerView:
             .inline
         )
         .task {
-            guard healthRecords.isEmpty,
+            guard healthRecords
+                    .isEmpty,
                   fetchedHealthRecords
                     .isEmpty,
                   health
@@ -6208,7 +6331,321 @@ struct ProfileRecordShowcasePickerView:
         }
     }
 
-    private func showcaseRow(
+    private var showcaseHero:
+        some View {
+        GeometryReader {
+            proxy in
+
+            ZStack(
+                alignment: .leading
+            ) {
+                Image("GoalProgress")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        width:
+                            proxy.size
+                                .width,
+                        height:
+                            proxy.size
+                                .height
+                    )
+                    .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.black
+                            .opacity(0.72),
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.54),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "PERSONAL RECORDS",
+                            norwegian:
+                                "PERSONLIGE REKORDER"
+                        ),
+                        systemImage:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                    )
+                    .tracking(1.0)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Build your record showcase",
+                            norwegian:
+                                "Bygg rekordhyllen din"
+                        )
+                    )
+                    .font(
+                        .title2
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Choose up to four verified performances that best represent you.",
+                            norwegian:
+                                "Velg opptil fire verifiserte prestasjoner som best representerer deg."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .white
+                            .opacity(0.86)
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .frame(
+                        maxWidth:
+                            proxy.size
+                                .width *
+                            0.68,
+                        alignment: .leading
+                    )
+                }
+                .padding(18)
+            }
+        }
+        .frame(height: 168)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.12),
+            radius: 16,
+            y: 8
+        )
+    }
+
+    private func showcaseSlot(
+        _ index: Int
+    ) -> some View {
+        Group {
+            if selection.indices
+                .contains(index) {
+                let kind =
+                    selection[index]
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 7
+                ) {
+                    HStack {
+                        Image(
+                            systemName:
+                                kind.icon
+                        )
+                        .font(
+                            .system(
+                                size: 13,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            kind.tint
+                        )
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "checkmark.seal.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 11
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
+
+                    Text(
+                        kind.displayValue(
+                            healthRecords:
+                                resolvedHealthRecords,
+                            stats: stats
+                        )
+                    )
+                    .font(
+                        .headline
+                            .weight(.bold)
+                    )
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.72
+                    )
+
+                    Text(kind.title)
+                        .font(
+                            .caption2
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                }
+                .padding(12)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 94,
+                    alignment: .leading
+                )
+                .background(
+                    LinearGradient(
+                        colors: [
+                            kind.tint
+                                .opacity(
+                                    0.12
+                                ),
+                            Color.white
+                                .opacity(
+                                    0.88
+                                )
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        kind.tint
+                            .opacity(
+                                0.18
+                            ),
+                        lineWidth: 0.8
+                    )
+                }
+            } else {
+                VStack(spacing: 6) {
+                    Image(
+                        systemName:
+                            "plus"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open slot",
+                            norwegian:
+                                "Ledig plass"
+                        )
+                    )
+                    .font(
+                        .caption2
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 94
+                )
+                .background(
+                    Color.black
+                        .opacity(0.025),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .border
+                            .opacity(0.65),
+                        style:
+                            StrokeStyle(
+                                lineWidth: 0.8,
+                                dash: [
+                                    5,
+                                    5
+                                ]
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+
+    private func showcaseCard(
         _ kind:
             ProfileFeaturedRecordKind
     ) -> some View {
@@ -6222,113 +6659,228 @@ struct ProfileRecordShowcasePickerView:
         return Button {
             toggle(kind)
         } label: {
-            HStack(spacing: 12) {
-                Image(
-                    systemName: kind.icon
-                )
-                .font(
-                    .system(
-                        size: 17,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(kind.tint)
-                .frame(
-                    width: 42,
-                    height: 42
-                )
-                .background(
-                    kind.tint.opacity(
-                        0.10
-                    ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 13,
-                            style:
-                                .continuous
-                        )
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(kind.title)
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .semibold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-
-                    Text(
-                        kind.displayValue(
-                            healthRecords:
-                                resolvedHealthRecords,
-                            stats: stats
-                        )
+            VStack(
+                alignment: .leading,
+                spacing: 9
+            ) {
+                HStack {
+                    Image(
+                        systemName:
+                            kind.icon
                     )
                     .font(
-                        .caption
-                            .monospacedDigit()
-                            .weight(.bold)
+                        .system(
+                            size: 16,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
+                    .background(
+                        kind.tint
+                            .opacity(0.10),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 12,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    Spacer()
+
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                isSelected
+                                    ? kind.tint
+                                    : ATHLTHTheme
+                                        .border,
+                                lineWidth:
+                                    isSelected
+                                    ? 0
+                                    : 1.2
+                            )
+                            .frame(
+                                width: 26,
+                                height: 26
+                            )
+
+                        if isSelected {
+                            Circle()
+                                .fill(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+                                .frame(
+                                    width: 26,
+                                    height: 26
+                                )
+
+                            Image(
+                                systemName:
+                                    "checkmark"
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight:
+                                        .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                        }
+                    }
+                }
+
+                Text(kind.title)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
-                            .mutedText
+                            .primaryText
                     )
-                }
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.76
+                    )
 
-                Spacer()
-
-                Image(
-                    systemName:
-                        isSelected
-                            ? "checkmark.circle.fill"
-                            : "circle"
+                Text(
+                    kind.displayValue(
+                        healthRecords:
+                            resolvedHealthRecords,
+                        stats: stats
+                    )
                 )
-                .font(.title3)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.68
+                )
+
+                Label(
+                    isSelected
+                        ? ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Shown on profile",
+                                norwegian:
+                                    "Vises på profil"
+                            )
+                        : ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Available",
+                                norwegian:
+                                    "Tilgjengelig"
+                            ),
+                    systemImage:
+                        isSelected
+                        ? "checkmark.seal.fill"
+                        : "plus.circle"
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .medium
+                    )
+                )
                 .foregroundStyle(
                     isSelected
                         ? ATHLTHTheme
                             .accentDeep
                         : ATHLTHTheme
                             .mutedText
-                            .opacity(0.42)
                 )
             }
             .padding(12)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 142,
+                alignment: .topLeading
+            )
             .background(
-                Color.white.opacity(
-                    isSelected
-                        ? 0.96
-                        : 0.84
+                LinearGradient(
+                    colors: [
+                        isSelected
+                            ? kind.tint
+                                .opacity(
+                                    0.10
+                                )
+                            : Color.white
+                                .opacity(
+                                    0.92
+                                ),
+                        Color.white
+                            .opacity(0.86)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
                 ),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
+                        cornerRadius: 20,
+                        style:
+                            .continuous
                     )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
+                    cornerRadius: 20,
+                    style:
+                        .continuous
                 )
                 .stroke(
                     isSelected
                         ? ATHLTHTheme
                             .premiumGold
-                            .opacity(0.22)
-                        : Color.black
-                            .opacity(0.04),
-                    lineWidth: 1
+                            .opacity(
+                                0.30
+                            )
+                        : ATHLTHTheme
+                            .border
+                            .opacity(
+                                0.55
+                            ),
+                    lineWidth:
+                        isSelected
+                        ? 1.2
+                        : 0.8
                 )
             }
+            .shadow(
+                color:
+                    Color.black
+                        .opacity(
+                            isSelected
+                            ? 0.045
+                            : 0.02
+                        ),
+                radius: 9,
+                y: 4
+            )
         }
         .buttonStyle(.plain)
         .disabled(
@@ -6338,7 +6890,7 @@ struct ProfileRecordShowcasePickerView:
         .opacity(
             !isSelected &&
             selectionIsFull
-                ? 0.48
+                ? 0.42
                 : 1
         )
     }
