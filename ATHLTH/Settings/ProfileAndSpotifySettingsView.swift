@@ -46,7 +46,13 @@ struct ATHLTHEditProfileView: View {
                     }
 
                     VStack(spacing: 12) {
-                        ATHLTHSectionHeader(title: "My gear")
+                        ATHLTHSectionHeader(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "My gear",
+                                    norwegian: "Mitt utstyr"
+                                )
+                        )
                             .padding(.horizontal, 2)
 
                         gearCard
@@ -438,7 +444,12 @@ struct ATHLTHEditProfileView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Manage gear")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Manage gear",
+                                norwegian: "Administrer utstyr"
+                            )
+                        )
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
@@ -1465,9 +1476,9 @@ struct ATHLTHPrivacyCenterView: View {
                     Label(
                         ATHLTHLocalization.choose(
                             english:
-                                "Personal by default",
+                                "Visible by default",
                             norwegian:
-                                "Personlig som standard"
+                                "Synlig som standard"
                         ),
                         systemImage:
                             "lock.fill"
@@ -1480,9 +1491,9 @@ struct ATHLTHPrivacyCenterView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Performance and personal records stay personal unless you choose to share them below.",
+                                "Profile sections are visible by default. Turn off anything you do not want to share.",
                             norwegian:
-                                "Prestasjoner og personlige rekorder er personlige som standard, med mindre du velger å dele dem nedenfor."
+                                "Profilseksjonene er synlige som standard. Skru av det du ikke ønsker å dele."
                         )
                     )
                     .font(.caption)
@@ -1526,6 +1537,13 @@ struct ATHLTHPrivacyCenterView: View {
                     Toggle(
                         "Completed goals",
                         isOn: binding.shareGoals
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Gear",
+                            norwegian: "Utstyr"
+                        ),
+                        isOn: binding.shareGear
                     )
                     Toggle(
                         "Workout totals",
