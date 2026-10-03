@@ -3,6 +3,8 @@ import SwiftUI
 struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
 
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
@@ -23,6 +25,47 @@ struct HomeActivityStrengthDetailView: View {
                     exerciseLibrary
                         .allExercises
             )
+    }
+
+    private var figureStyle:
+        StrengthBodyPresentation {
+        switch settings
+            .strengthFigurePreference {
+        case .female:
+            return .female
+        case .male:
+            return .male
+        case .neutral:
+            return .neutral
+        case .automatic:
+            let healthSex =
+                session
+                    .onboardingProfile?
+                    .healthSex ??
+                health
+                    .personalDetails
+                    .healthSex
+
+            switch healthSex {
+            case .female:
+                return .female
+            case .male:
+                return .male
+            case .other,
+                 .preferNotToSay,
+                 .none:
+                return .neutral
+            }
+        }
+    }
+
+    private var activationTint:
+        Color {
+        Color(
+            red: 0.91,
+            green: 0.54,
+            blue: 0.24
+        )
     }
 
     var body: some View {
@@ -258,17 +301,83 @@ struct HomeActivityStrengthDetailView: View {
                 .profile
                 .activations
                 .isEmpty {
-                ContentUnavailableView(
-                    "No muscle data",
-                    systemImage:
-                        "figure.strengthtraining.traditional",
-                    description: Text(
-                        "Muscle focus appears when the recorded exercises include muscle metadata."
+                ZStack(
+                    alignment: .bottomLeading
+                ) {
+                    Image(
+                        "StrengthPostWorkoutHero"
                     )
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 250
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        maxWidth:
+                            .infinity,
+                        minHeight: 250,
+                        maxHeight: 250
+                    )
+                    .clipped()
+                    .saturation(0.72)
+                    .contrast(0.94)
+
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.white
+                                .opacity(0.18),
+                            Color.white
+                                .opacity(0.92)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Strength session",
+                                norwegian:
+                                    "Styrkeøkt"
+                            )
+                        )
+                        .font(
+                            .headline.weight(
+                                .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Muscle focus appears when the recorded exercises include muscle metadata.",
+                                norwegian:
+                                    "Muskelfokus vises når de registrerte øvelsene inneholder muskeldata."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+                    .padding(15)
+                }
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
                 )
             } else {
                 HStack(
@@ -278,7 +387,11 @@ struct HomeActivityStrengthDetailView: View {
                     StrengthMuscleMapView(
                         profile:
                             muscleSummary
-                                .profile
+                                .profile,
+                        figureStyle:
+                            figureStyle,
+                        activationTint:
+                            activationTint
                     )
                     .frame(
                         width: 168,
@@ -323,16 +436,35 @@ struct HomeActivityStrengthDetailView: View {
         }
         .padding(16)
         .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.surfaceSage
-                        .opacity(0.65),
-                    Color.white
-                        .opacity(0.97)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.995,
+                            green: 0.990,
+                            blue: 0.978
+                        ),
+                        Color.white
+                            .opacity(0.985)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        activationTint
+                            .opacity(0.095),
+                        Color.clear
+                    ],
+                    center:
+                        .topTrailing,
+                    startRadius: 8,
+                    endRadius: 320
+                )
+            },
             in: RoundedRectangle(
                 cornerRadius: 22,
                 style: .continuous
@@ -764,8 +896,8 @@ struct HomeActivityStrengthDetailView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    ATHLTHTheme
-                                        .vitality,
+                                    activationTint
+                                        .opacity(0.62),
                                     ATHLTHTheme
                                         .premiumGold
                                 ],
