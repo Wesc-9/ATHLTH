@@ -137,6 +137,34 @@ struct SocialHubView: View {
     @State private var acceptedWorkoutInvite:
         SocialWorkoutInviteDisplay?
 
+    private var clubForest: Color {
+        Color(red: 0.025, green: 0.30, blue: 0.21)
+    }
+
+    private var clubEmerald: Color {
+        Color(red: 0.055, green: 0.49, blue: 0.32)
+    }
+
+    private var clubMint: Color {
+        Color(red: 0.90, green: 0.96, blue: 0.92)
+    }
+
+    private var suggestedProfiles:
+        [SocialProfileCard] {
+        social.visibleProfiles
+            .filter {
+                profile in
+
+                profile.userID !=
+                    social.currentUserID &&
+                !social.isFollowing(
+                    profile.userID
+                )
+            }
+            .prefix(5)
+            .map { $0 }
+    }
+
     init(initialTab: SocialHubTab = .feed) {
         self.initialTab = initialTab
         _selectedTab = State(initialValue: initialTab)
@@ -169,7 +197,7 @@ struct SocialHubView: View {
                                         .background(
                                             selectedTab == tab
                                                 ? Color.white
-                                                : ATHLTHTheme.accent,
+                                                : clubForest,
                                             in: Capsule()
                                         )
                                 }
@@ -184,8 +212,21 @@ struct SocialHubView: View {
                             .padding(.vertical, 9)
                             .background(
                                 selectedTab == tab
-                                    ? ATHLTHTheme.accent
-                                    : Color(.secondarySystemGroupedBackground),
+                                    ? AnyShapeStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                clubForest,
+                                                clubEmerald
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    : AnyShapeStyle(
+                                        Color.white.opacity(
+                                            0.92
+                                        )
+                                    ),
                                 in: Capsule()
                             )
                         }
@@ -219,8 +260,20 @@ struct SocialHubView: View {
                 }
             }
         }
-        .background(ATHLTHPremiumCanvas(accent: ATHLTHTheme.accent.opacity(0.20)))
-        .navigationTitle("Social")
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    clubEmerald.opacity(
+                        0.14
+                    )
+            )
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Social",
+                norwegian: "Sosialt"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -304,7 +357,7 @@ struct SocialHubView: View {
                                     SocialAvatar(profile: creator, size: 46)
                                 } else {
                                     Image(systemName: "person.fill")
-                                        .foregroundStyle(ATHLTHTheme.accent)
+                                        .foregroundStyle(clubForest)
                                         .frame(width: 46, height: 46)
                                         .background(
                                             ATHLTHTheme.accent.opacity(0.10),
@@ -446,7 +499,7 @@ struct SocialHubView: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .controlSize(.small)
-                                .tint(ATHLTHTheme.accent)
+                                .tint(clubForest)
                             }
                         }
                     }
@@ -470,75 +523,564 @@ struct SocialHubView: View {
         }
     }
 
-    private var discoverContent: some View {
+    private var discoverContent:
+        some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-
-                    TextField("Name or @username", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .onSubmit {
-                            Task { await social.search(searchText) }
-                        }
-
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                            social.clearSearch()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding(12)
-                .background(
-                    Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 15)
-                )
-                .onChange(of: searchText) { _, value in
-                    if value.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(300))
-                            guard value == searchText else { return }
-                            await social.search(value)
-                        }
-                    } else {
-                        social.clearSearch()
-                    }
-                }
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                discoverHero
+                discoverSearchField
 
                 if searchText.isEmpty {
-                    ContentUnavailableView(
-                        "Find ATHLTH users",
-                        systemImage: "person.2.badge.plus",
-                        description: Text("Search by name or @username.")
-                    )
-                    .padding(.vertical, 45)
-                } else if social.discoverResults.isEmpty {
-                    Text("No matching ATHLTH users.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 35)
-                } else {
-                    ForEach(social.discoverResults) { profile in
-                        NavigationLink {
-                            FriendProfileView(userID: profile.userID)
-                        } label: {
-                            SocialProfileRow(profile: profile) {
-                                relationshipAction(profile)
+                    if !suggestedProfiles
+                        .isEmpty {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Suggested for you",
+                                    norwegian:
+                                        "Forslag til deg"
+                                )
+                            )
+                            .font(
+                                .title3
+                                    .weight(.bold)
+                            )
+
+                            Spacer()
+                        }
+
+                        VStack(spacing: 8) {
+                            ForEach(
+                                suggestedProfiles
+                            ) {
+                                profile in
+
+                                NavigationLink {
+                                    FriendProfileView(
+                                        userID:
+                                            profile
+                                                .userID
+                                    )
+                                } label: {
+                                    SocialProfileRow(
+                                        profile:
+                                            profile
+                                    ) {
+                                        relationshipAction(
+                                            profile
+                                        )
+                                    }
+                                    .padding(
+                                        .horizontal,
+                                        12
+                                    )
+                                    .padding(
+                                        .vertical,
+                                        4
+                                    )
+                                    .background(
+                                        Color.white
+                                            .opacity(
+                                                0.94
+                                            ),
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    18,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                18,
+                                            style:
+                                                .continuous
+                                        )
+                                        .stroke(
+                                            clubMint,
+                                            lineWidth:
+                                                0.8
+                                        )
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .buttonStyle(.plain)
+
+                        HStack(spacing: 12) {
+                            Image(
+                                systemName:
+                                    "person.3.fill"
+                            )
+                            .font(.title3)
+                            .foregroundStyle(
+                                clubForest
+                            )
+                            .frame(
+                                width: 46,
+                                height: 46
+                            )
+                            .background(
+                                clubMint,
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            14,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Connect with the community",
+                                        norwegian:
+                                            "Koble deg med fellesskapet"
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Find friends, Clubs and challenges around you.",
+                                        norwegian:
+                                            "Finn venner, Clubs og utfordringer rundt deg."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                            .font(
+                                .caption.bold()
+                            )
+                            .foregroundStyle(
+                                clubForest
+                            )
+                        }
+                        .padding(14)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color.white
+                                        .opacity(
+                                            0.96
+                                        ),
+                                    clubMint
+                                        .opacity(
+                                            0.72
+                                        )
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        20,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(
+                                systemName:
+                                    "person.2.badge.plus"
+                            )
+                            .font(
+                                .system(
+                                    size: 36,
+                                    weight:
+                                        .medium
+                                )
+                            )
+                            .foregroundStyle(
+                                clubForest
+                            )
+                            .frame(
+                                width: 76,
+                                height: 76
+                            )
+                            .background(
+                                clubMint,
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            22,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Find ATHLTH users",
+                                    norwegian:
+                                        "Finn ATHLTH-brukere"
+                                )
+                            )
+                            .font(
+                                .title3
+                                    .weight(.bold)
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Search by name or @username.",
+                                    norwegian:
+                                        "Søk etter navn eller @brukernavn."
+                                )
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            50
+                        )
+                    }
+                } else if social
+                    .discoverResults
+                    .isEmpty {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "magnifyingglass"
+                        )
+                        .foregroundStyle(
+                            clubForest
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No matching ATHLTH users.",
+                                norwegian:
+                                    "Ingen treff på ATHLTH-brukere."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Spacer()
+                    }
+                    .padding(15)
+                    .background(
+                        Color.white.opacity(
+                            0.94
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 18,
+                                style:
+                                    .continuous
+                            )
+                    )
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(
+                            social
+                                .discoverResults
+                        ) {
+                            profile in
+
+                            NavigationLink {
+                                FriendProfileView(
+                                    userID:
+                                        profile
+                                            .userID
+                                )
+                            } label: {
+                                SocialProfileRow(
+                                    profile:
+                                        profile
+                                ) {
+                                    relationshipAction(
+                                        profile
+                                    )
+                                }
+                                .padding(
+                                    .horizontal,
+                                    12
+                                )
+                                .padding(
+                                    .vertical,
+                                    4
+                                )
+                                .background(
+                                    Color.white
+                                        .opacity(
+                                            0.94
+                                        ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                18,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+                                .overlay {
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            18,
+                                        style:
+                                            .continuous
+                                    )
+                                    .stroke(
+                                        clubMint,
+                                        lineWidth:
+                                            0.8
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 28)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var discoverHero:
+        some View {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 170)
+                .frame(
+                    maxWidth: .infinity
+                )
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    clubForest.opacity(0.86)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Find new training friends",
+                        norwegian:
+                            "Finn nye treningsvenner"
+                    )
+                )
+                .font(
+                    .title2.weight(
+                        .bold
+                    )
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Search by name or @username and discover more of the ATHLTH community.",
+                        norwegian:
+                            "Søk etter navn eller @brukernavn og oppdag mer av ATHLTH-fellesskapet."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .white.opacity(0.88)
+                )
+                .lineLimit(2)
+            }
+            .foregroundStyle(.white)
+            .padding(16)
+        }
+        .frame(height: 170)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.13
+                ),
+            radius: 15,
+            y: 6
+        )
+    }
+
+    private var discoverSearchField:
+        some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 15,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+
+            TextField(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Name or @username",
+                    norwegian:
+                        "Navn eller @brukernavn"
+                ),
+                text: $searchText
+            )
+            .textInputAutocapitalization(
+                .never
+            )
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            .onSubmit {
+                Task {
+                    await social.search(
+                        searchText
+                    )
+                }
+            }
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    social.clearSearch()
+                } label: {
+                    Image(
+                        systemName:
+                            "xmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 15)
+        .frame(height: 52)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.96),
+                    clubMint
+                        .opacity(0.48)
+                ],
+                startPoint:
+                    .leading,
+                endPoint:
+                    .trailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                clubMint,
+                lineWidth: 0.9
+            )
+        }
+        .onChange(
+            of: searchText
+        ) { _, value in
+            if value
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .count >= 2 {
+                Task {
+                    try? await Task.sleep(
+                        for:
+                            .milliseconds(
+                                300
+                            )
+                    )
+
+                    guard value ==
+                            searchText
+                    else {
+                        return
+                    }
+
+                    await social.search(
+                        value
+                    )
+                }
+            } else {
+                social.clearSearch()
+            }
         }
     }
 
@@ -549,7 +1091,7 @@ struct SocialHubView: View {
         if social.isFollowing(profile.userID) {
             Text("Following")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
+                .foregroundStyle(clubForest)
         } else if social.isFollowedBy(profile.userID) {
             Button(
                 profile.isPrivateProfile
@@ -566,7 +1108,7 @@ struct SocialHubView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .tint(ATHLTHTheme.accent)
+            .tint(clubForest)
         } else {
             switch social.relationshipState(
                 with: profile.userID
@@ -594,7 +1136,7 @@ struct SocialHubView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .tint(ATHLTHTheme.accent)
+                .tint(clubForest)
 
             case .none:
                 Button("Follow") {
@@ -610,7 +1152,7 @@ struct SocialHubView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .tint(ATHLTHTheme.accent)
+                .tint(clubForest)
 
             case .selfUser:
                 EmptyView()
