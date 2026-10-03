@@ -1503,7 +1503,7 @@ enum HomeHealthMetricKind:
     Identifiable {
 
     case sleep
-    case restingHeartRate
+    case respiratoryRate
     case hrv
     case load
 
@@ -1513,8 +1513,8 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "Søvn"
-        case .restingHeartRate:
-            return "Hvilepuls"
+        case .respiratoryRate:
+            return "Respirasjon"
         case .hrv:
             return "HRV"
         case .load:
@@ -1526,8 +1526,8 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "moon.fill"
-        case .restingHeartRate:
-            return "heart.fill"
+        case .respiratoryRate:
+            return "lungs.fill"
         case .hrv:
             return "waveform.path.ecg"
         case .load:
@@ -1539,12 +1539,12 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return .indigo
-        case .restingHeartRate:
-            return .pink
-        case .hrv:
-            return .green
-        case .load:
+        case .respiratoryRate:
             return .blue
+        case .hrv:
+            return .red
+        case .load:
+            return .green
         }
     }
 
@@ -1552,7 +1552,7 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "timer"
-        case .restingHeartRate:
+        case .respiratoryRate:
             return "bpm"
         case .hrv:
             return "ms"
@@ -1593,7 +1593,7 @@ private enum HomeHealthMetricRange:
 struct HomeHealthMetricStrip: View {
     let snapshot: RecoveryTrendSnapshot
     let sleepText: String
-    let restingHeartRateText: String
+    let respiratoryRateText: String
     let hrvText: String
     let loadText: String
     let readinessText: String?
@@ -1606,9 +1606,9 @@ struct HomeHealthMetricStrip: View {
             )
 
             metricLink(
-                .restingHeartRate,
+                .respiratoryRate,
                 value:
-                    restingHeartRateText
+                    respiratoryRateText
             )
 
             metricLink(
@@ -1659,7 +1659,7 @@ struct HomeHealthMetricStrip: View {
                             .system(
                                 size:
                                     kind ==
-                                        .restingHeartRate ||
+                                        .respiratoryRate ||
                                     kind ==
                                         .load
                                         ? 8.6
@@ -1831,9 +1831,9 @@ struct HomeHealthMetricStrip: View {
                     day.sleepDuration.map {
                         $0 / 3_600
                     }
-            case .restingHeartRate:
+            case .respiratoryRate:
                 value =
-                    day.restingHeartRate
+                    day.respiratoryRate
             case .hrv:
                 value =
                     day.hrvMilliseconds
@@ -1912,10 +1912,8 @@ struct HomeHealthMetricStrip: View {
         }
 
         switch kind {
-        case .restingHeartRate:
-            return change <= 0
-                ? ATHLTHTheme.vitality
-                : .orange
+        case .respiratoryRate:
+            return ATHLTHTheme.accentDeep
         case .load:
             return ATHLTHTheme
                 .accentDeep
@@ -2427,7 +2425,7 @@ struct HomeHealthMetricDetailView:
                         day.sleepDuration.map {
                             $0 / 3_600
                         }
-                case .restingHeartRate:
+                case .respiratoryRate:
                     value =
                         day.restingHeartRate
                 case .hrv:
@@ -2502,7 +2500,7 @@ struct HomeHealthMetricDetailView:
                 )
             return
                 "\(totalMinutes / 60) t \(totalMinutes % 60) min"
-        case .restingHeartRate:
+        case .respiratoryRate:
             return
                 "\(Int(value.rounded())) bpm"
         case .hrv:
@@ -2520,9 +2518,9 @@ struct HomeHealthMetricDetailView:
         case .sleep:
             return
                 "Registrert søvn fra Apple Health."
-        case .restingHeartRate:
+        case .respiratoryRate:
             return
-                "Daglig hvilepuls fra Apple Health."
+                "Daglig respirasjonsfrekvens fra Apple Health."
         case .hrv:
             return
                 "Daglig HRV fra Apple Health."
@@ -2596,12 +2594,12 @@ struct HomeHealthMetricDetailView:
                 norwegian:
                     "Søvn viser hvor mye søvn som er registrert gjennom natten. Det er mest nyttig som en trend sammen med hvordan du faktisk føler deg."
             )
-        case .restingHeartRate:
+        case .respiratoryRate:
             return ATHLTHLocalization.choose(
                 english:
-                    "Resting heart rate is the number of heartbeats per minute while your body is at rest. Your personal baseline matters more than comparing with other people.",
+                    "Respiratory rate is the number of breaths you take per minute. Your personal baseline and longer-term trend are more useful than comparison with other people.",
                 norwegian:
-                    "Hvilepuls er antall hjerteslag per minutt når kroppen er i ro. Din egen normalverdi er viktigere enn å sammenligne tallet med andre."
+                    "Respirasjonsfrekvens er antall pust du tar per minutt. Din egen grunnlinje og utviklingen over tid er mer nyttig enn å sammenligne tallet med andre."
             )
         case .hrv:
             return ATHLTHLocalization.choose(
@@ -2629,12 +2627,12 @@ struct HomeHealthMetricDetailView:
                 norwegian:
                     "ATHLTH leser kompatible søvnregistreringer fra Apple Health. Apple Watch og andre støttede kilder kan bidra med data. Netter uten data blir stående tomme i stedet for å bli estimert."
             )
-        case .restingHeartRate:
+        case .respiratoryRate:
             return ATHLTHLocalization.choose(
                 english:
-                    "ATHLTH reads resting-heart-rate samples from Apple Health. Apple Watch estimates resting heart rate from periods with little movement and heart-rate measurements collected through the day.",
+                    "ATHLTH reads respiratory-rate samples from Apple Health. Compatible Apple Watch models can estimate breathing rate during suitable periods, especially during sleep.",
                 norwegian:
-                    "ATHLTH leser hvilepuls fra Apple Health. Apple Watch beregner hvilepuls fra perioder med lite bevegelse og pulsmålinger som samles gjennom dagen."
+                    "ATHLTH leser respirasjonsfrekvens fra Apple Health. Kompatible Apple Watch-modeller kan estimere pustefrekvens i egnede perioder, særlig under søvn."
             )
         case .hrv:
             return ATHLTHLocalization.choose(
@@ -2662,12 +2660,12 @@ struct HomeHealthMetricDetailView:
                 norwegian:
                     "Se flere netter i sammenheng med energi, muskelømhet og den planlagte økten. Gjentatt kort søvn kan være et signal om å redusere volum eller intensitet, mens én kort natt ikke automatisk betyr at planen må endres."
             )
-        case .restingHeartRate:
+        case .respiratoryRate:
             return ATHLTHLocalization.choose(
                 english:
-                    "Compare with your recent baseline. A persistent rise together with fatigue, poor sleep or other recovery signals can support choosing an easier session. One isolated value should not drive the decision.",
+                    "Compare the trend with your own recent baseline. A persistent change together with poor sleep, fatigue or feeling unwell can be a reason to keep training flexible. Do not use one respiratory-rate reading alone to set training intensity.",
                 norwegian:
-                    "Sammenlign med din nyere grunnlinje. En vedvarende økning sammen med tretthet, dårlig søvn eller andre restitusjonssignaler kan støtte valget av en lettere økt. Én enkeltmåling bør ikke styre beslutningen alene."
+                    "Sammenlign utviklingen med din egen nyere grunnlinje. En vedvarende endring sammen med dårlig søvn, tretthet eller sykdomsfølelse kan være en grunn til å holde treningen fleksibel. Ikke bruk én respirasjonsmåling alene til å styre intensiteten."
             )
         case .hrv:
             return ATHLTHLocalization.choose(
