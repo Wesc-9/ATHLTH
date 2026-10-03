@@ -597,6 +597,8 @@ struct PerformanceStatsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @State private var fetchedHealthRecords: [HealthPersonalRecord] = []
+    @State private var performanceWorkoutHistory:
+        [WorkoutSummary] = []
     @State private var trainingVolumePeriod:
         PerformanceVolumePeriod = .year
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
@@ -656,16 +658,39 @@ struct PerformanceStatsView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            guard healthRecords.isEmpty,
-                  fetchedHealthRecords.isEmpty,
-                  health.hasRequestedAuthorization
+            guard health.hasRequestedAuthorization
             else {
                 return
             }
 
-            fetchedHealthRecords =
-                (try? await health.personalRecords()) ?? []
+            if performanceWorkoutHistory
+                .isEmpty {
+                performanceWorkoutHistory =
+                    (
+                        try? await health
+                            .performanceWorkoutHistory()
+                    ) ??
+                    health.workouts
+            }
+
+            if healthRecords.isEmpty &&
+                fetchedHealthRecords
+                    .isEmpty {
+                fetchedHealthRecords =
+                    (
+                        try? await health
+                            .personalRecords()
+                    ) ?? []
+            }
         }
+    }
+
+    private var resolvedPerformanceWorkouts:
+        [WorkoutSummary] {
+        performanceWorkoutHistory
+            .isEmpty
+            ? health.workouts
+            : performanceWorkoutHistory
     }
 
     private func editorialHero(
@@ -2271,7 +2296,7 @@ struct PerformanceStatsView: View {
             .total {
             return stats?
                 .totalRunningDistanceMeters ??
-                health.workouts
+                resolvedPerformanceWorkouts
                     .filter {
                         $0.activity ==
                             .running
@@ -2286,7 +2311,7 @@ struct PerformanceStatsView: View {
                     }
         }
 
-        return health.workouts
+        return resolvedPerformanceWorkouts
             .filter {
                 $0.activity ==
                     .running &&
@@ -2312,10 +2337,10 @@ struct PerformanceStatsView: View {
             .total {
             return stats?
                 .totalWorkoutCount ??
-                health.workouts.count
+                resolvedPerformanceWorkouts.count
         }
 
-        return health.workouts
+        return resolvedPerformanceWorkouts
             .filter {
                 volumeDateIncluded(
                     $0.startDate,
@@ -2328,7 +2353,7 @@ struct PerformanceStatsView: View {
 
     private var selectedVolumeRunningCount:
         Int {
-        health.workouts
+        resolvedPerformanceWorkouts
             .filter {
                 $0.activity ==
                     .running &&
@@ -2347,7 +2372,7 @@ struct PerformanceStatsView: View {
 
     private var selectedVolumeStrengthCount:
         Int {
-        health.workouts
+        resolvedPerformanceWorkouts
             .filter {
                 $0.activity ==
                     .strength &&
@@ -2366,7 +2391,7 @@ struct PerformanceStatsView: View {
 
     private var selectedVolumeWalkingCount:
         Int {
-        health.workouts
+        resolvedPerformanceWorkouts
             .filter {
                 (
                     $0.activity ==
@@ -2424,7 +2449,7 @@ struct PerformanceStatsView: View {
                     to: start
                 ) ?? start
             let value =
-                health.workouts
+                resolvedPerformanceWorkouts
                     .filter {
                         $0.activity ==
                             .running &&
@@ -2493,7 +2518,7 @@ struct PerformanceStatsView: View {
                 )
 
             let value =
-                health.workouts
+                resolvedPerformanceWorkouts
                     .filter {
                         $0.activity ==
                             .running &&
@@ -2562,7 +2587,7 @@ struct PerformanceStatsView: View {
             year in
 
             let value =
-                health.workouts
+                resolvedPerformanceWorkouts
                     .filter {
                         $0.activity ==
                             .running &&
@@ -2741,7 +2766,7 @@ struct PerformanceStatsView: View {
             )
 
         for workout in
-            health.workouts
+            resolvedPerformanceWorkouts
             where workout.activity ==
                 .running &&
                 calendar.component(
@@ -2796,7 +2821,7 @@ struct PerformanceStatsView: View {
                 from: now
             )
 
-        return health.workouts
+        return resolvedPerformanceWorkouts
             .filter { workout in
                 workout.activity ==
                     .running &&
@@ -3074,7 +3099,7 @@ struct PerformanceStatsView: View {
                     .year,
                     from: Date()
                 )
-        return health.workouts
+        return resolvedPerformanceWorkouts
             .filter {
                 Calendar.current
                     .component(
@@ -3126,7 +3151,7 @@ struct PerformanceStatsView: View {
                 from: Date()
             )
 
-        return health.workouts
+        return resolvedPerformanceWorkouts
             .filter {
                 calendar.component(
                     .year,
@@ -4797,6 +4822,8 @@ private struct PerformanceTrainingVolumeDetailView:
         HealthKitManager
     @State private var period:
         PerformanceVolumePeriod
+    @State private var workoutHistory:
+        [WorkoutSummary] = []
 
     init(
         stats: ProfilePerformanceStats?,
@@ -4850,6 +4877,22 @@ private struct PerformanceTrainingVolumeDetailView:
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .task {
+            guard workoutHistory
+                    .isEmpty,
+                  health
+                    .hasRequestedAuthorization
+            else {
+                return
+            }
+
+            workoutHistory =
+                (
+                    try? await health
+                        .performanceWorkoutHistory()
+                ) ??
+                health.workouts
+        }
     }
 
     private var volumeHero:
@@ -5546,9 +5589,16 @@ private struct PerformanceTrainingVolumeDetailView:
         )
     }
 
+    private var resolvedWorkouts:
+        [WorkoutSummary] {
+        workoutHistory.isEmpty
+            ? health.workouts
+            : workoutHistory
+    }
+
     private var selectedWorkouts:
         [WorkoutSummary] {
-        health.workouts
+        resolvedWorkouts
             .filter {
                 period ==
                     .total ||
