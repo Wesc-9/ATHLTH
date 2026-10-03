@@ -535,6 +535,92 @@ final class SupabaseCommunityService {
         return eventID
     }
 
+    func uploadEventCover(
+        eventID: UUID,
+        jpegData: Data
+    ) async throws -> String {
+        guard let userID = currentUserID else {
+            throw CommunityEventError
+                .notAuthenticated
+        }
+
+        guard !jpegData.isEmpty,
+              jpegData.count <=
+                10_485_760
+        else {
+            throw CommunityEventError
+                .invalidEvent
+        }
+
+        let storagePath =
+            "\(userID.uuidString.lowercased())/" +
+            "event-covers/" +
+            "\(eventID.uuidString.lowercased()).jpg"
+
+        try await client.storage
+            .from("workout-media")
+            .upload(
+                storagePath,
+                data: jpegData,
+                options: FileOptions(
+                    cacheControl: "31536000",
+                    contentType: "image/jpeg",
+                    upsert: true
+                )
+            )
+
+        let publicURL =
+            try client.storage
+                .from("workout-media")
+                .getPublicURL(
+                    path: storagePath
+                )
+
+        var components =
+            URLComponents(
+                url: publicURL,
+                resolvingAgainstBaseURL:
+                    false
+            )
+        components?.queryItems = [
+            URLQueryItem(
+                name: "v",
+                value:
+                    String(
+                        Int(
+                            Date()
+                                .timeIntervalSince1970
+                        )
+                    )
+            )
+        ]
+
+        return (
+            components?.url ??
+            publicURL
+        ).absoluteString
+    }
+
+    func removeEventCover(
+        eventID: UUID
+    ) async throws {
+        guard let userID = currentUserID else {
+            throw CommunityEventError
+                .notAuthenticated
+        }
+
+        let storagePath =
+            "\(userID.uuidString.lowercased())/" +
+            "event-covers/" +
+            "\(eventID.uuidString.lowercased()).jpg"
+
+        try await client.storage
+            .from("workout-media")
+            .remove(
+                paths: [storagePath]
+            )
+    }
+
     private func resolveMeetingCoordinate(
         _ query: String
     ) async -> CLLocationCoordinate2D? {
@@ -770,25 +856,65 @@ final class CommunityEventStore: ObservableObject {
 
     func create(_ draft: CommunityEventDraft) async -> Bool {
         do {
-            _ = try await service.createEvent(draft)
+            _ = try await service
+                .createEvent(draft)
             await refresh(force: true)
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
             return false
         }
     }
 
     func createAndReturnID(
-        _ draft: CommunityEventDraft
+        _ draft: CommunityEventDraft,
+        eventID: UUID = UUID()
     ) async -> UUID? {
         do {
-            let eventID = try await service.createEvent(draft)
+            let createdEventID =
+                try await service
+                    .createEvent(
+                        draft,
+                        eventID:
+                            eventID
+                    )
             await refresh(force: true)
-            return eventID
+            return createdEventID
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
             return nil
+        }
+    }
+
+    func uploadEventCover(
+        eventID: UUID,
+        jpegData: Data
+    ) async -> String? {
+        do {
+            return try await service
+                .uploadEventCover(
+                    eventID: eventID,
+                    jpegData: jpegData
+                )
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return nil
+        }
+    }
+
+    func removeEventCover(
+        eventID: UUID
+    ) async {
+        do {
+            try await service
+                .removeEventCover(
+                    eventID: eventID
+                )
+        } catch {
+            // Best-effort cleanup only.
         }
     }
 
