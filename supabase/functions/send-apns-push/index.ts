@@ -16,6 +16,7 @@ type NotificationDevice = {
   app_bundle_id: string;
   apns_environment: "sandbox" | "production";
   apns_token: string;
+  language_code: "en" | "nb" | null;
 };
 
 type UserPreferences = {
@@ -140,6 +141,231 @@ function threadID(event: InboxEvent): string {
   return event.kind;
 }
 
+function localizedAlert(
+  event: InboxEvent,
+  languageCode: string | null | undefined,
+): { title: string; body: string } {
+  if (languageCode !== "nb") {
+    return {
+      title: event.title,
+      body: event.message,
+    };
+  }
+
+  const kind = event.kind.toLowerCase();
+  let title = event.title;
+  let body = event.message;
+
+  const replaceSuffix = (
+    value: string,
+    english: string,
+    norwegian: string,
+  ) => value.endsWith(english)
+    ? value.slice(0, -english.length) + norwegian
+    : value;
+
+  switch (kind) {
+    case "friend_request":
+    case "follow_request":
+      title = "Ny følgeforespørsel";
+      body = replaceSuffix(
+        body,
+        " wants to follow you on ATHLTH.",
+        " vil følge deg på ATHLTH.",
+      );
+      break;
+
+    case "friend_accepted":
+    case "follow_accepted":
+      title = "Følgeforespørsel godkjent";
+      body = replaceSuffix(
+        body,
+        " accepted your follow request.",
+        " godkjente følgeforespørselen din.",
+      );
+      break;
+
+    case "challenge_invite":
+      title = "Ny challenge";
+      body = body.replace(
+        " challenged you: ",
+        " utfordret deg: ",
+      );
+      break;
+
+    case "challenge_result": {
+      title = "Nytt challenge-resultat";
+      const match = body.match(
+        /^(.+?) posted (.+) in (.+)\.$/,
+      );
+      if (match) {
+        body = `${match[1]} registrerte ${match[2]} i ${match[3]}.`;
+      }
+      break;
+    }
+
+    case "reaction":
+      title = "Ny reaksjon";
+      body = replaceSuffix(
+        body,
+        " reacted to your ATHLTH activity.",
+        " reagerte på ATHLTH-aktiviteten din.",
+      );
+      break;
+
+    case "workout_invite":
+      title = "Tren sammen";
+      body = body.replace(
+        " invited you to train together: ",
+        " inviterte deg til å trene sammen: ",
+      );
+      break;
+
+    case "workout_invite_accepted":
+      if (event.title === "Workout starting") {
+        title = "Økten starter";
+        body = "Tren sammen-økten din starter nå.";
+      } else {
+        title = "Treningspartner ble med";
+        body = body.replace(
+          " accepted your invite for ",
+          " godtok invitasjonen din til ",
+        );
+      }
+      break;
+
+    case "message":
+      if (body === "Shared something with you") {
+        body = "Delte noe med deg";
+      }
+      break;
+
+    case "message_request":
+      if (title.startsWith("Message request from ")) {
+        title = `Meldingsforespørsel fra ${title.slice(
+          "Message request from ".length,
+        )}`;
+      } else {
+        title = "Meldingsforespørsel";
+      }
+      if (body === "Shared something with you") {
+        body = "Delte noe med deg";
+      }
+      break;
+
+    case "message_request_accepted":
+      title = "Meldingsforespørsel godtatt";
+      body = replaceSuffix(
+        body,
+        " accepted your message request.",
+        " godtok meldingsforespørselen din.",
+      );
+      break;
+
+    case "mention":
+      title = "Du ble nevnt";
+      body = body
+        .replace(
+          " mentioned you in a message.",
+          " nevnte deg i en melding.",
+        )
+        .replace(
+          " mentioned you in ",
+          " nevnte deg i ",
+        );
+      break;
+
+    case "group_message":
+      // The title is the Club name and the body contains user-authored text.
+      break;
+
+    case "group_update":
+      if (title.endsWith(" update")) {
+        title = `Oppdatering · ${title.slice(0, -" update".length)}`;
+      }
+      // Announcement text is user-authored and should not be translated.
+      break;
+
+    case "group_event":
+      if (title.startsWith("New event in ")) {
+        title = `Nytt event i ${title.slice("New event in ".length)}`;
+      } else if (title === "Event cancelled") {
+        title = "Event avlyst";
+      } else if (title === "Event updated") {
+        title = "Event oppdatert";
+      } else if (title === "You have a spot") {
+        title = "Du har fått plass";
+      }
+
+      body = replaceSuffix(
+        body,
+        " has important changes.",
+        " har viktige endringer.",
+      );
+
+      {
+        const match = body.match(
+          /^A spot opened up for (.+)\. You are now going\.$/,
+        );
+        if (match) {
+          body = `Det ble ledig plass på ${match[1]}. Du er nå påmeldt.`;
+        }
+      }
+      break;
+
+    case "group_challenge":
+      if (title.startsWith("New challenge in ")) {
+        title = `Ny challenge i ${title.slice("New challenge in ".length)}`;
+      } else if (title === "Challenge cancelled") {
+        title = "Challenge avlyst";
+      } else if (title === "Challenge updated") {
+        title = "Challenge oppdatert";
+      }
+
+      body = replaceSuffix(
+        body,
+        " has important changes.",
+        " har viktige endringer.",
+      );
+      break;
+
+    case "group_invite":
+      title = "Gruppeinvitasjon";
+      if (
+        body.startsWith("You were invited to ") &&
+        body.endsWith(".")
+      ) {
+        body = `Du ble invitert til ${body.slice(
+          "You were invited to ".length,
+        )}`;
+      }
+      break;
+
+    case "group_join_request":
+      title = "Ny forespørsel om medlemskap";
+      body = replaceSuffix(
+        body,
+        " has a new membership request.",
+        " har en ny forespørsel om medlemskap.",
+      );
+      break;
+
+    case "group_join_approved":
+      if (title.startsWith("You joined ")) {
+        title = `Du ble med i ${title.slice("You joined ".length)}`;
+      }
+      if (body === "Your membership request was approved.") {
+        body = "Forespørselen om medlemskap ble godkjent.";
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return { title, body };
+}
+
 async function sendToDevice(
   device: NotificationDevice,
   event: InboxEvent,
@@ -156,12 +382,14 @@ async function sendToDevice(
     ? "https://api.sandbox.push.apple.com"
     : "https://api.push.apple.com";
 
+  const alert = localizedAlert(
+    event,
+    device.language_code,
+  );
+
   const payload = {
     aps: {
-      alert: {
-        title: event.title,
-        body: event.message,
-      },
+      alert,
       sound: "default",
       badge: unreadCount,
       "thread-id": threadID(event),
@@ -301,7 +529,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: devices, error: deviceError } = await admin
     .from("notification_devices")
-    .select("id,app_bundle_id,apns_environment,apns_token")
+    .select("id,app_bundle_id,apns_environment,apns_token,language_code")
     .eq("user_id", event.recipient_id)
     .eq("platform", "ios")
     .returns<NotificationDevice[]>();
