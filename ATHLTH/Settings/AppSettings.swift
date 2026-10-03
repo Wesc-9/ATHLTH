@@ -469,7 +469,16 @@ enum IntegrationKind: String, CaseIterable, Identifiable {
 
 @MainActor
 final class AppSettingsStore: ObservableObject {
-    @Published var language: AppLanguage { didSet { persist() } }
+    @Published var language: AppLanguage {
+        didSet {
+            persist()
+
+            Task { @MainActor in
+                await APNsPushManager.shared
+                    .syncCurrentToken()
+            }
+        }
+    }
     @Published var measurementPreference: MeasurementPreference { didSet { persist() } }
     @Published var timeFormatPreference: TimeFormatPreference { didSet { persist() } }
     @Published var appearance: AppAppearance { didSet { persist() } }
