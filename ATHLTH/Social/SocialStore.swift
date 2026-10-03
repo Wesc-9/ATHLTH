@@ -2321,8 +2321,8 @@ final class SocialStore: ObservableObject {
                 ATHLTHNotificationDraft(
                     eventKey: "social-backend-\(event.id.uuidString)",
                     kind: notificationKind(for: event),
-                    title: event.title,
-                    message: event.message,
+                    title: event.localizedTitle,
+                    message: event.localizedMessage,
                     createdAt: event.createdAt,
                     challengeID: event.entityType == "challenge"
                         ? event.entityID
