@@ -12717,6 +12717,7 @@ struct CommunityGroupSettingsView: View {
                 }
                 .disabled(saving)
             }
+            }
 
             HStack {
                 Text(
