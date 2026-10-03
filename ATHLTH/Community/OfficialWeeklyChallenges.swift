@@ -1708,6 +1708,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                             leaderboardSection(challenge)
                                 .id("weekly-leaderboard")
                             countedWorkoutsSection
+                                .id("weekly-counted-workouts")
                             rulesSection(challenge)
                                 .id("weekly-rules")
                         }
@@ -1760,16 +1761,6 @@ struct OfficialWeeklyChallengeDetailView: View {
                 .frame(height: 238)
                 .clipped()
 
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.02),
-                        Color.black.opacity(0.10),
-                        Color.black.opacity(0.74)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Label(
@@ -1817,12 +1808,22 @@ struct OfficialWeeklyChallengeDetailView: View {
                             )
                         )
                         .foregroundStyle(.white)
+                        .shadow(
+                            color: .black.opacity(0.34),
+                            radius: 4,
+                            y: 2
+                        )
                         .lineLimit(2)
                         .minimumScaleFactor(0.72)
 
                     Text(challenge.subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.90))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .shadow(
+                            color: .black.opacity(0.38),
+                            radius: 3,
+                            y: 1
+                        )
                         .lineLimit(3)
                         .fixedSize(
                             horizontal: false,
@@ -2019,79 +2020,188 @@ struct OfficialWeeklyChallengeDetailView: View {
                     )
                 }
 
-                HStack(spacing: 8) {
-                    Capsule()
-                        .fill(ATHLTHTheme.accentDeep.opacity(0.18))
-                        .frame(width: 28, height: 3)
-
-                    Text("MAKE THIS WEEK COUNT")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.72))
-
-                    Spacer()
-                }
-
-                Button {
-                    Task {
-                        if store.isJoined(challenge.id) {
-                            await store.syncCompletionState(
-                                workouts: health.workouts
+                if store.isJoined(challenge.id) {
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.32
+                            )
+                        ) {
+                            scrollProxy.scrollTo(
+                                "weekly-counted-workouts",
+                                anchor: .top
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 13) {
+                            Image(
+                                systemName:
+                                    "figure.run.circle.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 19,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.accentDeep
+                            )
+                            .frame(
+                                width: 40,
+                                height: 40
+                            )
+                            .background(
+                                ATHLTHTheme.accent
+                                    .opacity(0.12),
+                                in: Circle()
                             )
 
-                            withAnimation(.easeInOut(duration: 0.32)) {
-                                scrollProxy.scrollTo(
-                                    "weekly-progress",
-                                    anchor: .top
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    "Counted workouts"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                                Text(
+                                    countedWorkouts.isEmpty
+                                        ? "Your qualifying workouts will appear here."
+                                        : "\(countedWorkouts.count) qualifying \(countedWorkouts.count == 1 ? "workout" : "workouts") this week"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.80
                                 )
                             }
-                        } else {
-                            await store.join(challenge)
-                            await store.syncCompletionState(
-                                workouts: health.workouts
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(
+                                .system(
+                                    size: 13,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                                    .opacity(0.72)
+                            )
+                        }
+                        .padding(
+                            .horizontal,
+                            14
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .frame(height: 66)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme
+                                        .accent
+                                        .opacity(0.10),
+                                    ATHLTHTheme
+                                        .champagneSoft
+                                        .opacity(0.42)
+                                ],
+                                startPoint:
+                                    .leading,
+                                endPoint:
+                                    .trailing
+                            ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 18,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 18,
+                                style: .continuous
+                            )
+                            .stroke(
+                                ATHLTHTheme
+                                    .accentDeep
+                                    .opacity(0.10),
+                                lineWidth: 0.8
                             )
                         }
                     }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(
-                            systemName:
-                                store.isJoined(challenge.id)
-                                    ? "figure.run"
-                                    : "plus"
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        Task {
+                            await store.join(
+                                challenge
+                            )
+                            await store
+                                .syncCompletionState(
+                                    workouts:
+                                        health
+                                            .workouts
+                                )
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(
+                                systemName: "plus"
+                            )
+
+                            Text("Join Challenge")
+
+                            Spacer()
+
+                            Image(
+                                systemName:
+                                    "arrow.right"
+                            )
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .padding(
+                            .horizontal,
+                            18
                         )
-
-                        Text(
-                            store.isJoined(challenge.id)
-                                ? "Continue Challenge"
-                                : "Join Challenge"
+                        .frame(
+                            maxWidth: .infinity
                         )
-
-                        Spacer()
-
-                        Image(systemName: "arrow.right")
+                        .frame(height: 56)
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 18,
+                                    style:
+                                        .continuous
+                                )
+                        )
                     }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                ATHLTHTheme.accentDeep,
-                                ATHLTHTheme.accentDeep.opacity(0.86)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 HStack(spacing: 10) {
                     Button {
@@ -2111,7 +2221,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
                         .background(
-                            Color.white.opacity(0.78),
+                            ATHLTHTheme.accent.opacity(0.09),
                             in: RoundedRectangle(
                                 cornerRadius: 15,
                                 style: .continuous
@@ -2147,7 +2257,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
                         .background(
-                            Color.white.opacity(0.78),
+                            ATHLTHTheme.champagneSoft.opacity(0.48),
                             in: RoundedRectangle(
                                 cornerRadius: 15,
                                 style: .continuous
