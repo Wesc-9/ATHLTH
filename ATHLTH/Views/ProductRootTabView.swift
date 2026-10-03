@@ -1436,8 +1436,8 @@ struct ATHLTHHomeView: View {
                         .green
                     )
                     .frame(
-                        width: 40,
-                        height: 40
+                        width: 34,
+                        height: 34
                     )
                     .background(
                         Color.green
@@ -9471,48 +9471,6 @@ struct ATHLTHProfileView: View {
             for: .navigationBar
         )
         .toolbar {
-            ToolbarItem(
-                placement: .topBarLeading
-            ) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(
-                        systemName:
-                            "chevron.left"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 40,
-                        height: 40
-                    )
-                    .background(
-                        Color.black.opacity(0.24),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(0.28),
-                                lineWidth: 0.8
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Back",
-                        norwegian: "Tilbake"
-                    )
-                )
-            }
-
             ToolbarItemGroup(
                 placement: .topBarTrailing
             ) {
@@ -9530,8 +9488,8 @@ struct ATHLTHProfileView: View {
                     )
                     .foregroundStyle(.white)
                     .frame(
-                        width: 40,
-                        height: 40
+                        width: 34,
+                        height: 34
                     )
                     .background(
                         Color.black.opacity(0.24),
@@ -9568,8 +9526,8 @@ struct ATHLTHProfileView: View {
                     )
                     .foregroundStyle(.white)
                     .frame(
-                        width: 40,
-                        height: 40
+                        width: 34,
+                        height: 34
                     )
                     .background(
                         Color.black.opacity(0.24),
@@ -9750,7 +9708,7 @@ struct ATHLTHProfileView: View {
                     heroStatRow
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 14)
+                .padding(.bottom, 28)
                 .shadow(
                     color:
                         Color.black.opacity(0.28),
@@ -9759,7 +9717,7 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .frame(height: 248)
+        .frame(height: 264)
         .clipped()
     }
 
