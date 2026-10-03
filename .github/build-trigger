@@ -535,3 +535,4 @@ Validate distance-first walking Always-On display 2026-10-03
 Validate strength set-first Always-On display 2026-10-03
 Validate weekly challenge detail polish 2026-10-03
 1.5.9 release hardening validation
+validate-after-compile-fixes-build-trigger
