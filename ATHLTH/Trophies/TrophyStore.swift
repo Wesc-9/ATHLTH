@@ -81,12 +81,14 @@ final class TrophyStore: ObservableObject {
         trophies
             .filter(\.isUnlocked)
             .sorted {
-                if $0.isPrestigeTrophy != $1.isPrestigeTrophy {
-                    return $0.isPrestigeTrophy
-                }
-
+                // The shelf picker is intentionally one combined collection:
+                // Signature → Epic → Rare → Core, regardless of award class.
                 if $0.displayRarity != $1.displayRarity {
                     return $0.displayRarity > $1.displayRarity
+                }
+
+                if $0.isPrestigeTrophy != $1.isPrestigeTrophy {
+                    return $0.isPrestigeTrophy
                 }
 
                 return ($0.unlockedAt ?? .distantPast) >
@@ -276,7 +278,7 @@ final class TrophyStore: ObservableObject {
                     ?? participant.displayName.lowercased()
                 uniqueInvitees.insert(identity)
 
-                for threshold in [1, 5, 10]
+                for threshold in [1, 5, 10, 25, 50]
                 where inviteThresholdDates[threshold] == nil &&
                         uniqueInvitees.count >= threshold {
                     inviteThresholdDates[threshold] = challenge.createdAt
@@ -333,6 +335,34 @@ final class TrophyStore: ObservableObject {
                 value = Double(healthSnapshot?.longestWorkoutStreakDays ?? 0)
                 evidence = { threshold in
                     healthSnapshot?.workoutStreakReachedAt[Int(threshold)]
+                }
+
+            case TrophyCatalog.workoutDayDensity.id:
+                value =
+                    Double(
+                        healthSnapshot?
+                            .maxWorkoutsInDay ??
+                        0
+                    )
+                evidence = { threshold in
+                    healthSnapshot?
+                        .workoutDayDensityReachedAt?[
+                            Int(threshold)
+                        ]
+                }
+
+            case TrophyCatalog.workoutWeekDensity.id:
+                value =
+                    Double(
+                        healthSnapshot?
+                            .maxWorkoutsInWeek ??
+                        0
+                    )
+                evidence = { threshold in
+                    healthSnapshot?
+                        .workoutWeekDensityReachedAt?[
+                            Int(threshold)
+                        ]
                 }
 
             case TrophyCatalog.strengthSessions.id:
@@ -515,6 +545,101 @@ final class TrophyStore: ObservableObject {
 
             resolved.append(
                 signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .running250SessionsID,
+                    title: "Run Discipline 250",
+                    subtitle: "Complete 250 recorded running workouts.",
+                    icon: "figure.run.circle.fill",
+                    source: .appleHealth,
+                    category: .endurance,
+                    rarity: .epic,
+                    unlockedAt:
+                        healthSnapshot
+                            .runningWorkoutCountReachedAt?[
+                                250
+                            ]
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .running500SessionsID,
+                    title: "Run Discipline 500",
+                    subtitle: "Complete 500 recorded running workouts.",
+                    icon: "figure.run.circle.fill",
+                    source: .appleHealth,
+                    category: .endurance,
+                    rarity: .signature,
+                    unlockedAt:
+                        healthSnapshot
+                            .runningWorkoutCountReachedAt?[
+                                500
+                            ]
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .running1000KID,
+                    title: "Thousand Kilometre Club",
+                    subtitle: "Accumulate 1,000 kilometres of recorded running.",
+                    icon: "road.lanes",
+                    source: .appleHealth,
+                    category: .endurance,
+                    rarity: .epic,
+                    unlockedAt:
+                        healthSnapshot
+                            .runningDistanceReachedAt[
+                                1_000_000
+                            ]
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .running5000KID,
+                    title: "Five Thousand",
+                    subtitle: "Accumulate 5,000 kilometres of recorded running.",
+                    icon: "map.fill",
+                    source: .appleHealth,
+                    category: .endurance,
+                    rarity: .signature,
+                    unlockedAt:
+                        healthSnapshot
+                            .runningDistanceReachedAt[
+                                5_000_000
+                            ]
+                )
+            )
+
+            resolved.append(
+                signature(
+                    id:
+                        PrestigeTrophyCatalog
+                            .running10000KID,
+                    title: "Ten Thousand",
+                    subtitle: "Accumulate 10,000 kilometres of recorded running.",
+                    icon: "globe.europe.africa.fill",
+                    source: .appleHealth,
+                    category: .endurance,
+                    rarity: .signature,
+                    unlockedAt:
+                        healthSnapshot
+                            .runningDistanceReachedAt[
+                                10_000_000
+                            ]
+                )
+            )
+
+            resolved.append(
+                signature(
                     id: "signature.walk-5k",
                     title: "Five K on Foot",
                     subtitle: "A single recorded walking workout reaching 5 kilometres.",
@@ -554,6 +679,196 @@ final class TrophyStore: ObservableObject {
                 category: .strength,
                 rarity: .core,
                 unlockedAt: strengthSnapshot.firstWeightedSetDate
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength100SessionsID,
+                title: "Iron Century",
+                subtitle: "Complete 100 strength sessions recorded in ATHLTH.",
+                icon: "dumbbell.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .epic,
+                unlockedAt:
+                    strengthSnapshot
+                        .workoutCountReachedAt[
+                            100
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength250SessionsID,
+                title: "Quarter Thousand",
+                subtitle: "Complete 250 strength sessions recorded in ATHLTH.",
+                icon: "dumbbell.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .workoutCountReachedAt[
+                            250
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength500SessionsID,
+                title: "Five Hundred Strong",
+                subtitle: "Complete 500 strength sessions recorded in ATHLTH.",
+                icon: "figure.strengthtraining.traditional",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .workoutCountReachedAt[
+                            500
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength100KVolumeID,
+                title: "100K Under Load",
+                subtitle: "Accumulate 100,000 kg of completed working-set volume.",
+                icon: "scalemass.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .epic,
+                unlockedAt:
+                    strengthSnapshot
+                        .volumeReachedAt[
+                            100_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength500KVolumeID,
+                title: "Half-Million Iron",
+                subtitle: "Accumulate 500,000 kg of completed working-set volume.",
+                icon: "scalemass.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .volumeReachedAt[
+                            500_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strengthMillionVolumeID,
+                title: "Million Kilogram Club",
+                subtitle: "Accumulate 1,000,000 kg of completed working-set volume.",
+                icon: "crown.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .volumeReachedAt[
+                            1_000_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength10KSessionVolumeID,
+                title: "Ten-Tonne Session",
+                subtitle: "Move at least 10,000 kg of working-set volume in one strength session.",
+                icon: "bolt.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .epic,
+                unlockedAt:
+                    strengthSnapshot
+                        .workoutVolumeReachedAt[
+                            10_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength20KSessionVolumeID,
+                title: "Twenty-Tonne Session",
+                subtitle: "Move at least 20,000 kg of working-set volume in one strength session.",
+                icon: "bolt.circle.fill",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .workoutVolumeReachedAt[
+                            20_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength1000SetsID,
+                title: "Thousand Working Sets",
+                subtitle: "Complete 1,000 working sets in ATHLTH strength sessions.",
+                icon: "list.number",
+                source: .athlth,
+                category: .strength,
+                rarity: .epic,
+                unlockedAt:
+                    strengthSnapshot
+                        .workingSetCountReachedAt[
+                            1_000
+                        ]
+            )
+        )
+
+        resolved.append(
+            signature(
+                id:
+                    PrestigeTrophyCatalog
+                        .strength25000RepsID,
+                title: "Twenty-Five Thousand",
+                subtitle: "Complete 25,000 working repetitions across ATHLTH strength sessions.",
+                icon: "repeat",
+                source: .athlth,
+                category: .strength,
+                rarity: .signature,
+                unlockedAt:
+                    strengthSnapshot
+                        .workingRepetitionCountReachedAt[
+                            25_000
+                        ]
             )
         )
 
@@ -1025,9 +1340,7 @@ final class TrophyStore: ObservableObject {
         rarity: TrophyRarity = .signature,
         unlockedAt: Date?
     ) -> TrophyProgressItem {
-        if let unlockedAt,
-           !PrestigeTrophyCatalog
-                .isPrestigeTrophy(id) {
+        if let unlockedAt {
             registerUnlock(
                 stageKey:
                     "\(id).unlocked",
