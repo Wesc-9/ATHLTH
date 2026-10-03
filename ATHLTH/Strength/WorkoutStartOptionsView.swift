@@ -797,10 +797,16 @@ struct WorkoutStartOptionsView: View {
 
     private var trackingModeButton: some View {
         Button {
-            trackingMode =
-                trackingMode == .advanced
-                    ? .simple
-                    : .advanced
+            let nextMode:
+                StrengthTrackingMode =
+                    trackingMode == .advanced
+                        ? .simple
+                        : .advanced
+            trackingMode = nextMode
+            settings.recordAdvancedSetup(
+                nextMode == .advanced,
+                for: .strength
+            )
         } label: {
             HStack(spacing: 6) {
                 Image(
