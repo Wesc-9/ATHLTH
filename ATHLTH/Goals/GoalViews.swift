@@ -96,7 +96,9 @@ struct GoalSummaryCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             GoalCoverView(goal: goal)
+                .frame(maxWidth: .infinity)
                 .frame(height: prominent ? 220 : 145)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
 
             LinearGradient(
@@ -5330,6 +5332,7 @@ private struct GoalPreviewCard: View {
                     ATHLTHTheme.accentSoft
                 }
             }
+            .frame(maxWidth: .infinity)
             .frame(height: 158)
             .clipped()
 
@@ -5411,6 +5414,7 @@ private struct GoalPreviewCard: View {
             .foregroundStyle(.white)
             .padding(14)
         }
+        .frame(maxWidth: .infinity)
         .frame(height: 158)
         .clipShape(
             RoundedRectangle(

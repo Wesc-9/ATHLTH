@@ -708,6 +708,7 @@ struct WorkoutStartOptionsView: View {
             )
             .resizable()
             .scaledToFill()
+            .frame(maxWidth: .infinity)
             .frame(height: 118)
             .clipped()
 
