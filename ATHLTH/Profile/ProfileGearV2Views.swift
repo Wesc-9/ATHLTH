@@ -203,8 +203,18 @@ struct WorkoutGearSelectionCard: View {
 
                     Text(
                         activity == .running
-                            ? "Choose your running shoes and anything else you used."
-                            : "Add the equipment used for this workout."
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Choose your running shoes and anything else you used.",
+                                norwegian:
+                                    "Velg løpeskoene dine og annet utstyr du brukte."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Add the equipment used for this workout.",
+                                norwegian:
+                                    "Velg utstyret du brukte i denne økten."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -230,11 +240,21 @@ struct WorkoutGearSelectionCard: View {
                             .foregroundStyle(ATHLTHTheme.accent)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Add your first gear")
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Add your first gear",
+                                    norwegian: "Legg til ditt første utstyr"
+                                )
+                            )
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.primary)
                             Text(
-                                "Shoes and other equipment can be linked to workouts."
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Shoes and other equipment can be linked to workouts.",
+                                    norwegian:
+                                        "Sko og annet utstyr kan knyttes til treningsøktene dine."
+                                )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -253,8 +273,17 @@ struct WorkoutGearSelectionCard: View {
                 VStack(spacing: 9) {
                     if !shoes.isEmpty {
                         gearSectionLabel(
-                            "RUNNING SHOES",
-                            detail: "One pair per workout"
+                            ATHLTHLocalization.choose(
+                                english: "RUNNING SHOES",
+                                norwegian: "LØPESKO"
+                            ),
+                            detail:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "One pair per workout",
+                                    norwegian:
+                                        "Ett par per økt"
+                                )
                         )
 
                         ForEach(shoes) { item in
@@ -269,8 +298,17 @@ struct WorkoutGearSelectionCard: View {
                         }
 
                         gearSectionLabel(
-                            "OTHER GEAR",
-                            detail: "Select any that you used"
+                            ATHLTHLocalization.choose(
+                                english: "OTHER GEAR",
+                                norwegian: "ANNET UTSTYR"
+                            ),
+                            detail:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Select any that you used",
+                                    norwegian:
+                                        "Velg det du brukte"
+                                )
                         )
 
                         ForEach(otherGear) { item in
@@ -327,7 +365,12 @@ struct WorkoutGearSelectionCard: View {
                             .lineLimit(1)
 
                         if detail?.isDefaultForRunning == true {
-                            Text("DEFAULT")
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "DEFAULT",
+                                    norwegian: "STANDARD"
+                                )
+                            )
                                 .font(
                                     .system(
                                         size: 8,
