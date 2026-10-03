@@ -541,109 +541,51 @@ struct PerformanceStatsView: View {
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                passportHero
-                featuredRecordsCard
-
-                if stats != nil ||
-                    !resolvedHealthRecords.isEmpty ||
-                    !strengthWorkout.workoutHistory.isEmpty ||
-                    health.hasTrainingHealthData {
-                    LazyVGrid(
-                        columns: gridColumns,
-                        alignment: .leading,
-                        spacing: 12
-                    ) {
-                        metricSection(
-                            title: text("Running PRs", "Løpe-PRer"),
-                            subtitle: text(
-                                "GPS-verified personal records",
-                                "GPS-verifiserte personlige rekorder"
-                            ),
-                            icon: "figure.run",
-                            accent: .blue,
-                            items: runningItems
-                        )
-
-                        metricSection(
-                            title: text("Training volume", "Treningsvolum"),
-                            subtitle: text(
-                                "Your complete training history",
-                                "Hele treningshistorikken din"
-                            ),
-                            icon: "chart.bar.fill",
-                            accent: ATHLTHTheme.accentDeep,
-                            items: volumeItems
-                        )
-
-                        metricSection(
-                            title: text("Strength", "Styrke"),
-                            subtitle: text(
-                                "Records tracked in ATHLTH",
-                                "Rekorder sporet i ATHLTH"
-                            ),
-                            icon: "dumbbell.fill",
-                            accent: ATHLTHTheme.premiumGold,
-                            items: strengthItems
-                        )
-
-                        metricSection(
-                            title: text(
-                                "Health & recovery",
-                                "Helse og restitusjon"
-                            ),
-                            subtitle: text(
-                                "Private Health signals",
-                                "Private helsesignaler"
-                            ),
-                            icon: "heart.fill",
-                            accent: .red,
-                            items: recoveryItems
-                        )
-
-                        metricSection(
-                            title: text(
-                                "More records",
-                                "Flere prestasjoner"
-                            ),
-                            subtitle: text(
-                                "Other activities and peaks",
-                                "Andre aktiviteter og høydepunkter"
-                            ),
-                            icon: "sparkles",
-                            accent: .purple,
-                            items: otherItems
-                        )
-
-                        verificationCard
-                    }
-                } else {
-                    ContentUnavailableView(
-                        text("No performance data", "Ingen prestasjonsdata"),
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        description: Text(
-                            text(
-                                "Connect Apple Health or complete workouts in ATHLTH to start building your Performance Passport.",
-                                "Koble til Apple Health eller fullfør økter i ATHLTH for å begynne å bygge Prestasjonspasset ditt."
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(spacing: 16) {
+                    editorialHero {
+                        withAnimation(
+                            .easeInOut(duration: 0.35)
+                        ) {
+                            reader.scrollTo(
+                                "performance-volume",
+                                anchor: .center
                             )
-                        )
-                    )
-                    .padding(.top, 44)
+                        }
+                    }
+
+                    editorialFeaturedRecords
+                    editorialSummaryStrip
+                    editorialRunningPRCard
+
+                    HStack(
+                        alignment: .top,
+                        spacing: 10
+                    ) {
+                        editorialTrainingVolumeCard
+                            .id("performance-volume")
+
+                        editorialMilestonesCard
+                    }
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 120)
+                .frame(maxWidth: 900)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 8)
-            .padding(.bottom, 120)
-            .frame(maxWidth: 900)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.hidden)
         }
         .background(
             Color(.systemGroupedBackground)
                 .ignoresSafeArea()
         )
         .navigationTitle(
-            text("Performance Statistics", "Prestasjonsstatistikk")
+            text(
+                "Performance Statistics",
+                "Prestasjonsstatistikk"
+            )
         )
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -657,6 +599,1737 @@ struct PerformanceStatsView: View {
             fetchedHealthRecords =
                 (try? await health.personalRecords()) ?? []
         }
+    }
+
+    private func editorialHero(
+        onOpenTrend: @escaping () -> Void
+    ) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Image("GoalRunning")
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .scaledToFill()
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .clipped()
+                    .accessibilityHidden(true)
+
+                LinearGradient(
+                    stops: [
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.76),
+                            location: 0
+                        ),
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.48),
+                            location: 0.48
+                        ),
+                        .init(
+                            color:
+                                Color.black
+                                    .opacity(0.05),
+                            location: 1
+                        )
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black.opacity(0.20)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Path { path in
+                    let w = proxy.size.width
+                    let h = proxy.size.height
+                    path.move(
+                        to: CGPoint(
+                            x: 0,
+                            y: h * 0.91
+                        )
+                    )
+                    path.addCurve(
+                        to: CGPoint(
+                            x: w,
+                            y: h * 0.55
+                        ),
+                        control1: CGPoint(
+                            x: w * 0.35,
+                            y: h * 0.96
+                        ),
+                        control2: CGPoint(
+                            x: w * 0.70,
+                            y: h * 0.60
+                        )
+                    )
+                }
+                .stroke(
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.72),
+                    style:
+                        StrokeStyle(
+                            lineWidth: 1.4,
+                            lineCap: .round
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    Text("ATHLTH")
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .black
+                            )
+                        )
+                        .tracking(4.2)
+                        .foregroundStyle(
+                            .white.opacity(0.88)
+                        )
+
+                    Text(
+                        text(
+                            "Performance Passport",
+                            "Prestasjonspass"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 31,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+
+                    Text(
+                        text(
+                            "Your personal performance, built from your training history.",
+                            "Dine personlige prestasjoner, bygget fra treningshistorikken din."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .white.opacity(0.88)
+                    )
+                    .lineLimit(2)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                    .frame(
+                        maxWidth:
+                            proxy.size.width * 0.63,
+                        alignment: .leading
+                    )
+
+                    Button(action: onOpenTrend) {
+                        HStack(spacing: 8) {
+                            Text(
+                                text(
+                                    "View your progress",
+                                    "Se din utvikling"
+                                )
+                            )
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                        }
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .padding(
+                            .horizontal,
+                            16
+                        )
+                        .frame(height: 42)
+                        .background(
+                            Color.white
+                                .opacity(0.92),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
+                }
+                .padding(20)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        text(
+                            "BETTER HABITS",
+                            "BEDRE VANER"
+                        )
+                    )
+
+                    Text(
+                        text(
+                            "GREATER POSSIBILITIES",
+                            "STØRRE MULIGHETER"
+                        )
+                    )
+                }
+                .font(
+                    .system(
+                        size: 8,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.5)
+                .foregroundStyle(
+                    .white.opacity(0.80)
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topTrailing
+                )
+                .padding(18)
+            }
+        }
+        .frame(height: 245)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.12),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.12),
+            radius: 18,
+            y: 8
+        )
+    }
+
+    private var editorialFeaturedRecords:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Text(
+                    text(
+                        "Featured records",
+                        "Utvalgte rekorder"
+                    )
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+
+                Spacer()
+
+                NavigationLink {
+                    ProfileRecordShowcasePickerView(
+                        stats: stats,
+                        healthRecords:
+                            resolvedHealthRecords
+                    )
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(
+                            text(
+                                "Edit",
+                                "Rediger"
+                            )
+                        )
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+            }
+            .padding(.horizontal, 4)
+
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .flexible(),
+                        spacing: 10
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 10
+                    )
+                ],
+                spacing: 10
+            ) {
+                ForEach(
+                    0..<ProfileFeaturedRecordKind
+                        .showcaseLimit,
+                    id: \.self
+                ) { index in
+                    if featuredRecordKinds.indices
+                        .contains(index) {
+                        editorialFeaturedTile(
+                            featuredRecordKinds[
+                                index
+                            ],
+                            index: index
+                        )
+                    } else {
+                        editorialEmptyFeaturedTile(
+                            index: index
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func editorialFeaturedTile(
+        _ kind: ProfileFeaturedRecordKind,
+        index: Int
+    ) -> some View {
+        let record =
+            record(kind.healthKind)
+
+        return ZStack(
+            alignment: .topLeading
+        ) {
+            Image(
+                editorialFeaturedAsset(
+                    index
+                )
+            )
+            .resizable()
+            .scaledToFill()
+            .frame(height: 122)
+            .clipped()
+            .opacity(0.34)
+
+            LinearGradient(
+                colors: [
+                    editorialFeaturedTint(
+                        index
+                    )
+                    .opacity(0.84),
+                    Color.white.opacity(0.76)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                HStack(
+                    alignment: .top
+                ) {
+                    Image(
+                        systemName:
+                            kind.icon
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        kind.tint
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.84),
+                        in: Circle()
+                    )
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                            .opacity(0.75)
+                    )
+                }
+
+                Text(kind.title)
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(2)
+
+                HStack(
+                    alignment:
+                        .firstTextBaseline
+                ) {
+                    Text(
+                        kind.displayValue(
+                            healthRecords:
+                                resolvedHealthRecords,
+                            stats: stats
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 23,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.66)
+
+                    Spacer()
+                }
+
+                Text(
+                    record.map {
+                        editorialRecordDetail(
+                            $0
+                        )
+                    } ??
+                    kind.shortTitle
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+            }
+            .padding(12)
+        }
+        .frame(height: 122)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.58),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func editorialEmptyFeaturedTile(
+        index: Int
+    ) -> some View {
+        NavigationLink {
+            ProfileRecordShowcasePickerView(
+                stats: stats,
+                healthRecords:
+                    resolvedHealthRecords
+            )
+        } label: {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        editorialFeaturedTint(
+                            index
+                        )
+                        .opacity(0.62),
+                        Color.white.opacity(
+                            0.88
+                        )
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+
+                VStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            "plus.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+
+                    Text(
+                        text(
+                            "Choose record",
+                            "Velg rekord"
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+            }
+            .frame(height: 122)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func editorialFeaturedAsset(
+        _ index: Int
+    ) -> String {
+        [
+            "GoalMountain",
+            "GoalRunning",
+            "GoalProgress",
+            "GoalWalking"
+        ][
+            min(
+                max(index, 0),
+                3
+            )
+        ]
+    }
+
+    private func editorialFeaturedTint(
+        _ index: Int
+    ) -> Color {
+        [
+            Color.green,
+            Color.orange,
+            Color.indigo,
+            Color.red
+        ][
+            min(
+                max(index, 0),
+                3
+            )
+        ]
+        .opacity(0.11)
+    }
+
+    private func editorialRecordDetail(
+        _ record: HealthPersonalRecord
+    ) -> String {
+        if let distance =
+                record.kind
+                    .targetDistanceMeters,
+           distance > 0 {
+            let pace =
+                record.value /
+                (distance / 1_000)
+
+            return formatPace(pace)
+        }
+
+        return formatDate(record.date)
+    }
+
+    private var editorialSummaryStrip:
+        some View {
+        HStack(spacing: 0) {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    text(
+                        "Summary",
+                        "Oppsummering"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+
+                Text(
+                    text(
+                        "Your training in numbers.",
+                        "Din trening i tall."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+
+            editorialSummaryDivider
+
+            editorialSummaryMetric(
+                icon:
+                    "figure.run",
+                value:
+                    stats?
+                        .totalWorkoutCount
+                        .formatted() ??
+                    "—",
+                label:
+                    text(
+                        "Workouts",
+                        "Økter"
+                    )
+            )
+
+            editorialSummaryDivider
+
+            editorialSummaryMetric(
+                icon:
+                    "point.topleft.down.to.point.bottomright.curvepath",
+                value:
+                    formatDistance(
+                        stats?
+                            .totalRunningDistanceMeters
+                    ),
+                label:
+                    text(
+                        "Total distance",
+                        "Total distanse"
+                    )
+            )
+
+            editorialSummaryDivider
+
+            editorialSummaryMetric(
+                icon: "clock",
+                value:
+                    stats.map {
+                        formatLongDuration(
+                            $0.totalTrainingDuration
+                        )
+                    } ?? "—",
+                label:
+                    text(
+                        "Total duration",
+                        "Total varighet"
+                    )
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(
+            Color.white.opacity(0.84),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var editorialSummaryDivider:
+        some View {
+        Rectangle()
+            .fill(
+                ATHLTHTheme
+                    .divider
+                    .opacity(0.72)
+            )
+            .frame(
+                width: 0.7,
+                height: 52
+            )
+            .padding(.horizontal, 5)
+    }
+
+    private func editorialSummaryMetric(
+        icon: String,
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
+                    )
+                )
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+
+            Text(label)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .foregroundStyle(
+            ATHLTHTheme.primaryText
+        )
+        .frame(
+            maxWidth: .infinity
+        )
+    }
+
+    private var editorialRunningPRCard:
+        some View {
+        ZStack {
+            Image("GoalSprint")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 224)
+                .clipped()
+                .accessibilityHidden(true)
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.88),
+                    Color.black.opacity(0.58)
+                ],
+                startPoint:
+                    .bottomLeading,
+                endPoint:
+                    .topTrailing
+            )
+
+            VStack(spacing: 13) {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "figure.run"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(.blue)
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.12),
+                        in: Circle()
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            text(
+                                "Running PRs",
+                                "Løpe-PRer"
+                            )
+                        )
+                        .font(
+                            .headline
+                                .weight(.bold)
+                        )
+
+                        Text(
+                            text(
+                                "GPS-verified personal records.",
+                                "GPS-verifiserte personlige rekorder."
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .white.opacity(
+                                0.72
+                            )
+                        )
+                    }
+
+                    Spacer()
+                }
+                .foregroundStyle(.white)
+
+                HStack(spacing: 0) {
+                    ForEach(
+                        Array(
+                            runningItems
+                                .prefix(4)
+                                .enumerated()
+                        ),
+                        id: \.offset
+                    ) {
+                        index,
+                        item in
+                        editorialPRCell(
+                            item,
+                            index: index
+                        )
+
+                        if index < 3 {
+                            Rectangle()
+                                .fill(
+                                    Color.white
+                                        .opacity(
+                                            0.18
+                                        )
+                                )
+                                .frame(
+                                    width: 0.7,
+                                    height: 82
+                                )
+                        }
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    8
+                )
+                .padding(
+                    .vertical,
+                    11
+                )
+                .background(
+                    Color.black.opacity(
+                        0.26
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white
+                            .opacity(0.14),
+                        lineWidth: 0.8
+                    )
+                }
+            }
+            .padding(16)
+        }
+        .frame(height: 224)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .shadow(
+            color:
+                Color.black.opacity(0.12),
+            radius: 16,
+            y: 8
+        )
+    }
+
+    private func editorialPRCell(
+        _ item: PerformanceMetricItem,
+        index: Int
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 4
+        ) {
+            Text(
+                [
+                    "1 km",
+                    "1 mile",
+                    "5 km",
+                    "10 km"
+                ][
+                    min(
+                        max(index, 0),
+                        3
+                    )
+                ]
+            )
+            .font(
+                .system(
+                    size: 10,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                .white.opacity(0.80)
+            )
+
+            Text(item.value)
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.60)
+
+            Text(
+                item.detail
+                    .components(
+                        separatedBy:
+                            " · "
+                    )
+                    .first ??
+                item.detail
+            )
+            .font(
+                .system(
+                    size: 9,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                .white.opacity(0.68)
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.60)
+
+            Capsule()
+                .fill(item.tint)
+                .frame(
+                    height: 3
+                )
+                .padding(.top, 4)
+        }
+        .padding(.horizontal, 7)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
+
+    private var editorialTrainingVolumeCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        "chart.bar.fill"
+                )
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text(
+                        text(
+                            "Training volume",
+                            "Treningsvolum"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        text(
+                            "Running history",
+                            "Løpehistorikken din"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+            }
+
+            HStack(spacing: 0) {
+                ForEach(
+                    [
+                        text(
+                            "Week",
+                            "Uke"
+                        ),
+                        text(
+                            "Month",
+                            "Måned"
+                        ),
+                        text(
+                            "Year",
+                            "År"
+                        ),
+                        text(
+                            "Total",
+                            "Totalt"
+                        )
+                    ],
+                    id: \.self
+                ) { title in
+                    Text(title)
+                        .font(
+                            .system(
+                                size: 8.5,
+                                weight:
+                                    title ==
+                                    text(
+                                        "Year",
+                                        "År"
+                                    )
+                                    ? .bold
+                                    : .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 25)
+                        .background(
+                            title ==
+                                text(
+                                    "Year",
+                                    "År"
+                                )
+                                ? Color.white
+                                    .opacity(
+                                        0.94
+                                    )
+                                : Color
+                                    .clear,
+                            in: Capsule()
+                        )
+                }
+            }
+            .padding(3)
+            .background(
+                Color.black.opacity(
+                    0.035
+                ),
+                in: Capsule()
+            )
+
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                Text(
+                    formatDistance(
+                        currentYearRunningDistanceMeters
+                    )
+                )
+                .font(
+                    .system(
+                        size: 23,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+
+                Spacer()
+
+                if let change =
+                        yearOverYearRunningChange {
+                    HStack(spacing: 3) {
+                        Image(
+                            systemName:
+                                change >= 0
+                                    ? "arrow.up.right"
+                                    : "arrow.down.right"
+                        )
+
+                        Text(
+                            String(
+                                format:
+                                    "%+.0f%%",
+                                change
+                            )
+                        )
+                    }
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        change >= 0
+                            ? Color.green
+                            : Color.orange
+                    )
+                }
+            }
+
+            Text(
+                text(
+                    "Total distance this year",
+                    "Total distanse i år"
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+
+            editorialMonthlyRunningChart
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .topLeading
+        )
+        .background(
+            Color.white.opacity(0.86),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var editorialMonthlyRunningChart:
+        some View {
+        let values =
+            currentYearRunningDistanceByMonth
+        let maximum =
+            max(
+                values.max() ?? 0,
+                1
+            )
+
+        return HStack(
+            alignment: .bottom,
+            spacing: 3
+        ) {
+            ForEach(
+                Array(
+                    values.enumerated()
+                ),
+                id: \.offset
+            ) {
+                index,
+                value in
+                VStack(spacing: 3) {
+                    Spacer(
+                        minLength: 0
+                    )
+
+                    RoundedRectangle(
+                        cornerRadius: 3,
+                        style: .continuous
+                    )
+                    .fill(
+                        index ==
+                            Calendar
+                                .current
+                                .component(
+                                    .month,
+                                    from: Date()
+                                ) - 1
+                            ? ATHLTHTheme
+                                .accentDeep
+                                .opacity(
+                                    0.72
+                                )
+                            : ATHLTHTheme
+                                .accentDeep
+                                .opacity(
+                                    0.18
+                                )
+                    )
+                    .frame(
+                        height:
+                            max(
+                                4,
+                                54 *
+                                (value /
+                                 maximum)
+                            )
+                    )
+
+                    Text(
+                        editorialMonthLetter(
+                            index
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 6.5,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 72)
+            }
+        }
+    }
+
+    private var currentYearRunningDistanceByMonth:
+        [Double] {
+        let calendar =
+            Calendar.current
+        let year =
+            calendar.component(
+                .year,
+                from: Date()
+            )
+
+        var values =
+            Array(
+                repeating: 0.0,
+                count: 12
+            )
+
+        for workout in
+            health.workouts
+            where workout.activity ==
+                .running &&
+                calendar.component(
+                    .year,
+                    from:
+                        workout.startDate
+                ) == year {
+            let month =
+                calendar.component(
+                    .month,
+                    from:
+                        workout.startDate
+                )
+
+            guard (1...12)
+                .contains(month)
+            else {
+                continue
+            }
+
+            values[month - 1] +=
+                max(
+                    workout
+                        .distanceMeters ??
+                    0,
+                    0
+                )
+        }
+
+        return values
+    }
+
+    private var currentYearRunningDistanceMeters:
+        Double {
+        currentYearRunningDistanceByMonth
+            .reduce(0, +)
+    }
+
+    private var previousYearToDateRunningDistanceMeters:
+        Double {
+        let calendar =
+            Calendar.current
+        let now = Date()
+        let currentYear =
+            calendar.component(
+                .year,
+                from: now
+            )
+        let currentMonth =
+            calendar.component(
+                .month,
+                from: now
+            )
+
+        return health.workouts
+            .filter { workout in
+                workout.activity ==
+                    .running &&
+                calendar.component(
+                    .year,
+                    from:
+                        workout.startDate
+                ) ==
+                    currentYear - 1 &&
+                calendar.component(
+                    .month,
+                    from:
+                        workout.startDate
+                ) <= currentMonth
+            }
+            .reduce(0.0) {
+                $0 +
+                max(
+                    $1.distanceMeters ??
+                    0,
+                    0
+                )
+            }
+    }
+
+    private var yearOverYearRunningChange:
+        Double? {
+        let previous =
+            previousYearToDateRunningDistanceMeters
+
+        guard previous > 0 else {
+            return nil
+        }
+
+        return (
+            (
+                currentYearRunningDistanceMeters -
+                previous
+            ) /
+            previous
+        ) * 100
+    }
+
+    private func editorialMonthLetter(
+        _ index: Int
+    ) -> String {
+        let symbols =
+            Calendar.current
+                .veryShortMonthSymbols
+
+        guard symbols.indices
+            .contains(index)
+        else {
+            return ""
+        }
+
+        return symbols[index]
+    }
+
+    private var editorialMilestonesCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        "flag.fill"
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .premiumGold
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text(
+                        text(
+                            "Latest milestones",
+                            "Siste milepæler"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        text(
+                            "Recent achievements",
+                            "Nylig oppnådde prestasjoner"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+            }
+
+            if let fiveK =
+                    record(.fastest5K) {
+                editorialMilestoneRow(
+                    icon: "trophy.fill",
+                    tint: .green,
+                    title:
+                        text(
+                            "Fastest 5K",
+                            "Raskeste 5 km"
+                        ),
+                    value:
+                        fiveK.formattedValue,
+                    detail:
+                        formatDate(
+                            fiveK.date
+                        )
+                )
+            } else if let fallback =
+                        stats?
+                            .fastestFiveKilometers {
+                editorialMilestoneRow(
+                    icon: "trophy.fill",
+                    tint: .green,
+                    title:
+                        text(
+                            "Fastest 5K",
+                            "Raskeste 5 km"
+                        ),
+                    value:
+                        fallback
+                            .formattedTime,
+                    detail:
+                        formatDate(
+                            fallback.date
+                        )
+                )
+            }
+
+            if let longest =
+                    record(.longestRun) {
+                editorialMilestoneRow(
+                    icon:
+                        "location.fill",
+                    tint: .purple,
+                    title:
+                        text(
+                            "Longest distance",
+                            "Lengste distanse"
+                        ),
+                    value:
+                        longest
+                            .formattedValue,
+                    detail:
+                        formatDate(
+                            longest.date
+                        )
+                )
+            } else if let meters =
+                        stats?
+                            .longestRunMeters,
+                      meters > 0 {
+                editorialMilestoneRow(
+                    icon:
+                        "location.fill",
+                    tint: .purple,
+                    title:
+                        text(
+                            "Longest distance",
+                            "Lengste distanse"
+                        ),
+                    value:
+                        formatDistance(
+                            meters
+                        ),
+                    detail:
+                        stats?
+                            .longestRunDate
+                            .map(
+                                formatDate
+                            ) ??
+                        "—"
+                )
+            }
+
+            editorialMilestoneRow(
+                icon:
+                    "chart.line.uptrend.xyaxis",
+                tint: .blue,
+                title:
+                    text(
+                        "Total workouts",
+                        "Totalt antall økter"
+                    ),
+                value:
+                    stats?
+                        .totalWorkoutCount
+                        .formatted() ??
+                    "—",
+                detail:
+                    text(
+                        "All recorded",
+                        "Totalt registrert"
+                    )
+            )
+        }
+        .padding(14)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .topLeading
+        )
+        .background(
+            Color.white.opacity(0.86),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func editorialMilestoneRow(
+        icon: String,
+        tint: Color,
+        title: String,
+        value: String,
+        detail: String
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 29,
+                    height: 29
+                )
+                .background(
+                    tint.opacity(
+                        0.10
+                    ),
+                    in: Circle()
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(title)
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(value)
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(
+                        .system(
+                            size: 8.5,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(
+                .system(
+                    size: 9,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+        }
+        .padding(.vertical, 4)
     }
 
     private var passportHero: some View {
