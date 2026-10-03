@@ -1658,6 +1658,34 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func uploadChallengeCover(
+        challengeID: UUID,
+        jpegData: Data
+    ) async -> String? {
+        do {
+            return try await service.uploadChallengeCover(
+                challengeID: challengeID,
+                jpegData: jpegData
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func removeChallengeCover(
+        challengeID: UUID
+    ) async {
+        do {
+            try await service.removeChallengeCover(
+                challengeID: challengeID
+            )
+        } catch {
+            // Best-effort cleanup only. A failed delete must not block
+            // challenge creation/retry.
+        }
+    }
+
     func publishStrengthWorkout(
         _ workout: StrengthWorkoutLog,
         visibility: ProfileVisibility = .friends
@@ -2051,17 +2079,34 @@ final class SocialStore: ObservableObject {
         _ challenge: ATHLTHChallenge
     ) async -> Bool {
         do {
+            var metadata: [String: String] = [
+                "challenge_id": challenge.id.uuidString,
+                "sport": challenge.sport.rawValue,
+                "starts_at": ISO8601DateFormatter()
+                    .string(from: challenge.rules.startsAt)
+            ]
+
+            if let summary = challenge.rules.summary,
+               !summary.isEmpty {
+                metadata["summary"] = summary
+            }
+
+            if let artwork = challenge.rules.coverArtworkName,
+               !artwork.isEmpty {
+                metadata["cover_artwork"] = artwork
+            }
+
+            if let imageURL = challenge.rules.coverImageURL,
+               !imageURL.isEmpty {
+                metadata["cover_image_url"] = imageURL
+            }
+
             try await service.publishActivity(
                 eventKey: "challenge-\(challenge.id.uuidString)-created",
                 kind: "challenge",
                 title: "Shared a challenge",
                 subtitle: challenge.title,
-                metadata: [
-                    "challenge_id": challenge.id.uuidString,
-                    "sport": challenge.sport.rawValue,
-                    "starts_at": ISO8601DateFormatter()
-                        .string(from: challenge.rules.startsAt)
-                ],
+                metadata: metadata,
                 visibility: challenge.visibility
             )
 
