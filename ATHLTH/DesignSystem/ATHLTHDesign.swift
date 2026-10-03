@@ -914,7 +914,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 }
 
 
-private struct ATHLTHPullDownFadeBridge:
+struct ATHLTHPullDownFadeBridge:
     View {
     var body: some View {
         LinearGradient(
