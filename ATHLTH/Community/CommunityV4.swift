@@ -181,8 +181,8 @@ struct ATHLTHCommunityV4View: View {
                     CommunityReferenceQuickActions()
 
                     referenceRecentActivitySection
-                    referenceDiscoverySection
                     referenceUpcomingSection
+                    referenceDiscoverySection
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 10)
