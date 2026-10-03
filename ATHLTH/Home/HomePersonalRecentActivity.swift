@@ -608,40 +608,59 @@ struct HomePersonalRecentActivitySection:
     ) -> some View {
         switch item.source {
         case .mine(let workout):
-            NavigationLink {
-                HomePersonalActivityDestination(
-                    workout: workout,
-                    strengthWorkout:
-                        strengthWorkout(
+            ZStack(alignment: .bottom) {
+                NavigationLink {
+                    HomePersonalActivityDestination(
+                        workout: workout,
+                        strengthWorkout:
+                            strengthWorkout(
+                                for: workout
+                            )
+                    )
+                } label: {
+                    HomePersonalHorizontalWorkoutCard(
+                        workout: workout,
+                        strengthWorkout:
+                            strengthWorkout(
+                                for: workout
+                            ),
+                        phoneWorkout:
+                            localPhoneWorkout(
+                                for: workout
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                HomeCompactActivityEngagementRow(
+                    item:
+                        socialFeedItem(
                             for: workout
                         )
                 )
-            } label: {
-                HomePersonalHorizontalWorkoutCard(
-                    workout: workout,
-                    strengthWorkout:
-                        strengthWorkout(
-                            for: workout
-                        ),
-                    phoneWorkout:
-                        localPhoneWorkout(
-                            for: workout
-                        )
-                )
+                .padding(.horizontal, 10)
+                .padding(.bottom, 7)
             }
-            .buttonStyle(.plain)
 
         case .following(let socialItem):
-            NavigationLink {
-                HomeFollowingWorkoutDetailView(
+            ZStack(alignment: .bottom) {
+                NavigationLink {
+                    HomeFollowingWorkoutDetailView(
+                        item: socialItem
+                    )
+                } label: {
+                    HomeFollowingHorizontalWorkoutCard(
+                        item: socialItem
+                    )
+                }
+                .buttonStyle(.plain)
+
+                HomeCompactActivityEngagementRow(
                     item: socialItem
                 )
-            } label: {
-                HomeFollowingHorizontalWorkoutCard(
-                    item: socialItem
-                )
+                .padding(.horizontal, 10)
+                .padding(.bottom, 7)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -822,6 +841,47 @@ struct HomePersonalRecentActivitySection:
                         .history
             )
     }
+
+    private func socialFeedItem(
+        for workout:
+            SocialPublishableWorkout
+    ) -> SocialFeedItem? {
+        let workoutID =
+            workout.id.uuidString
+                .lowercased()
+
+        return social.feed.first {
+            item in
+
+            guard item.activity.actorID ==
+                    social.currentUserID,
+                  item.activity.kind ==
+                    "workout"
+            else {
+                return false
+            }
+
+            let metadataWorkoutID =
+                item.activity
+                    .metadata?["workout_id"]?
+                    .lowercased()
+
+            if metadataWorkoutID ==
+                workoutID {
+                return true
+            }
+
+            let eventKey =
+                item.activity
+                    .eventKey?
+                    .lowercased()
+
+            return eventKey ==
+                    "workout-(workoutID)" ||
+                   eventKey ==
+                    "strength-workout-(workoutID)"
+        }
+    }
 }
 
 private struct HomePersonalHorizontalWorkoutCard:
@@ -922,6 +982,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                 alignment: .leading
             )
         }
+        .frame(height: 220, alignment: .top)
         .background(
             Color.white.opacity(0.96),
             in: RoundedRectangle(
@@ -1113,6 +1174,7 @@ private struct HomeFollowingHorizontalWorkoutCard:
                 alignment: .leading
             )
         }
+        .frame(height: 220, alignment: .top)
         .background(
             Color.white.opacity(0.96),
             in: RoundedRectangle(
@@ -1136,6 +1198,142 @@ private struct HomeFollowingHorizontalWorkoutCard:
                 lineWidth: 0.8
             )
         }
+    }
+}
+
+private struct HomeCompactActivityEngagementRow:
+    View {
+    @EnvironmentObject private var social:
+        SocialStore
+
+    let item: SocialFeedItem?
+
+    @State private var showingComments = false
+
+    private var currentItem:
+        SocialFeedItem? {
+        guard let item else {
+            return nil
+        }
+
+        return social.feed.first {
+            $0.id == item.id
+        } ?? item
+    }
+
+    private var isLiked: Bool {
+        guard let currentItem,
+              let userID =
+                social.currentUserID
+        else {
+            return false
+        }
+
+        return currentItem.reactions
+            .contains {
+                $0.userID == userID &&
+                $0.reaction == .heart
+            }
+    }
+
+    private var likeCount: Int {
+        currentItem?.reactions.count ?? 0
+    }
+
+    private var commentCount: Int {
+        currentItem?.comments.count ?? 0
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Button {
+                guard let currentItem else {
+                    return
+                }
+
+                Task {
+                    await social.setReaction(
+                        activityID:
+                            currentItem.id,
+                        reaction:
+                            isLiked
+                                ? nil
+                                : .heart
+                    )
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(
+                        systemName:
+                            isLiked
+                                ? "heart.fill"
+                                : "heart"
+                    )
+
+                    Text("\(likeCount)")
+                        .monospacedDigit()
+                }
+                .foregroundStyle(
+                    isLiked
+                        ? Color.red
+                        : ATHLTHTheme
+                            .mutedText
+                )
+            }
+            .disabled(currentItem == nil)
+
+            Button {
+                guard currentItem != nil else {
+                    return
+                }
+
+                showingComments = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(
+                        systemName:
+                            "bubble.left"
+                    )
+
+                    Text("\(commentCount)")
+                        .monospacedDigit()
+                }
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+            .disabled(currentItem == nil)
+
+            Spacer(minLength: 0)
+        }
+        .font(
+            .system(
+                size: 10,
+                weight: .semibold
+            )
+        )
+        .frame(height: 25)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(
+                    Color.black
+                        .opacity(0.055)
+                )
+                .frame(height: 0.5)
+        }
+        .sheet(
+            isPresented:
+                $showingComments
+        ) {
+            if let currentItem {
+                HomeActivityCommentsSheet(
+                    item: currentItem
+                )
+            }
+        }
+        .accessibilityElement(
+            children: .contain
+        )
     }
 }
 
