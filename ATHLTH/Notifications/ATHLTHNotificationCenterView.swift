@@ -80,12 +80,22 @@ struct ATHLTHNotificationCenterView: View {
                 accent: ATHLTHTheme.accent.opacity(0.22)
             )
         )
-        .navigationTitle("Notifications")
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Notifications",
+                norwegian: "Varsler"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if notifications.notificationCenterUnreadCount > 0 {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Read all") {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Read all",
+                            norwegian: "Marker alle som lest"
+                        )
+                    ) {
                         notifications.markAllRead()
                     }
                     .font(.caption.weight(.semibold))
@@ -200,8 +210,14 @@ struct ATHLTHNotificationCenterView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(
                             notifications.authorizationStatus == .denied
-                                ? "Device alerts are disabled"
-                                : "Stay in the loop"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Device alerts are disabled",
+                                    norwegian: "Varsler på enheten er deaktivert"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Stay in the loop",
+                                    norwegian: "Hold deg oppdatert"
+                                )
                         )
                         .font(.headline)
                         .foregroundStyle(
@@ -254,7 +270,12 @@ struct ATHLTHNotificationCenterView: View {
                     )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss alert prompt")
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Dismiss alert prompt",
+                    norwegian: "Lukk varselmeldingen"
+                )
+            )
         }
         .padding(16)
         .background {
@@ -301,8 +322,15 @@ struct ATHLTHNotificationCenterView: View {
                 title: "Apple Health",
                 subtitle:
                     health.pendingWorkoutImports.count == 1
-                        ? "1 workout waiting for you"
-                        : "\(health.pendingWorkoutImports.count) workouts waiting for you"
+                        ? ATHLTHLocalization.choose(
+                            english: "1 workout waiting for you",
+                            norwegian: "1 økt venter på deg"
+                        )
+                        : ATHLTHLocalization.format(
+                            english: "%d workouts waiting for you",
+                            norwegian: "%d økter venter på deg",
+                            health.pendingWorkoutImports.count
+                        )
             )
 
             VStack(spacing: 0) {
@@ -326,8 +354,14 @@ struct ATHLTHNotificationCenterView: View {
                 HStack(spacing: 10) {
                     Button(
                         selectedWorkoutImportIDs.isEmpty
-                            ? "Import all"
-                            : "Import selected"
+                            ? ATHLTHLocalization.choose(
+                                english: "Import all",
+                                norwegian: "Importer alle"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Import selected",
+                                norwegian: "Importer valgte"
+                            )
                     ) {
                         let ids =
                             selectedWorkoutImportIDs.isEmpty
@@ -345,13 +379,21 @@ struct ATHLTHNotificationCenterView: View {
 
                     Menu {
                         if !selectedWorkoutImportIDs.isEmpty {
-                            Button("Import All") {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english: "Import All",
+                                    norwegian: "Importer alle"
+                                )
+                            ) {
                                 health.importAllPendingWorkouts()
                                 selectedWorkoutImportIDs.removeAll()
                             }
 
                             Button(
-                                "Ignore Selected",
+                                ATHLTHLocalization.choose(
+                                    english: "Ignore Selected",
+                                    norwegian: "Ignorer valgte"
+                                ),
                                 role: .destructive
                             ) {
                                 let ids =
@@ -363,7 +405,10 @@ struct ATHLTHNotificationCenterView: View {
                         }
 
                         Button(
-                            "Ignore All",
+                            ATHLTHLocalization.choose(
+                                english: "Ignore All",
+                                norwegian: "Ignorer alle"
+                            ),
                             role: .destructive
                         ) {
                             health.ignoreAllPendingWorkouts()
@@ -371,7 +416,10 @@ struct ATHLTHNotificationCenterView: View {
                         }
                     } label: {
                         Label(
-                            "More",
+                            ATHLTHLocalization.choose(
+                                english: "More",
+                                norwegian: "Mer"
+                            ),
                             systemImage: "ellipsis"
                         )
                     }
@@ -403,7 +451,10 @@ struct ATHLTHNotificationCenterView: View {
     private var inboxSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader(
-                title: "Updates",
+                title: ATHLTHLocalization.choose(
+                    english: "Updates",
+                    norwegian: "Oppdateringer"
+                ),
                 subtitle: inboxSubtitle
             )
 
@@ -415,8 +466,14 @@ struct ATHLTHNotificationCenterView: View {
             } else {
                 if !actionableNotificationItems.isEmpty {
                     notificationGroup(
-                        title: "Needs attention",
-                        subtitle: "Requests and invites",
+                        title: ATHLTHLocalization.choose(
+                            english: "Needs attention",
+                            norwegian: "Krever oppmerksomhet"
+                        ),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Requests and invites",
+                            norwegian: "Forespørsler og invitasjoner"
+                        ),
                         items: actionableNotificationItems,
                         emphasized: true
                     )
@@ -424,7 +481,10 @@ struct ATHLTHNotificationCenterView: View {
 
                 if !todayNotificationItems.isEmpty {
                     notificationGroup(
-                        title: "Today",
+                        title: ATHLTHLocalization.choose(
+                            english: "Today",
+                            norwegian: "I dag"
+                        ),
                         subtitle: nil,
                         items: todayNotificationItems
                     )
@@ -432,7 +492,10 @@ struct ATHLTHNotificationCenterView: View {
 
                 if !earlierNotificationItems.isEmpty {
                     notificationGroup(
-                        title: "Earlier",
+                        title: ATHLTHLocalization.choose(
+                            english: "Earlier",
+                            norwegian: "Tidligere"
+                        ),
                         subtitle: nil,
                         items: earlierNotificationItems
                     )
@@ -468,7 +531,13 @@ struct ATHLTHNotificationCenterView: View {
 
                 let unread = items.filter(\.isUnread).count
                 if unread > 0 {
-                    Text("\(unread) new")
+                    Text(
+                        ATHLTHLocalization.format(
+                            english: "%d new",
+                            norwegian: "%d nye",
+                            unread
+                        )
+                    )
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(
                             emphasized
@@ -557,14 +626,24 @@ struct ATHLTHNotificationCenterView: View {
             }
 
             VStack(spacing: 6) {
-                Text("All quiet for now")
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "All quiet for now",
+                        norwegian: "Ingen nye varsler akkurat nå"
+                    )
+                )
                     .font(.title3.weight(.bold))
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
 
                 Text(
-                    "Important progress, personal records, challenges and social updates will appear here. Routine workout completions stay in your activity history."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Important progress, personal records, challenges and social updates will appear here. Routine workout completions stay in your activity history.",
+                        norwegian:
+                            "Viktig fremgang, personlige rekorder, challenges og sosiale oppdateringer vises her. Vanlige fullførte økter blir liggende i aktivitetshistorikken."
+                    )
                 )
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -626,7 +705,10 @@ struct ATHLTHNotificationCenterView: View {
                     .font(.headline)
 
                     Text(
-                        "New updates in this category will appear here."
+                        ATHLTHLocalization.choose(
+                            english: "New updates in this category will appear here.",
+                            norwegian: "Nye oppdateringer i denne kategorien vises her."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -687,8 +769,14 @@ struct ATHLTHNotificationCenterView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(
                 isSelected
-                    ? "Deselect workout"
-                    : "Select workout"
+                    ? ATHLTHLocalization.choose(
+                        english: "Deselect workout",
+                        norwegian: "Fjern valg av økt"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Select workout",
+                        norwegian: "Velg økt"
+                    )
             )
 
             Image(systemName: item.summary.activity.icon)
@@ -721,13 +809,21 @@ struct ATHLTHNotificationCenterView: View {
             Spacer(minLength: 4)
 
             Menu {
-                Button("Import") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Import",
+                        norwegian: "Importer"
+                    )
+                ) {
                     health.importPendingWorkout(item.id)
                     selectedWorkoutImportIDs.remove(item.id)
                 }
 
                 Button(
-                    "Ignore",
+                    ATHLTHLocalization.choose(
+                        english: "Ignore",
+                        norwegian: "Ignorer"
+                    ),
                     role: .destructive
                 ) {
                     health.ignorePendingWorkout(item.id)
@@ -864,12 +960,23 @@ struct ATHLTHNotificationCenterView: View {
 
         if unread > 0 {
             return unread == 1
-                ? "1 new"
-                : "\(unread) new"
+                ? ATHLTHLocalization.choose(
+                    english: "1 new",
+                    norwegian: "1 ny"
+                )
+                : ATHLTHLocalization.format(
+                    english: "%d new",
+                    norwegian: "%d nye",
+                    unread
+                )
         }
 
         if !filteredNotificationItems.isEmpty {
-            return "\(filteredNotificationItems.count) updates"
+            return ATHLTHLocalization.format(
+                english: "%d updates",
+                norwegian: "%d oppdateringer",
+                filteredNotificationItems.count
+            )
         }
 
         return nil
@@ -877,16 +984,32 @@ struct ATHLTHNotificationCenterView: View {
 
     private var permissionExplanation: String {
         if notifications.authorizationStatus == .denied {
-            return "Your ATHLTH inbox still works. Turn device alerts back on in iOS Settings when you want important progress, challenge and social updates outside the app."
+            return ATHLTHLocalization.choose(
+                english:
+                    "Your ATHLTH inbox still works. Turn device alerts back on in iOS Settings when you want important progress, challenge and social updates outside the app.",
+                norwegian:
+                    "ATHLTH-innboksen fungerer fortsatt. Slå på varsler igjen i iOS-innstillinger hvis du vil få viktige fremdrifts-, challenge- og sosiale oppdateringer utenfor appen."
+            )
         }
 
-        return "Get personal records, milestones, challenge updates and important social activity without needing to keep ATHLTH open."
+        return ATHLTHLocalization.choose(
+            english:
+                "Get personal records, milestones, challenge updates and important social activity without needing to keep ATHLTH open.",
+            norwegian:
+                "Få personlige rekorder, milepæler, challenge-oppdateringer og viktig sosial aktivitet uten å måtte ha ATHLTH åpen."
+        )
     }
 
     private var permissionActionTitle: String {
         notifications.authorizationStatus == .denied
-            ? "Open iOS Settings"
-            : "Enable device alerts"
+            ? ATHLTHLocalization.choose(
+                english: "Open iOS Settings",
+                norwegian: "Åpne iOS-innstillinger"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Enable device alerts",
+                norwegian: "Aktiver varsler"
+            )
     }
 
     @MainActor
@@ -932,7 +1055,12 @@ struct ATHLTHNotificationCenterView: View {
                             markOpened(item)
                         }
                     } label: {
-                        Text("Decline")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Decline",
+                                norwegian: "Avslå"
+                            )
+                        )
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(
                                 ATHLTHTheme.primaryText
@@ -952,7 +1080,12 @@ struct ATHLTHNotificationCenterView: View {
                             markOpened(item)
                         }
                     } label: {
-                        Text("Accept")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Accept",
+                                norwegian: "Godta"
+                            )
+                        )
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -990,7 +1123,10 @@ struct ATHLTHNotificationCenterView: View {
                         notifications.markRead(item.id)
                     } label: {
                         Label(
-                            "Mark as Read",
+                            ATHLTHLocalization.choose(
+                                english: "Mark as Read",
+                                norwegian: "Marker som lest"
+                            ),
                             systemImage: "checkmark.circle"
                         )
                     }
@@ -1000,7 +1136,10 @@ struct ATHLTHNotificationCenterView: View {
                     notifications.delete(item.id)
                 } label: {
                     Label(
-                        "Delete",
+                        ATHLTHLocalization.choose(
+                            english: "Delete",
+                            norwegian: "Slett"
+                        ),
                         systemImage: "trash"
                     )
                 }
@@ -1059,7 +1198,10 @@ struct ATHLTHNotificationCenterView: View {
                         notifications.markRead(item.id)
                     } label: {
                         Label(
-                            "Mark as Read",
+                            ATHLTHLocalization.choose(
+                                english: "Mark as Read",
+                                norwegian: "Marker som lest"
+                            ),
                             systemImage: "checkmark.circle"
                         )
                     }
@@ -1069,7 +1211,10 @@ struct ATHLTHNotificationCenterView: View {
                     notifications.delete(item.id)
                 } label: {
                     Label(
-                        "Delete",
+                        ATHLTHLocalization.choose(
+                            english: "Delete",
+                            norwegian: "Slett"
+                        ),
                         systemImage: "trash"
                     )
                 }
@@ -1232,7 +1377,10 @@ struct ATHLTHNotificationCenterView: View {
                     HStack(spacing: 5) {
                         Text(
                             isActionable(item)
-                                ? "Review"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Review",
+                                    norwegian: "Se gjennom"
+                                )
                                 : destinationActionTitle(item)
                         )
                         .font(.caption2.weight(.semibold))
@@ -1709,7 +1857,12 @@ struct ATHLTHNotificationPermissionPrimerView: View {
                 }
 
                 VStack(spacing: 10) {
-                    Text("Stay connected to your progress")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Stay connected to your progress",
+                            norwegian: "Følg med på fremgangen din"
+                        )
+                    )
                         .font(
                             .system(
                                 size: 28,
@@ -1723,7 +1876,12 @@ struct ATHLTHNotificationPermissionPrimerView: View {
                         .multilineTextAlignment(.center)
 
                     Text(
-                        "ATHLTH can let you know when a workout is ready, a goal moves forward, you reach a milestone or something important happens in your community."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "ATHLTH can let you know when a workout is ready, a goal moves forward, you reach a milestone or something important happens in your community.",
+                            norwegian:
+                                "ATHLTH kan varsle deg når en økt er klar, et mål går fremover, du når en milepæl eller noe viktig skjer i fellesskapet."
+                        )
                     )
                     .font(.subheadline)
                     .foregroundStyle(
@@ -1737,15 +1895,24 @@ struct ATHLTHNotificationPermissionPrimerView: View {
                 VStack(spacing: 10) {
                     permissionReason(
                         icon: "figure.run",
-                        title: "Workout updates"
+                        title: ATHLTHLocalization.choose(
+                            english: "Workout updates",
+                            norwegian: "Treningsoppdateringer"
+                        )
                     )
                     permissionReason(
                         icon: "target",
-                        title: "Goals & milestones"
+                        title: ATHLTHLocalization.choose(
+                            english: "Goals & milestones",
+                            norwegian: "Mål og milepæler"
+                        )
                     )
                     permissionReason(
                         icon: "person.2.fill",
-                        title: "Important social activity"
+                        title: ATHLTHLocalization.choose(
+                            english: "Important social activity",
+                            norwegian: "Viktig sosial aktivitet"
+                        )
                     )
                 }
                 .padding(16)
@@ -1771,7 +1938,12 @@ struct ATHLTHNotificationPermissionPrimerView: View {
 
                 VStack(spacing: 10) {
                     Button(action: onAllow) {
-                        Text("Allow notifications")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Allow notifications",
+                                norwegian: "Tillat varsler"
+                            )
+                        )
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
@@ -1780,7 +1952,12 @@ struct ATHLTHNotificationPermissionPrimerView: View {
                     .tint(ATHLTHTheme.accentDeep)
 
                     Button(action: onNotNow) {
-                        Text("Not now")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Not now",
+                                norwegian: "Ikke nå"
+                            )
+                        )
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(
                                 ATHLTHTheme.mutedText
