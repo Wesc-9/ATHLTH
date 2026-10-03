@@ -367,9 +367,7 @@ struct WorkoutStartOptionsView: View {
                     await social.refresh()
                 }
 
-                if exerciseLibrary.entries.isEmpty {
-                    await exerciseLibrary.refresh()
-                }
+                await exerciseLibrary.refresh()
             }
             .sheet(
                 isPresented: $showingExerciseLibrary
@@ -1109,11 +1107,11 @@ struct WorkoutStartOptionsView: View {
                         english:
                             trackingMode == .advanced
                                 ? "Detailed tracking, exercise by exercise."
-                                : "Fast setup. Add the exercises you want next.",
+                                : "Fast setup. Add exercises here before you start.",
                         norwegian:
                             trackingMode == .advanced
                                 ? "Detaljert registrering, øvelse for øvelse."
-                                : "Raskt oppsett. Legg til øvelsene du ønsker på neste side."
+                                : "Raskt oppsett. Legg til øvelser her før du starter."
                     )
                 )
                 .font(.caption)
