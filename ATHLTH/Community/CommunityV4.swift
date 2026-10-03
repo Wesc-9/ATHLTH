@@ -3935,37 +3935,17 @@ private struct CommunityReferenceActivityRow: View {
     @ViewBuilder
     private var mediaPreview: some View {
         if item.activity.kind == "event" {
-            ZStack(alignment: .bottomLeading) {
-                Image("CommunityHero")
-                    .resizable()
-                    .scaledToFill()
-
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        .black.opacity(0.45)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Text(
+            CommunityEventFeedCoverView(
+                metadata:
+                    item.activity.metadata ??
+                    [:],
+                title:
                     item.activity.subtitle ??
                     ATHLTHLocalization.choose(
                         english: "Event",
                         norwegian: "Event"
                     )
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold
-                    )
-                )
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .padding(8)
-            }
+            )
         } else if item.activity.kind ==
                     "challenge" {
             let metadata =
@@ -4018,6 +3998,75 @@ private struct CommunityReferenceActivityRow: View {
                 )
             }
         }
+    }
+}
+
+private struct CommunityEventFeedCoverView:
+    View {
+    let metadata: [String: String]
+    let title: String
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let rawURL =
+                        metadata[
+                            "cover_image_url"
+                        ],
+                   let url =
+                        URL(string: rawURL) {
+                    AsyncImage(url: url) {
+                        phase in
+                        switch phase {
+                        case .success(
+                            let image
+                        ):
+                            image
+                                .resizable()
+                                .scaledToFill()
+
+                        default:
+                            fallbackArtwork
+                        }
+                    }
+                } else {
+                    fallbackArtwork
+                }
+            }
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .black.opacity(0.38)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .padding(8)
+        }
+    }
+
+    @ViewBuilder
+    private var fallbackArtwork:
+        some View {
+        Image(
+            metadata[
+                "cover_artwork"
+            ] ??
+            "CommunityHero"
+        )
+        .resizable()
+        .scaledToFill()
     }
 }
 
