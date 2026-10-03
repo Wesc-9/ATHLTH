@@ -987,6 +987,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
             }
 
         return CommunityMatchupStats(
+            activityPoints: nil,
             workouts:
                 Double(workouts.count),
             runningKilometers:
@@ -1084,6 +1085,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
             }
 
         return CommunityMatchupStats(
+            activityPoints: nil,
             workouts:
                 Double(workouts.count),
             runningKilometers:
