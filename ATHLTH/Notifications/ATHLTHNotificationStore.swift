@@ -195,14 +195,36 @@ final class ATHLTHNotificationStore: ObservableObject {
 
     func syncTrophyEvents(from unlocks: [TrophyUnlockRecord]) {
         for unlock in unlocks where unlock.unlockedAt >= activationDate {
+            let title =
+                unlock.isPrestigeTrophy
+                    ? ATHLTHLocalization.choose(
+                        english: "New trophy unlocked",
+                        norwegian: "Ny pokal låst opp"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "New achievement unlocked",
+                        norwegian: "Ny achievement låst opp"
+                    )
+
+            let message =
+                ATHLTHLocalization.format(
+                    english:
+                        "%@ · %@. Tap to reveal.",
+                    norwegian:
+                        "%@ · %@. Trykk for å åpne.",
+                    unlock.title,
+                    unlock.stageTitle
+                )
+
             add(
                 ATHLTHNotificationDraft(
                     eventKey: "trophy-\(unlock.stageKey)-unlocked",
                     kind: .achievement,
-                    title: "Trophy unlocked",
-                    message: "\(unlock.title) · \(unlock.stageTitle). Verified by \(unlock.verificationSource.title).",
+                    title: title,
+                    message: message,
                     createdAt: unlock.unlockedAt
-                )
+                ),
+                deliverSystemAlert: false
             )
         }
     }
