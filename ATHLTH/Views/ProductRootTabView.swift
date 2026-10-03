@@ -6062,7 +6062,9 @@ struct ATHLTHRecoveryView: View {
                         MuscleRecoveryCard(
                             statuses: muscleRecoveryStatuses,
                             unmappedExerciseNames:
-                                unmappedMuscleExercises
+                                unmappedMuscleExercises,
+                            trendDays:
+                                recoverySnapshot.days
                         ) {
                             showingSorenessLog = true
                         }
@@ -6113,7 +6115,9 @@ struct ATHLTHRecoveryView: View {
                         MuscleRecoveryCard(
                             statuses: muscleRecoveryStatuses,
                             unmappedExerciseNames:
-                                unmappedMuscleExercises
+                                unmappedMuscleExercises,
+                            trendDays:
+                                recoverySnapshot.days
                         ) {
                             showingSorenessLog = true
                         }
