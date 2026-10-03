@@ -16,13 +16,41 @@ enum CommunityEventActivity: String, CaseIterable, Codable, Hashable, Identifiab
 
     var title: String {
         switch self {
-        case .running: return "Running"
-        case .walking: return "Walking"
-        case .strength: return "Strength"
-        case .cycling: return "Cycling"
-        case .hike: return "Hike"
-        case .groupWorkout: return "Group workout"
-        case .other: return "Other"
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåtur"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .cycling:
+            return ATHLTHLocalization.choose(
+                english: "Cycling",
+                norwegian: "Sykling"
+            )
+        case .hike:
+            return ATHLTHLocalization.choose(
+                english: "Hike",
+                norwegian: "Tur"
+            )
+        case .groupWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Group workout",
+                norwegian: "Gruppeøkt"
+            )
+        case .other:
+            return ATHLTHLocalization.choose(
+                english: "Other",
+                norwegian: "Annet"
+            )
         }
     }
 
@@ -1259,162 +1287,1321 @@ struct CommunityEventCreateView: View {
     @State private var isCreating = false
 
     private var canCreate: Bool {
-        !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !draft.meetingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        draft.startsAt > Date()
+        !draft.title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        !draft.meetingName
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        draft.startsAt > Date() &&
+        !isCreating
+    }
+
+    private var selectedRoute: TrainingRoute? {
+        guard let selectedRouteID else {
+            return nil
+        }
+
+        return session.savedRoutes.first {
+            $0.id == selectedRouteID
+        }
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Event") {
-                    TextField("Event name", text: $draft.title)
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme.accent
+                            .opacity(0.12)
+                )
+                .ignoresSafeArea()
 
-                    Picker("Activity", selection: $draft.activityType) {
-                        ForEach(CommunityEventActivity.allCases) { activity in
-                            Label(activity.title, systemImage: activity.systemImage)
-                                .tag(activity)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        eventHero
+
+                        eventSection(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Event",
+                                    norwegian: "Arrangement"
+                                ),
+                            icon:
+                                "calendar.badge.plus"
+                        ) {
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Event name",
+                                        norwegian: "Navn på arrangement"
+                                    ),
+                                placeholder:
+                                    ATHLTHLocalization.choose(
+                                        english: "Add a name",
+                                        norwegian: "Gi arrangementet et navn"
+                                    ),
+                                text: $draft.title,
+                                icon: "doc.text"
+                            )
+
+                            eventDivider
+
+                            Menu {
+                                ForEach(
+                                    CommunityEventActivity.allCases
+                                ) { activity in
+                                    Button {
+                                        draft.activityType =
+                                            activity
+
+                                        if activity !=
+                                            .running &&
+                                            activity !=
+                                            .walking {
+                                            draft.paceLabel =
+                                                ""
+                                            selectedRouteID =
+                                                nil
+                                        }
+                                    } label: {
+                                        Label(
+                                            activity.title,
+                                            systemImage:
+                                                activity
+                                                    .systemImage
+                                        )
+                                    }
+                                }
+                            } label: {
+                                eventSelectionRow(
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english: "Activity",
+                                            norwegian: "Aktivitet"
+                                        ),
+                                    value:
+                                        draft.activityType
+                                            .title,
+                                    icon:
+                                        draft.activityType
+                                            .systemImage
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            eventDivider
+
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Description",
+                                        norwegian: "Beskrivelse"
+                                    ),
+                                placeholder:
+                                    ATHLTHLocalization.choose(
+                                        english: "Optional",
+                                        norwegian: "Valgfritt"
+                                    ),
+                                text: $draft.summary,
+                                icon: "text.alignleft",
+                                axis: .vertical
+                            )
+
+                            eventDivider
+
+                            HStack(spacing: 10) {
+                                compactDateControl(
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english: "Date",
+                                            norwegian: "Dato"
+                                        ),
+                                    icon: "calendar",
+                                    components: [.date]
+                                )
+
+                                compactDateControl(
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english: "Time",
+                                            norwegian: "Tid"
+                                        ),
+                                    icon: "clock",
+                                    components: [
+                                        .hourAndMinute
+                                    ]
+                                )
+                            }
+
+                            eventDivider
+
+                            Menu {
+                                Button {
+                                    draft.visibility =
+                                        .publicProfile
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Public",
+                                            norwegian: "Offentlig"
+                                        ),
+                                        systemImage: "globe"
+                                    )
+                                }
+
+                                Button {
+                                    draft.visibility =
+                                        .friends
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Friends",
+                                            norwegian: "Følgere"
+                                        ),
+                                        systemImage:
+                                            "person.2.fill"
+                                    )
+                                }
+                            } label: {
+                                eventSelectionRow(
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english: "Who can see it",
+                                            norwegian: "Hvem kan se det"
+                                        ),
+                                    value:
+                                        visibilityTitle,
+                                    icon:
+                                        draft.visibility ==
+                                            .publicProfile
+                                            ? "globe"
+                                            : "person.2.fill"
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                    }
 
-                    TextField(
-                        "Description (optional)",
-                        text: $draft.summary,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
+                        eventSection(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Meet",
+                                    norwegian: "Oppmøte"
+                                ),
+                            icon:
+                                "mappin.and.ellipse"
+                        ) {
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Meeting point",
+                                        norwegian: "Møtested"
+                                    ),
+                                placeholder:
+                                    ATHLTHLocalization.choose(
+                                        english: "Where do you meet?",
+                                        norwegian: "Hvor møtes dere?"
+                                    ),
+                                text: $draft.meetingName,
+                                icon:
+                                    "mappin.circle"
+                            )
 
-                    DatePicker(
-                        "Starts",
-                        selection: $draft.startsAt,
-                        in: Date()...,
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
+                            eventDivider
 
-                    Picker("Who can see it", selection: $draft.visibility) {
-                        Text("Public").tag(ProfileVisibility.publicProfile)
-                        Text("Friends").tag(ProfileVisibility.friends)
-                    }
-                }
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Meeting details",
+                                        norwegian: "Detaljer"
+                                    ),
+                                placeholder:
+                                    ATHLTHLocalization.choose(
+                                        english: "Optional",
+                                        norwegian: "Valgfritt"
+                                    ),
+                                text:
+                                    $draft.meetingDetails,
+                                icon:
+                                    "text.bubble",
+                                axis: .vertical
+                            )
 
-                Section("Meet") {
-                    TextField("Meeting point", text: $draft.meetingName)
+                            if draft.activityType ==
+                                .running ||
+                                draft.activityType ==
+                                .walking {
+                                eventDivider
 
-                    TextField(
-                        "Meeting details (optional)",
-                        text: $draft.meetingDetails,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...4)
+                                eventTextField(
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english: "Pace / level",
+                                            norwegian: "Fart / nivå"
+                                        ),
+                                    placeholder:
+                                        ATHLTHLocalization.choose(
+                                            english: "Optional",
+                                            norwegian: "Valgfritt"
+                                        ),
+                                    text:
+                                        $draft.paceLabel,
+                                    icon:
+                                        "speedometer"
+                                )
 
-                    if draft.activityType == .running ||
-                        draft.activityType == .walking {
-                        TextField(
-                            "Pace / level (optional)",
-                            text: $draft.paceLabel
-                        )
+                                eventDivider
 
-                        Picker("Route", selection: $selectedRouteID) {
-                            Text("No route").tag(UUID?.none)
-                            ForEach(session.savedRoutes) { route in
-                                Text(route.title).tag(Optional(route.id))
+                                Menu {
+                                    Button {
+                                        selectedRouteID =
+                                            nil
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "No route",
+                                                norwegian: "Ingen rute"
+                                            ),
+                                            systemImage:
+                                                "xmark.circle"
+                                        )
+                                    }
+
+                                    ForEach(
+                                        session.savedRoutes
+                                    ) { route in
+                                        Button {
+                                            selectedRouteID =
+                                                route.id
+                                        } label: {
+                                            Label(
+                                                route.title,
+                                                systemImage:
+                                                    "map"
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    eventSelectionRow(
+                                        title:
+                                            ATHLTHLocalization.choose(
+                                                english: "Route",
+                                                norwegian: "Rute"
+                                            ),
+                                        value:
+                                            selectedRoute?
+                                                .title ??
+                                            ATHLTHLocalization.choose(
+                                                english: "No route",
+                                                norwegian: "Ingen rute"
+                                            ),
+                                        icon:
+                                            "point.topleft.down.to.point.bottomright.curvepath"
+                                    )
+                                }
+                                .buttonStyle(.plain)
+
+                                if let selectedRoute {
+                                    eventRoutePreview(
+                                        selectedRoute
+                                    )
+                                    .padding(.top, 12)
+                                }
                             }
                         }
+
+                        eventSection(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Participants",
+                                    norwegian: "Deltakere"
+                                ),
+                            icon: "person.2.fill"
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "person.badge.plus"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12,
+                                        style:
+                                            .continuous
+                                    )
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Limit participants",
+                                        norwegian:
+                                            "Begrens deltakere"
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+
+                                Spacer()
+
+                                Toggle(
+                                    "",
+                                    isOn:
+                                        $limitParticipants
+                                )
+                                .labelsHidden()
+                                .tint(
+                                    ATHLTHTheme.accent
+                                )
+                            }
+
+                            if limitParticipants {
+                                eventDivider
+
+                                HStack(spacing: 14) {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Maximum participants",
+                                            norwegian:
+                                                "Maks antall deltakere"
+                                        )
+                                    )
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+
+                                    Spacer()
+
+                                    Button {
+                                        maxParticipants =
+                                            max(
+                                                2,
+                                                maxParticipants -
+                                                1
+                                            )
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                "minus"
+                                        )
+                                        .frame(
+                                            width: 34,
+                                            height: 34
+                                        )
+                                        .background(
+                                            Color.primary
+                                                .opacity(
+                                                    0.045
+                                                ),
+                                            in: Circle()
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Text(
+                                        "\(maxParticipants)"
+                                    )
+                                    .font(
+                                        .headline
+                                            .monospacedDigit()
+                                    )
+                                    .frame(
+                                        minWidth: 32
+                                    )
+
+                                    Button {
+                                        maxParticipants =
+                                            min(
+                                                500,
+                                                maxParticipants +
+                                                1
+                                            )
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                "plus"
+                                        )
+                                        .frame(
+                                            width: 34,
+                                            height: 34
+                                        )
+                                        .background(
+                                            Color.primary
+                                                .opacity(
+                                                    0.045
+                                                ),
+                                            in: Circle()
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
+                        eventSection(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Community",
+                                    norwegian: "Fellesskap"
+                                ),
+                            icon: "person.3.fill"
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "megaphone.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight: .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accent
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12,
+                                        style:
+                                            .continuous
+                                    )
+                                )
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Share to Community activity",
+                                            norwegian:
+                                                "Del til Community-aktivitet"
+                                        )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "People who can see the event can also discover it in Community.",
+                                            norwegian:
+                                                "Arrangementet kan vises i Community for dem som har tilgang."
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .fixedSize(
+                                        horizontal:
+                                            false,
+                                        vertical: true
+                                    )
+                                }
+
+                                Spacer(
+                                    minLength: 8
+                                )
+
+                                Toggle(
+                                    "",
+                                    isOn:
+                                        $shareToCommunity
+                                )
+                                .labelsHidden()
+                                .tint(
+                                    ATHLTHTheme.accent
+                                )
+                            }
+
+                            eventDivider
+
+                            Label(
+                                privacyMessage,
+                                systemImage:
+                                    draft.visibility ==
+                                        .publicProfile
+                                        ? "globe"
+                                        : "lock.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 28)
                 }
-
-                Section("Participants") {
-                    Toggle("Limit participants", isOn: $limitParticipants)
-
-                    if limitParticipants {
-                        Stepper(
-                            "Maximum: \(maxParticipants)",
-                            value: $maxParticipants,
-                            in: 2...500
-                        )
-                    }
-                }
-
-                Section("Community") {
-                    Toggle(
-                        "Share to Community activity",
-                        isOn: $shareToCommunity
-                    )
-
-                    Text(
-                        "When enabled, people who can see this event also get a compact event card in their Community feed."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Label(
-                        "Public events can be discovered by signed-in ATHLTH users. Friends-only events are limited to your ATHLTH friends.",
-                        systemImage: "hand.raised.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                .scrollDismissesKeyboard(
+                    .interactively
+                )
             }
-            .navigationTitle("Create Event")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Create Event",
+                    norwegian: "Opprett arrangement"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isCreating ? "Creating…" : "Create") {
-                        Task {
-                            isCreating = true
-                            draft.maxParticipants = limitParticipants
-                                ? maxParticipants
-                                : nil
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button {
+                        createEvent()
+                    } label: {
+                        Text(
+                            isCreating
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Creating…",
+                                    norwegian:
+                                        "Oppretter…"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Create",
+                                    norwegian:
+                                        "Opprett"
+                                )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    }
+                    .disabled(!canCreate)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .opacity(0.35)
 
-                            if let selectedRouteID,
-                               let route = session.savedRoutes.first(where: {
-                                   $0.id == selectedRouteID
-                               }) {
-                                draft.routeID = route.id
-                                draft.routeTitle = route.title
-                            } else {
-                                draft.routeID = nil
-                                draft.routeTitle = nil
+                    Button {
+                        createEvent()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isCreating {
+                                ProgressView()
+                                    .tint(.white)
                             }
 
-                            let eventID =
-                                await community
-                                    .createAndReturnID(draft)
-
-                            if let eventID,
-                               shareToCommunity {
-                                _ = await social
-                                    .shareCommunityEvent(
-                                        id: eventID,
-                                        title: draft.title,
-                                        activityType:
-                                            draft.activityType,
-                                        startsAt:
-                                            draft.startsAt,
-                                        meetingName:
-                                            draft.meetingName,
-                                        visibility:
-                                            draft.visibility
+                            Text(
+                                isCreating
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Creating…",
+                                        norwegian:
+                                            "Oppretter…"
                                     )
-                            }
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Create event",
+                                        norwegian:
+                                            "Opprett arrangement"
+                                    )
+                            )
+                            .font(.headline)
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(
+                                        red: 0.20,
+                                        green: 0.26,
+                                        blue: 0.36
+                                    ),
+                                    Color(
+                                        red: 0.34,
+                                        green: 0.43,
+                                        blue: 0.57
+                                    )
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: Capsule(
+                                style:
+                                    .continuous
+                            )
+                        )
+                        .opacity(
+                            canCreate
+                                ? 1
+                                : 0.34
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canCreate)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+                .background(
+                    .ultraThinMaterial
+                )
+            }
+            .sensoryFeedback(
+                .selection,
+                trigger:
+                    draft.activityType
+            )
+            .sensoryFeedback(
+                .selection,
+                trigger:
+                    draft.visibility
+            )
+        }
+    }
 
-                            isCreating = false
+    private var eventHero: some View {
+        ZStack(alignment: .bottomLeading) {
+            Image(eventArtworkName)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
+                .clipped()
 
-                            if eventID != nil {
-                                dismiss()
-                            }
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .clear,
+                    Color.black.opacity(0.38)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Label(
+                eventActivityLabel,
+                systemImage:
+                    draft.activityType
+                        .systemImage
+            )
+            .font(
+                .caption.weight(.semibold)
+            )
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                .ultraThinMaterial,
+                in: Capsule()
+            )
+            .padding(14)
+        }
+        .frame(height: 150)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.35),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.06),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    private var eventArtworkName: String {
+        switch draft.activityType {
+        case .running:
+            return "GoalRunning"
+        case .walking:
+            return "GoalWalking"
+        case .strength:
+            return "GoalStrength"
+        case .cycling:
+            return "GoalAdventure"
+        case .hike:
+            return "GoalMountain"
+        case .groupWorkout:
+            return "GoalConsistency"
+        case .other:
+            return "GoalEvent"
+        }
+    }
+
+    private var eventActivityLabel: String {
+        ATHLTHLocalization.format(
+            english: "%@ event",
+            norwegian: "%@event",
+            draft.activityType.title
+        )
+    }
+
+    private var visibilityTitle: String {
+        draft.visibility ==
+            .publicProfile
+            ? ATHLTHLocalization.choose(
+                english: "Public",
+                norwegian: "Offentlig"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Friends",
+                norwegian: "Følgere"
+            )
+    }
+
+    private var privacyMessage: String {
+        draft.visibility ==
+            .publicProfile
+            ? ATHLTHLocalization.choose(
+                english:
+                    "Public events can be discovered by signed-in ATHLTH users.",
+                norwegian:
+                    "Offentlige arrangementer kan oppdages av innloggede ATHLTH-brukere."
+            )
+            : ATHLTHLocalization.choose(
+                english:
+                    "Followers-only events are limited to your ATHLTH network.",
+                norwegian:
+                    "Arrangementet er begrenset til følgernettverket ditt."
+            )
+    }
+
+    private var eventDivider: some View {
+        Divider()
+            .opacity(0.42)
+            .padding(.leading, 50)
+    }
+
+    private func eventSection<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content:
+            () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+            content()
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.93),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.025),
+            radius: 9,
+            y: 3
+        )
+    }
+
+    private func eventTextField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        icon: String,
+        axis: Axis = .horizontal
+    ) -> some View {
+        HStack(
+            alignment:
+                axis == .vertical
+                    ? .top
+                    : .center,
+            spacing: 12
+        ) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accent
+                )
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField(
+                    placeholder,
+                    text: text,
+                    axis: axis
+                )
+                .font(.body)
+                .lineLimit(
+                    axis == .vertical
+                        ? 2...4
+                        : 1...1
+                )
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func eventSelectionRow(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accent
+                )
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+            Spacer()
+
+            HStack(spacing: 7) {
+                Text(value)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .lineLimit(1)
+
+                Image(
+                    systemName:
+                        "chevron.up.chevron.down"
+                )
+                .font(.caption2.bold())
+            }
+            .foregroundStyle(
+                Color(
+                    red: 0.20,
+                    green: 0.26,
+                    blue: 0.36
+                )
+            )
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .background(
+                Color(
+                    red: 0.91,
+                    green: 0.94,
+                    blue: 0.98
+                ),
+                in: Capsule()
+            )
+        }
+    }
+
+    private func compactDateControl(
+        title: String,
+        icon: String,
+        components:
+            DatePickerComponents
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            DatePicker(
+                "",
+                selection: $draft.startsAt,
+                in: Date()...,
+                displayedComponents:
+                    components
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(
+            Color.primary.opacity(0.035),
+            in: RoundedRectangle(
+                cornerRadius: 15,
+                style: .continuous
+            )
+        )
+    }
+
+    private func eventRoutePreview(
+        _ route: TrainingRoute
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if route.coordinates.count >= 2 {
+                Map(
+                    initialPosition:
+                        .region(
+                            routeRegion(
+                                route
+                            )
+                        )
+                ) {
+                    MapPolyline(
+                        coordinates:
+                            route.coordinates
+                                .map(
+                                    \.coordinate
+                                )
+                    )
+                    .stroke(
+                        Color(
+                            red: 0.20,
+                            green: 0.29,
+                            blue: 0.52
+                        ),
+                        lineWidth: 5
+                    )
+
+                    if let first =
+                        route.coordinates.first {
+                        Marker(
+                            route.startName ??
+                                ATHLTHLocalization.choose(
+                                    english: "Start",
+                                    norwegian: "Start"
+                                ),
+                            coordinate:
+                                first.coordinate
+                        )
+                        .tint(
+                            ATHLTHTheme.accent
+                        )
+                    }
+
+                    if let last =
+                        route.coordinates.last {
+                        Marker(
+                            route.endName ??
+                                ATHLTHLocalization.choose(
+                                    english: "Finish",
+                                    norwegian: "Mål"
+                                ),
+                            coordinate:
+                                last.coordinate
+                        )
+                        .tint(.red)
+                    }
+                }
+                .allowsHitTesting(false)
+                .frame(height: 138)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+            }
+
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accent
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(route.title)
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                    HStack(spacing: 8) {
+                        Text(
+                            String(
+                                format:
+                                    "%.1f km",
+                                route
+                                    .distanceKilometers
+                            )
+                        )
+
+                        if let elevation =
+                            route
+                                .elevationGainMeters {
+                            Text(
+                                "· \(Int(elevation.rounded())) m ↑"
+                            )
                         }
                     }
-                    .disabled(!canCreate || isCreating)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
+
+                Spacer()
+            }
+        }
+        .padding(10)
+        .background(
+            Color.primary.opacity(0.028),
+            in: RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+        )
+    }
+
+    private func routeRegion(
+        _ route: TrainingRoute
+    ) -> MKCoordinateRegion {
+        let coordinates =
+            route.coordinates.map(
+                \.coordinate
+            )
+
+        guard let first =
+                coordinates.first
+        else {
+            return MKCoordinateRegion(
+                center:
+                    CLLocationCoordinate2D(
+                        latitude: 63.43,
+                        longitude: 10.39
+                    ),
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta: 0.04,
+                        longitudeDelta: 0.04
+                    )
+            )
+        }
+
+        var minLat = first.latitude
+        var maxLat = first.latitude
+        var minLon = first.longitude
+        var maxLon = first.longitude
+
+        for coordinate in coordinates {
+            minLat = min(
+                minLat,
+                coordinate.latitude
+            )
+            maxLat = max(
+                maxLat,
+                coordinate.latitude
+            )
+            minLon = min(
+                minLon,
+                coordinate.longitude
+            )
+            maxLon = max(
+                maxLon,
+                coordinate.longitude
+            )
+        }
+
+        return MKCoordinateRegion(
+            center:
+                CLLocationCoordinate2D(
+                    latitude:
+                        (minLat + maxLat) /
+                        2,
+                    longitude:
+                        (minLon + maxLon) /
+                        2
+                ),
+            span:
+                MKCoordinateSpan(
+                    latitudeDelta:
+                        max(
+                            (maxLat - minLat) *
+                            1.35,
+                            0.008
+                        ),
+                    longitudeDelta:
+                        max(
+                            (maxLon - minLon) *
+                            1.35,
+                            0.008
+                        )
+                )
+        )
+    }
+
+    private func createEvent() {
+        guard canCreate else {
+            return
+        }
+
+        Task {
+            isCreating = true
+
+            draft.maxParticipants =
+                limitParticipants
+                    ? maxParticipants
+                    : nil
+
+            if let selectedRoute {
+                draft.routeID =
+                    selectedRoute.id
+                draft.routeTitle =
+                    selectedRoute.title
+            } else {
+                draft.routeID = nil
+                draft.routeTitle = nil
+            }
+
+            let eventID =
+                await community
+                    .createAndReturnID(
+                        draft
+                    )
+
+            if let eventID,
+               shareToCommunity {
+                _ = await social
+                    .shareCommunityEvent(
+                        id: eventID,
+                        title: draft.title,
+                        activityType:
+                            draft.activityType,
+                        startsAt:
+                            draft.startsAt,
+                        meetingName:
+                            draft.meetingName,
+                        visibility:
+                            draft.visibility
+                    )
+            }
+
+            isCreating = false
+
+            if eventID != nil {
+                dismiss()
             }
         }
     }
