@@ -44,6 +44,9 @@ struct ProfileHighlightsManagerView: View {
     @AppStorage(ProfileMomentFavorites.storageKey)
     private var favoriteMomentSelectionRaw = ""
 
+    @State private var filter:
+        ProfileHighlightsFilter = .all
+
     private var favoriteTokens:
         Set<String> {
         ProfileMomentFavorites.decode(
@@ -67,6 +70,42 @@ struct ProfileHighlightsManagerView: View {
                 $0.startDate >
                     $1.startDate
             }
+    }
+
+    private var filteredMedia:
+        [WorkoutMediaRecord] {
+        switch filter {
+        case .all, .photos:
+            return media
+        case .favorites:
+            return media.filter {
+                favoriteTokens.contains(
+                    ProfileMomentFavorites
+                        .mediaToken($0.id)
+                )
+            }
+        case .highlights:
+            return []
+        }
+    }
+
+    private var filteredWorkouts:
+        [WorkoutSummary] {
+        switch filter {
+        case .all, .highlights:
+            return workouts
+        case .favorites:
+            return workouts.filter {
+                favoriteTokens.contains(
+                    ProfileMomentFavorites
+                        .highlightToken(
+                            $0.id
+                        )
+                )
+            }
+        case .photos:
+            return []
+        }
     }
 
     var body: some View {
@@ -112,7 +151,7 @@ struct ProfileHighlightsManagerView: View {
                         )
                         .padding(.top, 24)
                     } else {
-                        if !media.isEmpty {
+                        if !filteredMedia.isEmpty {
                             momentSectionHeader(
                                 title:
                                     ATHLTHLocalization.choose(
@@ -129,7 +168,7 @@ struct ProfileHighlightsManagerView: View {
                                 spacing: 9
                             ) {
                                 ForEach(
-                                    media
+                                    filteredMedia
                                 ) { item in
                                     mediaRow(
                                         item
@@ -138,7 +177,7 @@ struct ProfileHighlightsManagerView: View {
                             }
                         }
 
-                        if !workouts.isEmpty {
+                        if !filteredWorkouts.isEmpty {
                             momentSectionHeader(
                                 title:
                                     ATHLTHLocalization.choose(
@@ -156,7 +195,7 @@ struct ProfileHighlightsManagerView: View {
                                 spacing: 9
                             ) {
                                 ForEach(
-                                    workouts
+                                    filteredWorkouts
                                 ) { workout in
                                     highlightRow(
                                         workout
@@ -187,6 +226,78 @@ struct ProfileHighlightsManagerView: View {
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .toolbar {
+            ToolbarItem(
+                placement: .topBarTrailing
+            ) {
+                Menu {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Filter",
+                            norwegian: "Filter"
+                        ),
+                        selection: $filter
+                    ) {
+                        ForEach(
+                            ProfileHighlightsFilter
+                                .allCases
+                        ) { option in
+                            Label(
+                                option.title,
+                                systemImage:
+                                    option.icon
+                            )
+                            .tag(option)
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            filter == .all
+                                ? "line.3.horizontal.decrease"
+                                : "line.3.horizontal.decrease.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        filter == .all
+                            ? ATHLTHTheme
+                                .primaryText
+                            : ATHLTHTheme
+                                .premiumGold
+                    )
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
+                    .background(
+                        Color.white.opacity(
+                            0.72
+                        ),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.black.opacity(
+                                    0.08
+                                ),
+                                lineWidth: 0.8
+                            )
+                    }
+                }
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Filter",
+                        norwegian: "Filtrer"
+                    )
+                )
+            }
+        }
         .task {
             await social
                 .refreshWorkoutMedia()
@@ -688,3 +799,56 @@ struct ProfileHighlightsManagerView: View {
     }
 }
 
+
+
+private enum ProfileHighlightsFilter:
+    String,
+    CaseIterable,
+    Identifiable {
+    case all
+    case photos
+    case highlights
+    case favorites
+
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        switch self {
+        case .all:
+            return ATHLTHLocalization.choose(
+                english: "All",
+                norwegian: "Alle"
+            )
+        case .photos:
+            return ATHLTHLocalization.choose(
+                english: "Photos",
+                norwegian: "Bilder"
+            )
+        case .highlights:
+            return ATHLTHLocalization.choose(
+                english: "Workout highlights",
+                norwegian: "Høydepunkter"
+            )
+        case .favorites:
+            return ATHLTHLocalization.choose(
+                english: "Favorites",
+                norwegian: "Favoritter"
+            )
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all:
+            return "square.grid.2x2"
+        case .photos:
+            return "photo"
+        case .highlights:
+            return "sparkles"
+        case .favorites:
+            return "star.fill"
+        }
+    }
+}
