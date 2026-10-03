@@ -91,6 +91,7 @@ final class AppSessionStore: ObservableObject {
     private let defaults: UserDefaults
     private var localAccountID: UUID?
     private var loadingAccountContent = false
+    private var accountContentSaveTask: Task<Void, Never>?
     private var backendSubscriptionAccess: SubscriptionAccess
     private var storeEntitlement: StoreSubscriptionEntitlement?
 
@@ -543,7 +544,7 @@ final class AppSessionStore: ObservableObject {
     }
 
     func resetAuthenticationState() {
-        persistAccountContent()
+        persistAccountContent(immediate: true)
         localAccountID = nil
         loadingAccountContent = true
         activePlan = nil
@@ -3145,11 +3146,20 @@ final class AppSessionStore: ObservableObject {
         savedRoutes.insert(copy, at: 0)
     }
 
-    private func persistAccountContent() {
-        guard !loadingAccountContent, let userID = localAccountID else { return }
+    private func persistAccountContent(
+        immediate: Bool = false
+    ) {
+        guard !loadingAccountContent,
+              let userID = localAccountID
+        else {
+            return
+        }
+
         let content = AccountTrainingContent(
-            activePlan: activePlan, scheduledPlans: scheduledPlans,
-            planTemplates: planTemplates, savedWorkoutTemplates: savedWorkoutTemplates,
+            activePlan: activePlan,
+            scheduledPlans: scheduledPlans,
+            planTemplates: planTemplates,
+            savedWorkoutTemplates: savedWorkoutTemplates,
             standalonePlannedSessions: standalonePlannedSessions,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
@@ -3158,8 +3168,53 @@ final class AppSessionStore: ObservableObject {
             pendingCoachPlanProposal: pendingCoachPlanProposal,
             coachPlanAdaptationHistory: coachPlanAdaptationHistory
         )
-        AccountLocalStorage.write(content, name: "training", userID: userID, defaults: defaults)
-        ATHLTHTrainingDataChangeSignal.post(userID: userID)
+
+        accountContentSaveTask?.cancel()
+        accountContentSaveTask = nil
+
+        if immediate {
+            writeAccountContent(
+                content,
+                userID: userID
+            )
+            return
+        }
+
+        accountContentSaveTask =
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(
+                    for: .milliseconds(400)
+                )
+
+                guard !Task.isCancelled,
+                      let self,
+                      !self.loadingAccountContent,
+                      self.localAccountID == userID
+                else {
+                    return
+                }
+
+                self.writeAccountContent(
+                    content,
+                    userID: userID
+                )
+                self.accountContentSaveTask = nil
+            }
+    }
+
+    private func writeAccountContent(
+        _ content: AccountTrainingContent,
+        userID: UUID
+    ) {
+        AccountLocalStorage.write(
+            content,
+            name: "training",
+            userID: userID,
+            defaults: defaults
+        )
+        ATHLTHTrainingDataChangeSignal.post(
+            userID: userID
+        )
     }
 
     func reloadTrainingContent() {
@@ -3170,7 +3225,7 @@ final class AppSessionStore: ObservableObject {
 
     private func activateLocalAccount(_ userID: UUID) {
         guard localAccountID != userID else { return }
-        persistAccountContent()
+        persistAccountContent(immediate: true)
         loadingAccountContent = true
         localAccountID = userID
         aiHealthDataSharingEnabled =
