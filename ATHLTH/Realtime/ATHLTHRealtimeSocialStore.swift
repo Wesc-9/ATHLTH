@@ -337,7 +337,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private var lastOnlineRefreshAt: Date?
     private var lastVisibleSessionsRefreshAt: Date?
 
-    private let onlineHeartbeatInterval: Duration = .seconds(45)
+    private let onlineHeartbeatInterval: Duration = .seconds(90)
     private let liveRefreshInterval: Duration = .seconds(3)
     private let liveGhostFreshAge: TimeInterval = 8
     private let liveGhostDelayedAge: TimeInterval = 25
@@ -412,7 +412,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         if !force,
            let lastOnlineRefreshAt,
-           Date().timeIntervalSince(lastOnlineRefreshAt) < 30 {
+           Date().timeIntervalSince(lastOnlineRefreshAt) < 60 {
             return
         }
 
@@ -427,7 +427,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .execute()
                     .value
 
-            let cutoff = Date().addingTimeInterval(-100)
+            let cutoff = Date().addingTimeInterval(-210)
             onlineUserIDs = Set(
                 rows
                     .filter {
