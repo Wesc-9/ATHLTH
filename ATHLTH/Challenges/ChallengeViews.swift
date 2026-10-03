@@ -1443,7 +1443,8 @@ struct ChallengeCreationView: View {
                                 norwegian: "Starter"
                             ),
                         selection: $startsAt,
-                        range: Date()...
+                        range:
+                            Date()...Date.distantFuture
                     )
 
                     if hasEnd {
@@ -1454,7 +1455,8 @@ struct ChallengeCreationView: View {
                                     norwegian: "Slutter"
                                 ),
                             selection: $endsAt,
-                            range: startsAt...
+                            range:
+                                startsAt...Date.distantFuture
                         )
                     }
                 }
@@ -2562,16 +2564,17 @@ struct ChallengeCreationView: View {
                                     norwegian:
                                         "Velg minst én deltaker"
                                 )
-                                : ATHLTHLocalization.counted(
-                                    invitees.count,
-                                    englishSingular:
-                                        "1 invited",
-                                    englishPlural:
-                                        "%d invited",
-                                    norwegianSingular:
-                                        "1 invitert",
-                                    norwegianPlural:
-                                        "%d invitert"
+                                : (
+                                    invitees.count == 1
+                                        ? ATHLTHLocalization.choose(
+                                            english: "1 invited",
+                                            norwegian: "1 invitert"
+                                        )
+                                        : ATHLTHLocalization.format(
+                                            english: "%d invited",
+                                            norwegian: "%d invitert",
+                                            invitees.count
+                                        )
                                 )
                         )
                         .font(.caption)
@@ -3404,14 +3407,11 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private func creationDateControl<
-        R: RangeExpression
-    >(
+    private func creationDateControl(
         title: String,
         selection: Binding<Date>,
-        range: R
-    ) -> some View
-    where R.Bound == Date {
+        range: ClosedRange<Date>
+    ) -> some View {
         VStack(
             alignment: .leading,
             spacing: 5
