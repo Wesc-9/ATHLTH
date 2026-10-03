@@ -93,7 +93,8 @@ final class HealthKitManager: ObservableObject {
     private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
-    private var refreshRequestedWhileRunning = false
+    private var backgroundRefreshTask: Task<Void, Never>?
+    private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var workoutRouteCache:
         [UUID: (route: [CLLocation], generatedAt: Date)] = [:]
@@ -747,18 +748,17 @@ final class HealthKitManager: ObservableObject {
                         return
                     }
 
-                    if type.identifier ==
-                        HKObjectType.workoutType().identifier {
-                        let acceptedWorkoutChanged =
-                            await self.refreshWorkoutImportInbox()
+                    let isWorkoutEvent =
+                        type.identifier ==
+                        HKObjectType.workoutType().identifier
 
-                        if acceptedWorkoutChanged {
-                            await self.refreshAll()
-                        }
-                    } else {
-                        await self.refreshAll()
+                    if isWorkoutEvent {
+                        _ = await self.refreshWorkoutImportInbox()
                     }
 
+                    await self.coalescedBackgroundRefresh(
+                        requireFullRefresh: isWorkoutEvent
+                    )
                     completion.call()
                 }
             }
@@ -771,6 +771,10 @@ final class HealthKitManager: ObservableObject {
     func refreshIfStale(
         maxAge: TimeInterval = 60
     ) async {
+        guard !isRefreshing else {
+            return
+        }
+
         if let lastSuccessfulRefreshAt,
            Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge,
            hasReadableHealthData {
@@ -778,6 +782,95 @@ final class HealthKitManager: ObservableObject {
         }
 
         await refreshAll()
+    }
+
+    private func coalescedBackgroundRefresh(
+        requireFullRefresh: Bool
+    ) async {
+        if requireFullRefresh {
+            backgroundRefreshNeedsFull = true
+        }
+
+        if let existing = backgroundRefreshTask {
+            await existing.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            try? await Task.sleep(
+                for: .milliseconds(650)
+            )
+
+            guard let self,
+                  !Task.isCancelled
+            else {
+                return
+            }
+
+            let fullRefresh = self.backgroundRefreshNeedsFull
+            self.backgroundRefreshNeedsFull = false
+
+            if fullRefresh {
+                await self.refreshAll()
+            } else {
+                await self.refreshHealthSignals()
+            }
+        }
+
+        backgroundRefreshTask = task
+        await task.value
+        backgroundRefreshTask = nil
+    }
+
+    private func refreshHealthSignals() async {
+        guard healthDataAvailable,
+              !shouldDeferAutomaticHealthWork,
+              !isRefreshing
+        else {
+            return
+        }
+
+        isRefreshing = true
+        recoveryTrendCache.removeAll()
+        defer { isRefreshing = false }
+
+        let previousSleepDuration = sleep.totalAsleep
+
+        async let sleepTask = fetchLatestSleep()
+        async let heartTask = fetchHeartSummary()
+        async let trainingTask = fetchTrainingSummary()
+
+        var sleepReadSucceeded = false
+        var heartReadSucceeded = false
+
+        if let fetchedSleep = try? await sleepTask {
+            sleep = fetchedSleep
+            sleepReadSucceeded = true
+
+            if fetchedSleep.totalAsleep != previousSleepDuration {
+                invalidateTrophySnapshotCache()
+            }
+        }
+
+        if let fetchedHeart = try? await heartTask {
+            heart = fetchedHeart
+            heartReadSucceeded = true
+        }
+
+        if let fetchedTraining = try? await trainingTask {
+            training = fetchedTraining
+        }
+
+        if sleepReadSucceeded,
+           heartReadSucceeded,
+           let refreshedRecovery = try? await fetchRecoveryReadiness(
+                currentSleep: sleep,
+                currentHeart: heart
+           ) {
+            recovery = refreshedRecovery
+        }
+
+        await refreshPersonalDetails()
     }
 
     func refreshAll() async {
@@ -796,8 +889,7 @@ final class HealthKitManager: ObservableObject {
             return
         }
 
-        if isRefreshing {
-            refreshRequestedWhileRunning = true
+        guard !isRefreshing else {
             return
         }
 
@@ -814,15 +906,6 @@ final class HealthKitManager: ObservableObject {
                 forKey:
                     refreshInProgressKey
             )
-
-            if refreshRequestedWhileRunning {
-                refreshRequestedWhileRunning =
-                    false
-
-                Task { @MainActor [weak self] in
-                    await self?.refreshAll()
-                }
-            }
         }
 
         let end = Date()

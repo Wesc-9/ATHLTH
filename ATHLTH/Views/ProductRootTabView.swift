@@ -787,9 +787,9 @@ struct ATHLTHHomeView: View {
 
                 _ = await health.refreshWorkoutImportInbox()
 
-                if health.lastSuccessfulRefreshAt == nil {
-                    await health.refreshAll()
-                }
+                await health.refreshIfStale(
+                    maxAge: 90
+                )
 
                 homeRecoveryTrendSnapshot =
                     await health.recoveryTrendSnapshot(
