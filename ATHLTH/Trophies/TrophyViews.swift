@@ -2724,17 +2724,11 @@ struct TrophyCollectionView: View {
                         index
                     ]
 
-            Button {
-                withAnimation(
-                    .snappy(
-                        duration: 0.20
-                    )
-                ) {
-                    trophies
-                        .toggleShowcase(
-                            trophy.id
-                        )
-                }
+            NavigationLink {
+                TrophyDetailView(
+                    trophyID:
+                        trophy.id
+                )
             } label: {
                 VStack(spacing: 5) {
                     ATHLTHTrophyCoreView(
@@ -2822,9 +2816,9 @@ struct TrophyCollectionView: View {
             .accessibilityHint(
                 ATHLTHLocalization.choose(
                     english:
-                        "Double tap to remove from the trophy shelf.",
+                        "Double tap to open this award. You can remove it from the trophy shelf in the detail view.",
                     norwegian:
-                        "Dobbelttrykk for å fjerne fra trofehyllen."
+                        "Dobbelttrykk for å åpne utmerkelsen. Du kan fjerne den fra trofehyllen i detaljvisningen."
                 )
             )
         } else {
