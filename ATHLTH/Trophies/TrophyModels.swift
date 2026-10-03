@@ -596,15 +596,57 @@ enum TrophyCatalog {
 
     static let workoutDayDensity = TrophySeriesDefinition(
         id: "consistency.workouts-in-day",
-        title: "Double Shift",
-        subtitle: "Complete multiple recorded workouts on the same calendar day.",
+        title: ATHLTHLocalization.choose(
+            english: "Same-Day Workouts",
+            norwegian: "Flere økter samme dag"
+        ),
+        subtitle: ATHLTHLocalization.choose(
+            english: "Complete multiple recorded workouts on the same calendar day.",
+            norwegian: "Fullfør flere registrerte treningsøkter på samme kalenderdag."
+        ),
         category: .consistency,
         verificationSource: .appleHealth,
         systemImage: "calendar.badge.clock",
         stages: [
-            .init(id: "2", title: "Double Shift", threshold: 2, displayTarget: "2 workouts in one day", rarity: .rare),
-            .init(id: "3", title: "Triple Session", threshold: 3, displayTarget: "3 workouts in one day", rarity: .epic),
-            .init(id: "4", title: "Full Send", threshold: 4, displayTarget: "4 workouts in one day", rarity: .signature)
+            .init(
+                id: "2",
+                title: ATHLTHLocalization.choose(
+                    english: "Double Session",
+                    norwegian: "Dobbeltøkt"
+                ),
+                threshold: 2,
+                displayTarget: ATHLTHLocalization.choose(
+                    english: "2 workouts in one day",
+                    norwegian: "2 økter på én dag"
+                ),
+                rarity: .rare
+            ),
+            .init(
+                id: "3",
+                title: ATHLTHLocalization.choose(
+                    english: "Triple Session",
+                    norwegian: "Trippeløkt"
+                ),
+                threshold: 3,
+                displayTarget: ATHLTHLocalization.choose(
+                    english: "3 workouts in one day",
+                    norwegian: "3 økter på én dag"
+                ),
+                rarity: .epic
+            ),
+            .init(
+                id: "4",
+                title: ATHLTHLocalization.choose(
+                    english: "Four Sessions",
+                    norwegian: "Fire økter samme dag"
+                ),
+                threshold: 4,
+                displayTarget: ATHLTHLocalization.choose(
+                    english: "4 workouts in one day",
+                    norwegian: "4 økter på én dag"
+                ),
+                rarity: .signature
+            )
         ]
     )
 
