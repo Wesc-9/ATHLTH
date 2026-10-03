@@ -380,6 +380,16 @@ struct AppRootView: View {
                 }.padding(.top, 4)
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for:
+                    UIApplication
+                        .didReceiveMemoryWarningNotification
+            )
+        ) { _ in
+            ATHLTHArtworkImage
+                .clearRemoteCache()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 spotifyPlayback
