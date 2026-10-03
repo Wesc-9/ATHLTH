@@ -130,7 +130,19 @@ struct WorkoutStartOptionsView: View {
                 VStack(spacing: 12) {
                     strengthIntroCard
 
-                    exerciseSelectionCard
+                    if trackingMode == .advanced {
+                        exerciseSelectionCard
+                            .transition(
+                                .opacity
+                                    .combined(
+                                        with:
+                                            .move(
+                                                edge:
+                                                    .top
+                                            )
+                                    )
+                            )
+                    }
 
                     ATHLTHCard {
                         HStack(spacing: 8) {
@@ -1164,7 +1176,13 @@ struct WorkoutStartOptionsView: View {
                     trackingMode == .advanced
                         ? .simple
                         : .advanced
-            trackingMode = nextMode
+            withAnimation(
+                .easeInOut(
+                    duration: 0.22
+                )
+            ) {
+                trackingMode = nextMode
+            }
             settings.recordAdvancedSetup(
                 nextMode == .advanced,
                 for: .strength
