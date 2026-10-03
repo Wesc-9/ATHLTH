@@ -2762,6 +2762,9 @@ private struct CommunityDiscoveryDivider:
 }
 
 private struct CommunityReferenceQuickActions: View {
+    @State private var showingCreateChallenge = false
+    @State private var showingCreateEvent = false
+
     var body: some View {
         HStack(spacing: 8) {
             NavigationLink {
@@ -2785,15 +2788,19 @@ private struct CommunityReferenceQuickActions: View {
             }
             .buttonStyle(.plain)
 
-            NavigationLink {
-                ChallengeHubView()
+            Button {
+                showingCreateChallenge = true
             } label: {
                 tile(
-                    title: "Challenges",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Challenge",
+                            norwegian: "Challenge"
+                        ),
                     detail:
                         ATHLTHLocalization.choose(
-                            english: "Join",
-                            norwegian: "Delta"
+                            english: "Create",
+                            norwegian: "Opprett"
                         ),
                     icon: "trophy.fill",
                     tint: .orange
@@ -2801,22 +2808,21 @@ private struct CommunityReferenceQuickActions: View {
             }
             .buttonStyle(.plain)
 
-            NavigationLink {
-                CommunityEventsView()
+            Button {
+                showingCreateEvent = true
             } label: {
                 tile(
                     title:
                         ATHLTHLocalization.choose(
-                            english: "Events",
-                            norwegian: "Events"
+                            english: "Event",
+                            norwegian: "Event"
                         ),
                     detail:
                         ATHLTHLocalization.choose(
-                            english: "Upcoming",
-                            norwegian:
-                                "Se kommende"
+                            english: "Create",
+                            norwegian: "Opprett"
                         ),
-                    icon: "calendar",
+                    icon: "calendar.badge.plus",
                     tint: .blue
                 )
             }
@@ -2845,6 +2851,16 @@ private struct CommunityReferenceQuickActions: View {
                 )
             }
             .buttonStyle(.plain)
+        }
+        .sheet(
+            isPresented: $showingCreateChallenge
+        ) {
+            ChallengeCreationView()
+        }
+        .sheet(
+            isPresented: $showingCreateEvent
+        ) {
+            CommunityEventCreateView()
         }
     }
 
