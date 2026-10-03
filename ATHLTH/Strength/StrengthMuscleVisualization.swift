@@ -821,9 +821,48 @@ enum StrengthBodyPresentation:
         case .neutral:
             return 1.0
         case .female:
-            return 0.965
+            return 0.992
         case .male:
-            return 1.035
+            return 1.008
+        }
+    }
+
+    fileprivate var shoulderHalfWidth:
+        CGFloat
+    {
+        switch self {
+        case .neutral:
+            return 0.205
+        case .female:
+            return 0.192
+        case .male:
+            return 0.218
+        }
+    }
+
+    fileprivate var waistHalfWidth:
+        CGFloat
+    {
+        switch self {
+        case .neutral:
+            return 0.116
+        case .female:
+            return 0.106
+        case .male:
+            return 0.122
+        }
+    }
+
+    fileprivate var hipHalfWidth:
+        CGFloat
+    {
+        switch self {
+        case .neutral:
+            return 0.154
+        case .female:
+            return 0.168
+        case .male:
+            return 0.150
         }
     }
 }
@@ -1006,147 +1045,378 @@ private struct StrengthBodyFigureCanvas:
     ) {
         let base: Color
         let outline: Color
+        let highlight: Color
 
         switch style {
         case .activation:
             base =
                 Color(
-                    red: 0.83,
-                    green: 0.84,
-                    blue: 0.85
+                    red: 0.855,
+                    green: 0.862,
+                    blue: 0.872
                 )
             outline =
-                Color.black.opacity(0.09)
+                Color(
+                    red: 0.33,
+                    green: 0.36,
+                    blue: 0.40
+                )
+                .opacity(0.16)
+            highlight =
+                Color.white.opacity(0.38)
 
         case .recoveryLoad:
             base =
                 Color(
-                    red: 0.90,
-                    green: 0.89,
-                    blue: 0.86
+                    red: 0.905,
+                    green: 0.898,
+                    blue: 0.875
                 )
             outline =
-                Color.black.opacity(0.075)
+                Color.black.opacity(0.10)
+            highlight =
+                Color.white.opacity(0.30)
         }
 
-        let head =
-            CGRect(
-                x: size.width * 0.39,
-                y: size.height * 0.015,
-                width: size.width * 0.22,
-                height: size.width * 0.23
-            )
-        context.fill(
-            Path(ellipseIn: head),
-            with: .color(base)
+        let shoulder =
+            figureStyle
+                .shoulderHalfWidth
+        let waist =
+            figureStyle
+                .waistHalfWidth
+        let hip =
+            figureStyle
+                .hipHalfWidth
+
+        // Limbs are drawn first so the torso naturally covers the shoulder
+        // and hip joints. Tapered organic segments avoid the old toy-like
+        // capsule/mannequin appearance.
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.5 - shoulder * 0.90,
+                    y: 0.235
+                ),
+            to:
+                CGPoint(
+                    x: 0.235,
+                    y: 0.425
+                ),
+            startWidth: 0.100,
+            endWidth: 0.074,
+            curve: -0.018,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
         )
-        context.stroke(
-            Path(ellipseIn: head),
-            with: .color(outline),
-            lineWidth: 0.7
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.235,
+                    y: 0.415
+                ),
+            to:
+                CGPoint(
+                    x: 0.205,
+                    y: 0.605
+                ),
+            startWidth: 0.073,
+            endWidth: 0.052,
+            curve: 0.010,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
+        )
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.5 + shoulder * 0.90,
+                    y: 0.235
+                ),
+            to:
+                CGPoint(
+                    x: 0.765,
+                    y: 0.425
+                ),
+            startWidth: 0.100,
+            endWidth: 0.074,
+            curve: 0.018,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
+        )
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.765,
+                    y: 0.415
+                ),
+            to:
+                CGPoint(
+                    x: 0.795,
+                    y: 0.605
+                ),
+            startWidth: 0.073,
+            endWidth: 0.052,
+            curve: -0.010,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
         )
 
-        drawRounded(
-            x: 0.455,
-            y: 0.115,
-            width: 0.09,
-            height: 0.07,
-            radius: 0.035,
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.5 - hip * 0.46,
+                    y: 0.555
+                ),
+            to:
+                CGPoint(
+                    x: 0.405,
+                    y: 0.765
+                ),
+            startWidth: 0.122,
+            endWidth: 0.087,
+            curve: -0.006,
             fill: base,
+            outline: outline,
+            context: &context,
+            size: size
+        )
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.5 + hip * 0.46,
+                    y: 0.555
+                ),
+            to:
+                CGPoint(
+                    x: 0.595,
+                    y: 0.765
+                ),
+            startWidth: 0.122,
+            endWidth: 0.087,
+            curve: 0.006,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
+        )
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.405,
+                    y: 0.748
+                ),
+            to:
+                CGPoint(
+                    x: 0.395,
+                    y: 0.962
+                ),
+            startWidth: 0.084,
+            endWidth: 0.054,
+            curve: 0.004,
+            fill: base,
+            outline: outline,
+            context: &context,
+            size: size
+        )
+        drawTaperedSegment(
+            from:
+                CGPoint(
+                    x: 0.595,
+                    y: 0.748
+                ),
+            to:
+                CGPoint(
+                    x: 0.605,
+                    y: 0.962
+                ),
+            startWidth: 0.084,
+            endWidth: 0.054,
+            curve: -0.004,
+            fill: base,
+            outline: outline,
             context: &context,
             size: size
         )
 
         var torso = Path()
         torso.move(
-            to: CGPoint(
-                x: size.width * 0.46,
-                y: size.height * 0.155
-            )
+            to:
+                point(
+                    x: 0.455,
+                    y: 0.155,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.29,
-                y: size.height * 0.235
-            ),
-            control1: CGPoint(
-                x: size.width * 0.39,
-                y: size.height * 0.16
-            ),
-            control2: CGPoint(
-                x: size.width * 0.32,
-                y: size.height * 0.19
-            )
+            to:
+                point(
+                    x: 0.5 - shoulder,
+                    y: 0.225,
+                    size: size
+                ),
+            control1:
+                point(
+                    x: 0.405,
+                    y: 0.164,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 -
+                        shoulder * 0.82,
+                    y: 0.178,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.38,
-                y: size.height * 0.53
-            ),
-            control1: CGPoint(
-                x: size.width * 0.32,
-                y: size.height * 0.34
-            ),
-            control2: CGPoint(
-                x: size.width * 0.34,
-                y: size.height * 0.47
-            )
+            to:
+                point(
+                    x: 0.5 - waist,
+                    y: 0.485,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 -
+                        shoulder * 0.98,
+                    y: 0.315,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 -
+                        waist * 1.18,
+                    y: 0.425,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.50,
-                y: size.height * 0.575
-            ),
-            control1: CGPoint(
-                x: size.width * 0.41,
-                y: size.height * 0.55
-            ),
-            control2: CGPoint(
-                x: size.width * 0.46,
-                y: size.height * 0.575
-            )
+            to:
+                point(
+                    x: 0.5 - hip,
+                    y: 0.555,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 -
+                        waist * 0.98,
+                    y: 0.520,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 -
+                        hip * 0.84,
+                    y: 0.548,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.62,
-                y: size.height * 0.53
-            ),
-            control1: CGPoint(
-                x: size.width * 0.54,
-                y: size.height * 0.575
-            ),
-            control2: CGPoint(
-                x: size.width * 0.59,
-                y: size.height * 0.55
-            )
+            to:
+                point(
+                    x: 0.5 + hip,
+                    y: 0.555,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 -
+                        hip * 0.78,
+                    y: 0.595,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 +
+                        hip * 0.78,
+                    y: 0.595,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.71,
-                y: size.height * 0.235
-            ),
-            control1: CGPoint(
-                x: size.width * 0.66,
-                y: size.height * 0.47
-            ),
-            control2: CGPoint(
-                x: size.width * 0.68,
-                y: size.height * 0.34
-            )
+            to:
+                point(
+                    x: 0.5 + waist,
+                    y: 0.485,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 +
+                        hip * 0.84,
+                    y: 0.548,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 +
+                        waist * 0.98,
+                    y: 0.520,
+                    size: size
+                )
         )
         torso.addCurve(
-            to: CGPoint(
-                x: size.width * 0.54,
-                y: size.height * 0.155
-            ),
-            control1: CGPoint(
-                x: size.width * 0.68,
-                y: size.height * 0.19
-            ),
-            control2: CGPoint(
-                x: size.width * 0.61,
-                y: size.height * 0.16
-            )
+            to:
+                point(
+                    x: 0.5 + shoulder,
+                    y: 0.225,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 +
+                        waist * 1.18,
+                    y: 0.425,
+                    size: size
+                ),
+            control2:
+                point(
+                    x:
+                        0.5 +
+                        shoulder * 0.98,
+                    y: 0.315,
+                    size: size
+                )
+        )
+        torso.addCurve(
+            to:
+                point(
+                    x: 0.545,
+                    y: 0.155,
+                    size: size
+                ),
+            control1:
+                point(
+                    x:
+                        0.5 +
+                        shoulder * 0.82,
+                    y: 0.178,
+                    size: size
+                ),
+            control2:
+                point(
+                    x: 0.595,
+                    y: 0.164,
+                    size: size
+                )
         )
         torso.closeSubpath()
 
@@ -1157,91 +1427,129 @@ private struct StrengthBodyFigureCanvas:
         context.stroke(
             torso,
             with: .color(outline),
+            lineWidth: 0.75
+        )
+
+        // Subtle sculpted highlight gives the neutral material depth without
+        // making the figure glossy or medically realistic.
+        var torsoLight = Path()
+        torsoLight.move(
+            to:
+                point(
+                    x: 0.475,
+                    y: 0.185,
+                    size: size
+                )
+        )
+        torsoLight.addCurve(
+            to:
+                point(
+                    x: 0.455,
+                    y: 0.515,
+                    size: size
+                ),
+            control1:
+                point(
+                    x: 0.440,
+                    y: 0.275,
+                    size: size
+                ),
+            control2:
+                point(
+                    x: 0.445,
+                    y: 0.430,
+                    size: size
+                )
+        )
+        context.stroke(
+            torsoLight,
+            with: .color(highlight),
             lineWidth: 0.8
         )
 
-        // Segmented limbs create a more recognisable human silhouette while
-        // remaining a single lightweight Canvas with no image allocation.
-        drawCapsule(
-            x: 0.185,
-            y: 0.225,
-            width: 0.105,
-            height: 0.205,
-            rotation: -0.07,
-            fill: base,
-            context: &context,
-            size: size
-        )
-        drawCapsule(
-            x: 0.145,
-            y: 0.405,
-            width: 0.078,
-            height: 0.205,
-            rotation: -0.025,
-            fill: base,
-            context: &context,
-            size: size
-        )
-        drawCapsule(
-            x: 0.71,
-            y: 0.225,
-            width: 0.105,
-            height: 0.205,
-            rotation: 0.07,
-            fill: base,
-            context: &context,
-            size: size
-        )
-        drawCapsule(
-            x: 0.777,
-            y: 0.405,
-            width: 0.078,
-            height: 0.205,
-            rotation: 0.025,
-            fill: base,
-            context: &context,
-            size: size
+        let neck =
+            CGRect(
+                x:
+                    size.width *
+                    0.462,
+                y:
+                    size.height *
+                    0.112,
+                width:
+                    size.width *
+                    0.076,
+                height:
+                    size.height *
+                    0.070
+            )
+        context.fill(
+            Path(
+                roundedRect: neck,
+                cornerRadius:
+                    neck.width * 0.40
+            ),
+            with: .color(base)
         )
 
-        drawCapsule(
-            x: 0.345,
-            y: 0.545,
-            width: 0.135,
-            height: 0.225,
-            rotation: -0.012,
-            fill: base,
-            context: &context,
-            size: size
+        let head =
+            CGRect(
+                x:
+                    size.width *
+                    0.405,
+                y:
+                    size.height *
+                    0.012,
+                width:
+                    size.width *
+                    0.190,
+                height:
+                    size.height *
+                    0.112
+            )
+        context.fill(
+            Path(ellipseIn: head),
+            with: .color(base)
         )
-        drawCapsule(
-            x: 0.52,
-            y: 0.545,
-            width: 0.135,
-            height: 0.225,
-            rotation: 0.012,
-            fill: base,
-            context: &context,
-            size: size
+        context.stroke(
+            Path(ellipseIn: head),
+            with: .color(outline),
+            lineWidth: 0.65
         )
-        drawCapsule(
-            x: 0.365,
-            y: 0.755,
-            width: 0.095,
-            height: 0.22,
-            rotation: 0.012,
-            fill: base,
-            context: &context,
-            size: size
+
+        // A barely visible centre reference keeps front/back orientation clear
+        // at detail size while disappearing naturally in compact cards.
+        var centreLine = Path()
+        centreLine.move(
+            to:
+                point(
+                    x: 0.5,
+                    y:
+                        side == .back
+                            ? 0.185
+                            : 0.255,
+                    size: size
+                )
         )
-        drawCapsule(
-            x: 0.54,
-            y: 0.755,
-            width: 0.095,
-            height: 0.22,
-            rotation: -0.012,
-            fill: base,
-            context: &context,
-            size: size
+        centreLine.addLine(
+            to:
+                point(
+                    x: 0.5,
+                    y: 0.535,
+                    size: size
+                )
+        )
+        context.stroke(
+            centreLine,
+            with:
+                .color(
+                    Color.black
+                        .opacity(
+                            side == .back
+                                ? 0.075
+                                : 0.040
+                        )
+                ),
+            lineWidth: 0.55
         )
     }
 
@@ -1258,8 +1566,8 @@ private struct StrengthBodyFigureCanvas:
             fill =
                 activationTint
                     .opacity(
-                        0.24 +
-                        intensity * 0.76
+                        0.22 +
+                        intensity * 0.74
                     )
 
         case .recoveryLoad:
@@ -1269,246 +1577,738 @@ private struct StrengthBodyFigureCanvas:
                 )
         }
 
+        let emphasis =
+            min(
+                max(
+                    CGFloat(intensity),
+                    0
+                ),
+                1
+            )
+
         switch (side, region) {
         case (.front, .chest):
-            ellipsePair(
-                y: 0.28,
-                width: 0.21,
-                height: 0.105,
-                spacing: 0.12,
+            organicPair(
+                centerY: 0.300,
+                width: 0.178,
+                height: 0.094,
+                spacing: 0.175,
+                lean: 0.18,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .frontDelts),
              (.front, .sideDelts):
-            circlePair(
-                y: 0.25,
-                diameter: 0.15,
-                spacing: 0.38,
+            organicPair(
+                centerY: 0.250,
+                width: 0.120,
+                height: 0.092,
+                spacing: 0.385,
+                lean: 0.42,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .rearDelts),
              (.back, .sideDelts):
-            circlePair(
-                y: 0.25,
-                diameter: 0.15,
-                spacing: 0.38,
+            organicPair(
+                centerY: 0.252,
+                width: 0.122,
+                height: 0.094,
+                spacing: 0.385,
+                lean: 0.34,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .biceps):
-            capsulePair(
-                y: 0.34,
-                width: 0.075,
-                height: 0.17,
-                spacing: 0.50,
+            organicPair(
+                centerY: 0.365,
+                width: 0.064,
+                height: 0.135,
+                spacing: 0.505,
+                lean: 0.18,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .triceps):
-            capsulePair(
-                y: 0.34,
-                width: 0.078,
-                height: 0.18,
-                spacing: 0.50,
+            organicPair(
+                centerY: 0.365,
+                width: 0.066,
+                height: 0.145,
+                spacing: 0.505,
+                lean: 0.16,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (_, .forearms):
-            capsulePair(
-                y: 0.47,
-                width: 0.060,
-                height: 0.17,
-                spacing: 0.56,
+            organicPair(
+                centerY: 0.495,
+                width: 0.050,
+                height: 0.135,
+                spacing: 0.570,
+                lean: 0.10,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .traps):
-            drawRounded(
-                x: 0.39,
-                y: 0.17,
-                width: 0.22,
-                height: 0.15,
-                radius: 0.05,
+            organicSingle(
+                centerX: 0.5,
+                centerY: 0.225,
+                width: 0.205,
+                height: 0.120,
+                lean: 0,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .upperBack):
-            drawRounded(
-                x: 0.33,
-                y: 0.27,
-                width: 0.34,
-                height: 0.13,
-                radius: 0.06,
+            organicPair(
+                centerY: 0.320,
+                width: 0.160,
+                height: 0.118,
+                spacing: 0.185,
+                lean: 0.22,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .lats):
-            capsulePair(
-                y: 0.33,
-                width: 0.115,
-                height: 0.23,
-                spacing: 0.22,
+            organicPair(
+                centerY: 0.405,
+                width: 0.106,
+                height: 0.205,
+                spacing: 0.225,
+                lean: 0.34,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .lowerBack):
-            drawRounded(
-                x: 0.40,
-                y: 0.43,
-                width: 0.20,
-                height: 0.13,
-                radius: 0.05,
+            organicSingle(
+                centerX: 0.5,
+                centerY: 0.480,
+                width: 0.170,
+                height: 0.115,
+                lean: 0,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .abs):
-            drawRounded(
-                x: 0.41,
-                y: 0.37,
-                width: 0.18,
-                height: 0.20,
-                radius: 0.04,
+            drawAbdominalStack(
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .obliques):
-            capsulePair(
-                y: 0.40,
-                width: 0.075,
-                height: 0.17,
-                spacing: 0.20,
+            organicPair(
+                centerY: 0.455,
+                width: 0.062,
+                height: 0.155,
+                spacing: 0.205,
+                lean: 0.30,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .serratus):
-            capsulePair(
-                y: 0.33,
-                width: 0.055,
-                height: 0.12,
-                spacing: 0.24,
+            organicPair(
+                centerY: 0.365,
+                width: 0.050,
+                height: 0.105,
+                spacing: 0.247,
+                lean: 0.44,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .glutes):
-            ellipsePair(
-                y: 0.55,
-                width: 0.17,
-                height: 0.105,
-                spacing: 0.13,
+            organicPair(
+                centerY: 0.565,
+                width: 0.138,
+                height: 0.090,
+                spacing: 0.135,
+                lean: 0.10,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .outerHip),
              (.back, .outerHip):
-            capsulePair(
-                y: 0.55,
-                width: 0.065,
-                height: 0.12,
-                spacing: 0.25,
+            organicPair(
+                centerY: 0.570,
+                width: 0.057,
+                height: 0.105,
+                spacing: 0.255,
+                lean: 0.34,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .innerThigh):
-            capsulePair(
-                y: 0.62,
-                width: 0.060,
-                height: 0.20,
-                spacing: 0.08,
+            organicPair(
+                centerY: 0.675,
+                width: 0.052,
+                height: 0.180,
+                spacing: 0.078,
+                lean: 0.12,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .hipFlexors):
-            capsulePair(
-                y: 0.55,
-                width: 0.055,
-                height: 0.11,
-                spacing: 0.12,
+            organicPair(
+                centerY: 0.585,
+                width: 0.050,
+                height: 0.095,
+                spacing: 0.118,
+                lean: 0.30,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .quads):
-            capsulePair(
-                y: 0.63,
-                width: 0.105,
-                height: 0.23,
-                spacing: 0.17,
+            organicPair(
+                centerY: 0.675,
+                width: 0.092,
+                height: 0.205,
+                spacing: 0.170,
+                lean: 0.10,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.back, .hamstrings):
-            capsulePair(
-                y: 0.64,
-                width: 0.105,
-                height: 0.23,
-                spacing: 0.17,
+            organicPair(
+                centerY: 0.682,
+                width: 0.090,
+                height: 0.205,
+                spacing: 0.170,
+                lean: 0.10,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .calves),
              (.back, .calves):
-            capsulePair(
-                y: 0.82,
-                width: 0.075,
-                height: 0.16,
-                spacing: 0.17,
+            organicPair(
+                centerY: 0.845,
+                width: 0.064,
+                height: 0.145,
+                spacing: 0.172,
+                lean: 0.08,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         case (.front, .shins):
-            capsulePair(
-                y: 0.81,
-                width: 0.044,
-                height: 0.17,
-                spacing: 0.17,
+            organicPair(
+                centerY: 0.842,
+                width: 0.038,
+                height: 0.150,
+                spacing: 0.172,
+                lean: 0.04,
                 fill: fill,
+                emphasis: emphasis,
                 context: &context,
                 size: size
             )
 
         default:
             break
+        }
+    }
+
+    private func point(
+        x: CGFloat,
+        y: CGFloat,
+        size: CGSize
+    ) -> CGPoint {
+        CGPoint(
+            x: size.width * x,
+            y: size.height * y
+        )
+    }
+
+    private func drawTaperedSegment(
+        from start: CGPoint,
+        to end: CGPoint,
+        startWidth: CGFloat,
+        endWidth: CGFloat,
+        curve: CGFloat,
+        fill: Color,
+        outline: Color,
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let startPoint =
+            point(
+                x: start.x,
+                y: start.y,
+                size: size
+            )
+        let endPoint =
+            point(
+                x: end.x,
+                y: end.y,
+                size: size
+            )
+        let dx =
+            endPoint.x -
+            startPoint.x
+        let dy =
+            endPoint.y -
+            startPoint.y
+        let length =
+            max(
+                sqrt(
+                    dx * dx +
+                    dy * dy
+                ),
+                0.001
+            )
+        let nx =
+            -dy / length
+        let ny =
+            dx / length
+        let startRadius =
+            size.width *
+            startWidth / 2
+        let endRadius =
+            size.width *
+            endWidth / 2
+        let bend =
+            size.width *
+            curve
+
+        let s1 =
+            CGPoint(
+                x:
+                    startPoint.x +
+                    nx *
+                    startRadius,
+                y:
+                    startPoint.y +
+                    ny *
+                    startRadius
+            )
+        let s2 =
+            CGPoint(
+                x:
+                    startPoint.x -
+                    nx *
+                    startRadius,
+                y:
+                    startPoint.y -
+                    ny *
+                    startRadius
+            )
+        let e1 =
+            CGPoint(
+                x:
+                    endPoint.x +
+                    nx *
+                    endRadius,
+                y:
+                    endPoint.y +
+                    ny *
+                    endRadius
+            )
+        let e2 =
+            CGPoint(
+                x:
+                    endPoint.x -
+                    nx *
+                    endRadius,
+                y:
+                    endPoint.y -
+                    ny *
+                    endRadius
+            )
+        let mid =
+            CGPoint(
+                x:
+                    (
+                        startPoint.x +
+                        endPoint.x
+                    ) / 2 +
+                    nx * bend,
+                y:
+                    (
+                        startPoint.y +
+                        endPoint.y
+                    ) / 2 +
+                    ny * bend
+            )
+
+        var path = Path()
+        path.move(to: s1)
+        path.addQuadCurve(
+            to: e1,
+            control:
+                CGPoint(
+                    x:
+                        mid.x +
+                        nx *
+                        (
+                            startRadius +
+                            endRadius
+                        ) * 0.45,
+                    y:
+                        mid.y +
+                        ny *
+                        (
+                            startRadius +
+                            endRadius
+                        ) * 0.45
+                )
+        )
+        path.addQuadCurve(
+            to: e2,
+            control:
+                CGPoint(
+                    x:
+                        endPoint.x -
+                        dx / length *
+                        endRadius * 0.55,
+                    y:
+                        endPoint.y -
+                        dy / length *
+                        endRadius * 0.55
+                )
+        )
+        path.addQuadCurve(
+            to: s2,
+            control:
+                CGPoint(
+                    x:
+                        mid.x -
+                        nx *
+                        (
+                            startRadius +
+                            endRadius
+                        ) * 0.45,
+                    y:
+                        mid.y -
+                        ny *
+                        (
+                            startRadius +
+                            endRadius
+                        ) * 0.45
+                )
+        )
+        path.addQuadCurve(
+            to: s1,
+            control:
+                CGPoint(
+                    x:
+                        startPoint.x -
+                        dx / length *
+                        startRadius * 0.45,
+                    y:
+                        startPoint.y -
+                        dy / length *
+                        startRadius * 0.45
+                )
+        )
+        path.closeSubpath()
+
+        context.fill(
+            path,
+            with: .color(fill)
+        )
+        context.stroke(
+            path,
+            with: .color(outline),
+            lineWidth: 0.65
+        )
+    }
+
+    private func organicPair(
+        centerY: CGFloat,
+        width: CGFloat,
+        height: CGFloat,
+        spacing: CGFloat,
+        lean: CGFloat,
+        fill: Color,
+        emphasis: CGFloat,
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        for sign in [-1.0, 1.0] {
+            let direction =
+                CGFloat(sign)
+            organicSingle(
+                centerX:
+                    0.5 +
+                    direction *
+                    spacing / 2,
+                centerY:
+                    centerY,
+                width: width,
+                height: height,
+                lean:
+                    lean *
+                    direction,
+                fill: fill,
+                emphasis: emphasis,
+                context: &context,
+                size: size
+            )
+        }
+    }
+
+    private func organicSingle(
+        centerX: CGFloat,
+        centerY: CGFloat,
+        width: CGFloat,
+        height: CGFloat,
+        lean: CGFloat,
+        fill: Color,
+        emphasis: CGFloat,
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let rect =
+            CGRect(
+                x:
+                    size.width *
+                    (
+                        centerX -
+                        width / 2
+                    ),
+                y:
+                    size.height *
+                    (
+                        centerY -
+                        height / 2
+                    ),
+                width:
+                    size.width *
+                    width,
+                height:
+                    size.height *
+                    height
+            )
+        let leanOffset =
+            rect.width *
+            lean * 0.18
+        let top =
+            CGPoint(
+                x:
+                    rect.midX +
+                    leanOffset,
+                y: rect.minY
+            )
+        let bottom =
+            CGPoint(
+                x:
+                    rect.midX -
+                    leanOffset,
+                y: rect.maxY
+            )
+
+        var path = Path()
+        path.move(to: top)
+        path.addCurve(
+            to: bottom,
+            control1:
+                CGPoint(
+                    x:
+                        rect.maxX +
+                        leanOffset * 0.35,
+                    y:
+                        rect.minY +
+                        rect.height * 0.28
+                ),
+            control2:
+                CGPoint(
+                    x:
+                        rect.maxX -
+                        leanOffset * 0.30,
+                    y:
+                        rect.minY +
+                        rect.height * 0.76
+                )
+        )
+        path.addCurve(
+            to: top,
+            control1:
+                CGPoint(
+                    x:
+                        rect.minX -
+                        leanOffset * 0.30,
+                    y:
+                        rect.minY +
+                        rect.height * 0.76
+                ),
+            control2:
+                CGPoint(
+                    x:
+                        rect.minX +
+                        leanOffset * 0.35,
+                    y:
+                        rect.minY +
+                        rect.height * 0.28
+                )
+        )
+        path.closeSubpath()
+
+        context.fill(
+            path,
+            with: .color(fill)
+        )
+        context.stroke(
+            path,
+            with:
+                .color(
+                    Color.white
+                        .opacity(
+                            0.10 +
+                            emphasis *
+                            0.14
+                        )
+                ),
+            lineWidth:
+                emphasis > 0.72
+                    ? 0.85
+                    : 0.55
+        )
+
+        if emphasis > 0.56 {
+            var highlightPath =
+                Path()
+            highlightPath.move(
+                to:
+                    CGPoint(
+                        x:
+                            rect.midX +
+                            leanOffset * 0.55,
+                        y:
+                            rect.minY +
+                            rect.height * 0.15
+                    )
+            )
+            highlightPath.addCurve(
+                to:
+                    CGPoint(
+                        x:
+                            rect.midX -
+                            leanOffset * 0.45,
+                        y:
+                            rect.minY +
+                            rect.height * 0.72
+                    ),
+                control1:
+                    CGPoint(
+                        x:
+                            rect.midX +
+                            rect.width * 0.13,
+                        y:
+                            rect.minY +
+                            rect.height * 0.32
+                    ),
+                control2:
+                    CGPoint(
+                        x:
+                            rect.midX +
+                            rect.width * 0.07,
+                        y:
+                            rect.minY +
+                            rect.height * 0.56
+                    )
+            )
+            context.stroke(
+                highlightPath,
+                with:
+                    .color(
+                        Color.white
+                            .opacity(
+                                0.10 +
+                                emphasis *
+                                0.10
+                            )
+                    ),
+                lineWidth: 0.65
+            )
+        }
+    }
+
+    private func drawAbdominalStack(
+        fill: Color,
+        emphasis: CGFloat,
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let rows: [
+            (
+                y: CGFloat,
+                width: CGFloat,
+                height: CGFloat
+            )
+        ] = [
+            (0.385, 0.066, 0.050),
+            (0.438, 0.064, 0.052),
+            (0.492, 0.058, 0.054)
+        ]
+
+        for row in rows {
+            organicPair(
+                centerY: row.y,
+                width: row.width,
+                height: row.height,
+                spacing: 0.072,
+                lean: 0.04,
+                fill: fill,
+                emphasis: emphasis,
+                context: &context,
+                size: size
+            )
         }
     }
 
