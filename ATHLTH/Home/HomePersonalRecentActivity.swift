@@ -2129,10 +2129,21 @@ struct HomePersonalActivityHistoryView:
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
     @State private var scope:
-        HomeActivityScopeFilter = .all
+        HomeActivityScopeFilter
     @State private var type:
         HomeActivityTypeFilter = .all
     @State private var loading = false
+
+    init(
+        showOnlyMine: Bool = false
+    ) {
+        _scope = State(
+            initialValue:
+                showOnlyMine
+                    ? .mine
+                    : .all
+        )
+    }
 
     private var allItems:
         [HomeActivityStreamItem] {
