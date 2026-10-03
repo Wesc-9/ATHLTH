@@ -97,12 +97,73 @@ enum PrestigeTrophyCatalog {
     static let ultra50KID =
         "signature.ultra-50k"
 
-    static let ids: Set<String> = [
-        halfMarathonID,
-        longRun30KID,
-        marathonID,
-        ultra50KID
+    // Difficult strength trophies. These stay separate from the evolving
+    // achievement series so they feel like major collectible milestones.
+    static let strength100SessionsID =
+        "trophy.strength.100-sessions"
+    static let strength250SessionsID =
+        "trophy.strength.250-sessions"
+    static let strength500SessionsID =
+        "trophy.strength.500-sessions"
+    static let strength100KVolumeID =
+        "trophy.strength.100k-volume"
+    static let strength500KVolumeID =
+        "trophy.strength.500k-volume"
+    static let strengthMillionVolumeID =
+        "trophy.strength.million-volume"
+    static let strength10KSessionVolumeID =
+        "trophy.strength.10k-session-volume"
+    static let strength20KSessionVolumeID =
+        "trophy.strength.20k-session-volume"
+    static let strength1000SetsID =
+        "trophy.strength.1000-working-sets"
+    static let strength25000RepsID =
+        "trophy.strength.25000-working-reps"
+
+    // Difficult running trophies based on verified Apple Health history.
+    static let running250SessionsID =
+        "trophy.running.250-sessions"
+    static let running500SessionsID =
+        "trophy.running.500-sessions"
+    static let running1000KID =
+        "trophy.running.1000-km"
+    static let running5000KID =
+        "trophy.running.5000-km"
+    static let running10000KID =
+        "trophy.running.10000-km"
+
+    static let strengthIDs: [String] = [
+        strength100SessionsID,
+        strength250SessionsID,
+        strength500SessionsID,
+        strength100KVolumeID,
+        strength500KVolumeID,
+        strengthMillionVolumeID,
+        strength10KSessionVolumeID,
+        strength20KSessionVolumeID,
+        strength1000SetsID,
+        strength25000RepsID
     ]
+
+    static let runningIDs: [String] = [
+        running250SessionsID,
+        running500SessionsID,
+        running1000KID,
+        running5000KID,
+        running10000KID
+    ]
+
+    static let ids: Set<String> =
+        Set(
+            [
+                halfMarathonID,
+                longRun30KID,
+                marathonID,
+                ultra50KID
+            ] +
+            strengthIDs +
+            runningIDs
+        )
 
     static func isPrestigeTrophy(
         _ id: String
@@ -179,6 +240,14 @@ struct TrophyHealthSnapshot: Hashable, Codable {
     let totalRunningDistanceMeters: Double
     let runningDistanceReachedAt: [Int: Date]
 
+    // Optional additions keep older disk caches decodable.
+    let runningWorkoutCount: Int?
+    let runningWorkoutCountReachedAt: [Int: Date]?
+    let maxWorkoutsInDay: Int?
+    let workoutDayDensityReachedAt: [Int: Date]?
+    let maxWorkoutsInWeek: Int?
+    let workoutWeekDensityReachedAt: [Int: Date]?
+
     let longestRunMeters: Double
     let firstFiveKDate: Date?
     let firstTenKDate: Date?
@@ -212,6 +281,13 @@ struct TrophyStrengthSnapshot: Hashable {
     let firstWeightedSetDate: Date?
     let totalVolumeKilograms: Double
     let volumeReachedAt: [Int: Date]
+
+    let completedWorkingSetCount: Int
+    let workingSetCountReachedAt: [Int: Date]
+    let totalWorkingRepetitions: Int
+    let workingRepetitionCountReachedAt: [Int: Date]
+    let maxWorkoutVolumeKilograms: Double
+    let workoutVolumeReachedAt: [Int: Date]
 }
 
 struct TrophyProgressItem: Identifiable, Hashable {
@@ -518,6 +594,34 @@ enum TrophyCatalog {
         ]
     )
 
+    static let workoutDayDensity = TrophySeriesDefinition(
+        id: "consistency.workouts-in-day",
+        title: "Double Shift",
+        subtitle: "Complete multiple recorded workouts on the same calendar day.",
+        category: .consistency,
+        verificationSource: .appleHealth,
+        systemImage: "calendar.badge.clock",
+        stages: [
+            .init(id: "2", title: "Double Shift", threshold: 2, displayTarget: "2 workouts in one day", rarity: .rare),
+            .init(id: "3", title: "Triple Session", threshold: 3, displayTarget: "3 workouts in one day", rarity: .epic),
+            .init(id: "4", title: "Full Send", threshold: 4, displayTarget: "4 workouts in one day", rarity: .signature)
+        ]
+    )
+
+    static let workoutWeekDensity = TrophySeriesDefinition(
+        id: "consistency.workouts-in-week",
+        title: "Packed Week",
+        subtitle: "Stack a high number of recorded workouts inside one calendar week.",
+        category: .consistency,
+        verificationSource: .appleHealth,
+        systemImage: "calendar.badge.checkmark",
+        stages: [
+            .init(id: "5", title: "Busy Week", threshold: 5, displayTarget: "5 workouts in one week", rarity: .rare),
+            .init(id: "7", title: "Seven Strong", threshold: 7, displayTarget: "7 workouts in one week", rarity: .epic),
+            .init(id: "10", title: "Packed Week", threshold: 10, displayTarget: "10 workouts in one week", rarity: .signature)
+        ]
+    )
+
     static let strengthSessions = TrophySeriesDefinition(
         id: "strength.sessions",
         title: "Built Under Load",
@@ -603,7 +707,9 @@ enum TrophyCatalog {
         stages: [
             .init(id: "1", title: "First Win", threshold: 1, displayTarget: "1 win", rarity: .rare),
             .init(id: "5", title: "Winner", threshold: 5, displayTarget: "5 wins", rarity: .epic),
-            .init(id: "25", title: "On Top", threshold: 25, displayTarget: "25 wins", rarity: .signature)
+            .init(id: "25", title: "On Top", threshold: 25, displayTarget: "25 wins", rarity: .signature),
+            .init(id: "50", title: "Dominant", threshold: 50, displayTarget: "50 wins", rarity: .signature),
+            .init(id: "100", title: "Untouchable", threshold: 100, displayTarget: "100 wins", rarity: .signature)
         ]
     )
 
@@ -617,7 +723,9 @@ enum TrophyCatalog {
         stages: [
             .init(id: "1", title: "Call Out", threshold: 1, displayTarget: "1 friend", rarity: .core),
             .init(id: "5", title: "Crew", threshold: 5, displayTarget: "5 friends", rarity: .rare),
-            .init(id: "10", title: "Call Them Out", threshold: 10, displayTarget: "10 friends", rarity: .epic)
+            .init(id: "10", title: "Call Them Out", threshold: 10, displayTarget: "10 friends", rarity: .epic),
+            .init(id: "25", title: "Challenge Network", threshold: 25, displayTarget: "25 friends", rarity: .signature),
+            .init(id: "50", title: "Everyone Gets One", threshold: 50, displayTarget: "50 friends", rarity: .signature)
         ]
     )
 
@@ -627,6 +735,8 @@ enum TrophyCatalog {
         walkingSessions,
         runningDistance,
         streak,
+        workoutDayDensity,
+        workoutWeekDensity,
         strengthSessions,
         strengthVolume,
         recoveryNights,
