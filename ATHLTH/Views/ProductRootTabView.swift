@@ -1243,65 +1243,68 @@ struct ATHLTHHomeView: View {
                     )
                 }
 
-                HStack(spacing: 9) {
-                    ZStack {
-                        Circle()
-                            .stroke(
-                                ATHLTHTheme
-                                    .vitality
-                                    .opacity(
-                                        0.16
-                                    ),
-                                lineWidth: 6
-                            )
-
-                        Circle()
-                            .trim(
-                                from: 0,
-                                to:
-                                    max(
-                                        min(
-                                            goal.progress,
-                                            1
-                                        ),
-                                        0
-                                    )
-                            )
-                            .stroke(
-                                ATHLTHTheme
-                                    .vitality,
+                HStack(spacing: 10) {
+                    ZStack(
+                        alignment:
+                            .bottomTrailing
+                    ) {
+                        GoalCoverView(
+                            goal: goal
+                        )
+                        .frame(
+                            width: 74,
+                            height: 74
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 16,
                                 style:
-                                    StrokeStyle(
-                                        lineWidth:
-                                            6,
-                                        lineCap:
-                                            .round
-                                    )
+                                    .continuous
                             )
-                            .rotationEffect(
-                                .degrees(
-                                    -90
-                                )
-                            )
+                        )
 
                         Text(
                             "\(Int((goal.progress * 100).rounded()))%"
                         )
                         .font(
                             .system(
-                                size: 12,
+                                size: 9,
                                 weight: .bold
                             )
                         )
                         .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
+                            .white
+                        )
+                        .padding(
+                            .horizontal,
+                            6
+                        )
+                        .padding(
+                            .vertical,
+                            4
+                        )
+                        .background(
+                            .black.opacity(
+                                0.58
+                            ),
+                            in: Capsule()
+                        )
+                        .padding(5)
+                    }
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 16,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.white
+                                .opacity(
+                                    0.62
+                                ),
+                            lineWidth: 0.8
                         )
                     }
-                    .frame(
-                        width: 50,
-                        height: 50
-                    )
 
                     VStack(
                         alignment: .leading,
