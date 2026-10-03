@@ -48,6 +48,70 @@ private func makeQuickStrengthSession() -> PlannedSession {
     )
 }
 
+private struct QuickStrengthWorkoutStartView:
+    View {
+    let trainingDeviceProvider:
+        TrainingDeviceProvider
+    let watchConnected: Bool
+    let defaultTracking:
+        StrengthTrackingPreference
+    let onStart: (
+        PlannedSession,
+        WorkoutCaptureDevice,
+        StrengthTrackingMode,
+        [SocialProfileCard],
+        WatchAudioCoachConfiguration,
+        StrengthAdvancedConfiguration
+    ) -> Void
+
+    @State private var session:
+        PlannedSession
+
+    init(
+        trainingDeviceProvider:
+            TrainingDeviceProvider,
+        watchConnected: Bool,
+        defaultTracking:
+            StrengthTrackingPreference,
+        onStart: @escaping (
+            PlannedSession,
+            WorkoutCaptureDevice,
+            StrengthTrackingMode,
+            [SocialProfileCard],
+            WatchAudioCoachConfiguration,
+            StrengthAdvancedConfiguration
+        ) -> Void
+    ) {
+        self.trainingDeviceProvider =
+            trainingDeviceProvider
+        self.watchConnected =
+            watchConnected
+        self.defaultTracking =
+            defaultTracking
+        self.onStart = onStart
+        _session =
+            State(
+                initialValue:
+                    makeQuickStrengthSession()
+            )
+    }
+
+    var body: some View {
+        WorkoutStartOptionsView(
+            session: session,
+            trainingDeviceProvider:
+                trainingDeviceProvider,
+            watchConnected:
+                watchConnected,
+            defaultCapture:
+                .automatic,
+            defaultTracking:
+                defaultTracking,
+            onStart: onStart
+        )
+    }
+}
+
 struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
 
@@ -523,17 +587,13 @@ struct ATHLTHHomeView: View {
                         }
                     }
                 } else if kind == .strength {
-                    WorkoutStartOptionsView(
-                        session:
-                            makeQuickStrengthSession(),
+                    QuickStrengthWorkoutStartView(
                         trainingDeviceProvider:
                             watchConnection.isReady
                                 ? .appleWatch
                                 : .none,
                         watchConnected:
                             watchConnection.isReady,
-                        defaultCapture:
-                            .automatic,
                         defaultTracking:
                             settings
                                 .defaultStrengthTracking
@@ -4266,17 +4326,13 @@ struct ATHLTHTrainView: View {
                 isPresented:
                     $showingStrengthQuickStart
             ) {
-                WorkoutStartOptionsView(
-                    session:
-                        makeQuickStrengthSession(),
+                QuickStrengthWorkoutStartView(
                     trainingDeviceProvider:
                         watchConnection.isReady
                             ? .appleWatch
                             : .none,
                     watchConnected:
                         watchConnection.isReady,
-                    defaultCapture:
-                        .automatic,
                     defaultTracking:
                         settings
                             .defaultStrengthTracking
