@@ -9450,7 +9450,11 @@ struct ATHLTHProfileView: View {
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            .padding(.top, 18)
+            // Keep the first profile card clear of the four hero stat cells.
+            // The pinned/immersive transition visually overlaps the content
+            // with the hero, so this needs a little more breathing room than
+            // the standard section spacing.
+            .padding(.top, 38)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
