@@ -3223,6 +3223,10 @@ final class AppSessionStore: ObservableObject {
         activateLocalAccount(profile.userID)
     }
 
+    func checkpointTrainingContent() {
+        persistAccountContent(immediate: true)
+    }
+
     private func activateLocalAccount(_ userID: UUID) {
         guard localAccountID != userID else { return }
         persistAccountContent(immediate: true)

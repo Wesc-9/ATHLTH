@@ -392,6 +392,7 @@ struct AppRootView: View {
             phoneWorkout.checkpoint()
             if phase != .active {
                 strengthWorkout.checkpoint()
+                appSession.checkpointTrainingContent()
             }
 
             if appSession.signedIn {
