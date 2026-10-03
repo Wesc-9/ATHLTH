@@ -4032,6 +4032,28 @@ struct CommunityGroupDetailView: View {
     @State private var showAllClubPosts = false
     @FocusState private var updateComposerFocused: Bool
 
+    // Club-only premium green palette. Keeping this local prevents the
+    // Community redesign from changing the visual language elsewhere.
+    private var clubForest: Color {
+        Color(red: 0.025, green: 0.30, blue: 0.21)
+    }
+
+    private var clubEmerald: Color {
+        Color(red: 0.055, green: 0.49, blue: 0.32)
+    }
+
+    private var clubLeaf: Color {
+        Color(red: 0.18, green: 0.62, blue: 0.35)
+    }
+
+    private var clubMint: Color {
+        Color(red: 0.90, green: 0.96, blue: 0.92)
+    }
+
+    private var clubSage: Color {
+        Color(red: 0.77, green: 0.88, blue: 0.81)
+    }
+
     private var currentGroup: CommunityGroupRecord {
         groups.groups.first {
             $0.id == group.id
@@ -4050,7 +4072,7 @@ struct CommunityGroupDetailView: View {
         GeometryReader { geometry in
             ZStack {
                 ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.premiumGold.opacity(0.16)
+                    accent: clubEmerald.opacity(0.16)
                 )
 
                 if isMember && selectedTab == .chat {
@@ -4221,10 +4243,8 @@ struct CommunityGroupDetailView: View {
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            ATHLTHTheme
-                                                .accentDeep,
-                                            ATHLTHTheme
-                                                .premiumGold
+                                            clubForest,
+                                            clubEmerald
                                         ],
                                         startPoint: .leading,
                                         endPoint: .trailing
@@ -4232,8 +4252,7 @@ struct CommunityGroupDetailView: View {
                                 )
                                 .shadow(
                                     color:
-                                        ATHLTHTheme
-                                            .premiumGold
+                                        clubEmerald
                                             .opacity(0.12),
                                     radius: 7,
                                     y: 3
@@ -4261,16 +4280,14 @@ struct CommunityGroupDetailView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .premiumGold
+                clubEmerald
                     .opacity(0.16),
                 lineWidth: 0.8
             )
         }
         .shadow(
             color:
-                ATHLTHTheme
-                    .accentDeep
+                clubForest
                     .opacity(0.05),
             radius: 10,
             y: 4
@@ -4312,7 +4329,7 @@ struct CommunityGroupDetailView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
+                    .tint(clubForest)
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.top, 12)
@@ -4373,7 +4390,7 @@ struct CommunityGroupDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
+                .tint(clubForest)
                 .padding(.top, 8)
             }
         }
@@ -4586,42 +4603,6 @@ struct CommunityGroupDetailView: View {
                         showingGroupSettings = true
                     } label: {
                         detailGroupImage
-                            .overlay(
-                                alignment:
-                                    .bottomTrailing
-                            ) {
-                                Image(
-                                    systemName:
-                                        "pencil"
-                                )
-                                .font(
-                                    .system(
-                                        size: 12,
-                                        weight:
-                                            .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    .white
-                                )
-                                .frame(
-                                    width: 30,
-                                    height: 30
-                                )
-                                .background(
-                                    ATHLTHTheme
-                                        .accentDeep,
-                                    in: Circle()
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            .white,
-                                            lineWidth:
-                                                2
-                                        )
-                                }
-                            }
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -4721,7 +4702,7 @@ struct CommunityGroupDetailView: View {
                 maxWidth: .infinity,
                 alignment: .leading
             )
-            .padding(.leading, 24)
+            .padding(.leading, 28)
             .padding(.trailing, 18)
             .padding(.bottom, 18)
         }
@@ -4740,7 +4721,7 @@ struct CommunityGroupDetailView: View {
         )
         .shadow(
             color:
-                ATHLTHTheme.accentDeep
+                clubForest
                     .opacity(0.10),
             radius: 18,
             y: 7
@@ -4822,8 +4803,8 @@ struct CommunityGroupDetailView: View {
 
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.accentDeep.opacity(0.10),
-                    ATHLTHTheme.vitality.opacity(0.12)
+                    clubForest.opacity(0.10),
+                    clubLeaf.opacity(0.12)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -4851,17 +4832,17 @@ struct CommunityGroupDetailView: View {
                 detailGroupImageFallback
             }
         }
-        .frame(width: 82, height: 82)
+        .frame(width: 76, height: 76)
         .fixedSize()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 20,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 23,
+                cornerRadius: 20,
                 style: .continuous
             )
             .stroke(
@@ -4884,8 +4865,8 @@ struct CommunityGroupDetailView: View {
             .background(
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme.accentDeep,
-                        ATHLTHTheme.premiumGold
+                        clubForest,
+                        clubEmerald
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -4948,8 +4929,7 @@ struct CommunityGroupDetailView: View {
                 } else {
                     Circle()
                         .fill(
-                            ATHLTHTheme
-                                .accentSoft
+                            clubMint
                         )
                         .frame(
                             width: 42,
@@ -4961,8 +4941,7 @@ struct CommunityGroupDetailView: View {
                                     "person.fill"
                             )
                             .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
+                                clubForest
                             )
                         }
                 }
@@ -5031,10 +5010,8 @@ struct CommunityGroupDetailView: View {
                     .background(
                         LinearGradient(
                             colors: [
-                                ATHLTHTheme
-                                    .accentDeep,
-                                ATHLTHTheme
-                                    .premiumGold
+                                clubForest,
+                                clubEmerald
                             ],
                             startPoint:
                                 .topLeading,
@@ -5045,8 +5022,7 @@ struct CommunityGroupDetailView: View {
                     )
                     .shadow(
                         color:
-                            ATHLTHTheme
-                                .accentDeep
+                            clubForest
                                 .opacity(0.18),
                         radius: 8,
                         y: 4
@@ -5092,8 +5068,7 @@ struct CommunityGroupDetailView: View {
                             icon:
                                 "slider.horizontal.3",
                             tint:
-                                ATHLTHTheme
-                                    .premiumGold
+                                clubEmerald
                         )
                     }
                     .buttonStyle(.plain)
@@ -5114,8 +5089,7 @@ struct CommunityGroupDetailView: View {
                             icon:
                                 "bubble.left.and.bubble.right.fill",
                             tint:
-                                ATHLTHTheme
-                                    .accentDeep
+                                clubForest
                         )
                     }
                     .buttonStyle(.plain)
@@ -5164,8 +5138,7 @@ struct CommunityGroupDetailView: View {
                                 ? "person.badge.plus"
                                 : "person.2.fill",
                         tint:
-                            ATHLTHTheme
-                                .accentDeep
+                            clubForest
                     )
                 }
                 .buttonStyle(.plain)
@@ -5212,8 +5185,7 @@ struct CommunityGroupDetailView: View {
                                     ),
                         icon: "calendar",
                         tint:
-                            ATHLTHTheme
-                                .accent
+                            clubEmerald
                     )
                 }
                 .buttonStyle(.plain)
@@ -5221,7 +5193,7 @@ struct CommunityGroupDetailView: View {
         }
         .padding(13)
         .background(
-            Color.white.opacity(0.88),
+            Color.white.opacity(0.94),
             in:
                 RoundedRectangle(
                     cornerRadius: 22,
@@ -5240,8 +5212,7 @@ struct CommunityGroupDetailView: View {
         }
         .shadow(
             color:
-                ATHLTHTheme
-                    .accentDeep
+                clubForest
                     .opacity(0.05),
             radius: 12,
             y: 5
@@ -5279,8 +5250,7 @@ struct CommunityGroupDetailView: View {
                             ),
                     icon: "trophy.fill",
                     tint:
-                        ATHLTHTheme
-                            .premiumGold
+                        clubEmerald
                 )
             }
             .buttonStyle(.plain)
@@ -5327,8 +5297,7 @@ struct CommunityGroupDetailView: View {
                                 ),
                     icon: "trophy.fill",
                     tint:
-                        ATHLTHTheme
-                            .premiumGold
+                        clubEmerald
                 )
             }
             .buttonStyle(.plain)
@@ -5422,9 +5391,9 @@ struct CommunityGroupDetailView: View {
         .background(
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.card,
-                    ATHLTHTheme.champagneSoft,
-                    tint.opacity(0.07)
+                    Color.white.opacity(0.98),
+                    clubMint.opacity(0.78),
+                    tint.opacity(0.08)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -5441,9 +5410,7 @@ struct CommunityGroupDetailView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .premiumGold
-                    .opacity(0.13),
+                clubSage.opacity(0.62),
                 lineWidth: 0.8
             )
         }
@@ -5505,10 +5472,9 @@ struct CommunityGroupDetailView: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    ATHLTHTheme
-                                        .premiumGold
+                                    clubEmerald
                                         .opacity(0.92),
-                                    .orange.opacity(0.88)
+                                    clubLeaf.opacity(0.88)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -5530,8 +5496,7 @@ struct CommunityGroupDetailView: View {
                 .frame(width: 58, height: 58)
                 .shadow(
                     color:
-                        ATHLTHTheme
-                            .premiumGold
+                        clubEmerald
                             .opacity(0.20),
                     radius: 10,
                     y: 4
@@ -5643,8 +5608,7 @@ struct CommunityGroupDetailView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                     )
                 }
 
@@ -5656,8 +5620,7 @@ struct CommunityGroupDetailView: View {
                 )
                 .font(.caption.bold())
                 .foregroundStyle(
-                    ATHLTHTheme
-                        .accentDeep
+                    clubForest
                         .opacity(0.65)
                 )
             }
@@ -5672,8 +5635,7 @@ struct CommunityGroupDetailView: View {
                     colors: [
                         Color.white
                             .opacity(0.96),
-                        ATHLTHTheme
-                            .premiumGoldSoft
+                        clubMint
                             .opacity(0.72),
                         ATHLTHTheme
                             .card
@@ -5693,16 +5655,14 @@ struct CommunityGroupDetailView: View {
                     style: .continuous
                 )
                 .stroke(
-                    ATHLTHTheme
-                        .premiumGold
+                    clubEmerald
                         .opacity(0.18),
                     lineWidth: 0.8
                 )
             }
             .shadow(
                 color:
-                    ATHLTHTheme
-                        .accentDeep
+                    clubForest
                         .opacity(0.06),
                 radius: 12,
                 y: 5
@@ -5738,8 +5698,7 @@ struct CommunityGroupDetailView: View {
 
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                             .opacity(0.58),
                         Color.clear
                     ],
@@ -5808,8 +5767,7 @@ struct CommunityGroupDetailView: View {
                             )
                         )
                         .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
+                            clubForest
                         )
                         .padding(
                             .horizontal,
@@ -5916,8 +5874,7 @@ struct CommunityGroupDetailView: View {
             }
             .shadow(
                 color:
-                    ATHLTHTheme
-                        .accentDeep
+                    clubForest
                         .opacity(0.12),
                 radius: 13,
                 y: 6
@@ -5948,13 +5905,10 @@ struct CommunityGroupDetailView: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        ATHLTHTheme
-                            .accentDeep,
-                        ATHLTHTheme
-                            .vitality
+                        clubForest,
+                        clubLeaf
                             .opacity(0.82),
-                        ATHLTHTheme
-                            .premiumGold
+                        clubEmerald
                             .opacity(0.72)
                     ],
                     startPoint: .topLeading,
@@ -6047,8 +6001,7 @@ struct CommunityGroupDetailView: View {
                             "calendar.badge.plus"
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                     )
 
                     Text(
@@ -6072,7 +6025,7 @@ struct CommunityGroupDetailView: View {
         }
         .padding(13)
         .background(
-            Color.white.opacity(0.88),
+            Color.white.opacity(0.94),
             in:
                 RoundedRectangle(
                     cornerRadius: 21,
@@ -6145,7 +6098,7 @@ struct CommunityGroupDetailView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.accentDeep
+                    clubForest
                 )
                 .padding(
                     .horizontal,
@@ -6153,8 +6106,7 @@ struct CommunityGroupDetailView: View {
                 )
                 .padding(.vertical, 3)
                 .background(
-                    ATHLTHTheme
-                        .accentSoft,
+                    clubMint,
                     in: Capsule()
                 )
 
@@ -6209,15 +6161,14 @@ struct CommunityGroupDetailView: View {
             )
             .font(.caption.bold())
             .foregroundStyle(
-                ATHLTHTheme.accentDeep
+                clubForest
             )
             .frame(
                 width: 34,
                 height: 34
             )
             .background(
-                ATHLTHTheme
-                    .accentSoft,
+                clubMint,
                 in: Circle()
             )
         }
@@ -6255,13 +6206,13 @@ struct CommunityGroupDetailView: View {
                     "trophy.fill"
             )
             .font(.title3)
-            .foregroundStyle(.orange)
+            .foregroundStyle(clubLeaf)
             .frame(
                 width: 46,
                 height: 46
             )
             .background(
-                Color.orange
+                clubLeaf
                     .opacity(0.10),
                 in:
                     RoundedRectangle(
@@ -6388,8 +6339,7 @@ struct CommunityGroupDetailView: View {
                             "text.bubble"
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                     )
 
                     Text(
@@ -6423,7 +6373,7 @@ struct CommunityGroupDetailView: View {
         }
         .padding(13)
         .background(
-            Color.white.opacity(0.88),
+            Color.white.opacity(0.94),
             in:
                 RoundedRectangle(
                     cornerRadius: 21,
@@ -6461,14 +6411,14 @@ struct CommunityGroupDetailView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.accentDeep
+                    clubForest
                 )
                 .frame(
                     width: 36,
                     height: 36
                 )
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    clubMint,
                     in:
                         RoundedRectangle(
                             cornerRadius: 11,
@@ -6513,8 +6463,7 @@ struct CommunityGroupDetailView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                     )
                 }
                 .buttonStyle(.plain)
@@ -6555,8 +6504,7 @@ struct CommunityGroupDetailView: View {
                 } else {
                     Circle()
                         .fill(
-                            ATHLTHTheme
-                                .accentSoft
+                            clubMint
                         )
                         .frame(
                             width: 39,
@@ -6569,8 +6517,7 @@ struct CommunityGroupDetailView: View {
                             )
                             .font(.caption)
                             .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
+                                clubForest
                             )
                         }
                 }
@@ -6608,8 +6555,7 @@ struct CommunityGroupDetailView: View {
                                 .caption2
                             )
                             .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
+                                clubForest
                             )
                         }
                     }
@@ -6845,9 +6791,9 @@ struct CommunityGroupDetailView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            ATHLTHTheme.accentDeep,
-                            ATHLTHTheme.accent,
-                            ATHLTHTheme.vitality
+                            clubForest,
+                            clubEmerald,
+                            clubLeaf
                                 .opacity(0.92)
                         ],
                         startPoint: .topLeading,
@@ -6972,7 +6918,7 @@ struct CommunityGroupDetailView: View {
             }
             .shadow(
                 color:
-                    ATHLTHTheme.accentDeep
+                    clubForest
                         .opacity(0.15),
                 radius: 18,
                 y: 9
@@ -7046,7 +6992,7 @@ struct CommunityGroupDetailView: View {
                                 )
                                 .background(
                                     index < 3
-                                        ? ATHLTHTheme.accent
+                                        ? clubEmerald
                                             .opacity(0.14)
                                         : Color.secondary
                                             .opacity(0.08),
@@ -7076,8 +7022,7 @@ struct CommunityGroupDetailView: View {
                                                     .weight(.bold)
                                             )
                                             .foregroundStyle(
-                                                ATHLTHTheme
-                                                    .accentDeep
+                                                clubForest
                                             )
                                     }
                                 }
@@ -7106,7 +7051,7 @@ struct CommunityGroupDetailView: View {
                                     .weight(.bold)
                             )
                             .foregroundStyle(
-                                ATHLTHTheme.accentDeep
+                                clubForest
                             )
                         }
                         .padding(.vertical, 9)
@@ -7200,10 +7145,10 @@ struct CommunityGroupDetailView: View {
             HStack(spacing: 9) {
                 Image(systemName: "megaphone.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(clubForest)
                     .frame(width: 34, height: 34)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        clubMint,
                         in: RoundedRectangle(
                             cornerRadius: 11,
                             style: .continuous
@@ -7267,7 +7212,7 @@ struct CommunityGroupDetailView: View {
                     .foregroundStyle(.white)
                     .frame(width: 42, height: 42)
                     .background(
-                        ATHLTHTheme.accentDeep,
+                        clubForest,
                         in: Circle()
                     )
                 }
@@ -7389,7 +7334,7 @@ struct CommunityGroupDetailView: View {
                                     comingUpChallengeDetail(
                                         challenge
                                     ),
-                                tint: ATHLTHTheme.vitality
+                                tint: clubLeaf
                             )
                         }
                         .buttonStyle(.plain)
@@ -7608,15 +7553,15 @@ struct CommunityGroupDetailView: View {
     ) -> Color {
         switch kind {
         case "member_joined":
-            return ATHLTHTheme.accent
+            return clubEmerald
         case "announcement":
-            return .orange
+            return clubLeaf
         case "event_created":
             return ATHLTHTheme.recoveryBlue
         case "challenge_created":
             return .green
         default:
-            return ATHLTHTheme.accent
+            return clubEmerald
         }
     }
 
@@ -7687,8 +7632,8 @@ struct CommunityGroupDetailView: View {
                 .font(.headline)
                 .foregroundStyle(
                     isPinned
-                        ? ATHLTHTheme.accentDeep
-                        : ATHLTHTheme.accentDeep
+                        ? clubForest
+                        : clubForest
                 )
 
                 Spacer()
@@ -7792,14 +7737,14 @@ struct CommunityGroupDetailView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(
                     liked
-                        ? ATHLTHTheme.accentDeep
+                        ? clubForest
                         : .secondary
                 )
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .background(
                     liked
-                        ? ATHLTHTheme.accent
+                        ? clubEmerald
                             .opacity(0.12)
                         : Color.secondary
                             .opacity(0.07),
@@ -7924,8 +7869,7 @@ struct CommunityGroupDetailView: View {
                         style: .continuous
                     )
                     .stroke(
-                        ATHLTHTheme
-                            .premiumGold
+                        clubEmerald
                             .opacity(0.16),
                         lineWidth: 1
                     )
@@ -7949,10 +7893,8 @@ struct CommunityGroupDetailView: View {
                         .background(
                             LinearGradient(
                                 colors: [
-                                    ATHLTHTheme
-                                        .accentDeep,
-                                    ATHLTHTheme
-                                        .premiumGold
+                                    clubForest,
+                                    clubEmerald
                                 ],
                                 startPoint:
                                     .topLeading,
@@ -8222,8 +8164,7 @@ struct CommunityGroupDetailView: View {
                                                     )
                                             )
                                             .foregroundStyle(
-                                                ATHLTHTheme
-                                                    .accentDeep
+                                                clubForest
                                             )
                                             .lineLimit(2)
                                         }
@@ -8442,10 +8383,8 @@ struct CommunityGroupDetailView: View {
                             .background(
                                 LinearGradient(
                                     colors: [
-                                        ATHLTHTheme
-                                            .accentDeep,
-                                        ATHLTHTheme
-                                            .premiumGold
+                                        clubForest,
+                                        clubEmerald
                                     ],
                                     startPoint:
                                         .topLeading,
@@ -8478,8 +8417,7 @@ struct CommunityGroupDetailView: View {
                                 "calendar.circle.fill"
                         )
                         .foregroundStyle(
-                            ATHLTHTheme
-                                .premiumGold
+                            clubEmerald
                         )
 
                         Text(
@@ -8504,8 +8442,7 @@ struct CommunityGroupDetailView: View {
                             )
                         )
                         .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
+                            clubForest
                         )
 
                         Spacer()
@@ -8642,10 +8579,8 @@ struct CommunityGroupDetailView: View {
                     )
                     .foregroundStyle(
                         planned
-                            ? ATHLTHTheme
-                                .premiumGold
-                            : ATHLTHTheme
-                                .accentDeep
+                            ? clubEmerald
+                            : clubForest
                     )
                     .frame(
                         width: 34,
@@ -8654,10 +8589,8 @@ struct CommunityGroupDetailView: View {
                     .background(
                         (
                             planned
-                                ? ATHLTHTheme
-                                    .premiumGoldSoft
-                                : ATHLTHTheme
-                                    .accentSoft
+                                ? clubMint
+                                : clubMint
                         ),
                         in:
                             RoundedRectangle(
@@ -8697,14 +8630,12 @@ struct CommunityGroupDetailView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme
-                        .accentDeep
+                    clubForest
                 )
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(
-                    ATHLTHTheme
-                        .champagneSoft,
+                    clubMint.opacity(0.72),
                     in: Capsule()
                 )
             }
@@ -8750,10 +8681,8 @@ struct CommunityGroupDetailView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            ATHLTHTheme
-                                .accentDeep,
-                            ATHLTHTheme
-                                .premiumGold
+                            clubForest,
+                            clubEmerald
                         ],
                         startPoint:
                             .topLeading,
@@ -8808,8 +8737,7 @@ struct CommunityGroupDetailView: View {
                     )
                     .tracking(0.6)
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        clubForest
                     )
                     .padding(
                         .horizontal,
@@ -8820,8 +8748,7 @@ struct CommunityGroupDetailView: View {
                         3
                     )
                     .background(
-                        ATHLTHTheme
-                            .premiumGoldSoft,
+                        clubMint,
                         in: Capsule()
                     )
                 }
@@ -8839,8 +8766,7 @@ struct CommunityGroupDetailView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme
-                        .accentDeep
+                    clubForest
                 )
 
                 Text(
@@ -8880,8 +8806,7 @@ struct CommunityGroupDetailView: View {
             LinearGradient(
                 colors: [
                     ATHLTHTheme.card,
-                    ATHLTHTheme
-                        .champagneSoft
+                    clubMint.opacity(0.72)
                 ],
                 startPoint:
                     .topLeading,
@@ -8900,8 +8825,7 @@ struct CommunityGroupDetailView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .premiumGold
+                clubEmerald
                     .opacity(0.14),
                 lineWidth: 0.8
             )
@@ -8915,7 +8839,7 @@ struct CommunityGroupDetailView: View {
     ) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(clubForest)
             Text(value)
                 .font(.headline.monospacedDigit())
             Text(title)
@@ -8989,10 +8913,8 @@ struct CommunityGroupDetailView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        ATHLTHTheme
-                                            .accentDeep,
-                                        ATHLTHTheme
-                                            .accent
+                                        clubForest,
+                                        clubEmerald
                                     ],
                                     startPoint:
                                         .topLeading,
@@ -9017,8 +8939,7 @@ struct CommunityGroupDetailView: View {
                         )
                         .stroke(
                             mine
-                                ? ATHLTHTheme
-                                    .premiumGold
+                                ? clubEmerald
                                     .opacity(0.22)
                                 : ATHLTHTheme
                                     .border
@@ -9109,7 +9030,7 @@ struct CommunityGroupDetailView: View {
                     )
                 )
                 .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(clubForest)
             }
 
             if let configuration =
@@ -9117,12 +9038,12 @@ struct CommunityGroupDetailView: View {
                 Text(configuration.compactSummary)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
-                        ATHLTHTheme.accentDeep
+                        clubForest
                     )
             }
 
             ProgressView(value: fraction)
-                .tint(ATHLTHTheme.accent)
+                .tint(clubEmerald)
 
             HStack {
                 Text(
@@ -9207,7 +9128,7 @@ struct CommunityGroupDetailView: View {
         case .live:
             return .green
         case .completed:
-            return ATHLTHTheme.accent
+            return clubEmerald
         case .cancelled:
             return .red
         }
