@@ -52,7 +52,11 @@ final class APNsPushManager: ObservableObject {
             platform: "ios",
             appBundleID: Bundle.main.bundleIdentifier ?? "com.wesc9.athlth",
             apnsEnvironment: Self.apnsEnvironment,
-            apnsToken: token
+            apnsToken: token,
+            languageCode:
+                ATHLTHLocalization.isNorwegian
+                    ? "nb"
+                    : "en"
         )
 
         do {
@@ -169,6 +173,7 @@ private struct RegisterNotificationDeviceParams: Encodable {
     let appBundleID: String
     let apnsEnvironment: String
     let apnsToken: String
+    let languageCode: String
 
     enum CodingKeys: String, CodingKey {
         case deviceID = "p_device_id"
@@ -176,6 +181,7 @@ private struct RegisterNotificationDeviceParams: Encodable {
         case appBundleID = "p_app_bundle_id"
         case apnsEnvironment = "p_apns_environment"
         case apnsToken = "p_apns_token"
+        case languageCode = "p_language_code"
     }
 }
 
