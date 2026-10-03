@@ -4479,7 +4479,7 @@ struct GoalCreationView: View {
             category: category,
             createdAt: now,
             startDate: now,
-            deadline: (hasDeadline || category == .event) ? deadline : nil,
+            deadline: hasDeadline ? deadline : nil,
             coverStyle: coverStyle,
             whyItMatters: whyItMatters.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
