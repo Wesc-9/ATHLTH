@@ -3002,58 +3002,60 @@ struct HomeWeeklyProgressStrip:
         }
     }
 
+    // Weekly progress is activity based: every completed workout counts,
+    // while unfinished planned sessions remain in the denominator.
     private var completedCount:
         Int {
-        if plannedCount == 0 {
-            return
-                visibleWorkouts.count
-        }
+        visibleWorkouts.count
+    }
 
-        return visibleWeekDates.reduce(
+    private var unfinishedPlannedCount:
+        Int {
+        visibleWeekDates.reduce(
             0
         ) { total, date in
             let planned =
                 plannedSessions(
                     for: date
                 )
-            return total +
+            let completed =
                 completedPlanSessionIDs(
                     date: date,
                     planned: planned
                 )
-                .count
+
+            return total +
+                max(
+                    planned.count -
+                        completed.count,
+                    0
+                )
         }
+    }
+
+    private var weeklyTotalCount:
+        Int {
+        completedCount +
+            unfinishedPlannedCount
     }
 
     private var progress:
         Double {
-        guard plannedCount > 0
+        guard weeklyTotalCount > 0
         else {
-            return
-                visibleWorkouts
-                    .isEmpty
-                    ? 0
-                    : min(
-                        Double(
-                            visibleWorkouts
-                                .count
-                        ) / 5.0,
-                        1
-                    )
+            return 0
         }
 
         return min(
             Double(completedCount) /
-                Double(plannedCount),
+                Double(weeklyTotalCount),
             1
         )
     }
 
     private var progressText:
         String {
-        plannedCount > 0
-            ? "\(completedCount) av \(plannedCount)"
-            : "\(visibleWorkouts.count) økter"
+        "\(completedCount) av \(weeklyTotalCount)"
     }
 
     private var canAdvance:
