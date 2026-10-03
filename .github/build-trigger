@@ -517,3 +517,4 @@ performance-audit-build: 2026-10-03T10:14+02:00
 performance-audit-final-build: 2026-10-03T10:30+02:00
 Validate 1.5.7 full performance cleanup 2026-10-03
 performance-cleanup-head: 7de5686a42a00957fe9b233f9462b00cddf98a83
+performance-cleanup-final-head: ce2e0ae034218dac165bef8d3b64122af0448bd8
