@@ -349,8 +349,8 @@ struct ATHLTHHomeView: View {
                             homeRecoveryTrendSnapshot,
                         sleepText:
                             homeSleepMetricText,
-                        restingHeartRateText:
-                            homeRestingHeartRateMetricText,
+                        respiratoryRateText:
+                            homeRespiratoryRateMetricText,
                         hrvText:
                             homeHRVMetricText,
                         loadText:
@@ -1027,17 +1027,23 @@ struct ATHLTHHomeView: View {
         return health.sleep.totalAsleep.shortDuration
     }
 
-    private var homeRestingHeartRateMetricText: String {
+    private var homeRespiratoryRateMetricText: String {
         guard let value =
-                health.heart.restingHeartRate,
+                homeRecoveryTrendSnapshot.days
+                    .reversed()
+                    .compactMap(\.respiratoryRate)
+                    .first,
               value.isFinite,
               value > 0
         else {
             return "—"
         }
 
-        return
-            "\(Int(value.rounded())) bpm"
+        return String(
+            format: "%.1f/min",
+            locale: Locale.current,
+            value
+        )
     }
 
     private var homeHRVMetricText: String {
