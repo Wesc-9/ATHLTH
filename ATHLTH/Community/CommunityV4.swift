@@ -603,7 +603,7 @@ struct ATHLTHCommunityV4View: View {
                                     norwegian: "Offentlige events og challenges vises her."
                                 ),
                             assetName:
-                                "GoalAdventure",
+                                "GoalAdventureThumbnail",
                             icon:
                                 "sparkles"
                         )
@@ -2665,7 +2665,8 @@ private struct CommunityDiscoveryClubCard:
                         group.headerImageURL ??
                         group.imageURL,
                     fallbackAssetName:
-                        "CommunityHero"
+                        "CommunityHero",
+                    maxPixelSize: 420
                 )
                 .frame(
                     maxWidth: .infinity
@@ -2886,7 +2887,8 @@ private struct CommunityDiscoveryClubCard:
                 group.imageURL ??
                 group.headerImageURL,
             fallbackAssetName:
-                "CommunityHero"
+                "CommunityHero",
+            maxPixelSize: 220
         )
     }
 }
@@ -2943,11 +2945,11 @@ private struct CommunityDiscoveryChallengeCard:
         String {
         switch challenge.sport {
         case .running:
-            return "GoalRunning"
+            return "GoalRunningThumbnail"
         case .strength:
-            return "GoalStrength"
+            return "GoalStrengthThumbnail"
         case .heartRate:
-            return "GoalRecovery"
+            return "GoalRecoveryThumbnail"
         }
     }
 
@@ -3019,19 +3021,19 @@ private struct CommunityDiscoveryEventCard:
         String {
         switch item.event.activityType {
         case .running:
-            return "GoalRunning"
+            return "GoalRunningThumbnail"
         case .walking:
-            return "GoalWalking"
+            return "GoalWalkingThumbnail"
         case .strength:
-            return "GoalStrength"
+            return "GoalStrengthThumbnail"
         case .cycling:
-            return "GoalEndurance"
+            return "GoalEnduranceThumbnail"
         case .hike:
-            return "GoalMountain"
+            return "GoalMountainThumbnail"
         case .groupWorkout:
             return "CommunityHero"
         case .other:
-            return "GoalAdventure"
+            return "GoalAdventureThumbnail"
         }
     }
 }
