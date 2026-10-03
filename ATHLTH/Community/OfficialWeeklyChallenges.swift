@@ -3356,6 +3356,7 @@ struct OfficialWeeklyChallengeAdminListView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var editorSeed: OfficialWeeklyChallengeEditorSeed?
+    @State private var showingTemplates = false
     @State private var challengeToDelete: OfficialWeeklyChallenge?
     @State private var isWorking = false
 
@@ -3383,6 +3384,27 @@ struct OfficialWeeklyChallengeAdminListView: View {
                                 adminRow(challenge)
                             }
                         }
+                    }
+
+                    Section {
+                        Button {
+                            showingTemplates = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Seasonal challenge templates",
+                                    norwegian: "Sesongbaserte challenge-maler"
+                                ),
+                                systemImage: "sparkles.rectangle.stack"
+                            )
+                        }
+                    } footer: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Ready-made ideas for seasons, holidays and special weeks.",
+                                norwegian: "Ferdige ideer for årstider, høytider og spesielle uker."
+                            )
+                        )
                     }
                 }
                 .navigationTitle("Weekly Challenges")
@@ -3435,6 +3457,19 @@ struct OfficialWeeklyChallengeAdminListView: View {
                 .sheet(item: $editorSeed) { seed in
                     NavigationStack {
                         OfficialWeeklyChallengeEditorView(seed: seed)
+                    }
+                }
+                .sheet(isPresented: $showingTemplates) {
+                    NavigationStack {
+                        OfficialWeeklyChallengeTemplatePicker(
+                            window: store.nextAvailableWindow()
+                        ) { template in
+                            showingTemplates = false
+                            editorSeed = .template(
+                                template,
+                                window: store.nextAvailableWindow()
+                            )
+                        }
                     }
                 }
                 .confirmationDialog(
@@ -3694,6 +3729,22 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
         )
     }
 
+    static func template(
+        _ template: OfficialWeeklyChallengeTemplate,
+        window: (Date, Date)
+    ) -> Self {
+        Self(
+            existing: nil,
+            title: template.title,
+            subtitle: template.subtitle,
+            kind: template.kind,
+            targetValue: template.targetValue,
+            startsAt: window.0,
+            endsAt: window.1,
+            source: "template"
+        )
+    }
+
     static func ai(
         draft: OfficialWeeklyChallengeAIDraft,
         startsAt: Date,
@@ -3709,6 +3760,101 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
             endsAt: endsAt,
             source: "ai"
         )
+    }
+}
+
+struct OfficialWeeklyChallengeTemplate: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let kind: OfficialRunningChallengeKind
+    let targetValue: Double
+    let season: String
+    let icon: String
+
+    static let seasonal: [Self] = [
+        .init(id: "new-year", title: "New Year Kickoff", subtitle: "Start the year strong with a fresh week of movement.", kind: .distance, targetValue: 25, season: "JANUARY", icon: "sparkles"),
+        .init(id: "winter", title: "Winter Miles", subtitle: "Keep moving through the coldest week.", kind: .distance, targetValue: 30, season: "WINTER", icon: "snowflake"),
+        .init(id: "valentine", title: "Heart Run", subtitle: "Collect a week of heart-healthy kilometres.", kind: .distance, targetValue: 21, season: "VALENTINE", icon: "heart.fill"),
+        .init(id: "easter", title: "Easter Hunt", subtitle: "Find your kilometres across the Easter week.", kind: .distance, targetValue: 30, season: "EASTER", icon: "hare.fill"),
+        .init(id: "spring", title: "Spring Reset", subtitle: "A fresh-air challenge for brighter days.", kind: .distance, targetValue: 35, season: "SPRING", icon: "leaf.fill"),
+        .init(id: "may17", title: "17. mai Miles", subtitle: "Celebrate Norway with a festive week of movement.", kind: .distance, targetValue: 17, season: "17. MAI", icon: "flag.fill"),
+        .init(id: "midsummer", title: "Midnight Sun", subtitle: "Make the most of the long Nordic summer days.", kind: .distance, targetValue: 50, season: "SUMMER", icon: "sun.max.fill"),
+        .init(id: "summer-streak", title: "Summer Streak", subtitle: "Build consistency through a bright summer week.", kind: .sessions, targetValue: 5, season: "SUMMER", icon: "flame.fill"),
+        .init(id: "back-to-routine", title: "Back to Routine", subtitle: "Reset your rhythm after summer.", kind: .sessions, targetValue: 5, season: "AUTUMN", icon: "arrow.triangle.2.circlepath"),
+        .init(id: "autumn", title: "Autumn 40", subtitle: "Collect 40 km as the season changes.", kind: .distance, targetValue: 40, season: "AUTUMN", icon: "leaf.fill"),
+        .init(id: "halloween", title: "Halloween Night Run", subtitle: "A spooky week of running before the final bell.", kind: .distance, targetValue: 31, season: "HALLOWEEN", icon: "moon.stars.fill"),
+        .init(id: "black-friday", title: "Black Week 50", subtitle: "Skip the queue. Collect kilometres instead.", kind: .distance, targetValue: 50, season: "NOVEMBER", icon: "bolt.fill"),
+        .init(id: "advent", title: "Advent Streak", subtitle: "Keep the routine alive through a busy December week.", kind: .sessions, targetValue: 5, season: "ADVENT", icon: "star.fill"),
+        .init(id: "christmas", title: "Christmas Run", subtitle: "Move through Christmas week at your own pace.", kind: .distance, targetValue: 24, season: "CHRISTMAS", icon: "gift.fill"),
+        .init(id: "romjul", title: "Romjul Reset", subtitle: "Fresh air and easy kilometres between Christmas and New Year.", kind: .distance, targetValue: 20, season: "CHRISTMAS", icon: "snowflake"),
+        .init(id: "year-end", title: "Finish Strong", subtitle: "Close the year with one final push.", kind: .distance, targetValue: 50, season: "NEW YEAR", icon: "flag.checkered")
+    ]
+}
+
+private struct OfficialWeeklyChallengeTemplatePicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let window: (Date, Date)
+    let onSelect: (OfficialWeeklyChallengeTemplate) -> Void
+
+    var body: some View {
+        List {
+            ForEach(OfficialWeeklyChallengeTemplate.seasonal) { template in
+                Button {
+                    onSelect(template)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: template.icon)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.premiumGold.opacity(0.10),
+                                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            )
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(template.season)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(0.8)
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                            Text(template.title)
+                                .font(.headline)
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(template.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .lineLimit(2)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Challenge Templates",
+                norwegian: "Challenge-maler"
+            )
+        )
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Close",
+                        norwegian: "Lukk"
+                    )
+                ) {
+                    dismiss()
+                }
+            }
+        }
     }
 }
 
