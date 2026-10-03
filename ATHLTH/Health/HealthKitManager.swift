@@ -1302,9 +1302,81 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        let runThresholds = [25_000, 100_000, 500_000, 2_500_000]
+        let calendar = Calendar.current
+        let dayDensityThresholds = [2, 3, 4]
+        let weekDensityThresholds = [5, 7, 10]
+        var workoutsByDay: [Date: Int] = [:]
+        var workoutsByWeek: [String: Int] = [:]
+        var workoutDayDensityReachedAt: [Int: Date] = [:]
+        var workoutWeekDensityReachedAt: [Int: Date] = [:]
+        var maxWorkoutsInDay = 0
+        var maxWorkoutsInWeek = 0
+
+        for workout in workouts {
+            let day =
+                calendar.startOfDay(
+                    for: workout.startDate
+                )
+            let dayCount =
+                (workoutsByDay[day] ?? 0) + 1
+            workoutsByDay[day] = dayCount
+            maxWorkoutsInDay =
+                max(
+                    maxWorkoutsInDay,
+                    dayCount
+                )
+
+            for threshold in dayDensityThresholds
+            where workoutDayDensityReachedAt[threshold] == nil &&
+                    dayCount >= threshold {
+                workoutDayDensityReachedAt[threshold] =
+                    workout.endDate
+            }
+
+            let weekYear =
+                calendar.component(
+                    .yearForWeekOfYear,
+                    from: workout.startDate
+                )
+            let week =
+                calendar.component(
+                    .weekOfYear,
+                    from: workout.startDate
+                )
+            let weekKey =
+                "\(weekYear)-\(week)"
+            let weekCount =
+                (workoutsByWeek[weekKey] ?? 0) + 1
+            workoutsByWeek[weekKey] =
+                weekCount
+            maxWorkoutsInWeek =
+                max(
+                    maxWorkoutsInWeek,
+                    weekCount
+                )
+
+            for threshold in weekDensityThresholds
+            where workoutWeekDensityReachedAt[threshold] == nil &&
+                    weekCount >= threshold {
+                workoutWeekDensityReachedAt[threshold] =
+                    workout.endDate
+            }
+        }
+
+        let runThresholds = [
+            25_000,
+            100_000,
+            500_000,
+            1_000_000,
+            2_500_000,
+            5_000_000,
+            10_000_000
+        ]
         var runningDistanceReachedAt: [Int: Date] = [:]
         var cumulativeRunDistance = 0.0
+        var runningWorkoutCount = 0
+        var runningWorkoutCountReachedAt: [Int: Date] = [:]
+        let runningWorkoutThresholds = [250, 500]
         var longestRunMeters = 0.0
         var firstFiveKDate: Date?
         var firstTenKDate: Date?
@@ -1320,6 +1392,15 @@ final class HealthKitManager: ObservableObject {
             PrestigeRunEvidence?
 
         for workout in workouts where workout.workoutActivityType == .running {
+            runningWorkoutCount += 1
+
+            for threshold in runningWorkoutThresholds
+            where runningWorkoutCountReachedAt[threshold] == nil &&
+                    runningWorkoutCount >= threshold {
+                runningWorkoutCountReachedAt[threshold] =
+                    workout.endDate
+            }
+
             let distance = workout.athlthDistanceMeters ?? 0
             guard distance > 0 else { continue }
 
@@ -1590,6 +1671,18 @@ final class HealthKitManager: ObservableObject {
             workoutCountReachedAt: workoutCountReachedAt,
             totalRunningDistanceMeters: cumulativeRunDistance,
             runningDistanceReachedAt: runningDistanceReachedAt,
+            runningWorkoutCount:
+                runningWorkoutCount,
+            runningWorkoutCountReachedAt:
+                runningWorkoutCountReachedAt,
+            maxWorkoutsInDay:
+                maxWorkoutsInDay,
+            workoutDayDensityReachedAt:
+                workoutDayDensityReachedAt,
+            maxWorkoutsInWeek:
+                maxWorkoutsInWeek,
+            workoutWeekDensityReachedAt:
+                workoutWeekDensityReachedAt,
             longestRunMeters: longestRunMeters,
             firstFiveKDate: firstFiveKDate,
             firstTenKDate: firstTenKDate,
