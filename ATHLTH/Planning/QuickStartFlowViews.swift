@@ -558,8 +558,23 @@ private struct QuickStartAutoPauseCard: View {
 private struct QuickTrainingHeroCard: View {
     let imageName: String
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let icon: String
+    let height: CGFloat
+
+    init(
+        imageName: String,
+        title: String,
+        subtitle: String? = nil,
+        icon: String,
+        height: CGFloat = 148
+    ) {
+        self.imageName = imageName
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.height = height
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -656,20 +671,23 @@ private struct QuickTrainingHeroCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
 
-                    Text(subtitle)
-                        .font(
-                            .subheadline
-                                .weight(.medium)
-                        )
-                        .foregroundStyle(
-                            Color.white
-                                .opacity(0.86)
-                        )
-                        .lineLimit(2)
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
+                    if let subtitle,
+                       !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(
+                                .subheadline
+                                    .weight(.medium)
+                            )
+                            .foregroundStyle(
+                                Color.white
+                                    .opacity(0.86)
+                            )
+                            .lineLimit(2)
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -679,7 +697,7 @@ private struct QuickTrainingHeroCard: View {
         .frame(
             maxWidth: .infinity
         )
-        .frame(height: 148)
+        .frame(height: height)
         .background(Color.black)
         .clipShape(
             RoundedRectangle(
@@ -920,13 +938,13 @@ struct RunQuickStartSheet: View {
 
                     selectionCard
 
-                    WorkoutGearSelectionCard(
-                        selectedGearIDs: $selectedGearIDs,
-                        activity: .running
-                    )
-
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
+                            WorkoutGearSelectionCard(
+                                selectedGearIDs: $selectedGearIDs,
+                                activity: .running
+                            )
+
                             QuickStartAutoPauseCard(
                                 preference: $autoPausePreference,
                                 appDefaultEnabled:
@@ -1205,18 +1223,9 @@ struct RunQuickStartSheet: View {
                     english: "Start Run",
                     norwegian: "Start løpeøkt"
                 ),
-            subtitle:
-                ATHLTHLocalization.choose(
-                    english:
-                        isAdvancedSetup
-                            ? "Routes, guidance and social options."
-                            : "Fast setup with the essentials.",
-                    norwegian:
-                        isAdvancedSetup
-                            ? "Ruter, veiledning og sosiale valg."
-                            : "Raskt oppsett med det viktigste."
-                ),
-            icon: "figure.run"
+            subtitle: nil,
+            icon: "figure.run",
+            height: 172
         )
     }
 
