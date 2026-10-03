@@ -6,11 +6,13 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: (
+        PlannedSession,
         WorkoutCaptureDevice,
         StrengthTrackingMode,
         [SocialProfileCard],
@@ -35,6 +37,11 @@ struct WorkoutStartOptionsView: View {
         WatchStrengthInputMode = .both
     @State private var effortMetric:
         StrengthEffortMetric = .off
+    @State private var configuredExercises:
+        [PlannedExercise]
+    @State private var showingExerciseLibrary = false
+    @State private var exerciseBeingEdited:
+        PlannedExercise?
 
     @State private var showingSpotifyPicker = false
     @State private var didLoadSpotifySelection = false
@@ -50,6 +57,7 @@ struct WorkoutStartOptionsView: View {
         defaultCapture: WorkoutCapturePreference,
         defaultTracking: StrengthTrackingPreference,
         onStart: @escaping (
+            PlannedSession,
             WorkoutCaptureDevice,
             StrengthTrackingMode,
             [SocialProfileCard],
@@ -75,6 +83,9 @@ struct WorkoutStartOptionsView: View {
         _captureDevice = State(initialValue: initialDevice)
         _trackingMode = State(
             initialValue: defaultTracking == .advanced ? .advanced : .simple
+        )
+        _configuredExercises = State(
+            initialValue: session.exercises
         )
         _selectedSpotifyPlaylist = State(
             initialValue:
@@ -118,6 +129,8 @@ struct WorkoutStartOptionsView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     strengthIntroCard
+
+                    exerciseSelectionCard
 
                     ATHLTHCard {
                         HStack(spacing: 8) {
@@ -353,6 +366,43 @@ struct WorkoutStartOptionsView: View {
                 if social.trainingPartners.isEmpty {
                     await social.refresh()
                 }
+
+                if exerciseLibrary.entries.isEmpty {
+                    await exerciseLibrary.refresh()
+                }
+            }
+            .sheet(
+                isPresented: $showingExerciseLibrary
+            ) {
+                NavigationStack {
+                    ExerciseLibraryView(
+                        selectionTitle:
+                            ATHLTHLocalization.choose(
+                                english: "Add to Workout",
+                                norwegian: "Legg til i økten"
+                            )
+                    ) { entry in
+                        addExercise(entry.exercise)
+                        showingExerciseLibrary = false
+                    }
+                }
+            }
+            .sheet(item: $exerciseBeingEdited) { exercise in
+                PlannedExerciseEditorView(
+                    exercise: exercise
+                ) { updated in
+                    if let index =
+                        configuredExercises
+                            .firstIndex(
+                                where: {
+                                    $0.id == updated.id
+                                }
+                            ) {
+                        configuredExercises[index] =
+                            updated
+                    }
+                    exerciseBeingEdited = nil
+                }
             }
             .sheet(
                 isPresented: $showingSpotifyPicker
@@ -535,6 +585,7 @@ struct WorkoutStartOptionsView: View {
                 restCues.hapticsEnabled
 
             onStart(
+                configuredSession,
                 captureDevice,
                 trackingMode,
                 selectedFriends,
@@ -701,10 +752,323 @@ struct WorkoutStartOptionsView: View {
         .buttonStyle(.plain)
     }
 
+    private var configuredSession:
+        PlannedSession {
+        var configured = session
+        configured.exercises =
+            configuredExercises
+        return configured
+    }
+
+    private var exerciseSelectionCard:
+        some View {
+        ATHLTHCard {
+            HStack(spacing: 8) {
+                RoundedRectangle(
+                    cornerRadius: 2,
+                    style: .continuous
+                )
+                .fill(
+                    ATHLTHTheme
+                        .premiumGold
+                )
+                .frame(
+                    width: 4,
+                    height: 26
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Exercises",
+                        norwegian: "Øvelser"
+                    )
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+
+                Spacer()
+
+                if !configuredExercises
+                    .isEmpty {
+                    Text(
+                        "\(configuredExercises.count)"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .frame(height: 26)
+                    .background(
+                        Color.primary
+                            .opacity(0.05),
+                        in: Capsule()
+                    )
+                }
+            }
+
+            if configuredExercises
+                .isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No exercises selected yet. Add exercises now, or start freestyle and add them during the workout.",
+                        norwegian:
+                            "Ingen øvelser er valgt ennå. Legg dem til nå, eller start freestyle og legg dem til under økten."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .padding(.top, 4)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(
+                        Array(
+                            configuredExercises
+                                .enumerated()
+                        ),
+                        id: \.element.id
+                    ) { index, exercise in
+                        HStack(spacing: 10) {
+                            Button {
+                                exerciseBeingEdited =
+                                    exercise
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(
+                                        "\(index + 1)"
+                                    )
+                                    .font(
+                                        .caption
+                                            .bold()
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .accent
+                                    )
+                                    .frame(
+                                        width: 28,
+                                        height: 28
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .accentSoft,
+                                        in: Circle()
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 2
+                                    ) {
+                                        Text(
+                                            exercise
+                                                .embeddedExercise
+                                                .name
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                        .lineLimit(1)
+
+                                        Text(
+                                            exerciseSummary(
+                                                exercise
+                                            )
+                                        )
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .tertiary
+                                    )
+                                }
+                                .contentShape(
+                                    Rectangle()
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            Button(
+                                role: .destructive
+                            ) {
+                                configuredExercises
+                                    .remove(
+                                        at: index
+                                    )
+                            } label: {
+                                Image(
+                                    systemName:
+                                        "trash"
+                                )
+                                .font(
+                                    .system(
+                                        size: 14,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .frame(
+                                    width: 34,
+                                    height: 34
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(
+                            .vertical,
+                            2
+                        )
+                    }
+                }
+                .padding(.top, 6)
+            }
+
+            Button {
+                showingExerciseLibrary =
+                    true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Add exercise",
+                        norwegian: "Legg til øvelse"
+                    ),
+                    systemImage:
+                        "plus.circle.fill"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(
+                ATHLTHTheme.accent
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+            )
+            .padding(.top, 8)
+        }
+    }
+
+    private func addExercise(
+        _ exercise: Exercise
+    ) {
+        configuredExercises.append(
+            PlannedExercise(
+                id: UUID(),
+                exerciseID:
+                    exercise.id,
+                embeddedExercise:
+                    exercise.snapshot,
+                sets: 3,
+                reps: 8,
+                targetWeightKilograms:
+                    nil,
+                targetRPE: nil,
+                restSeconds: 90,
+                notes: nil,
+                targetRIR: nil,
+                supersetGroupID: nil,
+                progression:
+                    StrengthProgressionRule
+                        .none
+            )
+        )
+    }
+
+    private func exerciseSummary(
+        _ exercise:
+            PlannedExercise
+    ) -> String {
+        var parts = [
+            "\(exercise.sets) × \(exercise.reps ?? 0)"
+        ]
+
+        if let weight =
+            exercise
+                .targetWeightKilograms {
+            parts.append(
+                String(
+                    format: "%.1f kg",
+                    weight
+                )
+            )
+        }
+
+        if let rpe =
+            exercise.targetRPE {
+            parts.append(
+                String(
+                    format: "RPE %.1f",
+                    rpe
+                )
+            )
+        }
+
+        if let rest =
+            exercise.restSeconds {
+            parts.append(
+                ATHLTHLocalization.format(
+                    english: "%d s rest",
+                    norwegian: "%d s hvile",
+                    rest
+                )
+            )
+        }
+
+        return parts.joined(
+            separator: " · "
+        )
+    }
+
     private var strengthIntroCard: some View {
         ZStack {
             Image(
-                "TrainHero"
+                "StrengthQuickHero"
             )
             .resizable()
             .scaledToFill()
