@@ -156,20 +156,35 @@ final class ATHLTHNotificationStore: ObservableObject {
                 let methodText: String
                 switch milestone.completionMethod {
                 case .automaticAppleHealth:
-                    methodText = "Verified from Apple Health."
+                    methodText = ATHLTHLocalization.choose(
+                        english: "Verified from Apple Health.",
+                        norwegian: "Verifisert fra Apple Health."
+                    )
                 case .automaticATHLTH:
-                    methodText = "Verified from your ATHLTH training."
+                    methodText = ATHLTHLocalization.choose(
+                        english: "Verified from your ATHLTH training.",
+                        norwegian: "Verifisert fra treningen din i ATHLTH."
+                    )
                 case .manual:
-                    methodText = "Marked complete manually."
+                    methodText = ATHLTHLocalization.choose(
+                        english: "Marked complete manually.",
+                        norwegian: "Markert som fullført manuelt."
+                    )
                 case nil:
-                    methodText = "Milestone completed."
+                    methodText = ATHLTHLocalization.choose(
+                        english: "Milestone completed.",
+                        norwegian: "Delmål fullført."
+                    )
                 }
 
                 add(
                     ATHLTHNotificationDraft(
                         eventKey: "goal-\(goal.id.uuidString)-milestone-\(milestone.id.uuidString)-complete",
                         kind: .milestoneReached,
-                        title: "Milestone reached",
+                        title: ATHLTHLocalization.choose(
+                            english: "Milestone reached",
+                            norwegian: "Milepæl nådd"
+                        ),
                         message: "\(milestone.title) · \(goal.title). \(methodText)",
                         createdAt: completedAt,
                         goalID: goal.id
@@ -183,8 +198,15 @@ final class ATHLTHNotificationStore: ObservableObject {
                     ATHLTHNotificationDraft(
                         eventKey: "goal-\(goal.id.uuidString)-complete",
                         kind: .goalCompleted,
-                        title: "Goal completed",
-                        message: "You reached \(goal.title).",
+                        title: ATHLTHLocalization.choose(
+                            english: "Goal completed",
+                            norwegian: "Mål fullført"
+                        ),
+                        message: ATHLTHLocalization.format(
+                            english: "You reached %@.",
+                            norwegian: "Du nådde målet %@.",
+                            goal.title
+                        ),
                         createdAt: completedAt,
                         goalID: goal.id
                     )
@@ -245,8 +267,17 @@ final class ATHLTHNotificationStore: ObservableObject {
                     ATHLTHNotificationDraft(
                         eventKey: "challenge-\(challenge.id.uuidString)-attempt-\(attempt.id.uuidString)",
                         kind: .challenge,
-                        title: "New challenge result",
-                        message: "\(attempt.participantName) posted \(attempt.detail) in \(challenge.title).",
+                        title: ATHLTHLocalization.choose(
+                            english: "New challenge result",
+                            norwegian: "Nytt challenge-resultat"
+                        ),
+                        message: ATHLTHLocalization.format(
+                            english: "%@ posted %@ in %@.",
+                            norwegian: "%@ registrerte %@ i %@.",
+                            attempt.participantName,
+                            attempt.detail,
+                            challenge.title
+                        ),
                         createdAt: attempt.submittedAt,
                         workoutID: attempt.sourceWorkoutID,
                         challengeID: challenge.id
@@ -261,8 +292,15 @@ final class ATHLTHNotificationStore: ObservableObject {
                     ATHLTHNotificationDraft(
                         eventKey: "challenge-\(challenge.id.uuidString)-completed",
                         kind: .challenge,
-                        title: "Challenge completed",
-                        message: "\(challenge.title) has finished. View the final leaderboard.",
+                        title: ATHLTHLocalization.choose(
+                            english: "Challenge completed",
+                            norwegian: "Challenge fullført"
+                        ),
+                        message: ATHLTHLocalization.format(
+                            english: "%@ has finished. View the final leaderboard.",
+                            norwegian: "%@ er ferdig. Se den endelige resultatlisten.",
+                            challenge.title
+                        ),
                         createdAt: end,
                         challengeID: challenge.id
                     )
@@ -319,18 +357,22 @@ final class ATHLTHNotificationStore: ObservableObject {
 
                 if threshold >= 1 {
                     message =
-                        String(
-                            format:
+                        ATHLTHLocalization.format(
+                            english:
                                 "%@ has reached %.0f km of your %.0f km target. Check the shoe’s condition and comfort before deciding whether to retire it.",
+                            norwegian:
+                                "%@ har nådd %.0f km av målet på %.0f km. Sjekk slitasje og komfort før du bestemmer om skoene bør byttes ut.",
                             item.name,
                             usedKM,
                             target
                         )
                 } else {
                     message =
-                        String(
-                            format:
+                        ATHLTHLocalization.format(
+                            english:
                                 "%@ has reached %.0f km of your %.0f km target. Keep an eye on wear and comfort.",
+                            norwegian:
+                                "%@ har nådd %.0f km av målet på %.0f km. Følg med på slitasje og komfort.",
                             item.name,
                             usedKM,
                             target
@@ -343,7 +385,12 @@ final class ATHLTHNotificationStore: ObservableObject {
                             "gear-\(item.id.uuidString)-replacement-\(percentage)",
                         kind: .system,
                         title:
-                            "\(item.name) · \(percentage)% of shoe target",
+                            ATHLTHLocalization.format(
+                                english: "%@ · %d%% of shoe target",
+                                norwegian: "%@ · %d%% av skomålet",
+                                item.name,
+                                percentage
+                            ),
                         message: message
                     ),
                     deliverSystemAlert: false
@@ -472,7 +519,10 @@ final class ATHLTHNotificationStore: ObservableObject {
         let startReminder = challenge.rules.startsAt.addingTimeInterval(-3_600)
         if startReminder > now {
             let content = UNMutableNotificationContent()
-            content.title = "Challenge starts in 1 hour"
+            content.title = ATHLTHLocalization.choose(
+                english: "Challenge starts in 1 hour",
+                norwegian: "Challenge starter om 1 time"
+            )
             content.body = challenge.title
             content.sound = .default
             content.userInfo = [
@@ -498,7 +548,10 @@ final class ATHLTHNotificationStore: ObservableObject {
 
             if meetupReminder > now {
                 let content = UNMutableNotificationContent()
-                content.title = "Meet & Train in 1 hour"
+                content.title = ATHLTHLocalization.choose(
+                    english: "Meet & Train in 1 hour",
+                    norwegian: "Meet & Train om 1 time"
+                )
                 content.body = "\(challenge.title) · \(meetup.placeName)"
                 content.sound = .default
                 content.userInfo = [
@@ -525,7 +578,10 @@ final class ATHLTHNotificationStore: ObservableObject {
 
             if endReminder > now {
                 let content = UNMutableNotificationContent()
-                content.title = "Challenge ends tomorrow"
+                content.title = ATHLTHLocalization.choose(
+                    english: "Challenge ends tomorrow",
+                    norwegian: "Challenge avsluttes i morgen"
+                )
                 content.body = challenge.title
                 content.sound = .default
                 content.userInfo = [
