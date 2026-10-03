@@ -557,6 +557,7 @@ struct PerformanceStatsView: View {
                     editorialFeaturedRecords
                     editorialSummaryStrip
                     editorialRunningPRCard
+                    editorialStrengthPRCard
 
                     HStack(
                         alignment: .top,
@@ -944,7 +945,7 @@ struct PerformanceStatsView: View {
             .resizable()
             .scaledToFill()
             .frame(maxWidth: .infinity)
-            .frame(height: 122)
+            .frame(height: 94)
             .clipped()
             .opacity(0.34)
 
@@ -973,7 +974,7 @@ struct PerformanceStatsView: View {
                     )
                     .font(
                         .system(
-                            size: 15,
+                            size: 13,
                             weight: .semibold
                         )
                     )
@@ -981,8 +982,8 @@ struct PerformanceStatsView: View {
                         kind.tint
                     )
                     .frame(
-                        width: 38,
-                        height: 38
+                        width: 32,
+                        height: 32
                     )
                     .background(
                         Color.white
@@ -1009,8 +1010,10 @@ struct PerformanceStatsView: View {
 
                 Text(kind.title)
                     .font(
-                        .caption
-                            .weight(.semibold)
+                        .system(
+                            size: 11,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
@@ -1031,7 +1034,7 @@ struct PerformanceStatsView: View {
                     )
                     .font(
                         .system(
-                            size: 23,
+                            size: 18,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1062,9 +1065,9 @@ struct PerformanceStatsView: View {
                 )
                 .lineLimit(1)
             }
-            .padding(12)
+            .padding(10)
         }
-        .frame(height: 122)
+        .frame(height: 94)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 20,
@@ -1110,12 +1113,12 @@ struct PerformanceStatsView: View {
                         .bottomTrailing
                 )
 
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     Image(
                         systemName:
                             "plus.circle.fill"
                     )
-                    .font(.title2)
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(
                         ATHLTHTheme
                             .accentDeep
@@ -1137,7 +1140,7 @@ struct PerformanceStatsView: View {
                     )
                 }
             }
-            .frame(height: 122)
+            .frame(height: 94)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 20,
@@ -1377,7 +1380,7 @@ struct PerformanceStatsView: View {
                 .resizable()
                 .scaledToFill()
                 .frame(maxWidth: .infinity)
-                .frame(height: 224)
+                .frame(height: 174)
                 .clipped()
                 .accessibilityHidden(true)
 
@@ -1392,7 +1395,7 @@ struct PerformanceStatsView: View {
                     .topTrailing
             )
 
-            VStack(spacing: 13) {
+            VStack(spacing: 8) {
                 HStack(spacing: 10) {
                     Image(
                         systemName:
@@ -1406,8 +1409,8 @@ struct PerformanceStatsView: View {
                     )
                     .foregroundStyle(.blue)
                     .frame(
-                        width: 42,
-                        height: 42
+                        width: 34,
+                        height: 34
                     )
                     .background(
                         Color.white
@@ -1426,8 +1429,10 @@ struct PerformanceStatsView: View {
                             )
                         )
                         .font(
-                            .headline
-                                .weight(.bold)
+                            .system(
+                                size: 15,
+                                weight: .bold
+                            )
                         )
 
                         Text(
@@ -1474,7 +1479,7 @@ struct PerformanceStatsView: View {
                                 )
                                 .frame(
                                     width: 0.7,
-                                    height: 82
+                                    height: 58
                                 )
                         }
                     }
@@ -1485,7 +1490,7 @@ struct PerformanceStatsView: View {
                 )
                 .padding(
                     .vertical,
-                    11
+                    8
                 )
                 .background(
                     Color.black.opacity(
@@ -1510,9 +1515,9 @@ struct PerformanceStatsView: View {
                     )
                 }
             }
-            .padding(16)
+            .padding(12)
         }
-        .frame(height: 224)
+        .frame(height: 174)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 26,
@@ -1550,7 +1555,7 @@ struct PerformanceStatsView: View {
             )
             .font(
                 .system(
-                    size: 10,
+                    size: 9,
                     weight: .semibold
                 )
             )
@@ -1561,7 +1566,7 @@ struct PerformanceStatsView: View {
             Text(item.value)
                 .font(
                     .system(
-                        size: 22,
+                        size: 17,
                         weight: .bold,
                         design: .rounded
                     )
@@ -1604,6 +1609,152 @@ struct PerformanceStatsView: View {
             maxWidth: .infinity,
             alignment: .leading
         )
+    }
+
+    private var editorialStrengthPRCard:
+        some View {
+        ZStack {
+            Image("GoalStrength")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 174)
+                .clipped()
+                .accessibilityHidden(true)
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.90),
+                    Color.black.opacity(0.62)
+                ],
+                startPoint: .bottomLeading,
+                endPoint: .topTrailing
+            )
+
+            VStack(spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.indigo)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Color.white.opacity(0.12),
+                            in: Circle()
+                        )
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(
+                            text(
+                                "Strength records",
+                                "Styrke-rekorder"
+                            )
+                        )
+                        .font(.system(size: 15, weight: .bold))
+
+                        Text(
+                            text(
+                                "Personal records from strength workouts.",
+                                "Personlige rekorder fra styrkeøkter."
+                            )
+                        )
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.72))
+                    }
+
+                    Spacer()
+                }
+                .foregroundStyle(.white)
+
+                HStack(spacing: 0) {
+                    ForEach(
+                        Array(strengthItems.prefix(4).enumerated()),
+                        id: \.offset
+                    ) { index, item in
+                        editorialStrengthPRCell(item)
+
+                        if index < 3 {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.18))
+                                .frame(width: 0.7, height: 58)
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+                .background(
+                    Color.black.opacity(0.28),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.14),
+                        lineWidth: 0.8
+                    )
+                }
+            }
+            .padding(12)
+        }
+        .frame(height: 174)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .shadow(
+            color: Color.black.opacity(0.12),
+            radius: 16,
+            y: 8
+        )
+    }
+
+    private func editorialStrengthPRCell(
+        _ item: PerformanceMetricItem
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(item.title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.80))
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+
+            Text(item.value)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.58)
+
+            Text(
+                item.detail
+                    .components(separatedBy: " · ")
+                    .first ?? item.detail
+            )
+            .font(.system(size: 8.5, weight: .medium))
+            .foregroundStyle(.white.opacity(0.68))
+            .lineLimit(1)
+            .minimumScaleFactor(0.58)
+
+            Capsule()
+                .fill(item.tint)
+                .frame(height: 3)
+                .padding(.top, 3)
+        }
+        .padding(.horizontal, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var editorialTrainingVolumeCard:
