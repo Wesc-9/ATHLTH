@@ -521,6 +521,75 @@ struct ProfilePerformanceSection: View {
     }
 }
 
+private enum PerformanceVolumePeriod:
+    String,
+    CaseIterable,
+    Identifiable {
+    case week
+    case month
+    case year
+    case total
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .week:
+            return ATHLTHLocalization.choose(
+                english: "Week",
+                norwegian: "Uke"
+            )
+        case .month:
+            return ATHLTHLocalization.choose(
+                english: "Month",
+                norwegian: "Måned"
+            )
+        case .year:
+            return ATHLTHLocalization.choose(
+                english: "Year",
+                norwegian: "År"
+            )
+        case .total:
+            return ATHLTHLocalization.choose(
+                english: "Total",
+                norwegian: "Totalt"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .week:
+            return ATHLTHLocalization.choose(
+                english: "This week",
+                norwegian: "Denne uken"
+            )
+        case .month:
+            return ATHLTHLocalization.choose(
+                english: "This month",
+                norwegian: "Denne måneden"
+            )
+        case .year:
+            return ATHLTHLocalization.choose(
+                english: "This year",
+                norwegian: "Dette året"
+            )
+        case .total:
+            return ATHLTHLocalization.choose(
+                english: "All recorded training",
+                norwegian: "All registrert trening"
+            )
+        }
+    }
+}
+
+private struct PerformanceVolumePoint:
+    Identifiable {
+    let id: String
+    let label: String
+    let value: Double
+}
+
 struct PerformanceStatsView: View {
     let stats: ProfilePerformanceStats?
     var healthRecords: [HealthPersonalRecord] = []
@@ -528,6 +597,8 @@ struct PerformanceStatsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @State private var fetchedHealthRecords: [HealthPersonalRecord] = []
+    @State private var trainingVolumePeriod:
+        PerformanceVolumePeriod = .year
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
 
@@ -559,15 +630,11 @@ struct PerformanceStatsView: View {
                     editorialRunningPRCard
                     editorialStrengthPRCard
 
-                    HStack(
-                        alignment: .top,
-                        spacing: 10
-                    ) {
-                        editorialTrainingVolumeCard
-                            .id("performance-volume")
+                    editorialTrainingVolumeCard
+                        .id("performance-volume")
 
-                        editorialMilestonesCard
-                    }
+                    editorialTrainingMixCard
+                    editorialMilestonesCard
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
@@ -1761,9 +1828,9 @@ struct PerformanceStatsView: View {
         some View {
         VStack(
             alignment: .leading,
-            spacing: 10
+            spacing: 12
         ) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(
                     systemName:
                         "chart.bar.fill"
@@ -1779,22 +1846,22 @@ struct PerformanceStatsView: View {
                         .accentDeep
                 )
                 .frame(
-                    width: 38,
-                    height: 38
+                    width: 40,
+                    height: 40
                 )
                 .background(
                     ATHLTHTheme
                         .accentSoft,
                     in:
                         RoundedRectangle(
-                            cornerRadius: 12,
+                            cornerRadius: 13,
                             style: .continuous
                         )
                 )
 
                 VStack(
                     alignment: .leading,
-                    spacing: 1
+                    spacing: 2
                 ) {
                     Text(
                         text(
@@ -1803,104 +1870,130 @@ struct PerformanceStatsView: View {
                         )
                     )
                     .font(
-                        .subheadline
+                        .headline
                             .weight(.bold)
                     )
 
                     Text(
-                        text(
-                            "Running history",
-                            "Løpehistorikken din"
-                        )
+                        trainingVolumePeriod
+                            .subtitle
                     )
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(
                         ATHLTHTheme
                             .mutedText
                     )
                 }
-            }
 
-            HStack(spacing: 0) {
-                ForEach(
-                    [
-                        text(
-                            "Week",
-                            "Uke"
-                        ),
-                        text(
-                            "Month",
-                            "Måned"
-                        ),
-                        text(
-                            "Year",
-                            "År"
-                        ),
-                        text(
-                            "Total",
-                            "Totalt"
-                        )
-                    ],
-                    id: \.self
-                ) { title in
-                    Text(title)
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight:
-                                    title ==
-                                    text(
-                                        "Year",
-                                        "År"
-                                    )
-                                    ? .bold
-                                    : .medium
+                Spacer()
+
+                NavigationLink {
+                    PerformanceTrainingVolumeDetailView(
+                        stats: stats,
+                        initialPeriod:
+                            trainingVolumePeriod
+                    )
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(
+                            text(
+                                "Details",
+                                "Detaljer"
                             )
                         )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
+
+                        Image(
+                            systemName:
+                                "chevron.right"
                         )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                        .frame(height: 25)
-                        .background(
-                            title ==
-                                text(
-                                    "Year",
-                                    "År"
+                    }
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+            }
+
+            HStack(spacing: 4) {
+                ForEach(
+                    PerformanceVolumePeriod
+                        .allCases
+                ) {
+                    period in
+
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            trainingVolumePeriod =
+                                period
+                        }
+                    } label: {
+                        Text(period.title)
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight:
+                                        trainingVolumePeriod ==
+                                            period
+                                        ? .bold
+                                        : .medium
                                 )
-                                ? Color.white
-                                    .opacity(
-                                        0.94
-                                    )
-                                : Color
-                                    .clear,
-                            in: Capsule()
-                        )
+                            )
+                            .foregroundStyle(
+                                trainingVolumePeriod ==
+                                    period
+                                    ? ATHLTHTheme
+                                        .primaryText
+                                    : ATHLTHTheme
+                                        .mutedText
+                            )
+                            .frame(
+                                maxWidth:
+                                    .infinity
+                            )
+                            .frame(height: 31)
+                            .background(
+                                trainingVolumePeriod ==
+                                    period
+                                    ? Color.white
+                                        .opacity(
+                                            0.98
+                                        )
+                                    : Color.clear,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(3)
             .background(
-                Color.black.opacity(
-                    0.035
-                ),
+                Color.black
+                    .opacity(0.035),
                 in: Capsule()
             )
 
             HStack(
-                alignment: .firstTextBaseline
+                alignment:
+                    .firstTextBaseline
             ) {
                 Text(
                     formatDistance(
-                        currentYearRunningDistanceMeters
+                        selectedVolumeDistanceMeters
                     )
                 )
                 .font(
                     .system(
-                        size: 23,
+                        size: 28,
                         weight: .bold,
                         design: .rounded
                     )
@@ -1909,14 +2002,16 @@ struct PerformanceStatsView: View {
 
                 Spacer()
 
-                if let change =
-                        yearOverYearRunningChange {
+                if trainingVolumePeriod ==
+                    .year,
+                   let change =
+                    yearOverYearRunningChange {
                     HStack(spacing: 3) {
                         Image(
                             systemName:
                                 change >= 0
-                                    ? "arrow.up.right"
-                                    : "arrow.down.right"
+                                ? "arrow.up.right"
+                                : "arrow.down.right"
                         )
 
                         Text(
@@ -1941,29 +2036,86 @@ struct PerformanceStatsView: View {
 
             Text(
                 text(
-                    "Total distance this year",
-                    "Total distanse i år"
+                    "Running distance",
+                    "Løpedistanse"
                 )
             )
-            .font(.caption2)
+            .font(.caption)
             .foregroundStyle(
                 ATHLTHTheme
                     .mutedText
             )
 
-            editorialMonthlyRunningChart
+            HStack(spacing: 8) {
+                editorialVolumeMiniMetric(
+                    value:
+                        selectedVolumeWorkoutCount
+                            .formatted(),
+                    label:
+                        text(
+                            "Workouts",
+                            "Økter"
+                        ),
+                    icon:
+                        "checkmark.circle.fill"
+                )
+
+                editorialVolumeMiniMetric(
+                    value:
+                        selectedVolumeRunningCount
+                            .formatted(),
+                    label:
+                        text(
+                            "Runs",
+                            "Løp"
+                        ),
+                    icon:
+                        "figure.run"
+                )
+
+                editorialVolumeMiniMetric(
+                    value:
+                        selectedVolumeStrengthCount
+                            .formatted(),
+                    label:
+                        text(
+                            "Strength",
+                            "Styrke"
+                        ),
+                    icon:
+                        "dumbbell.fill"
+                )
+
+                editorialVolumeMiniMetric(
+                    value:
+                        selectedVolumeWalkingCount
+                            .formatted(),
+                    label:
+                        text(
+                            "Walks",
+                            "Turer"
+                        ),
+                    icon:
+                        "figure.walk"
+                )
+            }
+
+            editorialSelectedVolumeChart
         }
-        .padding(14)
+        .padding(15)
         .frame(
             maxWidth: .infinity,
             alignment: .topLeading
         )
         .background(
-            Color.white.opacity(0.86),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
+            Color.white.opacity(
+                0.90
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
@@ -1978,6 +2130,515 @@ struct PerformanceStatsView: View {
             )
         }
     }
+
+    private func editorialVolumeMiniMetric(
+        value: String,
+        label: String,
+        icon: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 4
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 10,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+            )
+
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+
+            Text(label)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+        }
+        .padding(9)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            ATHLTHTheme
+                .accentSoft
+                .opacity(0.48),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var editorialSelectedVolumeChart:
+        some View {
+        let values =
+            selectedVolumeSeries
+        let maximum =
+            max(
+                values
+                    .map(\.value)
+                    .max() ?? 0,
+                1
+            )
+
+        return HStack(
+            alignment: .bottom,
+            spacing: 5
+        ) {
+            ForEach(values) {
+                point in
+
+                VStack(spacing: 4) {
+                    Spacer(
+                        minLength: 0
+                    )
+
+                    RoundedRectangle(
+                        cornerRadius: 4,
+                        style: .continuous
+                    )
+                    .fill(
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(
+                                point.value > 0
+                                    ? 0.72
+                                    : 0.12
+                            )
+                    )
+                    .frame(
+                        height:
+                            max(
+                                4,
+                                70 *
+                                (
+                                    point.value /
+                                    maximum
+                                )
+                            )
+                    )
+
+                    Text(point.label)
+                        .font(
+                            .system(
+                                size: 7.5,
+                                weight:
+                                    .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.65
+                        )
+                }
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 92)
+            }
+        }
+    }
+
+    private var selectedVolumeDistanceMeters:
+        Double {
+        if trainingVolumePeriod ==
+            .total {
+            return stats?
+                .totalRunningDistanceMeters ??
+                health.workouts
+                    .filter {
+                        $0.activity ==
+                            .running
+                    }
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ??
+                                0,
+                            0
+                        )
+                    }
+        }
+
+        return health.workouts
+            .filter {
+                $0.activity ==
+                    .running &&
+                volumeDateIncluded(
+                    $0.startDate,
+                    period:
+                        trainingVolumePeriod
+                )
+            }
+            .reduce(0.0) {
+                $0 +
+                max(
+                    $1.distanceMeters ??
+                        0,
+                    0
+                )
+            }
+    }
+
+    private var selectedVolumeWorkoutCount:
+        Int {
+        if trainingVolumePeriod ==
+            .total {
+            return stats?
+                .totalWorkoutCount ??
+                health.workouts.count
+        }
+
+        return health.workouts
+            .filter {
+                volumeDateIncluded(
+                    $0.startDate,
+                    period:
+                        trainingVolumePeriod
+                )
+            }
+            .count
+    }
+
+    private var selectedVolumeRunningCount:
+        Int {
+        health.workouts
+            .filter {
+                $0.activity ==
+                    .running &&
+                (
+                    trainingVolumePeriod ==
+                        .total ||
+                    volumeDateIncluded(
+                        $0.startDate,
+                        period:
+                            trainingVolumePeriod
+                    )
+                )
+            }
+            .count
+    }
+
+    private var selectedVolumeStrengthCount:
+        Int {
+        health.workouts
+            .filter {
+                $0.activity ==
+                    .strength &&
+                (
+                    trainingVolumePeriod ==
+                        .total ||
+                    volumeDateIncluded(
+                        $0.startDate,
+                        period:
+                            trainingVolumePeriod
+                    )
+                )
+            }
+            .count
+    }
+
+    private var selectedVolumeWalkingCount:
+        Int {
+        health.workouts
+            .filter {
+                (
+                    $0.activity ==
+                        .walking ||
+                    $0.activity ==
+                        .hiking
+                ) &&
+                (
+                    trainingVolumePeriod ==
+                        .total ||
+                    volumeDateIncluded(
+                        $0.startDate,
+                        period:
+                            trainingVolumePeriod
+                    )
+                )
+            }
+            .count
+    }
+
+    private var selectedVolumeSeries:
+        [PerformanceVolumePoint] {
+        switch trainingVolumePeriod {
+        case .week:
+            return weekVolumeSeries
+        case .month:
+            return monthVolumeSeries
+        case .year:
+            return yearVolumeSeries
+        case .total:
+            return totalVolumeSeries
+        }
+    }
+
+    private var weekVolumeSeries:
+        [PerformanceVolumePoint] {
+        let calendar =
+            Calendar.current
+        let start =
+            calendar.dateInterval(
+                of: .weekOfYear,
+                for: Date()
+            )?.start ??
+            calendar.startOfDay(
+                for: Date()
+            )
+
+        return (0..<7).map {
+            offset in
+
+            let day =
+                calendar.date(
+                    byAdding: .day,
+                    value: offset,
+                    to: start
+                ) ?? start
+            let value =
+                health.workouts
+                    .filter {
+                        $0.activity ==
+                            .running &&
+                        calendar.isDate(
+                            $0.startDate,
+                            inSameDayAs: day
+                        )
+                    }
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ??
+                                0,
+                            0
+                        )
+                    }
+
+            return PerformanceVolumePoint(
+                id:
+                    "week-\(offset)",
+                label:
+                    day.formatted(
+                        .dateTime
+                            .weekday(
+                                .narrow
+                            )
+                    ),
+                value: value
+            )
+        }
+    }
+
+    private var monthVolumeSeries:
+        [PerformanceVolumePoint] {
+        let calendar =
+            Calendar.current
+        let monthInterval =
+            calendar.dateInterval(
+                of: .month,
+                for: Date()
+            )
+        let start =
+            monthInterval?.start ??
+            Date()
+        let end =
+            monthInterval?.end ??
+            Date()
+
+        return (0..<5).map {
+            index in
+
+            let bucketStart =
+                calendar.date(
+                    byAdding: .day,
+                    value: index * 7,
+                    to: start
+                ) ?? start
+            let bucketEnd =
+                min(
+                    calendar.date(
+                        byAdding: .day,
+                        value: 7,
+                        to: bucketStart
+                    ) ?? end,
+                    end
+                )
+
+            let value =
+                health.workouts
+                    .filter {
+                        $0.activity ==
+                            .running &&
+                        $0.startDate >=
+                            bucketStart &&
+                        $0.startDate <
+                            bucketEnd
+                    }
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ??
+                                0,
+                            0
+                        )
+                    }
+
+            return PerformanceVolumePoint(
+                id:
+                    "month-\(index)",
+                label:
+                    "U\(index + 1)",
+                value: value
+            )
+        }
+    }
+
+    private var yearVolumeSeries:
+        [PerformanceVolumePoint] {
+        currentYearRunningDistanceByMonth
+            .enumerated()
+            .map {
+                index,
+                value in
+
+                PerformanceVolumePoint(
+                    id:
+                        "year-\(index)",
+                    label:
+                        editorialMonthLetter(
+                            index
+                        ),
+                    value: value
+                )
+            }
+    }
+
+    private var totalVolumeSeries:
+        [PerformanceVolumePoint] {
+        let calendar =
+            Calendar.current
+        let currentYear =
+            calendar.component(
+                .year,
+                from: Date()
+            )
+        let years =
+            Array(
+                (max(
+                    currentYear - 5,
+                    2020
+                )...currentYear)
+            )
+
+        return years.map {
+            year in
+
+            let value =
+                health.workouts
+                    .filter {
+                        $0.activity ==
+                            .running &&
+                        calendar.component(
+                            .year,
+                            from:
+                                $0.startDate
+                        ) == year
+                    }
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ??
+                                0,
+                            0
+                        )
+                    }
+
+            return PerformanceVolumePoint(
+                id:
+                    "total-\(year)",
+                label:
+                    String(year)
+                        .suffix(2)
+                        .description,
+                value: value
+            )
+        }
+    }
+
+    private func volumeDateIncluded(
+        _ date: Date,
+        period:
+            PerformanceVolumePeriod
+    ) -> Bool {
+        let calendar =
+            Calendar.current
+
+        switch period {
+        case .week:
+            guard let interval =
+                    calendar.dateInterval(
+                        of: .weekOfYear,
+                        for: Date()
+                    )
+            else {
+                return false
+            }
+            return interval.contains(date)
+
+        case .month:
+            guard let interval =
+                    calendar.dateInterval(
+                        of: .month,
+                        for: Date()
+                    )
+            else {
+                return false
+            }
+            return interval.contains(date)
+
+        case .year:
+            return calendar.component(
+                .year,
+                from: date
+            ) ==
+                calendar.component(
+                    .year,
+                    from: Date()
+                )
+
+        case .total:
+            return true
+        }
+    }
+
 
     private var editorialMonthlyRunningChart:
         some View {
@@ -2195,6 +2856,288 @@ struct PerformanceStatsView: View {
         return symbols[index]
     }
 
+    private var editorialTrainingMixCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        text(
+                            "Training mix",
+                            "Treningsmiks"
+                        )
+                    )
+                    .font(
+                        .headline
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        text(
+                            "Your recorded sessions this year.",
+                            "Dine registrerte økter dette året."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+
+                Text(
+                    currentYearWorkoutCount
+                        .formatted()
+                )
+                .font(
+                    .title2
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+            }
+
+            HStack(spacing: 8) {
+                trainingMixMetric(
+                    title:
+                        text(
+                            "Running",
+                            "Løping"
+                        ),
+                    value:
+                        currentYearRunningCount,
+                    icon:
+                        "figure.run",
+                    tint: .green
+                )
+
+                trainingMixMetric(
+                    title:
+                        text(
+                            "Strength",
+                            "Styrke"
+                        ),
+                    value:
+                        currentYearStrengthCount,
+                    icon:
+                        "dumbbell.fill",
+                    tint:
+                        ATHLTHTheme
+                            .accentDeep
+                )
+
+                trainingMixMetric(
+                    title:
+                        text(
+                            "Walk / hike",
+                            "Gå / tur"
+                        ),
+                    value:
+                        currentYearWalkingCount,
+                    icon:
+                        "figure.hiking",
+                    tint: .orange
+                )
+
+                trainingMixMetric(
+                    title:
+                        text(
+                            "Other",
+                            "Annet"
+                        ),
+                    value:
+                        max(
+                            currentYearWorkoutCount -
+                            currentYearRunningCount -
+                            currentYearStrengthCount -
+                            currentYearWalkingCount,
+                            0
+                        ),
+                    icon:
+                        "figure.mixed.cardio",
+                    tint: .purple
+                )
+            }
+        }
+        .padding(15)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.92),
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.34)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.62),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func trainingMixMetric(
+        title: String,
+        value: Int,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(tint)
+
+            Text(
+                value.formatted()
+            )
+            .font(
+                .headline
+                    .weight(.bold)
+            )
+            .monospacedDigit()
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.7
+                )
+        }
+        .padding(10)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            tint.opacity(0.07),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var currentYearWorkoutCount:
+        Int {
+        let year =
+            Calendar.current
+                .component(
+                    .year,
+                    from: Date()
+                )
+        return health.workouts
+            .filter {
+                Calendar.current
+                    .component(
+                        .year,
+                        from:
+                            $0.startDate
+                    ) == year
+            }
+            .count
+    }
+
+    private var currentYearRunningCount:
+        Int {
+        currentYearActivityCount(
+            matching: {
+                $0 == .running
+            }
+        )
+    }
+
+    private var currentYearStrengthCount:
+        Int {
+        currentYearActivityCount(
+            matching: {
+                $0 == .strength
+            }
+        )
+    }
+
+    private var currentYearWalkingCount:
+        Int {
+        currentYearActivityCount(
+            matching: {
+                $0 == .walking ||
+                $0 == .hiking
+            }
+        )
+    }
+
+    private func currentYearActivityCount(
+        matching:
+            (WorkoutActivity) -> Bool
+    ) -> Int {
+        let calendar =
+            Calendar.current
+        let year =
+            calendar.component(
+                .year,
+                from: Date()
+            )
+
+        return health.workouts
+            .filter {
+                calendar.component(
+                    .year,
+                    from:
+                        $0.startDate
+                ) == year &&
+                matching($0.activity)
+            }
+            .count
+    }
+
     private var editorialMilestonesCard:
         some View {
         VStack(
@@ -2256,6 +3199,39 @@ struct PerformanceStatsView: View {
                     .foregroundStyle(
                         ATHLTHTheme
                             .mutedText
+                    )
+                }
+
+                Spacer()
+
+                NavigationLink {
+                    PerformanceMilestonesDetailView(
+                        stats: stats,
+                        healthRecords:
+                            resolvedHealthRecords
+                    )
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(
+                            text(
+                                "All",
+                                "Alle"
+                            )
+                        )
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
                     )
                 }
             }
