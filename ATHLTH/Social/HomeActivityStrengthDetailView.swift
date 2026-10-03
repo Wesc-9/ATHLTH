@@ -436,35 +436,23 @@ struct HomeActivityStrengthDetailView: View {
         }
         .padding(16)
         .background(
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(
-                            red: 0.995,
-                            green: 0.990,
-                            blue: 0.978
-                        ),
-                        Color.white
-                            .opacity(0.985)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                )
-
-                RadialGradient(
-                    colors: [
-                        activationTint
-                            .opacity(0.095),
-                        Color.clear
-                    ],
-                    center:
-                        .topTrailing,
-                    startRadius: 8,
-                    endRadius: 320
-                )
-            },
+            LinearGradient(
+                colors: [
+                    Color(
+                        red: 0.995,
+                        green: 0.990,
+                        blue: 0.978
+                    ),
+                    activationTint
+                        .opacity(0.055),
+                    Color.white
+                        .opacity(0.985)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 22,
                 style: .continuous
