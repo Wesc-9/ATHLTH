@@ -1169,6 +1169,29 @@ final class TrophyStore: ObservableObject {
         pendingReveal = revealQueue.first
     }
 
+    @discardableResult
+    func presentReveal(
+        forStageKey stageKey: String
+    ) -> Bool {
+        guard let record =
+                unlocks.first(
+                    where: {
+                        $0.stageKey ==
+                            stageKey
+                    }
+                )
+        else {
+            return false
+        }
+
+        // Reveals are now user-driven from the Home notification bell.
+        // Replace any stale queue so tapping one notification always opens
+        // exactly the award the athlete selected.
+        revealQueue = [record]
+        pendingReveal = record
+        return true
+    }
+
     func unlockRecordsSince(_ date: Date) -> [TrophyUnlockRecord] {
         unlocks
             .filter { $0.unlockedAt >= date }
@@ -1566,19 +1589,9 @@ final class TrophyStore: ObservableObject {
 
         unlocks.append(record)
 
-        guard allowReveal,
-              record.unlockedAt >=
-                activationDate
-        else {
-            return
-        }
-
-        revealQueue.append(record)
-
-        if pendingReveal == nil {
-            pendingReveal =
-                revealQueue.first
-        }
+        // Keep the parameter for call-site compatibility. Unlocks are surfaced
+        // through the notification bell and revealed only after an explicit tap.
+        _ = allowReveal
     }
 
     private func registerUnlock(
@@ -1606,13 +1619,10 @@ final class TrophyStore: ObservableObject {
 
         unlocks.append(record)
 
-        if unlockedAt >= activationDate {
-            revealQueue.append(record)
-
-            if pendingReveal == nil {
-                pendingReveal = revealQueue.first
-            }
-        }
+        // Do not interrupt the athlete with an automatic reveal. The matching
+        // bell notification is created by ATHLTHNotificationStore and opens
+        // the reveal only when the athlete taps it.
+        _ = activationDate
     }
 
     private static func collectionSort(_ lhs: TrophyProgressItem, _ rhs: TrophyProgressItem) -> Bool {
