@@ -88,6 +88,12 @@ final class AchievementTiltMotionStore:
 }
 
 extension TrophyRarity {
+    /// Restrained ATHLTH material system.
+    ///
+    /// Rarity is communicated primarily through finish, contrast and light
+    /// rather than a rainbow of category colours:
+    /// Core = matte graphite, Rare = titanium, Epic = carbon + warm metal,
+    /// Signature = black + gold.
     var achievementPalette:
         [Color]
     {
@@ -95,19 +101,19 @@ extension TrophyRarity {
         case .core:
             return [
                 Color(
-                    red: 0.34,
-                    green: 0.37,
-                    blue: 0.41
+                    red: 0.31,
+                    green: 0.33,
+                    blue: 0.36
                 ),
                 Color(
-                    red: 0.17,
-                    green: 0.19,
-                    blue: 0.22
+                    red: 0.16,
+                    green: 0.17,
+                    blue: 0.19
                 ),
                 Color(
-                    red: 0.10,
-                    green: 0.11,
-                    blue: 0.13
+                    red: 0.075,
+                    green: 0.08,
+                    blue: 0.09
                 )
             ]
 
@@ -115,66 +121,66 @@ extension TrophyRarity {
             return [
                 Color(
                     red: 0.94,
-                    green: 0.97,
-                    blue: 1.00
+                    green: 0.95,
+                    blue: 0.96
                 ),
                 Color(
-                    red: 0.56,
-                    green: 0.67,
-                    blue: 0.78
+                    red: 0.64,
+                    green: 0.66,
+                    blue: 0.69
                 ),
                 Color(
-                    red: 0.20,
-                    green: 0.25,
-                    blue: 0.32
+                    red: 0.25,
+                    green: 0.27,
+                    blue: 0.30
                 ),
                 Color(
-                    red: 0.78,
-                    green: 0.86,
-                    blue: 0.94
+                    red: 0.82,
+                    green: 0.84,
+                    blue: 0.86
                 )
             ]
 
         case .epic:
             return [
                 Color(
-                    red: 0.42,
+                    red: 0.35,
+                    green: 0.33,
+                    blue: 0.29
+                ),
+                Color(
+                    red: 0.17,
                     green: 0.16,
-                    blue: 0.88
+                    blue: 0.15
                 ),
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.82),
                 Color(
-                    red: 0.88,
-                    green: 0.30,
-                    blue: 0.82
-                ),
-                Color(
-                    red: 1.00,
-                    green: 0.60,
-                    blue: 0.18
-                ),
-                Color(
-                    red: 0.09,
-                    green: 0.06,
-                    blue: 0.17
+                    red: 0.065,
+                    green: 0.065,
+                    blue: 0.07
                 )
             ]
 
         case .signature:
             return [
                 Color(
-                    red: 0.05,
-                    green: 0.06,
-                    blue: 0.09
+                    red: 0.035,
+                    green: 0.035,
+                    blue: 0.04
                 ),
                 Color(
-                    red: 0.14,
-                    green: 0.19,
-                    blue: 0.30
+                    red: 0.12,
+                    green: 0.105,
+                    blue: 0.075
                 ),
+                ATHLTHTheme
+                    .premiumGold,
                 Color(
-                    red: 0.08,
-                    green: 0.08,
-                    blue: 0.11
+                    red: 0.055,
+                    green: 0.055,
+                    blue: 0.06
                 )
             ]
         }
@@ -187,55 +193,47 @@ extension TrophyRarity {
         case .core:
             return [
                 Color(
-                    red: 0.47,
-                    green: 0.52,
-                    blue: 0.58
+                    red: 0.37,
+                    green: 0.40,
+                    blue: 0.44
                 ),
                 Color(
-                    red: 0.72,
-                    green: 0.75,
-                    blue: 0.79
+                    red: 0.67,
+                    green: 0.69,
+                    blue: 0.72
                 )
             ]
+
         case .rare:
             return [
                 Color(
-                    red: 0.50,
-                    green: 0.72,
-                    blue: 0.96
+                    red: 0.54,
+                    green: 0.57,
+                    blue: 0.61
                 ),
                 Color.white
+                    .opacity(0.92)
             ]
+
         case .epic:
             return [
                 Color(
-                    red: 0.58,
+                    red: 0.28,
                     green: 0.27,
-                    blue: 0.98
+                    blue: 0.25
                 ),
-                Color(
-                    red: 1.00,
-                    green: 0.55,
-                    blue: 0.17
-                )
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.88)
             ]
+
         case .signature:
             return [
-                Color(
-                    red: 0.22,
-                    green: 0.87,
-                    blue: 0.98
-                ),
-                Color(
-                    red: 0.95,
-                    green: 0.34,
-                    blue: 0.89
-                ),
-                Color(
-                    red: 1.00,
-                    green: 0.81,
-                    blue: 0.28
-                )
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.82),
+                Color.white
+                    .opacity(0.96)
             ]
         }
     }
@@ -249,64 +247,49 @@ extension TrophyRarity {
                 Color.white
                     .opacity(0.78),
                 Color(
-                    red: 0.50,
-                    green: 0.56,
-                    blue: 0.63
+                    red: 0.48,
+                    green: 0.51,
+                    blue: 0.55
                 )
             ]
+
         case .rare:
             return [
                 Color.white,
                 Color(
-                    red: 0.52,
-                    green: 0.78,
-                    blue: 1.00
+                    red: 0.69,
+                    green: 0.71,
+                    blue: 0.74
                 ),
                 Color(
-                    red: 0.76,
-                    green: 0.85,
-                    blue: 0.96
+                    red: 0.43,
+                    green: 0.46,
+                    blue: 0.50
                 )
             ]
+
         case .epic:
             return [
+                Color.white
+                    .opacity(0.92),
+                ATHLTHTheme
+                    .premiumGold,
                 Color(
-                    red: 0.67,
-                    green: 0.31,
-                    blue: 1.00
-                ),
-                Color(
-                    red: 1.00,
-                    green: 0.47,
-                    blue: 0.80
-                ),
-                Color(
-                    red: 1.00,
-                    green: 0.72,
-                    blue: 0.22
+                    red: 0.40,
+                    green: 0.38,
+                    blue: 0.34
                 )
             ]
+
         case .signature:
             return [
+                Color.white,
+                ATHLTHTheme
+                    .premiumGold,
                 Color(
-                    red: 0.20,
-                    green: 0.93,
-                    blue: 1.00
-                ),
-                Color(
-                    red: 0.96,
-                    green: 0.32,
-                    blue: 0.90
-                ),
-                Color(
-                    red: 1.00,
-                    green: 0.83,
-                    blue: 0.28
-                ),
-                Color(
-                    red: 0.48,
-                    green: 0.55,
-                    blue: 1.00
+                    red: 0.63,
+                    green: 0.56,
+                    blue: 0.39
                 )
             ]
         }
