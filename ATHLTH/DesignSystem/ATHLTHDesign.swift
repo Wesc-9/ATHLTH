@@ -635,6 +635,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let softTransition: Bool
     let immersiveTransition: Bool
     let scrollFadeTransition: Bool
+    let pullDownFadeBridge: Bool
     private let hero: Hero
     private let content: Content
 
@@ -674,6 +675,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         softTransition: Bool = false,
         immersiveTransition: Bool = false,
         scrollFadeTransition: Bool = false,
+        pullDownFadeBridge: Bool = false,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
@@ -681,6 +683,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         self.softTransition = softTransition
         self.immersiveTransition = immersiveTransition
         self.scrollFadeTransition = scrollFadeTransition
+        self.pullDownFadeBridge = pullDownFadeBridge
         self.hero = hero()
         self.content = content()
     }
@@ -699,8 +702,10 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                             : (softTransition ? 40 : 16)
                     )
                     .overlay(alignment: .bottom) {
-                        if !scrollFadeTransition &&
-                            (softTransition || immersiveTransition) {
+                        if pullDownFadeBridge {
+                            ATHLTHPullDownFadeBridge()
+                        } else if !scrollFadeTransition &&
+                                    (softTransition || immersiveTransition) {
                             LinearGradient(
                                 stops: immersiveTransition
                                     ? [
@@ -787,17 +792,25 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                         .allowsHitTesting(false)
                     }
                     .overlay(alignment: .top) {
-                        if immersiveTransition && !scrollFadeTransition {
+                        if pullDownFadeBridge ||
+                            (immersiveTransition && !scrollFadeTransition) {
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.38),
-                                    Color.white.opacity(0.08),
+                                    Color.white.opacity(
+                                        pullDownFadeBridge ? 0.62 : 0.38
+                                    ),
+                                    Color.white.opacity(
+                                        pullDownFadeBridge ? 0.20 : 0.08
+                                    ),
                                     Color.clear
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
-                            .frame(height: 42)
+                            .frame(
+                                height:
+                                    pullDownFadeBridge ? 54 : 42
+                            )
                             .clipShape(
                                 ATHLTHTopRoundedSheetShape(
                                     radius: sheetCornerRadius
@@ -897,6 +910,53 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         // origin below the status-bar safe area even though the canvas itself
         // can paint behind it.
         .ignoresSafeArea(edges: .top)
+    }
+}
+
+
+private struct ATHLTHPullDownFadeBridge:
+    View {
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(
+                    color: .clear,
+                    location: 0
+                ),
+                .init(
+                    color:
+                        ATHLTHTheme
+                            .canvasTop
+                            .opacity(0.08),
+                    location: 0.18
+                ),
+                .init(
+                    color:
+                        ATHLTHTheme
+                            .canvasTop
+                            .opacity(0.38),
+                    location: 0.48
+                ),
+                .init(
+                    color:
+                        ATHLTHTheme
+                            .canvasTop
+                            .opacity(0.80),
+                    location: 0.76
+                ),
+                .init(
+                    color:
+                        ATHLTHTheme
+                            .canvasTop,
+                    location: 1
+                )
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 92)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
