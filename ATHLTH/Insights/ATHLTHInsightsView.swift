@@ -19,7 +19,8 @@ struct ATHLTHInsightsView: View {
 
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.accentDeep.opacity(0.62)
+                accent: ATHLTHTheme.accentDeep.opacity(0.62),
+                pullDownFadeBridge: true
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
