@@ -6846,49 +6846,6 @@ struct CommunityGroupDetailView: View {
                 Spacer()
             }
 
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "Stronger\nTogether",
-                    norwegian: "Sterkere\nSammen"
-                )
-            )
-            .font(
-                .system(
-                    size: 21,
-                    weight: .medium,
-                    design: .serif
-                )
-            )
-            .italic()
-            .multilineTextAlignment(.center)
-            .foregroundStyle(
-                .white.opacity(0.88)
-            )
-            .rotationEffect(.degrees(-7))
-            .shadow(
-                color: .black.opacity(0.18),
-                radius: 4,
-                y: 2
-            )
-            .padding(
-                .trailing,
-                groups.canManage(
-                    currentGroup
-                )
-                    ? 148
-                    : 95
-            )
-            .padding(
-                .top,
-                max(topInset + 5, 16)
-            )
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: .topTrailing
-            )
-            .allowsHitTesting(false)
-
             HStack(
                 alignment: .bottom,
                 spacing: 14
