@@ -486,48 +486,42 @@ struct ATHLTHCommunityV4View: View {
                                 group: group
                             )
                         } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    groups.joinedGroupIDs
-                                        .contains(group.id)
-                                    ? ATHLTHLocalization.choose(
-                                        english: "YOUR CLUB",
-                                        norwegian: "DIN GRUPPE"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "PUBLIC CLUB",
-                                        norwegian: "OFFENTLIG GRUPPE"
-                                    ),
-                                title: group.name,
-                                detail:
-                                    group.locationName.isEmpty
-                                    ? group.summary
-                                    : group.locationName,
-                                icon: "person.3.fill",
-                                tint: .green
+                            CommunityDiscoveryClubCard(
+                                group: group,
+                                memberCount:
+                                    groups.members(
+                                        in: group.id
+                                    ).count,
+                                isJoined:
+                                    groups
+                                        .joinedGroupIDs
+                                        .contains(
+                                            group.id
+                                        )
                             )
-                            .frame(width: 220)
+                            .frame(width: 252)
                         }
                         .buttonStyle(.plain)
                     }
 
                     if discoveryGroups.isEmpty {
-                        CommunityDiscoveryNowRow(
-                            eyebrow: "DISCOVERY",
+                        CommunityDiscoveryVisualEmptyCard(
                             title:
                                 ATHLTHLocalization.choose(
-                                    english: "Discover clubs",
-                                    norwegian: "Oppdag grupper"
+                                    english: "Discover Clubs",
+                                    norwegian: "Oppdag Clubs"
                                 ),
                             detail:
                                 ATHLTHLocalization.choose(
-                                    english: "Public clubs will appear here.",
-                                    norwegian: "Offentlige grupper vises her."
+                                    english: "Public Clubs will appear here.",
+                                    norwegian: "Offentlige Clubs vises her."
                                 ),
-                            icon: "person.3.fill",
-                            tint: .green
+                            assetName:
+                                "CommunityHero",
+                            icon:
+                                "person.3.fill"
                         )
-                        .frame(width: 220)
+                        .frame(width: 252)
                     }
                 }
             }
@@ -561,19 +555,17 @@ struct ATHLTHCommunityV4View: View {
                                 challengeID: challenge.id
                             )
                         } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    ATHLTHLocalization.choose(
-                                        english: "PUBLIC CHALLENGE",
-                                        norwegian: "OFFENTLIG CHALLENGE"
-                                    ),
-                                title: challenge.title,
-                                detail: challenge.sport.title,
-                                icon:
-                                    challenge.sport.systemImage,
-                                tint: .orange
+                            CommunityDiscoveryChallengeCard(
+                                challenge: challenge,
+                                creator:
+                                    social.visibleProfiles
+                                        .first {
+                                            $0.userID ==
+                                            challenge
+                                                .creatorID
+                                        }
                             )
-                            .frame(width: 220)
+                            .frame(width: 252)
                         }
                         .buttonStyle(.plain)
                     }
@@ -589,31 +581,17 @@ struct ATHLTHCommunityV4View: View {
                                 eventID: event.id
                             )
                         } label: {
-                            CommunityDiscoveryNowRow(
-                                eyebrow:
-                                    ATHLTHLocalization.choose(
-                                        english: "PUBLIC EVENT",
-                                        norwegian: "OFFENTLIG EVENT"
-                                    ),
-                                title: event.event.title,
-                                detail:
-                                    event.event.startsAt
-                                        .formatted(
-                                            date: .abbreviated,
-                                            time: .shortened
-                                        ),
-                                icon: "calendar",
-                                tint: .blue
+                            CommunityDiscoveryEventCard(
+                                item: event
                             )
-                            .frame(width: 220)
+                            .frame(width: 252)
                         }
                         .buttonStyle(.plain)
                     }
 
                     if publicDiscoveryChallenges.isEmpty &&
                         publicDiscoveryEvents.isEmpty {
-                        CommunityDiscoveryNowRow(
-                            eyebrow: "DISCOVERY",
+                        CommunityDiscoveryVisualEmptyCard(
                             title:
                                 ATHLTHLocalization.choose(
                                     english: "Discover what's next",
@@ -624,10 +602,12 @@ struct ATHLTHCommunityV4View: View {
                                     english: "Public events and challenges will appear here.",
                                     norwegian: "Offentlige events og challenges vises her."
                                 ),
-                            icon: "sparkles",
-                            tint: ATHLTHTheme.premiumGold
+                            assetName:
+                                "GoalAdventure",
+                            icon:
+                                "sparkles"
                         )
-                        .frame(width: 220)
+                        .frame(width: 252)
                     }
                 }
             }
@@ -2654,6 +2634,704 @@ private struct CommunityDiscoveryEmptyCard:
                     cornerRadius: 17,
                     style: .continuous
                 )
+        )
+    }
+}
+
+private struct CommunityDiscoveryClubCard:
+    View {
+    let group: CommunityGroupRecord
+    let memberCount: Int
+    let isJoined: Bool
+
+    private var forest: Color {
+        Color(
+            red: 0.025,
+            green: 0.30,
+            blue: 0.21
+        )
+    }
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            ZStack(
+                alignment: .bottomLeading
+            ) {
+                ATHLTHArtworkImage(
+                    reference:
+                        group.headerImageURL ??
+                        group.imageURL,
+                    fallbackAssetName:
+                        "CommunityHero"
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 92)
+                .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.34)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                clubAvatar
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style:
+                                .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.white,
+                            lineWidth: 2
+                        )
+                    }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(0.16),
+                        radius: 6,
+                        y: 3
+                    )
+                    .padding(.leading, 11)
+                    .offset(y: 18)
+
+                HStack {
+                    Spacer()
+
+                    Text(
+                        isJoined
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "YOUR CLUB",
+                                    norwegian:
+                                        "DIN CLUB"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "PUBLIC",
+                                    norwegian:
+                                        "OFFENTLIG"
+                                )
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.7)
+                    .foregroundStyle(
+                        .white
+                    )
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .frame(height: 24)
+                    .background(
+                        forest
+                            .opacity(0.88),
+                        in: Capsule()
+                    )
+                    .padding(9)
+                }
+                .frame(
+                    maxHeight:
+                        .infinity,
+                    alignment: .top
+                )
+            }
+            .frame(height: 92)
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(group.name)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    if !group
+                        .locationName
+                        .isEmpty {
+                        Label(
+                            group.locationName,
+                            systemImage:
+                                "location.fill"
+                        )
+                    } else {
+                        Label(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Club",
+                                    norwegian:
+                                        "Club"
+                                ),
+                            systemImage:
+                                "person.3.fill"
+                        )
+                    }
+
+                    if memberCount > 0 {
+                        Text("·")
+
+                        Text(
+                            ATHLTHLocalization
+                                .counted(
+                                    memberCount,
+                                    englishSingular:
+                                        "member",
+                                    englishPlural:
+                                        "members",
+                                    norwegianSingular:
+                                        "medlem",
+                                    norwegianPlural:
+                                        "medlemmer"
+                                )
+                        )
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+            }
+            .padding(.leading, 68)
+            .padding(.trailing, 10)
+            .padding(.top, 9)
+            .padding(.bottom, 10)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .background(
+            Color.white.opacity(
+                0.96
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style:
+                        .continuous
+                )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                forest.opacity(
+                    0.10
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                forest.opacity(
+                    0.06
+                ),
+            radius: 10,
+            y: 4
+        )
+    }
+
+    @ViewBuilder
+    private var clubAvatar:
+        some View {
+        ATHLTHArtworkImage(
+            reference:
+                group.imageURL ??
+                group.headerImageURL,
+            fallbackAssetName:
+                "CommunityHero"
+        )
+    }
+}
+
+private struct CommunityDiscoveryChallengeCard:
+    View {
+    let challenge: ATHLTHChallenge
+    let creator: SocialProfileCard?
+
+    private var participantCount: Int {
+        challenge.participants
+            .filter {
+                $0.state == .creator ||
+                $0.state == .accepted
+            }
+            .count
+    }
+
+    var body: some View {
+        discoveryVisualCard(
+            eyebrow:
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "PUBLIC CHALLENGE",
+                        norwegian:
+                            "OFFENTLIG CHALLENGE"
+                    ),
+            title: challenge.title,
+            detail:
+                challenge.sport.title,
+            meta:
+                ATHLTHLocalization
+                    .counted(
+                        participantCount,
+                        englishSingular:
+                            "participant",
+                        englishPlural:
+                            "participants",
+                        norwegianSingular:
+                            "deltaker",
+                        norwegianPlural:
+                            "deltakere"
+                    ),
+            assetName:
+                challengeArtworkAsset,
+            icon:
+                challenge.sport
+                    .systemImage
+        )
+    }
+
+    private var challengeArtworkAsset:
+        String {
+        switch challenge.sport {
+        case .running:
+            return "GoalRunning"
+        case .strength:
+            return "GoalStrength"
+        case .heartRate:
+            return "GoalRecovery"
+        }
+    }
+
+    private func discoveryVisualCard(
+        eyebrow: String,
+        title: String,
+        detail: String,
+        meta: String,
+        assetName: String,
+        icon: String
+    ) -> some View {
+        CommunityDiscoveryPeopleCardShell(
+            eyebrow: eyebrow,
+            title: title,
+            detail: detail,
+            meta: meta,
+            assetName: assetName,
+            icon: icon,
+            profile: creator
+        )
+    }
+}
+
+private struct CommunityDiscoveryEventCard:
+    View {
+    let item: CommunityEventItem
+
+    var body: some View {
+        CommunityDiscoveryPeopleCardShell(
+            eyebrow:
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "PUBLIC EVENT",
+                        norwegian:
+                            "OFFENTLIG EVENT"
+                    ),
+            title:
+                item.event.title,
+            detail:
+                item.event.startsAt
+                    .formatted(
+                        date:
+                            .abbreviated,
+                        time:
+                            .shortened
+                    ),
+            meta:
+                item.event
+                    .meetingName
+                    .isEmpty
+                    ? item.event
+                        .activityType
+                        .title
+                    : item.event
+                        .meetingName,
+            assetName:
+                eventArtworkAsset,
+            icon:
+                item.event
+                    .activityType
+                    .systemImage,
+            profile:
+                item.creator
+        )
+    }
+
+    private var eventArtworkAsset:
+        String {
+        switch item.event.activityType {
+        case .running:
+            return "GoalRunning"
+        case .walking:
+            return "GoalWalking"
+        case .strength:
+            return "GoalStrength"
+        case .cycling:
+            return "GoalEndurance"
+        case .hike:
+            return "GoalMountain"
+        case .groupWorkout:
+            return "CommunityHero"
+        case .other:
+            return "GoalAdventure"
+        }
+    }
+}
+
+private struct CommunityDiscoveryPeopleCardShell:
+    View {
+    let eyebrow: String
+    let title: String
+    let detail: String
+    let meta: String
+    let assetName: String
+    let icon: String
+    let profile: SocialProfileCard?
+
+    private var forest: Color {
+        Color(
+            red: 0.025,
+            green: 0.30,
+            blue: 0.21
+        )
+    }
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            ZStack(
+                alignment:
+                    .bottomLeading
+            ) {
+                Image(assetName)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFill()
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                    .frame(height: 92)
+                    .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        Color.black
+                            .opacity(0.42)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                creatorAvatar
+                    .frame(
+                        width: 43,
+                        height: 43
+                    )
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white,
+                                lineWidth: 2
+                            )
+                    }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(
+                                    0.16
+                                ),
+                        radius: 6,
+                        y: 3
+                    )
+                    .padding(.leading, 11)
+                    .offset(y: 17)
+
+                HStack {
+                    Label(
+                        eyebrow,
+                        systemImage: icon
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.6)
+                    .foregroundStyle(
+                        .white
+                    )
+                    .lineLimit(1)
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .frame(height: 24)
+                    .background(
+                        forest
+                            .opacity(0.88),
+                        in: Capsule()
+                    )
+
+                    Spacer()
+                }
+                .padding(9)
+                .frame(
+                    maxHeight:
+                        .infinity,
+                    alignment: .top
+                )
+            }
+            .frame(height: 92)
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+
+                if !meta.isEmpty {
+                    Text(meta)
+                        .font(
+                            .system(
+                                size: 9.5,
+                                weight:
+                                    .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            forest
+                        )
+                        .lineLimit(1)
+                }
+            }
+            .padding(.leading, 65)
+            .padding(.trailing, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 9)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .background(
+            Color.white.opacity(
+                0.96
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style:
+                        .continuous
+                )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                forest.opacity(
+                    0.10
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                forest.opacity(
+                    0.05
+                ),
+            radius: 10,
+            y: 4
+        )
+    }
+
+    @ViewBuilder
+    private var creatorAvatar:
+        some View {
+        if let profile {
+            CommunityV4Avatar(
+                profile: profile,
+                size: 43,
+                isOnline: false
+            )
+        } else {
+            Circle()
+                .fill(
+                    Color.white
+                        .opacity(0.94)
+                )
+                .overlay {
+                    Image(
+                        systemName:
+                            "person.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        forest
+                    )
+                }
+        }
+    }
+}
+
+private struct CommunityDiscoveryVisualEmptyCard:
+    View {
+    let title: String
+    let detail: String
+    let assetName: String
+    let icon: String
+
+    var body: some View {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            Image(assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 130)
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black
+                        .opacity(0.58)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Image(
+                    systemName: icon
+                )
+                .font(.caption.bold())
+
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .white.opacity(
+                            0.86
+                        )
+                    )
+                    .lineLimit(2)
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+        }
+        .frame(height: 130)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
         )
     }
 }
