@@ -502,6 +502,11 @@ struct ATHLTHHomeView: View {
                             }
                         }
                     }
+                } else if kind == .strength {
+                    StrengthQuickStartSheet { workout in
+                        pendingHomeQuickStartKind = nil
+                        selectedHomeStrengthSession = workout
+                    }
                 } else {
                     QuickWorkoutStartSheet(
                         kind: kind,
@@ -1741,8 +1746,8 @@ struct ATHLTHHomeView: View {
                         icon: "dumbbell.fill",
                         tint: ATHLTHTheme.accentDeep
                     ) {
-                        selectedHomeStrengthSession =
-                            homeFreestyleStrengthSession
+                        pendingHomeQuickStartKind =
+                            .strength
                     }
                 }
                 .frame(
@@ -2530,8 +2535,8 @@ struct ATHLTHHomeView: View {
                         icon: "dumbbell.fill",
                         tint: .purple
                     ) {
-                        selectedHomeStrengthSession =
-                            homeFreestyleStrengthSession
+                        pendingHomeQuickStartKind =
+                            .strength
                     }
                 }
                 .padding(.top, 12)
