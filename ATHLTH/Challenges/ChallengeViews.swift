@@ -580,43 +580,136 @@ struct ChallengeCreationView: View {
     @State private var creatingChallenge = false
     @State private var createError: String?
 
+    private var clubForest: Color {
+        Color(red: 0.025, green: 0.30, blue: 0.21)
+    }
+
+    private var clubEmerald: Color {
+        Color(red: 0.055, green: 0.49, blue: 0.32)
+    }
+
+    private var clubMint: Color {
+        Color(red: 0.90, green: 0.96, blue: 0.92)
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ProgressView(value: Double(step + 1), total: 5)
-                    .tint(ATHLTHTheme.accent)
-                    .padding(.horizontal)
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        clubEmerald.opacity(0.14)
+                )
+                .ignoresSafeArea()
 
-                Text(stepTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 6)
+                VStack(spacing: 0) {
+                    VStack(spacing: 10) {
+                        ProgressView(
+                            value: Double(step + 1),
+                            total: 5
+                        )
+                        .tint(clubEmerald)
 
-                ScrollView {
-                    Group {
-                        switch step {
-                        case 0: typeStep
-                        case 1: rulesStep
-                        case 2: peopleStep
-                        case 3: scheduleStep
-                        default: reviewStep
+                        HStack(spacing: 0) {
+                            ForEach(
+                                Array([
+                                    "Detaljer",
+                                    "Regler",
+                                    "Personer",
+                                    "Tid",
+                                    "Se over"
+                                ].enumerated()),
+                                id: \.offset
+                            ) { index, label in
+                                HStack(spacing: 5) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(
+                                                index <= step
+                                                    ? clubForest
+                                                    : Color.white.opacity(0.92)
+                                            )
+                                            .frame(
+                                                width: 24,
+                                                height: 24
+                                            )
+
+                                        Text("\(index + 1)")
+                                            .font(
+                                                .caption2.bold()
+                                            )
+                                            .foregroundStyle(
+                                                index <= step
+                                                    ? Color.white
+                                                    : ATHLTHTheme.mutedText
+                                            )
+                                    }
+
+                                    if index == step {
+                                        Text(label)
+                                            .font(
+                                                .caption2.weight(
+                                                    .semibold
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                clubForest
+                                            )
+                                            .lineLimit(1)
+                                    }
+
+                                    if index < 4 {
+                                        Spacer(minLength: 5)
+                                    }
+                                }
+                            }
                         }
                     }
-                    .padding()
-                }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
 
-                footer
+                    ScrollView {
+                        Group {
+                            switch step {
+                            case 0: typeStep
+                            case 1: rulesStep
+                            case 2: peopleStep
+                            case 3: scheduleStep
+                            default: reviewStep
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 18)
+                    }
+                    .scrollIndicators(.hidden)
+
+                    footer
+                }
             }
-            .background(Color(.systemGroupedBackground))
             .navigationTitle(
                 preselectedRouteID == nil
-                    ? "Create Challenge"
-                    : "Challenge Route"
+                    ? ATHLTHLocalization.choose(
+                        english: "Create Challenge",
+                        norwegian: "Opprett utfordring"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Challenge Route",
+                        norwegian: "Challenge-rute"
+                    )
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                    .foregroundStyle(clubForest)
                 }
             }
             .task {
@@ -725,6 +818,64 @@ struct ChallengeCreationView: View {
 
     private var typeStep: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ZStack(alignment: .bottomLeading) {
+                Image("CommunityHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 144)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        clubForest.opacity(0.82)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(
+                        "CHALLENGE",
+                        systemImage: "bolt.fill"
+                    )
+                    .font(.caption2.bold())
+                    .tracking(1.0)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "New challenge",
+                            norwegian: "Ny utfordring"
+                        )
+                    )
+                    .font(.title2.bold())
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Motivate your community and set a shared goal.",
+                            norwegian: "Motiver fellesskapet og sett et felles mål."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.88))
+                }
+                .foregroundStyle(.white)
+                .padding(16)
+            }
+            .frame(height: 144)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+            )
+            .shadow(
+                color: clubForest.opacity(0.12),
+                radius: 14,
+                y: 6
+            )
+
             VStack(alignment: .leading, spacing: 7) {
                 Text("Challenge name")
                     .font(.headline)
@@ -2002,23 +2153,37 @@ struct ChallengeCreationView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             if step > 0 {
-                Button("Back") {
-                    withAnimation { step -= 1 }
+                Button {
+                    withAnimation {
+                        step -= 1
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "chevron.left"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        Color.white.opacity(0.92),
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             }
 
-            Button(
-                step == 4
-                    ? (
-                        creatingChallenge
-                            ? "Sending…"
-                            : "Send Challenge"
-                    )
-                    : "Continue"
-            ) {
+            Button {
                 if step == 4 {
                     Task {
                         await createChallenge()
@@ -2028,17 +2193,79 @@ struct ChallengeCreationView: View {
                         step += 1
                     }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    if creatingChallenge {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text(
+                        step == 4
+                            ? (
+                                creatingChallenge
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Sending…",
+                                        norwegian: "Sender…"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Send Challenge",
+                                        norwegian: "Send utfordring"
+                                    )
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Continue",
+                                norwegian: "Fortsett"
+                            )
+                    )
+                    .font(.headline)
+
+                    if step < 4 &&
+                        !creatingChallenge {
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 50)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            clubForest,
+                            clubEmerald
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+                .opacity(
+                    canContinue &&
+                    !creatingChallenge
+                        ? 1
+                        : 0.34
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
             .disabled(
                 !canContinue ||
                 creatingChallenge
             )
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            .ultraThinMaterial
+        )
     }
 
     private var scoringOptions: [ATHLTHChallengeScoring] {
@@ -2516,21 +2743,91 @@ struct ChallengeCreationView: View {
         )
     }
 
-    private func sportButton(_ option: ATHLTHChallengeSport) -> some View {
-        Button {
+    private func sportButton(
+        _ option: ATHLTHChallengeSport
+    ) -> some View {
+        let selected = sport == option
+
+        return Button {
             sport = option
         } label: {
-            VStack(spacing: 9) {
-                Image(systemName: option.systemImage)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            option.systemImage
+                    )
                     .font(.title2)
-                Text(option.title)
-                    .font(.headline)
+
+                    Text(option.title)
+                        .font(.headline)
+                }
+                .foregroundStyle(
+                    selected
+                        ? Color.white
+                        : clubForest
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 100
+                )
+                .background(
+                    selected
+                        ? AnyShapeStyle(
+                            LinearGradient(
+                                colors: [
+                                    clubForest,
+                                    clubEmerald
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            )
+                        )
+                        : AnyShapeStyle(
+                            Color.white.opacity(
+                                0.94
+                            )
+                        ),
+                    in: RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+                    .stroke(
+                        selected
+                            ? clubEmerald.opacity(
+                                0.72
+                            )
+                            : clubMint,
+                        lineWidth: 1
+                    )
+                }
+
+                if selected {
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        clubMint
+                    )
+                    .padding(10)
+                }
             }
-            .foregroundStyle(sport == option ? .white : .primary)
-            .frame(maxWidth: .infinity, minHeight: 92)
-            .background(
-                sport == option ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 20)
+            .shadow(
+                color:
+                    clubForest.opacity(
+                        selected ? 0.12 : 0.035
+                    ),
+                radius: 10,
+                y: 4
             )
         }
         .buttonStyle(.plain)
@@ -3936,13 +4233,44 @@ private extension View {
     func challengeCard() -> some View {
         self
             .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.96),
+                        Color(
+                            red: 0.90,
+                            green: 0.96,
+                            blue: 0.92
+                        )
+                        .opacity(0.32)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(
+                    Color(
+                        red: 0.77,
+                        green: 0.88,
+                        blue: 0.81
+                    )
+                    .opacity(0.52),
+                    lineWidth: 0.8
+                )
             }
+            .shadow(
+                color: Color.black.opacity(0.025),
+                radius: 8,
+                y: 3
+            )
     }
 
     func challengeHint() -> some View {
