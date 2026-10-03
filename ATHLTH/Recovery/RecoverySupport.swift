@@ -1955,155 +1955,1319 @@ struct RecoveryDailyCheckInCard: View {
 struct MuscleRecoveryCard: View {
     let statuses: [MuscleRecoveryStatus]
     var unmappedExerciseNames: [String] = []
+    var trendDays: [RecoveryTrendDay] = []
     let onLogSoreness: () -> Void
+
+    private var forest: Color {
+        Color(
+            red: 0.025,
+            green: 0.30,
+            blue: 0.21
+        )
+    }
+
+    private var emerald: Color {
+        Color(
+            red: 0.13,
+            green: 0.67,
+            blue: 0.33
+        )
+    }
+
+    private var mint: Color {
+        Color(
+            red: 0.91,
+            green: 0.97,
+            blue: 0.92
+        )
+    }
+
+    private var amber: Color {
+        Color(
+            red: 0.95,
+            green: 0.67,
+            blue: 0.08
+        )
+    }
+
+    private var coral: Color {
+        Color(
+            red: 0.93,
+            green: 0.34,
+            blue: 0.28
+        )
+    }
 
     var body: some View {
         ATHLTHCard {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(recoveryText("Recently trained areas", "Nylig trente områder"))
-                        .font(.title3.weight(.bold))
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                header
 
-                    Text(
-                        recoveryText(
-                            "Last 7 days · minutes and actual training volume determine the load.",
-                            "Siste 7 dager · minutter og faktisk treningsmengde avgjør belastningen."
+                if statuses.isEmpty {
+                    emptyState
+                } else {
+                    heroRecoveryPanel
+                    readinessLegend
+                    muscleGroupPanel
+                    loadTrendPanel
+                    assessmentPanel
+
+                    if !unmappedExerciseNames
+                        .isEmpty {
+                        missingMappingWarning
+                    }
+
+                    HStack {
+                        Text(
+                            recoveryText(
+                                "Estimated from recorded training and soreness data.",
+                                "Estimert fra registrert trening og ømhetsdata."
+                            )
                         )
+                        .font(
+                            .system(
+                                size: 8.5,
+                                weight: .regular
+                            )
+                        )
+                        .foregroundStyle(
+                            .tertiary
+                        )
+
+                        Spacer()
+
+                        Button {
+                            onLogSoreness()
+                        } label: {
+                            Label(
+                                recoveryText(
+                                    "Check in",
+                                    "Sjekk inn"
+                                ),
+                                systemImage:
+                                    "plus.circle.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                forest
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var header:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName:
+                    "waveform.path.ecg"
+            )
+            .font(
+                .system(
+                    size: 18,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                emerald
+            )
+            .frame(
+                width: 42,
+                height: 42
+            )
+            .background(
+                mint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
                     )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+            )
 
-                Spacer(minLength: 8)
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    recoveryText(
+                        "Muscle recovery",
+                        "Muskelrestitusjon"
+                    )
+                )
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
 
-                Button(recoveryText("Check in", "Sjekk inn")) {
-                    onLogSoreness()
-                }
-                .font(.caption.weight(.semibold))
+                Text(
+                    recoveryText(
+                        "See how ready your muscle groups are for new load.",
+                        "Se hvor restituerte muskelgruppene dine er."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
             }
 
-            HStack(spacing: 8) {
-                sourceBadge(
-                    title:
-                        recoveryText(
-                            "Strength",
-                            "Styrke"
-                        ),
-                    icon: "figure.strengthtraining.traditional"
-                )
-                sourceBadge(
-                    title:
-                        recoveryText(
-                            "Run",
-                            "Løp"
-                        ),
-                    icon: "figure.run"
-                )
-                sourceBadge(
-                    title:
-                        recoveryText(
-                            "Walk",
-                            "Gange"
-                        ),
-                    icon: "figure.walk"
-                )
-            }
-            .padding(.top, 10)
+            Spacer(
+                minLength: 4
+            )
 
-            if !unmappedExerciseNames.isEmpty {
-                HStack(
-                    alignment: .top,
-                    spacing: 8
-                ) {
-                    Image(
-                        systemName:
-                            "exclamationmark.triangle.fill"
+            HStack(spacing: 5) {
+                Image(
+                    systemName:
+                        "clock.fill"
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight:
+                            .semibold
                     )
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
-                    .padding(.top, 1)
+                )
+
+                Text(
+                    recoveryText(
+                        "Updated today",
+                        "Oppdatert i dag"
+                    )
+                )
+                .lineLimit(1)
+            }
+            .font(
+                .system(
+                    size: 9,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                forest
+            )
+            .padding(
+                .horizontal,
+                8
+            )
+            .frame(height: 28)
+            .background(
+                mint,
+                in: Capsule()
+            )
+        }
+    }
+
+    private var heroRecoveryPanel:
+        some View {
+        HStack(
+            alignment: .center,
+            spacing: 8
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(
+                            overallTint
+                        )
+                        .frame(
+                            width: 7,
+                            height: 7
+                        )
 
                     Text(
-                        missingMuscleGroupWarning
+                        recoveryText(
+                            "TOTAL STATUS",
+                            "TOTAL STATUS"
+                        )
                     )
                     .font(
                         .system(
                             size: 9,
-                            weight: .medium
+                            weight: .bold
                         )
                     )
-                    .foregroundStyle(.secondary)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
+                    .tracking(1.1)
+                    .foregroundStyle(
+                        .secondary
                     )
-
-                    Spacer(minLength: 0)
                 }
-                .padding(.top, 8)
+
+                Text(
+                    overallTitle
+                )
+                .font(
+                    .system(
+                        size: 24,
+                        weight: .bold,
+                        design: .serif
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .minimumScaleFactor(
+                    0.78
+                )
+
+                Text(
+                    overallDetail
+                )
+                .font(
+                    .system(
+                        size: 10.5
+                    )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+                readinessRing
+                    .frame(
+                        width: 88,
+                        height: 88
+                    )
+                    .padding(.top, 2)
+            }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+
+            StrengthMuscleMapView(
+                profile:
+                    muscleMapProfile,
+                compact: true,
+                style:
+                    .recoveryLoad
+            )
+            .frame(height: 205)
+            .frame(
+                maxWidth: 176
+            )
+            .padding(
+                .vertical,
+                6
+            )
+        }
+        .padding(13)
+        .background(
+            LinearGradient(
+                colors: [
+                    mint.opacity(
+                        0.86
+                    ),
+                    Color.white
+                        .opacity(0.90)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                emerald.opacity(
+                    0.12
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var readinessRing:
+        some View {
+        ZStack {
+            Circle()
+                .stroke(
+                    Color.black
+                        .opacity(0.07),
+                    lineWidth: 9
+                )
+
+            Circle()
+                .trim(
+                    from: 0,
+                    to:
+                        overallReadiness /
+                        100
+                )
+                .stroke(
+                    overallTint,
+                    style:
+                        StrokeStyle(
+                            lineWidth: 9,
+                            lineCap: .round
+                        )
+                )
+                .rotationEffect(
+                    .degrees(-90)
+                )
+
+            VStack(spacing: 0) {
+                Text(
+                    "\(Int(overallReadiness.rounded()))%"
+                )
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .contentTransition(
+                    .numericText()
+                )
+
+                Text(
+                    recoveryText(
+                        "READY",
+                        "KLAR"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 7.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.7)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+        }
+    }
+
+    private var readinessLegend:
+        some View {
+        HStack(spacing: 6) {
+            legendItem(
+                title:
+                    recoveryText(
+                        "Ready",
+                        "Klar"
+                    ),
+                detail: "70–100%",
+                tint: emerald
+            )
+
+            legendItem(
+                title:
+                    recoveryText(
+                        "Moderate",
+                        "Moderat"
+                    ),
+                detail: "40–69%",
+                tint: amber
+            )
+
+            legendItem(
+                title:
+                    recoveryText(
+                        "Needs rest",
+                        "Trenger hvile"
+                    ),
+                detail: "0–39%",
+                tint: coral
+            )
+        }
+        .padding(9)
+        .background(
+            Color.white
+                .opacity(0.66),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 15,
+                style: .continuous
+            )
+            .stroke(
+                Color.black
+                    .opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func legendItem(
+        title: String,
+        detail: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(tint)
+                .frame(
+                    width: 8,
+                    height: 8
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 0
+            ) {
+                Text(title)
+                    .font(
+                        .system(
+                            size: 8.5,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(
+                        .system(
+                            size: 7.5
+                        )
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
             }
 
-            if statuses.isEmpty {
-                HStack(spacing: 11) {
-                    Image(systemName: "figure.mixed.cardio")
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 38, height: 38)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 12,
-                                style: .continuous
-                            )
-                        )
+            Spacer(
+                minLength: 0
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
 
-                    Text(
-                        recoveryText("Complete a tracked strength workout, run or walk and ATHLTH will show which areas have carried the most recent training.", "Fullfør en registrert styrkeøkt, løpetur eller gåtur, så viser ATHLTH hvilke områder som har hatt mest nylig belastning.")
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                    Spacer(minLength: 0)
-                }
-                .padding(.top, 12)
-            } else {
-                VStack(spacing: 14) {
-                    StrengthMuscleMapView(
-                        profile: muscleMapProfile,
-                        compact: true,
-                        style: .recoveryLoad
-                    )
-                    .frame(height: 158)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        Color.primary.opacity(0.025),
-                        in: RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
-                    )
-
-                    VStack(spacing: 7) {
-                        ForEach(statuses.prefix(8)) { status in
-                            muscleRow(status)
-                        }
-                    }
-                }
-                .padding(.top, 10)
-            }
-
+    private var muscleGroupPanel:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
             Text(
                 recoveryText(
-                    "Estimated from recorded training data. Use as guidance only — do not rely on the estimate blindly.",
-                    "Estimert ut fra registrerte treningsdata. Bruk dette kun som veiledning."
+                    "MUSCLE GROUPS",
+                    "MUSKELGRUPPER"
                 )
             )
-            .font(.system(size: 7.5, weight: .regular))
-            .foregroundStyle(.tertiary)
-            .padding(.top, 5)
+            .font(
+                .system(
+                    size: 9.5,
+                    weight: .bold
+                )
+            )
+            .tracking(0.8)
+            .foregroundStyle(
+                .secondary
+            )
+
+            ForEach(
+                displayedStatuses
+            ) { status in
+                compactMuscleRow(
+                    status
+                )
+            }
         }
+        .padding(12)
+        .background(
+            Color.primary
+                .opacity(0.022),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func compactMuscleRow(
+        _ status:
+            MuscleRecoveryStatus
+    ) -> some View {
+        let percent =
+            Int(
+                (
+                    status
+                        .readinessScore *
+                    100
+                )
+                .rounded()
+            )
+        let tint =
+            readinessTint(
+                status
+                    .readinessScore
+            )
+
+        return HStack(
+            spacing: 9
+        ) {
+            Image(
+                systemName:
+                    muscleIcon(
+                        status
+                            .muscleGroup
+                    )
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                tint
+            )
+            .frame(
+                width: 30,
+                height: 30
+            )
+            .background(
+                tint.opacity(
+                    0.09
+                ),
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                HStack {
+                    Text(
+                        recoveryMuscleName(
+                            status
+                                .muscleGroup
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Spacer()
+
+                    Text(
+                        "\(percent)%"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .monospacedDigit()
+                }
+
+                GeometryReader {
+                    proxy in
+
+                    ZStack(
+                        alignment: .leading
+                    ) {
+                        Capsule()
+                            .fill(
+                                Color.black
+                                    .opacity(
+                                        0.06
+                                    )
+                            )
+
+                        Capsule()
+                            .fill(tint)
+                            .frame(
+                                width:
+                                    max(
+                                        3,
+                                        proxy
+                                            .size
+                                            .width *
+                                        status
+                                            .readinessScore
+                                    )
+                            )
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(
+            children: .combine
+        )
+    }
+
+    private var loadTrendPanel:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Image(
+                    systemName:
+                        "chart.line.uptrend.xyaxis"
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight:
+                            .semibold
+                    )
+                )
+                .foregroundStyle(
+                    forest
+                )
+
+                Text(
+                    recoveryText(
+                        "LOAD · LAST 7 DAYS",
+                        "BELASTNING · SISTE 7 DAGER"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.65)
+                .foregroundStyle(
+                    .secondary
+                )
+
+                Spacer()
+
+                if let total =
+                    sevenDayTrainingMinutes {
+                    Text(
+                        "\(Int(total.rounded())) min"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        forest
+                    )
+                }
+            }
+
+            if recentTrendDays
+                .isEmpty {
+                Text(
+                    recoveryText(
+                        "Training-load history will appear here when recent data is available.",
+                        "Belastningshistorikk vises her når det finnes nok data."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 54,
+                    alignment: .leading
+                )
+            } else {
+                Chart(
+                    recentTrendDays
+                ) { day in
+                    LineMark(
+                        x: .value(
+                            recoveryText(
+                                "Day",
+                                "Dag"
+                            ),
+                            day.date
+                        ),
+                        y: .value(
+                            recoveryText(
+                                "Minutes",
+                                "Minutter"
+                            ),
+                            day.trainingMinutes
+                        )
+                    )
+                    .interpolationMethod(
+                        .catmullRom
+                    )
+                    .foregroundStyle(
+                        forest
+                    )
+
+                    AreaMark(
+                        x: .value(
+                            recoveryText(
+                                "Day",
+                                "Dag"
+                            ),
+                            day.date
+                        ),
+                        y: .value(
+                            recoveryText(
+                                "Minutes",
+                                "Minutter"
+                            ),
+                            day.trainingMinutes
+                        )
+                    )
+                    .interpolationMethod(
+                        .catmullRom
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                emerald
+                                    .opacity(
+                                        0.24
+                                    ),
+                                emerald
+                                    .opacity(
+                                        0.02
+                                    )
+                            ],
+                            startPoint:
+                                .top,
+                            endPoint:
+                                .bottom
+                        )
+                    )
+
+                    PointMark(
+                        x: .value(
+                            recoveryText(
+                                "Day",
+                                "Dag"
+                            ),
+                            day.date
+                        ),
+                        y: .value(
+                            recoveryText(
+                                "Minutes",
+                                "Minutter"
+                            ),
+                            day.trainingMinutes
+                        )
+                    )
+                    .symbolSize(18)
+                    .foregroundStyle(
+                        forest
+                    )
+                }
+                .chartXAxis {
+                    AxisMarks(
+                        values:
+                            .stride(
+                                by: .day
+                            )
+                    ) {
+                        value in
+
+                        AxisValueLabel(
+                            format:
+                                .dateTime
+                                    .weekday(
+                                        .narrow
+                                    )
+                        )
+                        .font(
+                            .system(
+                                size: 8
+                            )
+                        )
+                    }
+                }
+                .chartYAxis(.hidden)
+                .frame(height: 92)
+            }
+        }
+        .padding(12)
+        .background(
+            Color.white
+                .opacity(0.70),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.black
+                    .opacity(0.04),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private var assessmentPanel:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 11
+        ) {
+            Image(
+                systemName:
+                    "sparkles"
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                forest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                mint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    recoveryText(
+                        "Today's assessment",
+                        "Dagens vurdering"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+                Text(
+                    assessmentTitle
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+                Text(
+                    assessmentDetail
+                )
+                .font(
+                    .system(
+                        size: 9.5
+                    )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            Spacer(
+                minLength: 0
+            )
+        }
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [
+                    mint.opacity(
+                        0.74
+                    ),
+                    Color.white
+                        .opacity(0.82)
+                ],
+                startPoint:
+                    .leading,
+                endPoint:
+                    .trailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var emptyState:
+        some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "figure.strengthtraining.traditional"
+            )
+            .font(
+                .title3
+            )
+            .foregroundStyle(
+                forest
+            )
+            .frame(
+                width: 44,
+                height: 44
+            )
+            .background(
+                mint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    recoveryText(
+                        "No muscle-recovery data yet",
+                        "Ingen muskeldata ennå"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(
+                            .semibold
+                        )
+                )
+
+                Text(
+                    recoveryText(
+                        "Complete a tracked strength workout, run or walk and ATHLTH will build your muscle-recovery view here.",
+                        "Fullfør en registrert styrkeøkt, løpetur eller gåtur, så bygger ATHLTH muskelrestitusjonen her."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var missingMappingWarning:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 8
+        ) {
+            Image(
+                systemName:
+                    "exclamationmark.triangle.fill"
+            )
+            .font(
+                .system(
+                    size: 10
+                )
+            )
+            .foregroundStyle(
+                .orange
+            )
+            .padding(.top, 1)
+
+            Text(
+                missingMuscleGroupWarning
+            )
+            .font(
+                .system(
+                    size: 8.5
+                )
+            )
+            .foregroundStyle(
+                .secondary
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+
+            Spacer()
+        }
+    }
+
+    private var displayedStatuses:
+        [MuscleRecoveryStatus] {
+        Array(
+            statuses
+                .sorted {
+                    muscleSortIndex(
+                        $0.muscleGroup
+                    ) <
+                    muscleSortIndex(
+                        $1.muscleGroup
+                    )
+                }
+                .prefix(7)
+        )
+    }
+
+    private var overallReadiness:
+        Double {
+        guard !statuses.isEmpty
+        else {
+            return 100
+        }
+
+        return (
+            statuses.reduce(0) {
+                $0 +
+                $1.readinessScore
+            } /
+            Double(
+                statuses.count
+            )
+        ) * 100
+    }
+
+    private var overallTint:
+        Color {
+        readinessTint(
+            overallReadiness /
+                100
+        )
+    }
+
+    private var overallTitle:
+        String {
+        switch overallReadiness {
+        case 70...:
+            return recoveryText(
+                "Ready for strength",
+                "Klar for styrke"
+            )
+        case 40..<70:
+            return recoveryText(
+                "Train with care",
+                "Tren med omtanke"
+            )
+        default:
+            return recoveryText(
+                "Prioritize recovery",
+                "Prioriter restitusjon"
+            )
+        }
+    }
+
+    private var overallDetail:
+        String {
+        switch overallReadiness {
+        case 70...:
+            return recoveryText(
+                "Most muscle groups are recovered and ready for new load.",
+                "De fleste muskelgruppene er restituert og klare for ny belastning."
+            )
+        case 40..<70:
+            return recoveryText(
+                "Some areas still need recovery. Adjust volume or muscle focus.",
+                "Noen områder trenger fortsatt restitusjon. Juster volum eller muskelfokus."
+            )
+        default:
+            return recoveryText(
+                "Several muscle groups still carry meaningful recent load.",
+                "Flere muskelgrupper har fortsatt tydelig belastning fra nylig trening."
+            )
+        }
+    }
+
+    private var assessmentTitle:
+        String {
+        let lowest =
+            statuses
+                .sorted {
+                    $0.readinessScore <
+                    $1.readinessScore
+                }
+
+        guard let first =
+                lowest.first
+        else {
+            return recoveryText(
+                "Build your recovery baseline.",
+                "Bygg opp restitusjonsgrunnlaget ditt."
+            )
+        }
+
+        let firstName =
+            recoveryMuscleName(
+                first.muscleGroup
+            )
+                .lowercased()
+
+        if first.readinessScore >=
+            0.70 {
+            return recoveryText(
+                "Your tracked muscle groups look ready today.",
+                "De registrerte muskelgruppene ser klare ut i dag."
+            )
+        }
+
+        if lowest.count > 1,
+           lowest[1]
+                .readinessScore <
+                0.70 {
+            let secondName =
+                recoveryMuscleName(
+                    lowest[1]
+                        .muscleGroup
+                )
+                    .lowercased()
+
+            return recoveryText(
+                "\(firstName.capitalized) and \(secondName) need more recovery.",
+                "\(firstName.capitalized) og \(secondName) trenger mer hvile."
+            )
+        }
+
+        return recoveryText(
+            "\(firstName.capitalized) needs more recovery.",
+            "\(firstName.capitalized) trenger mer hvile."
+        )
+    }
+
+    private var assessmentDetail:
+        String {
+        switch overallReadiness {
+        case 70...:
+            return recoveryText(
+                "Your current muscle-load profile supports normal training. Keep the planned intensity sensible.",
+                "Dagens muskelprofil støtter normal trening. Hold den planlagte intensiteten fornuftig."
+            )
+        case 40..<70:
+            return recoveryText(
+                "Consider shifting focus toward the greener muscle groups or reducing volume in fatigued areas.",
+                "Vurder å flytte fokuset mot de grønnere muskelgruppene eller redusere volumet i slitne områder."
+            )
+        default:
+            return recoveryText(
+                "A lighter session, mobility work or extra recovery may fit better today.",
+                "En lettere økt, mobilitet eller ekstra restitusjon kan passe bedre i dag."
+            )
+        }
+    }
+
+    private var recentTrendDays:
+        [RecoveryTrendDay] {
+        Array(
+            trendDays
+                .sorted {
+                    $0.date <
+                    $1.date
+                }
+                .suffix(7)
+        )
+    }
+
+    private var sevenDayTrainingMinutes:
+        Double? {
+        guard !recentTrendDays
+            .isEmpty
+        else {
+            return nil
+        }
+
+        return recentTrendDays
+            .reduce(0) {
+                $0 +
+                $1.trainingMinutes
+            }
     }
 
     private var missingMuscleGroupWarning:
@@ -2114,7 +3278,8 @@ struct MuscleRecoveryCard: View {
                 .joined(separator: ", ")
         let remaining =
             max(
-                unmappedExerciseNames.count - 3,
+                unmappedExerciseNames.count -
+                3,
                 0
             )
         let suffix =
@@ -2122,7 +3287,8 @@ struct MuscleRecoveryCard: View {
                 ? " +\(remaining)"
                 : ""
 
-        if unmappedExerciseNames.count == 1 {
+        if unmappedExerciseNames.count ==
+            1 {
             return recoveryText(
                 "1 trained exercise is missing a muscle group and is not included in the muscle map: \(visibleNames).",
                 "1 trent øvelse mangler muskelgruppe og er ikke med i muskelkartet: \(visibleNames)."
@@ -2135,200 +3301,235 @@ struct MuscleRecoveryCard: View {
         )
     }
 
-    private func sourceBadge(
-        title: String,
-        icon: String
-    ) -> some View {
-        Label(title, systemImage: icon)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                ATHLTHTheme.accentSoft.opacity(0.7),
-                in: Capsule()
-            )
-    }
-
-    private func muscleRow(
-        _ status: MuscleRecoveryStatus
-    ) -> some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(recoveryMuscleName(status.muscleGroup))
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(status.sourceSummary)
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 7)
-
-                Text(status.loadTitle)
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(loadTint(status))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        loadTint(status).opacity(0.10),
-                        in: Capsule()
-                    )
-            }
-
-            ProgressView(value: max(status.currentLoadScore, 0.03))
-                .tint(loadTint(status))
-
-            HStack(spacing: 4) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "\(Int((status.readinessScore * 100).rounded()))% ready",
-                        norwegian:
-                            "\(Int((status.readinessScore * 100).rounded()))% klar"
-                    )
-                )
-                .font(.system(size: 9.5, weight: .semibold))
-                .foregroundStyle(statusTint(status))
-
-                Spacer()
-
-                if let last = status.lastTrainedAt {
-                    Text(relativeDescription(last))
-                        .font(.system(size: 8.5))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var muscleMapProfile: StrengthMuscleProfile {
-        var scores: [StrengthMuscleRegion: Double] = [:]
+    private var muscleMapProfile:
+        StrengthMuscleProfile {
+        var scores:
+            [StrengthMuscleRegion: Double] =
+                [:]
 
         for status in statuses {
-            let score =
-                status.currentLoadScore
-
             for region in muscleRegions(
-                for: status.muscleGroup
+                for:
+                    status
+                        .muscleGroup
             ) {
-                scores[region] = max(
-                    scores[region] ?? 0,
-                    score
-                )
+                scores[region] =
+                    max(
+                        scores[region] ??
+                        0,
+                        status
+                            .currentLoadScore
+                    )
             }
         }
 
         return StrengthMuscleProfile(
-            activations: scores.map {
-                StrengthMuscleActivation(
-                    region: $0.key,
-                    score: $0.value
-                )
-            }
+            activations:
+                scores.map {
+                    StrengthMuscleActivation(
+                        region: $0.key,
+                        score: $0.value
+                    )
+                }
         )
     }
 
     private func muscleRegions(
         for group: String
     ) -> [StrengthMuscleRegion] {
-        let normalized = group.lowercased()
+        let normalized =
+            group.lowercased()
 
-        if normalized.contains("chest") {
+        if normalized.contains(
+            "chest"
+        ) {
             return [.chest]
         }
-        if normalized.contains("back") {
-            return [.lats, .upperBack, .lowerBack]
+        if normalized.contains(
+            "back"
+        ) {
+            return [
+                .lats,
+                .upperBack,
+                .lowerBack
+            ]
         }
-        if normalized.contains("shoulder") {
-            return [.frontDelts, .sideDelts, .rearDelts]
+        if normalized.contains(
+            "shoulder"
+        ) {
+            return [
+                .frontDelts,
+                .sideDelts,
+                .rearDelts
+            ]
         }
-        if normalized.contains("arm") {
-            return [.biceps, .triceps, .forearms]
+        if normalized.contains(
+            "arm"
+        ) {
+            return [
+                .biceps,
+                .triceps,
+                .forearms
+            ]
         }
-        if normalized.contains("core") ||
-            normalized.contains("ab") {
-            return [.abs, .obliques]
+        if normalized.contains(
+            "core"
+        ) ||
+            normalized.contains(
+                "ab"
+            ) {
+            return [
+                .abs,
+                .obliques
+            ]
         }
-        if normalized.contains("glute") {
-            return [.glutes, .outerHip]
+        if normalized.contains(
+            "glute"
+        ) {
+            return [
+                .glutes,
+                .outerHip
+            ]
         }
-        if normalized.contains("quad") {
+        if normalized.contains(
+            "quad"
+        ) {
             return [.quads]
         }
-        if normalized.contains("hamstring") {
+        if normalized.contains(
+            "hamstring"
+        ) {
             return [.hamstrings]
         }
-        if normalized.contains("calf") ||
-            normalized.contains("calves") {
+        if normalized.contains(
+            "calf"
+        ) ||
+            normalized.contains(
+                "calves"
+            ) {
             return [.calves]
         }
 
         return []
     }
 
-    private func relativeDescription(
-        _ date: Date
-    ) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(
-            identifier:
-                ATHLTHLocalization.isNorwegian
-                    ? "nb_NO"
-                    : "en_US"
-        )
-        return formatter.localizedString(
-            for: date,
-            relativeTo: Date()
-        )
-    }
-
-    private func loadTint(
-        _ status: MuscleRecoveryStatus
+    private func readinessTint(
+        _ readiness: Double
     ) -> Color {
-        switch status.currentLoadScore {
-        case 0.84...:
-            return .red
-        case 0.65..<0.84:
-            return .orange
-        case 0.44..<0.65:
-            return Color(
-                red: 0.78,
-                green: 0.58,
-                blue: 0.05
-            )
-        case 0.20..<0.44:
-            return .green
+        switch readiness {
+        case 0.70...:
+            return emerald
+        case 0.40..<0.70:
+            return amber
         default:
-            return ATHLTHTheme.mutedText
+            return coral
         }
     }
 
-    private func statusTint(
-        _ status: MuscleRecoveryStatus
-    ) -> Color {
-        if status.currentLoadScore >= 0.84 ||
-            status.soreness == .high {
-            return .red
+    private func muscleSortIndex(
+        _ group: String
+    ) -> Int {
+        let normalized =
+            group.lowercased()
+
+        if normalized.contains(
+            "shoulder"
+        ) {
+            return 0
+        }
+        if normalized.contains(
+            "chest"
+        ) {
+            return 1
+        }
+        if normalized.contains(
+            "back"
+        ) {
+            return 2
+        }
+        if normalized.contains(
+            "core"
+        ) {
+            return 3
+        }
+        if normalized.contains(
+            "arm"
+        ) {
+            return 4
+        }
+        if normalized.contains(
+            "quad"
+        ) {
+            return 5
+        }
+        if normalized.contains(
+            "hamstring"
+        ) {
+            return 6
+        }
+        if normalized.contains(
+            "glute"
+        ) {
+            return 7
+        }
+        if normalized.contains(
+            "calf"
+        ) {
+            return 8
         }
 
-        if status.currentLoadScore >= 0.65 ||
-            status.soreness == .moderate {
-            return .orange
+        return 99
+    }
+
+    private func muscleIcon(
+        _ group: String
+    ) -> String {
+        let normalized =
+            group.lowercased()
+
+        if normalized.contains(
+            "shoulder"
+        ) {
+            return "figure.arms.open"
+        }
+        if normalized.contains(
+            "chest"
+        ) {
+            return "figure.strengthtraining.traditional"
+        }
+        if normalized.contains(
+            "back"
+        ) {
+            return "figure.core.training"
+        }
+        if normalized.contains(
+            "core"
+        ) {
+            return "figure.core.training"
+        }
+        if normalized.contains(
+            "arm"
+        ) {
+            return "dumbbell.fill"
+        }
+        if normalized.contains(
+            "quad"
+        ) ||
+            normalized.contains(
+                "hamstring"
+            ) ||
+            normalized.contains(
+                "glute"
+            ) {
+            return "figure.walk"
+        }
+        if normalized.contains(
+            "calf"
+        ) {
+            return "figure.run"
         }
 
-        if status.currentLoadScore >= 0.44 {
-            return Color(
-                red: 0.78,
-                green: 0.58,
-                blue: 0.05
-            )
-        }
-
-        return .green
+        return "figure.strengthtraining.traditional"
     }
 }
 
