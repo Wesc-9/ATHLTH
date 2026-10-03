@@ -11825,6 +11825,111 @@ struct CommunityGroupCreateView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var createCoverPreview: some View {
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let selectedImageData,
+                   let image = UIImage(
+                       data: selectedImageData
+                   ) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accentDeep.opacity(0.22),
+                            ATHLTHTheme.cardWarm,
+                            ATHLTHTheme.canvasTop
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(
+                        selectedImageData == nil
+                            ? 0.16
+                            : 0.88
+                    ),
+                    ATHLTHTheme.cardWarm.opacity(
+                        selectedImageData == nil
+                            ? 0.10
+                            : 0.60
+                    ),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    ATHLTHTheme.canvasBottom.opacity(0.28)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CLUB")
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.5)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep.opacity(0.62)
+                    )
+
+                Text(
+                    name.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty
+                        ? "Your Club"
+                        : name
+                )
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+            }
+            .padding(16)
+        }
+        .frame(height: 150)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 1
+            )
+        }
+    }
+
+    private var joinModeDescription: String {
+        switch joinMode {
+        case "open":
+            return "Anyone can join immediately."
+        case "approval":
+            return "People request access. Owner or Admin approves them."
+        default:
+            return "Only people invited by Owner or Admin can join."
+        }
+    }
+
 }
 
 struct CommunityGroupSettingsView: View {
