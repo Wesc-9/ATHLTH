@@ -3490,7 +3490,7 @@ struct MuscleRecoveryCard: View {
         if normalized.contains(
             "shoulder"
         ) {
-            return "figure.arms.open"
+            return "figure.strengthtraining.traditional"
         }
         if normalized.contains(
             "chest"
@@ -3500,12 +3500,12 @@ struct MuscleRecoveryCard: View {
         if normalized.contains(
             "back"
         ) {
-            return "figure.core.training"
+            return "figure.strengthtraining.traditional"
         }
         if normalized.contains(
             "core"
         ) {
-            return "figure.core.training"
+            return "figure.strengthtraining.traditional"
         }
         if normalized.contains(
             "arm"
