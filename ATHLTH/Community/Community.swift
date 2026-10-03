@@ -2,6 +2,8 @@ import Foundation
 @preconcurrency import MapKit
 import Supabase
 import SwiftUI
+import PhotosUI
+import UIKit
 
 enum CommunityEventActivity: String, CaseIterable, Codable, Hashable, Identifiable {
     case running
@@ -67,6 +69,43 @@ enum CommunityEventActivity: String, CaseIterable, Codable, Hashable, Identifiab
     }
 }
 
+enum CommunityEventCoverPolicy {
+    static let standardArtworkOptions: [String] = [
+        "GoalRunning",
+        "GoalWalking",
+        "GoalStrength",
+        "GoalEndurance",
+        "GoalMountain",
+        "GoalEvent",
+        "GoalAdventure",
+        "GoalConsistency",
+        "GoalProgress",
+        "GoalRecovery",
+        "GoalRelax"
+    ]
+
+    static func defaultArtwork(
+        for activity: CommunityEventActivity
+    ) -> String {
+        switch activity {
+        case .running:
+            return "GoalRunning"
+        case .walking:
+            return "GoalWalking"
+        case .strength:
+            return "GoalStrength"
+        case .cycling:
+            return "GoalAdventure"
+        case .hike:
+            return "GoalMountain"
+        case .groupWorkout:
+            return "GoalConsistency"
+        case .other:
+            return "GoalEvent"
+        }
+    }
+}
+
 struct CommunityEventRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let creatorID: UUID
@@ -85,6 +124,8 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
     let paceLabel: String?
     let routeID: UUID?
     let routeTitle: String?
+    let coverArtworkName: String?
+    let coverImageURL: String?
     let createdAt: Date
     let updatedAt: Date
 
@@ -106,6 +147,8 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
         case paceLabel = "pace_label"
         case routeID = "route_id"
         case routeTitle = "route_title"
+        case coverArtworkName = "cover_artwork_name"
+        case coverImageURL = "cover_image_url"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -159,6 +202,19 @@ struct CommunityEventDraft {
     var paceLabel = ""
     var routeID: UUID? = nil
     var routeTitle: String? = nil
+    var coverArtworkName: String? = nil
+    var coverImageURL: String? = nil
+
+    func isValidForCreation(
+        now: Date = Date()
+    ) -> Bool {
+        !title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        startsAt > now
+    }
 }
 
 private struct CommunityEventWrite: Encodable {
@@ -178,6 +234,8 @@ private struct CommunityEventWrite: Encodable {
     let paceLabel: String?
     let routeID: UUID?
     let routeTitle: String?
+    let coverArtworkName: String?
+    let coverImageURL: String?
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -197,6 +255,8 @@ private struct CommunityEventWrite: Encodable {
         case paceLabel = "pace_label"
         case routeID = "route_id"
         case routeTitle = "route_title"
+        case coverArtworkName = "cover_artwork_name"
+        case coverImageURL = "cover_image_url"
         case updatedAt = "updated_at"
     }
 }
@@ -412,7 +472,10 @@ final class SupabaseCommunityService {
         }
     }
 
-    func createEvent(_ draft: CommunityEventDraft) async throws -> UUID {
+    func createEvent(
+        _ draft: CommunityEventDraft,
+        eventID: UUID = UUID()
+    ) async throws -> UUID {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
         }
@@ -420,7 +483,7 @@ final class SupabaseCommunityService {
         let cleanTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanMeeting = draft.meetingName.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !cleanTitle.isEmpty, !cleanMeeting.isEmpty else {
+        guard !cleanTitle.isEmpty else {
             throw CommunityEventError.invalidEvent
         }
 
@@ -431,11 +494,14 @@ final class SupabaseCommunityService {
                 latitude: latitude,
                 longitude: longitude
             )
+        } else if !cleanMeeting.isEmpty {
+            resolvedCoordinate =
+                await resolveMeetingCoordinate(
+                    cleanMeeting
+                )
         } else {
-            resolvedCoordinate = await resolveMeetingCoordinate(cleanMeeting)
+            resolvedCoordinate = nil
         }
-
-        let eventID = UUID()
 
         try await client
             .from("community_events")
@@ -457,6 +523,10 @@ final class SupabaseCommunityService {
                     paceLabel: draft.paceLabel.nilIfBlank,
                     routeID: draft.routeID,
                     routeTitle: draft.routeTitle,
+                    coverArtworkName:
+                        draft.coverArtworkName,
+                    coverImageURL:
+                        draft.coverImageURL,
                     updatedAt: Date()
                 )
             )
@@ -592,7 +662,7 @@ enum CommunityEventError: LocalizedError {
         case .notAuthenticated:
             return "Sign in to use Community events."
         case .invalidEvent:
-            return "Add an event name and meeting point."
+            return "Add an event name and choose a future start time."
         case .eventFull:
             return "This event is full."
         }
