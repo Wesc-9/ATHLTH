@@ -751,7 +751,7 @@ final class AppSettingsStore: ObservableObject {
                     ) ?? ""
             ) ?? .simple
 
-        workoutSetupPreference =
+        let resolvedWorkoutSetupPreference =
             WorkoutSetupPreference(
                 rawValue:
                     defaults.string(
@@ -760,23 +760,30 @@ final class AppSettingsStore: ObservableObject {
                     ) ?? ""
             ) ?? .lastUsed
 
-        lastRunAdvancedSetup =
+        let resolvedLastRunAdvancedSetup =
             defaults.object(
                 forKey:
                     "settings.lastRunAdvancedSetup"
             ) as? Bool ?? false
 
-        lastStrengthAdvancedSetup =
+        let resolvedLastStrengthAdvancedSetup =
             defaults.object(
                 forKey:
                     "settings.lastStrengthAdvancedSetup"
             ) as? Bool ??
             (legacyStrengthTracking == .advanced)
 
-        switch workoutSetupPreference {
+        workoutSetupPreference =
+            resolvedWorkoutSetupPreference
+        lastRunAdvancedSetup =
+            resolvedLastRunAdvancedSetup
+        lastStrengthAdvancedSetup =
+            resolvedLastStrengthAdvancedSetup
+
+        switch resolvedWorkoutSetupPreference {
         case .lastUsed:
             defaultStrengthTracking =
-                lastStrengthAdvancedSetup
+                resolvedLastStrengthAdvancedSetup
                     ? .advanced
                     : .simple
         case .basic:
