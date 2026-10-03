@@ -1663,7 +1663,7 @@ struct PerformanceStatsView: View {
                         lightPRMetric(
                             item,
                             source:
-                                runningMetricSource(
+                                runningSummaryMetricSource(
                                     index
                                 )
                         )
@@ -1731,6 +1731,17 @@ struct PerformanceStatsView: View {
             mostRunsInWeekItem,
             bestRunningMonthItem
         ]
+    }
+
+    private func runningSummaryMetricSource(
+        _ index: Int
+    ) -> String {
+        index < 5
+            ? text(
+                "Verified",
+                "Verifisert"
+            )
+            : "ATHLTH"
     }
 
     private func runningMetricSource(
