@@ -9404,6 +9404,8 @@ struct ATHLTHProfileView: View {
     @State private var loadingProfileData = false
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
+    @AppStorage(ProfileMomentFavorites.storageKey)
+    private var favoriteMomentSelectionRaw = ""
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
@@ -9716,7 +9718,7 @@ struct ATHLTHProfileView: View {
                     heroStatRow
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 26)
+                .padding(.bottom, 14)
                 .shadow(
                     color:
                         Color.black.opacity(0.28),
@@ -9725,7 +9727,7 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .frame(height: 440)
+        .frame(height: 248)
         .clipped()
     }
 
@@ -9785,20 +9787,17 @@ struct ATHLTHProfileView: View {
         title: String,
         icon: String
     ) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .semibold
+        VStack(spacing: 3) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .semibold
+                        )
                     )
-                )
-                .frame(width: 15)
+                    .frame(width: 15)
 
-            VStack(
-                alignment: .leading,
-                spacing: 1
-            ) {
                 Text(value)
                     .font(
                         .system(
@@ -9810,26 +9809,31 @@ struct ATHLTHProfileView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
-
-                Text(title)
-                    .font(
-                        .system(
-                            size: 8.5,
-                            weight: .medium
-                        )
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
             }
+            .frame(
+                maxWidth: .infinity,
+                alignment: .center
+            )
 
-            Spacer(minLength: 0)
+            Text(title)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .medium
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .multilineTextAlignment(.center)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .center
+                )
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 9)
-        .frame(
-            maxWidth: .infinity
-        )
-        .frame(height: 60)
+        .padding(.horizontal, 5)
+        .frame(maxWidth: .infinity)
+        .frame(height: 58)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
@@ -10078,7 +10082,7 @@ struct ATHLTHProfileView: View {
             title:
                 ATHLTHLocalization.choose(
                     english: "My gear",
-                    norwegian: "Mine gear"
+                    norwegian: "Mitt utstyr"
                 ),
             icon: "shoeprints.fill",
             actionTitle:
@@ -10158,12 +10162,12 @@ struct ATHLTHProfileView: View {
                 "photo.on.rectangle.angled",
             actionTitle:
                 ATHLTHLocalization.choose(
-                    english: "See all",
-                    norwegian: "Se alle"
+                    english: "Manage",
+                    norwegian: "Administrer"
                 ),
             destination:
                 AnyView(
-                    WorkoutHistoryView()
+                    ProfileHighlightsManagerView()
                 )
         ) {
             if profileMedia.isEmpty &&
@@ -10185,9 +10189,9 @@ struct ATHLTHProfileView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Your workout moments will appear here",
+                                    "Favorite workout moments appear here",
                                 norwegian:
-                                    "Øyeblikk fra øktene dine vises her"
+                                    "Favoritter fra øktene dine vises her"
                             )
                         )
                         .font(
@@ -10201,9 +10205,9 @@ struct ATHLTHProfileView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Add photos after a workout. ATHLTH also creates highlights from the workout data.",
+                                    "Open Manage to choose the photos and workout highlights you want to feature on your profile.",
                                 norwegian:
-                                    "Legg til bilder etter en økt. ATHLTH lager også høydepunkter fra treningsdataene."
+                                    "Åpne Administrer for å velge bildene og høydepunktene du vil vise på profilen."
                             )
                         )
                         .font(.caption)
@@ -10575,13 +10579,10 @@ struct ATHLTHProfileView: View {
     private func gearTile(
         _ item: ProfileGearItem
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 7
-        ) {
+        HStack(spacing: 7) {
             ZStack {
                 RoundedRectangle(
-                    cornerRadius: 14,
+                    cornerRadius: 11,
                     style: .continuous
                 )
                 .fill(
@@ -10603,12 +10604,12 @@ struct ATHLTHProfileView: View {
                             image
                                 .resizable()
                                 .scaledToFit()
-                                .padding(7)
+                                .padding(5)
                         default:
                             ProfileGearCategoryIcon(
                                 category:
                                     item.category,
-                                size: 26
+                                size: 20
                             )
                         }
                     }
@@ -10616,55 +10617,65 @@ struct ATHLTHProfileView: View {
                     ProfileGearCategoryIcon(
                         category:
                             item.category,
-                        size: 26
+                        size: 20
                     )
                 }
             }
-            .frame(height: 66)
+            .frame(
+                width: 38,
+                height: 38
+            )
 
-            Text(item.name)
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(item.name)
+                    .font(
+                        .system(
+                            size: 9.5,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+
+                Text(
+                    item.category.shortTitle
+                )
                 .font(
                     .system(
-                        size: 10.5,
-                        weight: .bold
+                        size: 8,
+                        weight: .medium
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.primaryText
+                    ATHLTHTheme.mutedText
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+            }
 
-            Text(
-                item.category.shortTitle
-            )
-            .font(
-                .system(
-                    size: 9,
-                    weight: .medium
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
-            .lineLimit(1)
+            Spacer(minLength: 0)
         }
-        .padding(9)
+        .padding(.horizontal, 8)
         .frame(
             maxWidth: .infinity,
-            minHeight: 126,
+            minHeight: 56,
             alignment: .leading
         )
         .background(
             Color.white.opacity(0.72),
             in: RoundedRectangle(
-                cornerRadius: 17,
+                cornerRadius: 14,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 17,
+                cornerRadius: 14,
                 style: .continuous
             )
             .stroke(
@@ -10877,12 +10888,19 @@ struct ATHLTHProfileView: View {
 
         if !featured.isEmpty {
             return Array(
-                featured.prefix(4)
+                featured.prefix(3)
             )
         }
 
         return Array(
-            gear.items.prefix(4)
+            gear.items.prefix(3)
+        )
+    }
+
+    private var favoriteMomentTokens:
+        Set<String> {
+        ProfileMomentFavorites.decode(
+            favoriteMomentSelectionRaw
         )
     }
 
@@ -10890,22 +10908,42 @@ struct ATHLTHProfileView: View {
         [WorkoutMediaRecord] {
         Array(
             social.workoutMedia
+                .filter { media in
+                    favoriteMomentTokens
+                        .contains(
+                            ProfileMomentFavorites
+                                .mediaToken(
+                                    media.id
+                                )
+                        )
+                }
+                .sorted {
+                    $0.createdAt >
+                        $1.createdAt
+                }
                 .prefix(8)
         )
     }
 
     private var recentWorkoutHighlights:
         [ProfileWorkoutHighlight] {
-        health.workouts
+        let favorites =
+            favoriteMomentTokens
+
+        return health.workouts
+            .filter { workout in
+                favorites.contains(
+                    ProfileMomentFavorites
+                        .highlightToken(
+                            workout.id
+                        )
+                )
+            }
             .sorted {
                 $0.startDate >
                     $1.startDate
             }
-            .prefix(
-                profileMedia.isEmpty
-                    ? 5
-                    : 3
-            )
+            .prefix(8)
             .map { workout in
                 let value: String
                 let title: String
@@ -11077,8 +11115,8 @@ struct ATHLTHProfileView: View {
                 }
             }
             .frame(
-                width: 98,
-                height: 98
+                width: 84,
+                height: 84
             )
             .clipShape(Circle())
             .overlay {
@@ -11099,8 +11137,8 @@ struct ATHLTHProfileView: View {
         } else {
             avatarFallback
                 .frame(
-                    width: 98,
-                    height: 98
+                    width: 84,
+                    height: 84
                 )
                 .overlay {
                     Circle()
