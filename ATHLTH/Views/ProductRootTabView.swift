@@ -412,12 +412,12 @@ struct ATHLTHHomeView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
+                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             let didStart =
                                 try await WorkoutLaunchCoordinator.startStrength(
-                                workout: workout,
+                                workout: configuredWorkout,
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
@@ -4020,12 +4020,12 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
+                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             let didStart =
                                 try await WorkoutLaunchCoordinator.startStrength(
-                                workout: workout,
+                                workout: configuredWorkout,
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
