@@ -81,78 +81,73 @@ struct WatchRunWorkoutExperienceView: View {
     }
 
     private var alwaysOnPage: some View {
-        VStack(spacing: 7) {
-            HStack {
-                Image(
-                    systemName:
-                        workoutManager
-                            .kind.systemImage
-                )
-                .font(
-                    .system(
-                        size: 10,
-                        weight: .bold
-                    )
-                )
+        GeometryReader { proxy in
+            let compact =
+                proxy.size.width < 190 ||
+                proxy.size.height < 220
+            let isPaused =
+                workoutManager.state == .paused
+            let isAutoPaused =
+                workoutManager.automaticPauseActive
 
-                Text(
-                    workoutManager
-                        .automaticPauseActive
-                        ? "AUTO PAUSED"
-                        : workoutManager
-                            .state ==
-                            .paused
-                            ? "PAUSED"
-                            : "ATHLTH"
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold
-                    )
-                )
-                .tracking(0.8)
+            ZStack {
+                Color.black
 
-                Spacer()
-
-                Text(
-                    durationText(
-                        workoutManager
-                            .elapsedTime
+                if isPaused ||
+                    isAutoPaused {
+                    alwaysOnPausedContent(
+                        compact: compact,
+                        automatic:
+                            isAutoPaused
                     )
-                )
-                .font(
-                    .system(
-                        size: 11,
-                        weight: .semibold,
-                        design: .rounded
+                } else {
+                    alwaysOnRunningContent(
+                        compact: compact
                     )
-                )
-                .monospacedDigit()
+                }
             }
-            .foregroundStyle(
-                Color.white.opacity(0.72)
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
+        }
+        .foregroundStyle(
+            Color(
+                red: 0.94,
+                green: 0.94,
+                blue: 0.91
+            )
+        )
+        .background(
+            Color.black
+                .ignoresSafeArea()
+        )
+    }
+
+    private func alwaysOnRunningContent(
+        compact: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 5 : 7
+        ) {
+            alwaysOnHeader(
+                compact: compact
             )
 
-            HStack(
-                alignment:
-                    .firstTextBaseline
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 0
-                ) {
-                    Text("PACE")
-                        .font(
-                            .system(
-                                size: 7,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            Color.white.opacity(0.55)
-                        )
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
 
+            VStack(
+                alignment: .leading,
+                spacing: compact ? 0 : 1
+            ) {
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 4
+                ) {
                     Text(
                         paceText(
                             workoutManager
@@ -161,89 +156,637 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                     .font(
                         .system(
-                            size: 25,
+                            size:
+                                compact
+                                    ? 33
+                                    : 39,
                             weight: .bold,
                             design: .rounded
                         )
                     )
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.80)
+
+                    Text("/km")
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 10
+                                        : 11,
+                                weight: .semibold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.54
+                            )
+                        )
                 }
+
+                Text("PACE")
+                    .font(
+                        .system(
+                            size: 7.5,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1.15)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.43
+                        )
+                    )
+            }
+
+            if let step =
+                    workoutManager
+                        .currentStructuredRunningStep {
+                alwaysOnStructuredTarget(
+                    step,
+                    compact: compact
+                )
+            }
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            HStack(
+                alignment:
+                    .firstTextBaseline
+            ) {
+                alwaysOnMetricText(
+                    value:
+                        distanceKilometersText,
+                    suffix: "km",
+                    compact: compact
+                )
 
                 Spacer()
 
-                VStack(
-                    alignment: .trailing,
-                    spacing: 1
+                HStack(
+                    alignment:
+                        .firstTextBaseline,
+                    spacing: 4
                 ) {
-                    Text(
-                        distanceKilometersText +
-                        " km"
+                    Image(
+                        systemName:
+                            "heart.fill"
                     )
                     .font(
                         .system(
-                            size: 15,
-                            weight: .bold,
-                            design: .rounded
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight: .semibold
                         )
                     )
-                    .monospacedDigit()
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.52
+                        )
+                    )
 
                     Text(
-                        heartRateText +
-                        " bpm"
+                        heartRateText
                     )
                     .font(
                         .system(
-                            size: 12,
+                            size:
+                                compact
+                                    ? 14
+                                    : 16,
                             weight: .semibold,
                             design: .rounded
                         )
                     )
                     .monospacedDigit()
-                    .foregroundStyle(
-                        Color.white.opacity(0.72)
-                    )
+
+                    Text("bpm")
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 7
+                                        : 8,
+                                weight: .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.48
+                            )
+                        )
                 }
             }
 
             if let step =
                     workoutManager
                         .currentStructuredRunningStep {
-                HStack {
-                    Text(step.title)
-                        .font(
-                            .system(
-                                size: 9,
-                                weight: .semibold
-                            )
-                        )
-                        .lineLimit(1)
-
-                    Spacer()
-
-                    Text(
-                        "\(workoutManager.structuredStepIndex + 1)"
-                    )
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .bold
-                        )
-                    )
-                }
-                .foregroundStyle(
-                    WatchTheme
-                        .textSecondary
+                alwaysOnStepFooter(
+                    step,
+                    compact: compact
                 )
             }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .foregroundStyle(Color.white)
-        .background(
-            Color.black
-                .ignoresSafeArea()
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
         )
+        .padding(
+            .vertical,
+            compact ? 6 : 8
+        )
+    }
+
+    private func alwaysOnPausedContent(
+        compact: Bool,
+        automatic: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 6 : 8
+        ) {
+            alwaysOnHeader(
+                compact: compact,
+                showElapsedTime: false
+            )
+
+            Spacer(
+                minLength: 0
+            )
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(
+                        automatic
+                            ? Color(
+                                red: 0.78,
+                                green: 0.55,
+                                blue: 0.24
+                            )
+                            : Color.white
+                                .opacity(0.68)
+                    )
+                    .frame(
+                        width: 5,
+                        height: 5
+                    )
+
+                Text(
+                    automatic
+                        ? "AUTO PAUSED"
+                        : "PAUSED"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.05)
+                .foregroundStyle(
+                    automatic
+                        ? Color(
+                            red: 0.86,
+                            green: 0.68,
+                            blue: 0.40
+                        )
+                        : Color.white
+                            .opacity(0.66)
+                )
+            }
+
+            Text(
+                durationText(
+                    workoutManager
+                        .elapsedTime
+                )
+            )
+            .font(
+                .system(
+                    size:
+                        compact
+                            ? 34
+                            : 40,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+
+            HStack {
+                alwaysOnMetricText(
+                    value:
+                        distanceKilometersText,
+                    suffix: "km",
+                    compact: compact
+                )
+
+                Spacer()
+
+                if workoutManager
+                    .heartRate > 0 {
+                    HStack(
+                        alignment:
+                            .firstTextBaseline,
+                        spacing: 4
+                    ) {
+                        Image(
+                            systemName:
+                                "heart.fill"
+                        )
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 8
+                                        : 9
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white
+                                .opacity(0.46)
+                        )
+
+                        Text(
+                            heartRateText
+                        )
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 13
+                                        : 15,
+                                weight:
+                                    .semibold,
+                                design:
+                                    .rounded
+                            )
+                        )
+                        .monospacedDigit()
+                    }
+                }
+            }
+
+            Spacer(
+                minLength: 0
+            )
+        }
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
+        )
+        .padding(
+            .vertical,
+            compact ? 7 : 9
+        )
+    }
+
+    private func alwaysOnHeader(
+        compact: Bool,
+        showElapsedTime: Bool = true
+    ) -> some View {
+        HStack(spacing: 6) {
+            WatchATHLTHAlwaysOnMark()
+                .stroke(
+                    Color.white.opacity(
+                        0.72
+                    ),
+                    style:
+                        StrokeStyle(
+                            lineWidth: 1.7,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                )
+                .frame(
+                    width:
+                        compact
+                            ? 15
+                            : 17,
+                    height:
+                        compact
+                            ? 10
+                            : 11
+                )
+
+            Text("ATHLTH")
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 7.5
+                                : 8.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.05)
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.62
+                    )
+                )
+
+            Spacer()
+
+            if showElapsedTime {
+                Text(
+                    durationText(
+                        workoutManager
+                            .elapsedTime
+                    )
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 9.5
+                                : 10.5,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.58
+                    )
+                )
+            }
+        }
+    }
+
+    private func alwaysOnMetricText(
+        value: String,
+        suffix: String,
+        compact: Bool
+    ) -> some View {
+        HStack(
+            alignment:
+                .firstTextBaseline,
+            spacing: 3
+        ) {
+            Text(value)
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 14
+                                : 16,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+
+            Text(suffix)
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 7
+                                : 8,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.48
+                    )
+                )
+        }
+    }
+
+    private func alwaysOnStructuredTarget(
+        _ step:
+            WatchRunningWorkoutStep,
+        compact: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 2
+        ) {
+            if let intensity =
+                    step.intensityText,
+               !intensity.isEmpty {
+                HStack(spacing: 5) {
+                    Text("TARGET")
+                        .font(
+                            .system(
+                                size: 7,
+                                weight: .bold
+                            )
+                        )
+                        .tracking(0.9)
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.40
+                            )
+                        )
+
+                    Text(intensity)
+                        .font(
+                            .system(
+                                size:
+                                    compact
+                                        ? 9
+                                        : 10,
+                                weight:
+                                    .semibold,
+                                design:
+                                    .rounded
+                            )
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.72
+                        )
+                        .foregroundStyle(
+                            Color.white.opacity(
+                                0.68
+                            )
+                        )
+                }
+            }
+
+            if let remaining =
+                    alwaysOnRemainingStepText(
+                        step
+                    ) {
+                Text(remaining)
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight:
+                                .medium,
+                            design:
+                                .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.48
+                        )
+                    )
+            }
+        }
+    }
+
+    private func alwaysOnStepFooter(
+        _ step:
+            WatchRunningWorkoutStep,
+        compact: Bool
+    ) -> some View {
+        VStack(spacing: 4) {
+            GeometryReader { proxy in
+                ZStack(
+                    alignment: .leading
+                ) {
+                    Capsule()
+                        .fill(
+                            Color.white
+                                .opacity(0.10)
+                        )
+
+                    Capsule()
+                        .fill(
+                            WatchTheme
+                                .accent
+                                .opacity(0.54)
+                        )
+                        .frame(
+                            width:
+                                proxy.size
+                                    .width *
+                                currentStepProgress(
+                                    step
+                                )
+                        )
+                }
+            }
+            .frame(height: 2)
+
+            HStack {
+                Text(step.title)
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7.5
+                                    : 8.5,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .lineLimit(1)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.58
+                        )
+                    )
+
+                Spacer()
+
+                let totalSteps =
+                    workoutManager
+                        .structuredRunningWorkout?
+                        .steps.count ?? 0
+
+                if totalSteps > 0 {
+                    Text(
+                        "\(workoutManager.structuredStepIndex + 1)/\(totalSteps)"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7.5
+                                    : 8.5,
+                            weight: .bold,
+                            design:
+                                .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.58
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private func alwaysOnRemainingStepText(
+        _ step:
+            WatchRunningWorkoutStep
+    ) -> String? {
+        switch step.measure {
+        case .time:
+            guard let target =
+                    step.durationSeconds
+            else {
+                return nil
+            }
+
+            let remaining =
+                max(
+                    target -
+                    workoutManager
+                        .currentStructuredStepElapsedTime,
+                    0
+                )
+
+            return
+                durationText(
+                    remaining
+                ) +
+                " remaining"
+
+        case .distance:
+            guard let target =
+                    step.distanceMeters
+            else {
+                return nil
+            }
+
+            let remaining =
+                max(
+                    target -
+                    workoutManager
+                        .currentStructuredStepDistanceMeters,
+                    0
+                )
+
+            if remaining >= 1_000 {
+                return String(
+                    format:
+                        "%.1f km remaining",
+                    remaining / 1_000
+                )
+            }
+
+            return
+                "\(Int(remaining.rounded())) m remaining"
+
+        case .open:
+            return nil
+        }
     }
 
     // MARK: - Page 1: live metrics
@@ -1526,5 +2069,68 @@ struct WatchRunWorkoutExperienceView: View {
 
         return
             prefix + "\(seconds)s"
+    }
+}
+
+
+private struct WatchATHLTHAlwaysOnMark:
+    Shape {
+    func path(
+        in rect: CGRect
+    ) -> Path {
+        var path = Path()
+        let midY =
+            rect.midY
+
+        path.move(
+            to: CGPoint(
+                x: rect.minX,
+                y: midY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x:
+                    rect.minX +
+                    rect.width * 0.24,
+                y: midY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x:
+                    rect.minX +
+                    rect.width * 0.42,
+                y:
+                    rect.minY +
+                    rect.height * 0.12
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x:
+                    rect.minX +
+                    rect.width * 0.58,
+                y:
+                    rect.maxY -
+                    rect.height * 0.10
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x:
+                    rect.minX +
+                    rect.width * 0.72,
+                y: midY
+            )
+        )
+        path.addLine(
+            to: CGPoint(
+                x: rect.maxX,
+                y: midY
+            )
+        )
+
+        return path
     }
 }
