@@ -108,7 +108,7 @@ final class HealthKitManager: ObservableObject {
     private var trophyCacheLatestWorkoutID: UUID?
     private var trophyCacheLatestWorkoutEnd: Date?
     private var trophyCacheLatestSleepDuration: TimeInterval?
-    private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v1"
+    private let trophySnapshotDiskKey = "athlth.health.trophySnapshotCache.v2"
     private let legacyAuthorizationFlagKey = "athlth.healthAuthorizationRequested"
     private let authorizationVersionKey = "athlth.healthAuthorizationVersion"
     // Tracks the newest permission set ATHLTH has explicitly requested.
@@ -1608,7 +1608,6 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        let calendar = Calendar.current
         let workoutDays = Array(
             Set(workouts.map { calendar.startOfDay(for: $0.startDate) })
         )
