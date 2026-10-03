@@ -3966,6 +3966,26 @@ private struct CommunityReferenceActivityRow: View {
                 .lineLimit(1)
                 .padding(8)
             }
+        } else if item.activity.kind ==
+                    "challenge" {
+            let metadata =
+                item.activity.metadata ?? [:]
+            let sport =
+                ATHLTHChallengeSport(
+                    rawValue:
+                        metadata["sport"] ??
+                        ""
+                ) ?? .running
+
+            ChallengeCoverArtworkView(
+                sport: sport,
+                artworkName:
+                    metadata["cover_artwork"],
+                remoteURL:
+                    metadata[
+                        "cover_image_url"
+                    ]
+            )
         } else if workoutKind ==
                     "strength" {
             Image("TrainHero")
