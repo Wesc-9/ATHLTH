@@ -425,7 +425,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 14) {
                 if friends.isEmpty {
                     ContentUnavailableView(
                         "No mutual follows yet",
@@ -444,8 +444,8 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     contextCard
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.horizontal, 22)
+            .padding(.top, 14)
             .padding(.bottom, 36)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
@@ -493,14 +493,17 @@ struct CommunityFriendsVsFriendsDetailView: View {
             alignment: .leading,
             spacing: 9
         ) {
-            Text("CHOOSE MATCHUP")
-                .font(
-                    .caption2.weight(.bold)
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "CHOOSE MATCHUP",
+                    norwegian: "VELG DUELL"
                 )
-                .tracking(1.4)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+            )
+            .font(.caption2.weight(.bold))
+            .tracking(1.2)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
 
             ScrollView(
                 .horizontal,
@@ -555,7 +558,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                                         .accentDeep
                                     : Color.white
                                         .opacity(
-                                            0.82
+                                            0.94
                                         ),
                                 in: Capsule()
                             )
@@ -616,14 +619,30 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 )
             }
         }
-        .padding(18)
+        .padding(.vertical, 18)
+        .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)
         .background(
-            Color.white.opacity(0.84),
+            Color.white.opacity(0.94),
             in: RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: 22,
                 style: .continuous
             )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
         )
     }
 
@@ -647,8 +666,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
         let mine = currentStats
         let theirs = friendStats
 
-        return ATHLTHCard {
-            VStack(spacing: 0) {
+        return VStack(spacing: 0) {
                 matchupHeader
 
                 metricRow(
@@ -726,7 +744,29 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     )
                 }
             }
+        .padding(18)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
         }
+        .shadow(
+            color: Color.black.opacity(0.03),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var matchupHeader: some View {
@@ -760,11 +800,10 @@ struct CommunityFriendsVsFriendsDetailView: View {
     }
 
     private var contextCard: some View {
-        ATHLTHCard {
-            VStack(
-                alignment: .leading,
-                spacing: 11
-            ) {
+        VStack(
+            alignment: .leading,
+            spacing: 11
+        ) {
                 HStack {
                     VStack(
                         alignment: .leading,
@@ -843,7 +882,29 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     selectedFriend == nil
                 )
             }
+        .padding(18)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
         }
+        .shadow(
+            color: Color.black.opacity(0.03),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var currentStats:
