@@ -4734,6 +4734,1297 @@ struct PerformanceStatsView: View {
     }
 }
 
+private struct PerformanceTrainingVolumeDetailView:
+    View {
+    let stats: ProfilePerformanceStats?
+    @EnvironmentObject private var health:
+        HealthKitManager
+    @State private var period:
+        PerformanceVolumePeriod
+
+    init(
+        stats: ProfilePerformanceStats?,
+        initialPeriod:
+            PerformanceVolumePeriod
+    ) {
+        self.stats = stats
+        _period =
+            State(
+                initialValue:
+                    initialPeriod
+            )
+    }
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.16)
+            )
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    volumeHero
+                    periodPicker
+                    metricsGrid
+                    activityBreakdown
+                    recentSessions
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 40)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Training volume",
+                norwegian:
+                    "Treningsvolum"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    private var volumeHero:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        period.subtitle
+                    )
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Text(
+                        formatDistance(
+                            distanceMeters
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 34,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Recorded running distance",
+                            norwegian:
+                                "Registrert løpedistanse"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chart.bar.xaxis"
+                )
+                .font(
+                    .system(
+                        size: 26,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .frame(
+                    width: 62,
+                    height: 62
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 19,
+                            style: .continuous
+                        )
+                )
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Built from your recorded Health workouts. Change the period below to inspect your actual training history.",
+                    norwegian:
+                        "Bygget fra de registrerte Health-øktene dine. Bytt periode under for å se den faktiske treningshistorikken."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                .secondary
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.96),
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.56)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border
+                    .opacity(0.64),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var periodPicker:
+        some View {
+        HStack(spacing: 4) {
+            ForEach(
+                PerformanceVolumePeriod
+                    .allCases
+            ) { option in
+                Button {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        period = option
+                    }
+                } label: {
+                    Text(option.title)
+                        .font(
+                            .caption
+                                .weight(
+                                    period ==
+                                        option
+                                    ? .bold
+                                    : .medium
+                                )
+                        )
+                        .foregroundStyle(
+                            period ==
+                                option
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .primaryText
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 38)
+                        .background(
+                            period ==
+                                option
+                                ? ATHLTHTheme
+                                    .accentDeep
+                                : Color.clear,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(
+            Color.white
+                .opacity(0.86),
+            in: Capsule()
+        )
+    }
+
+    private var metricsGrid:
+        some View {
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .flexible(),
+                    spacing: 10
+                ),
+                GridItem(
+                    .flexible(),
+                    spacing: 10
+                )
+            ],
+            spacing: 10
+        ) {
+            detailMetric(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Workouts",
+                            norwegian:
+                                "Økter"
+                        ),
+                value:
+                    workoutCount
+                        .formatted(),
+                icon:
+                    "checkmark.circle.fill",
+                tint:
+                    ATHLTHTheme
+                        .accentDeep
+            )
+
+            detailMetric(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Runs",
+                            norwegian:
+                                "Løpeøkter"
+                        ),
+                value:
+                    runningCount
+                        .formatted(),
+                icon:
+                    "figure.run",
+                tint: .green
+            )
+
+            detailMetric(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Strength",
+                            norwegian:
+                                "Styrkeøkter"
+                        ),
+                value:
+                    strengthCount
+                        .formatted(),
+                icon:
+                    "dumbbell.fill",
+                tint: .indigo
+            )
+
+            detailMetric(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Walk / hike",
+                            norwegian:
+                                "Gå / tur"
+                        ),
+                value:
+                    walkingCount
+                        .formatted(),
+                icon:
+                    "figure.hiking",
+                tint: .orange
+            )
+        }
+    }
+
+    private func detailMetric(
+        title: String,
+        value: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(tint)
+            .frame(
+                width: 40,
+                height: 40
+            )
+            .background(
+                tint.opacity(0.10),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(value)
+                    .font(
+                        .title3
+                            .weight(.bold)
+                    )
+                    .monospacedDigit()
+
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(13)
+        .background(
+            Color.white
+                .opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var activityBreakdown:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Activity mix",
+                    norwegian:
+                        "Aktivitetsmiks"
+                )
+            )
+            .font(
+                .headline
+                    .weight(.bold)
+            )
+
+            breakdownRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Running",
+                            norwegian:
+                                "Løping"
+                        ),
+                value:
+                    runningCount,
+                total:
+                    max(
+                        workoutCount,
+                        1
+                    ),
+                tint: .green
+            )
+
+            breakdownRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Strength",
+                            norwegian:
+                                "Styrke"
+                        ),
+                value:
+                    strengthCount,
+                total:
+                    max(
+                        workoutCount,
+                        1
+                    ),
+                tint: .indigo
+            )
+
+            breakdownRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Walk / hike",
+                            norwegian:
+                                "Gå / tur"
+                        ),
+                value:
+                    walkingCount,
+                total:
+                    max(
+                        workoutCount,
+                        1
+                    ),
+                tint: .orange
+            )
+
+            let other =
+                max(
+                    workoutCount -
+                    runningCount -
+                    strengthCount -
+                    walkingCount,
+                    0
+                )
+
+            breakdownRow(
+                title:
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Other",
+                            norwegian:
+                                "Annet"
+                        ),
+                value: other,
+                total:
+                    max(
+                        workoutCount,
+                        1
+                    ),
+                tint: .purple
+            )
+        }
+        .padding(15)
+        .background(
+            Color.white
+                .opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func breakdownRow(
+        title: String,
+        value: Int,
+        total: Int,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .frame(
+                    width: 82,
+                    alignment: .leading
+                )
+
+            GeometryReader {
+                proxy in
+
+                ZStack(
+                    alignment: .leading
+                ) {
+                    Capsule()
+                        .fill(
+                            Color.black
+                                .opacity(0.06)
+                        )
+
+                    Capsule()
+                        .fill(tint)
+                        .frame(
+                            width:
+                                proxy
+                                    .size
+                                    .width *
+                                min(
+                                    Double(value) /
+                                    Double(total),
+                                    1
+                                )
+                        )
+                }
+            }
+            .frame(height: 7)
+
+            Text(
+                value.formatted()
+            )
+            .font(
+                .caption
+                    .weight(.bold)
+            )
+            .monospacedDigit()
+            .frame(
+                width: 30,
+                alignment: .trailing
+            )
+        }
+    }
+
+    private var recentSessions:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Recent sessions",
+                        norwegian:
+                            "Nylige økter"
+                    )
+                )
+                .font(
+                    .headline
+                        .weight(.bold)
+                )
+
+                Spacer()
+
+                Text(
+                    selectedWorkouts
+                        .count
+                        .formatted()
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+            }
+
+            if selectedWorkouts
+                .isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No recorded workouts in this period.",
+                        norwegian:
+                            "Ingen registrerte økter i denne perioden."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .padding(
+                    .vertical,
+                    8
+                )
+            } else {
+                ForEach(
+                    Array(
+                        selectedWorkouts
+                            .prefix(12)
+                    )
+                ) {
+                    workout in
+
+                    HStack(spacing: 11) {
+                        Image(
+                            systemName:
+                                activityIcon(
+                                    workout
+                                        .activity
+                                )
+                        )
+                        .font(
+                            .system(
+                                size: 14,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .frame(
+                            width: 38,
+                            height: 38
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .accentSoft,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        12,
+                                    style:
+                                        .continuous
+                                )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                activityTitle(
+                                    workout
+                                        .activity
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            Text(
+                                workout
+                                    .startDate
+                                    .formatted(
+                                        date:
+                                            .abbreviated,
+                                        time:
+                                            .shortened
+                                    )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        Spacer()
+
+                        if let meters =
+                                workout
+                                    .distanceMeters,
+                           meters > 0 {
+                            Text(
+                                formatDistance(
+                                    meters
+                                )
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                    .padding(
+                        .vertical,
+                        4
+                    )
+                }
+            }
+        }
+        .padding(15)
+        .background(
+            Color.white
+                .opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var selectedWorkouts:
+        [WorkoutSummary] {
+        health.workouts
+            .filter {
+                period ==
+                    .total ||
+                includes(
+                    $0.startDate
+                )
+            }
+            .sorted {
+                $0.startDate >
+                $1.startDate
+            }
+    }
+
+    private var distanceMeters:
+        Double {
+        if period == .total {
+            return stats?
+                .totalRunningDistanceMeters ??
+                selectedWorkouts
+                    .filter {
+                        $0.activity ==
+                            .running
+                    }
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ??
+                                0,
+                            0
+                        )
+                    }
+        }
+
+        return selectedWorkouts
+            .filter {
+                $0.activity ==
+                    .running
+            }
+            .reduce(0.0) {
+                $0 +
+                max(
+                    $1.distanceMeters ??
+                        0,
+                    0
+                )
+            }
+    }
+
+    private var workoutCount: Int {
+        if period == .total {
+            return stats?
+                .totalWorkoutCount ??
+                selectedWorkouts.count
+        }
+        return selectedWorkouts.count
+    }
+
+    private var runningCount:
+        Int {
+        selectedWorkouts
+            .filter {
+                $0.activity ==
+                    .running
+            }
+            .count
+    }
+
+    private var strengthCount:
+        Int {
+        selectedWorkouts
+            .filter {
+                $0.activity ==
+                    .strength
+            }
+            .count
+    }
+
+    private var walkingCount:
+        Int {
+        selectedWorkouts
+            .filter {
+                $0.activity ==
+                    .walking ||
+                $0.activity ==
+                    .hiking
+            }
+            .count
+    }
+
+    private func includes(
+        _ date: Date
+    ) -> Bool {
+        let calendar =
+            Calendar.current
+
+        switch period {
+        case .week:
+            return calendar
+                .dateInterval(
+                    of: .weekOfYear,
+                    for: Date()
+                )?
+                .contains(date) ??
+                false
+
+        case .month:
+            return calendar
+                .dateInterval(
+                    of: .month,
+                    for: Date()
+                )?
+                .contains(date) ??
+                false
+
+        case .year:
+            return calendar
+                .component(
+                    .year,
+                    from: date
+                ) ==
+                calendar.component(
+                    .year,
+                    from: Date()
+                )
+
+        case .total:
+            return true
+        }
+    }
+
+    private func activityTitle(
+        _ activity:
+            WorkoutActivity
+    ) -> String {
+        switch activity {
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåtur"
+            )
+        case .hiking:
+            return ATHLTHLocalization.choose(
+                english: "Hiking",
+                norwegian: "Fjelltur"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Workout",
+                norwegian: "Treningsøkt"
+            )
+        }
+    }
+
+    private func activityIcon(
+        _ activity:
+            WorkoutActivity
+    ) -> String {
+        switch activity {
+        case .running:
+            return "figure.run"
+        case .walking:
+            return "figure.walk"
+        case .hiking:
+            return "figure.hiking"
+        case .strength:
+            return "dumbbell.fill"
+        default:
+            return "figure.mixed.cardio"
+        }
+    }
+}
+
+private struct PerformanceMilestonesDetailView:
+    View {
+    let stats: ProfilePerformanceStats?
+    let healthRecords:
+        [HealthPersonalRecord]
+
+    private var records:
+        [ProfileFeaturedRecordKind] {
+        ProfileFeaturedRecordKind
+            .allCases
+            .filter {
+                $0.displayValue(
+                    healthRecords:
+                        healthRecords,
+                    stats: stats
+                ) != "—"
+            }
+            .sorted {
+                (recordDate($0) ??
+                    .distantPast) >
+                (recordDate($1) ??
+                    .distantPast)
+            }
+    }
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.20)
+            )
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    headerCard
+
+                    if records.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No milestones yet",
+                                norwegian:
+                                    "Ingen milepæler ennå"
+                            ),
+                            systemImage:
+                                "flag",
+                            description:
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Your verified records will appear here as you train.",
+                                        norwegian:
+                                            "Verifiserte rekorder vises her etter hvert som du trener."
+                                    )
+                                )
+                        )
+                        .padding(.top, 30)
+                    } else {
+                        ForEach(records) {
+                            kind in
+
+                            milestoneCard(
+                                kind
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 40)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Milestones",
+                norwegian: "Milepæler"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    private var headerCard:
+        some View {
+        HStack(spacing: 13) {
+            Image(
+                systemName:
+                    "flag.checkered"
+            )
+            .font(
+                .system(
+                    size: 22,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .premiumGold
+            )
+            .frame(
+                width: 54,
+                height: 54
+            )
+            .background(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.10),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Your performance milestones",
+                        norwegian:
+                            "Dine prestasjonsmilepæler"
+                    )
+                )
+                .font(
+                    .headline
+                        .weight(.bold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Built from verified Health records and your training history.",
+                        norwegian:
+                            "Bygget fra verifiserte Health-rekorder og treningshistorikken din."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            Color.white
+                .opacity(0.92),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func milestoneCard(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) -> some View {
+        let sourceRecord =
+            healthRecords.first {
+                $0.kind ==
+                    kind.healthKind
+            }
+
+        return HStack(spacing: 13) {
+            Image(
+                systemName:
+                    kind.icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                kind.tint
+            )
+            .frame(
+                width: 46,
+                height: 46
+            )
+            .background(
+                kind.tint
+                    .opacity(0.10),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(kind.title)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+
+                Text(
+                    kind.displayValue(
+                        healthRecords:
+                            healthRecords,
+                        stats: stats
+                    )
+                )
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .monospacedDigit()
+
+                HStack(spacing: 5) {
+                    Image(
+                        systemName:
+                            sourceRecord != nil
+                            ? "checkmark.seal.fill"
+                            : "clock.arrow.circlepath"
+                    )
+
+                    Text(
+                        sourceRecord != nil
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Verified from Apple Health",
+                                    norwegian:
+                                        "Verifisert fra Apple Health"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "From training history",
+                                    norwegian:
+                                        "Fra treningshistorikk"
+                                )
+                    )
+                }
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    sourceRecord != nil
+                        ? ATHLTHTheme
+                            .accentDeep
+                        : ATHLTHTheme
+                            .mutedText
+                )
+            }
+
+            Spacer()
+
+            if let date =
+                    recordDate(kind) {
+                Text(
+                    date.formatted(
+                        date: .abbreviated,
+                        time: .omitted
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            Color.white
+                .opacity(0.92),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                kind.tint
+                    .opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func recordDate(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) -> Date? {
+        if let record =
+                healthRecords.first(
+                    where: {
+                        $0.kind ==
+                            kind.healthKind
+                    }
+                ) {
+            return record.date
+        }
+
+        switch kind {
+        case .fastest1K:
+            return stats?
+                .fastestOneKilometer?
+                .date
+        case .fastest5K:
+            return stats?
+                .fastestFiveKilometers?
+                .date
+        case .fastestMarathon:
+            return stats?
+                .fastestMarathon?
+                .date
+        case .longestRun:
+            return stats?
+                .longestRunDate
+        default:
+            return nil
+        }
+    }
+}
+
 struct ProfileRecordShowcasePickerView:
     View {
     let stats: ProfilePerformanceStats?
