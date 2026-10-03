@@ -1,6 +1,8 @@
 import CoreLocation
 import MapKit
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct ProfileChallengesSection: View {
     @EnvironmentObject private var challenges: ChallengeStore
@@ -95,11 +97,18 @@ struct ChallengeCompactRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: challenge.sport.systemImage)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-                .frame(width: 40, height: 40)
-                .background(ATHLTHTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+            ChallengeCoverArtworkView(
+                sport: challenge.sport,
+                artworkName: challenge.rules.coverArtworkName,
+                remoteURL: challenge.rules.coverImageURL
+            )
+            .frame(width: 44, height: 44)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(challenge.title)
@@ -448,25 +457,28 @@ struct ChallengeHeroCard: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: challenge.sport == .running
-                    ? [ATHLTHTheme.accent.opacity(0.92), .black.opacity(0.90)]
-                    : [.orange.opacity(0.82), .black.opacity(0.92)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ChallengeCoverArtworkView(
+                sport: challenge.sport,
+                artworkName: challenge.rules.coverArtworkName,
+                remoteURL: challenge.rules.coverImageURL
             )
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.08))
-                .frame(width: 180, height: 130)
-                .rotationEffect(.degrees(-12))
-                .offset(x: 185, y: -35)
+            LinearGradient(
+                colors: [.clear, .clear, .black.opacity(0.46)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label(
-                        challenge.status == .active ? "LIVE" : challenge.status.rawValue.uppercased(),
-                        systemImage: challenge.status == .active ? "dot.radiowaves.left.and.right" : "calendar"
+                        challenge.status == .active
+                            ? "LIVE"
+                            : challenge.status.rawValue.uppercased(),
+                        systemImage:
+                            challenge.status == .active
+                                ? "dot.radiowaves.left.and.right"
+                                : "calendar"
                     )
                     .font(.caption2.bold())
                     .tracking(1)
@@ -485,18 +497,111 @@ struct ChallengeHeroCard: View {
                     .font(.title2.bold())
                     .lineLimit(2)
 
+                if let summary = challenge.rules.summary,
+                   !summary.isEmpty {
+                    Text(summary)
+                        .font(.caption)
+                        .lineLimit(2)
+                        .foregroundStyle(.white.opacity(0.86))
+                }
+
                 HStack {
-                    Label(challenge.rules.scoring.title, systemImage: challenge.sport.systemImage)
+                    Label(
+                        challenge.rules.scoring.title,
+                        systemImage: challenge.sport.systemImage
+                    )
                     Spacer()
-                    Label("\(challenge.participants.count)", systemImage: "person.2.fill")
+                    Label(
+                        "\(challenge.participants.count)",
+                        systemImage: "person.2.fill"
+                    )
                 }
                 .font(.caption)
             }
             .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.24), radius: 5, y: 2)
             .padding(18)
         }
-        .frame(height: 190)
+        .frame(height: 205)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
+struct ChallengeCoverArtworkView: View {
+    let sport: ATHLTHChallengeSport
+    let artworkName: String?
+    let remoteURL: String?
+
+    var body: some View {
+        GeometryReader { proxy in
+            Group {
+                if let remoteURL,
+                   let url = URL(string: remoteURL) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            coverImage(image, size: proxy.size)
+                        case .empty:
+                            ZStack {
+                                fallback
+                                ProgressView().tint(.white)
+                            }
+                        case .failure:
+                            fallback
+                        @unknown default:
+                            fallback
+                        }
+                    }
+                } else if let artworkName,
+                          UIImage(named: artworkName) != nil {
+                    coverImage(Image(artworkName), size: proxy.size)
+                } else {
+                    fallback
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .clipped()
+    }
+
+    private func coverImage(
+        _ image: Image,
+        size: CGSize
+    ) -> some View {
+        image
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFill()
+            .frame(width: size.width, height: size.height)
+            .clipped()
+    }
+
+    private var fallback: some View {
+        LinearGradient(
+            colors: {
+                switch sport {
+                case .running:
+                    return [
+                        Color(red: 0.20, green: 0.26, blue: 0.36),
+                        Color(red: 0.34, green: 0.43, blue: 0.57)
+                    ]
+                case .strength:
+                    return [
+                        Color(red: 0.26, green: 0.27, blue: 0.31),
+                        Color(red: 0.43, green: 0.37, blue: 0.31)
+                    ]
+                case .heartRate:
+                    return [
+                        Color(red: 0.28, green: 0.31, blue: 0.40),
+                        Color(red: 0.42, green: 0.30, blue: 0.38)
+                    ]
+                }
+            }(),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
@@ -534,6 +639,11 @@ struct ChallengeCreationView: View {
     @State private var sport: ATHLTHChallengeSport = .running
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
     @State private var title = ""
+    @State private var challengeSummary = ""
+    @State private var selectedCoverArtworkName = "GoalRunning"
+    @State private var selectedCoverPhoto: PhotosPickerItem?
+    @State private var selectedCoverImageData: Data?
+    @State private var coverWasManuallySelected = false
 
     @State private var targetDistanceKm = 5.0
     @State private var targetDurationMinutes = 60.0
@@ -694,6 +804,12 @@ struct ChallengeCreationView: View {
                 }
             }
             .onChange(of: sport) { _, newSport in
+                if !coverWasManuallySelected &&
+                    selectedCoverImageData == nil {
+                    selectedCoverArtworkName =
+                        defaultCoverArtwork(for: newSport)
+                }
+
                 switch newSport {
                 case .running:
                     scoring = .fastestDistance
@@ -715,6 +831,33 @@ struct ChallengeCreationView: View {
                     allowMultipleAttempts = true
                 }
             }
+            .onChange(of: selectedCoverPhoto) { _, item in
+                guard let item else { return }
+
+                Task {
+                    guard let data =
+                            try? await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data),
+                          let jpeg = image.jpegData(compressionQuality: 0.86)
+                    else {
+                        await MainActor.run {
+                            createError =
+                                ATHLTHLocalization.choose(
+                                    english: "The selected image could not be read.",
+                                    norwegian: "Det valgte bildet kunne ikke leses."
+                                )
+                        }
+                        return
+                    }
+
+                    await MainActor.run {
+                        selectedCoverImageData = jpeg
+                        coverWasManuallySelected = true
+                    }
+                }
+            }
+            .sensoryFeedback(.selection, trigger: sport)
+            .sensoryFeedback(.selection, trigger: scoring)
             .onChange(of: scoring) { _, newScoring in
                 guard sport == .running else {
                     return
@@ -769,7 +912,10 @@ struct ChallengeCreationView: View {
                 )
             }
             .alert(
-                "Challenge could not be sent",
+                ATHLTHLocalization.choose(
+                    english: "Could not complete challenge",
+                    norwegian: "Kunne ikke fullføre utfordringen"
+                ),
                 isPresented: Binding(
                     get: { createError != nil },
                     set: { shown in
@@ -802,10 +948,13 @@ struct ChallengeCreationView: View {
                 HStack(spacing: 10) {
                     TextField(
                         ATHLTHLocalization.choose(
-                            english: "Give your challenge a name",
-                            norwegian: "Gi utfordringen et navn"
+                            english: "Optional name",
+                            norwegian: "Valgfritt navn"
                         ),
-                        text: $title
+                        text: Binding(
+                            get: { title },
+                            set: { title = String($0.prefix(60)) }
+                        )
                     )
                     .textInputAutocapitalization(.words)
                     .font(.body.weight(.medium))
@@ -819,42 +968,184 @@ struct ChallengeCreationView: View {
                                 .foregroundStyle(.tertiary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Clear challenge name",
-                                norwegian: "Tøm navn på utfordring"
-                            )
-                        )
                     }
                 }
                 .padding(.horizontal, 15)
                 .frame(height: 54)
                 .background(
                     Color.white.opacity(0.96),
-                    in: RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
                 .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 16,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.primary.opacity(0.09),
-                        lineWidth: 0.8
-                    )
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.primary.opacity(0.09), lineWidth: 0.8)
                 }
 
                 Text(
+                    title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Optional · if left empty, ATHLTH uses “\(automaticTitle)”.",
+                            norwegian: "Valgfritt · står feltet tomt, brukes «\(automaticTitle)»."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "\(title.count)/60 characters",
+                            norwegian: "\(title.count)/60 tegn"
+                        )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
                     ATHLTHLocalization.choose(
-                        english: "Required · this is what participants will see.",
-                        norwegian: "Påkrevd · dette er det deltakerne ser."
+                        english: "Short description",
+                        norwegian: "Kort beskrivelse"
+                    )
+                )
+                .font(.headline)
+
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Optional · tell participants what the challenge is about",
+                        norwegian: "Valgfritt · fortell deltakerne hva utfordringen går ut på"
+                    ),
+                    text: Binding(
+                        get: { challengeSummary },
+                        set: { challengeSummary = String($0.prefix(160)) }
+                    ),
+                    axis: .vertical
+                )
+                .lineLimit(2...4)
+                .padding(14)
+                .background(
+                    Color.white.opacity(0.96),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.8)
+                }
+
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Shown on challenge cards and invitations.",
+                            norwegian: "Vises på challenge-kort og invitasjoner."
+                        )
+                    )
+                    Spacer()
+                    Text("\(challengeSummary.count)/160")
+                        .monospacedDigit()
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 11) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Challenge image",
+                        norwegian: "Challenge-bilde"
+                    )
+                )
+                .font(.headline)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Choose an ATHLTH image or upload your own.",
+                        norwegian: "Velg et ATHLTH-bilde eller last opp ditt eget."
                     )
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(challengeCoverArtworkOptions, id: \.self) { artwork in
+                            Button {
+                                selectedCoverArtworkName = artwork
+                                selectedCoverImageData = nil
+                                selectedCoverPhoto = nil
+                                coverWasManuallySelected = true
+                            } label: {
+                                Image(artwork)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 96, height: 62)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                            .stroke(
+                                                selectedCoverImageData == nil &&
+                                                selectedCoverArtworkName == artwork
+                                                    ? clubEmerald
+                                                    : Color.primary.opacity(0.08),
+                                                lineWidth:
+                                                    selectedCoverImageData == nil &&
+                                                    selectedCoverArtworkName == artwork
+                                                        ? 2
+                                                        : 0.8
+                                            )
+                                    }
+                                    .overlay(alignment: .topTrailing) {
+                                        if selectedCoverImageData == nil &&
+                                           selectedCoverArtworkName == artwork {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.white)
+                                                .padding(6)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(artwork)
+                        }
+
+                        PhotosPicker(
+                            selection: $selectedCoverPhoto,
+                            matching: .images
+                        ) {
+                            ZStack {
+                                if let data = selectedCoverImageData,
+                                   let image = UIImage(data: data) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    VStack(spacing: 5) {
+                                        Image(systemName: "photo.badge.plus")
+                                            .font(.title3)
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english: "Own",
+                                                norwegian: "Eget"
+                                            )
+                                        )
+                                        .font(.caption2.weight(.semibold))
+                                    }
+                                    .foregroundStyle(clubForest)
+                                }
+                            }
+                            .frame(width: 96, height: 62)
+                            .background(clubMint.opacity(0.72))
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                    .stroke(
+                                        selectedCoverImageData != nil
+                                            ? clubEmerald
+                                            : Color.primary.opacity(0.08),
+                                        lineWidth: selectedCoverImageData != nil ? 2 : 0.8
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.vertical, 2)
+                }
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -891,20 +1182,11 @@ struct ChallengeCreationView: View {
                         HStack(spacing: 13) {
                             Image(systemName: scoringIcon(option))
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(
-                                    selected
-                                        ? clubEmerald
-                                        : clubForest
-                                )
+                                .foregroundStyle(selected ? clubEmerald : clubForest)
                                 .frame(width: 44, height: 44)
                                 .background(
-                                    selected
-                                        ? clubMint
-                                        : Color.primary.opacity(0.045),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 14,
-                                        style: .continuous
-                                    )
+                                    selected ? clubMint : Color.primary.opacity(0.045),
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 )
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -916,56 +1198,29 @@ struct ChallengeCreationView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .multilineTextAlignment(.leading)
-                                    .fixedSize(
-                                        horizontal: false,
-                                        vertical: true
-                                    )
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
 
                             Spacer(minLength: 8)
 
-                            Image(
-                                systemName:
-                                    selected
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                            )
-                            .font(.title3)
-                            .foregroundStyle(
-                                selected
-                                    ? clubEmerald
-                                    : Color.secondary.opacity(0.72)
-                            )
+                            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(selected ? clubEmerald : Color.secondary.opacity(0.72))
                         }
                         .padding(14)
                         .background(
-                            selected
-                                ? clubMint.opacity(0.72)
-                                : Color.white.opacity(0.96),
-                            in: RoundedRectangle(
-                                cornerRadius: 20,
-                                style: .continuous
-                            )
+                            selected ? clubMint.opacity(0.72) : Color.white.opacity(0.96),
+                            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
                         )
                         .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 20,
-                                style: .continuous
-                            )
-                            .stroke(
-                                selected
-                                    ? clubEmerald.opacity(0.52)
-                                    : Color.primary.opacity(0.07),
-                                lineWidth:
-                                    selected
-                                        ? 1.1
-                                        : 0.8
-                            )
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(
+                                    selected ? clubEmerald.opacity(0.52) : Color.primary.opacity(0.07),
+                                    lineWidth: selected ? 1.1 : 0.8
+                                )
                         }
                         .shadow(
-                            color: Color.black.opacity(
-                                selected ? 0.045 : 0.022
-                            ),
+                            color: Color.black.opacity(selected ? 0.045 : 0.022),
                             radius: 9,
                             y: 4
                         )
@@ -2038,12 +2293,18 @@ struct ChallengeCreationView: View {
 
             ChallengeReviewCard(
                 title: resolvedTitle,
+                summary: resolvedSummary,
                 sport: sport,
                 scoring: effectiveScoring,
                 verification:
                     sport == .running
                         ? .verifiedRequired
-                        : verificationPolicy
+                        : verificationPolicy,
+                coverArtworkName:
+                    selectedCoverImageData == nil
+                        ? selectedCoverArtworkName
+                        : nil,
+                customImageData: selectedCoverImageData
             )
 
             reviewRow("Starts", startsAt.formatted(date: .abbreviated, time: .shortened))
@@ -2321,11 +2582,7 @@ struct ChallengeCreationView: View {
     private var canContinue: Bool {
         switch step {
         case 0:
-            return !title
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                .isEmpty
+            return true
         case 1:
             if sport == .running {
                 if scoring == .fastestDistance {
@@ -2384,10 +2641,47 @@ struct ChallengeCreationView: View {
         return scoring
     }
 
+    private var automaticTitle: String {
+        "\(sport.title) · \(effectiveScoring.title)"
+    }
+
     private var resolvedTitle: String {
-        title.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? automaticTitle : String(clean.prefix(60))
+    }
+
+    private var resolvedSummary: String? {
+        let clean =
+            challengeSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        return String(clean.prefix(160))
+    }
+
+    private var challengeCoverArtworkOptions: [String] {
+        [
+            "GoalRunning",
+            "GoalSprint",
+            "GoalStrength",
+            "GoalEndurance",
+            "GoalMountain",
+            "GoalEvent",
+            "GoalAdventure",
+            "GoalConsistency",
+            "GoalProgress",
+            "GoalRecovery",
+            "GoalRelax",
+            "GoalWalking"
+        ]
+    }
+
+    private func defaultCoverArtwork(
+        for sport: ATHLTHChallengeSport
+    ) -> String {
+        switch sport {
+        case .running: return "GoalRunning"
+        case .strength: return "GoalStrength"
+        case .heartRate: return "GoalEndurance"
+        }
     }
 
     private func challengeParticipant(_ friend: SocialProfileCard) -> ChallengeParticipant {
@@ -2409,6 +2703,32 @@ struct ChallengeCreationView: View {
 
     @MainActor
     private func createChallenge() async {
+        creatingChallenge = true
+        createError = nil
+
+        let challengeID = UUID()
+        var uploadedCoverURL: String?
+
+        if let selectedCoverImageData {
+            guard let imageURL =
+                    await social.uploadChallengeCover(
+                        challengeID: challengeID,
+                        jpegData: selectedCoverImageData
+                    )
+            else {
+                creatingChallenge = false
+                createError =
+                    social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "The challenge image could not be uploaded.",
+                        norwegian: "Challenge-bildet kunne ikke lastes opp."
+                    )
+                return
+            }
+
+            uploadedCoverURL = imageURL
+        }
+
         let creator = ChallengeParticipant(
             userID: session.profile.userID,
             username: session.profile.username,
@@ -2518,6 +2838,12 @@ struct ChallengeCreationView: View {
                 sport == .heartRate
                     ? heartRateAggregation
                     : nil,
+            summary: resolvedSummary,
+            coverArtworkName:
+                selectedCoverImageData == nil
+                    ? selectedCoverArtworkName
+                    : nil,
+            coverImageURL: uploadedCoverURL,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
@@ -2526,6 +2852,7 @@ struct ChallengeCreationView: View {
         )
 
         let challenge = ATHLTHChallenge(
+            id: challengeID,
             creatorID: session.profile.userID,
             title: resolvedTitle,
             sport: sport,
@@ -2534,8 +2861,6 @@ struct ChallengeCreationView: View {
             visibility: visibility
         )
 
-        creatingChallenge = true
-        createError = nil
         challenges.add(challenge)
 
         let synced =
@@ -2545,9 +2870,19 @@ struct ChallengeCreationView: View {
 
         guard synced else {
             challenges.remove(challenge.id)
+
+            if selectedCoverImageData != nil {
+                await social.removeChallengeCover(
+                    challengeID: challenge.id
+                )
+            }
+
             createError =
                 social.errorMessage ??
-                "This athlete may not be accepting challenge requests."
+                ATHLTHLocalization.choose(
+                    english: "This athlete may not be accepting challenge requests.",
+                    norwegian: "Denne brukeren tar kanskje ikke imot challenge-forespørsler."
+                )
             return
         }
 
@@ -3128,41 +3463,37 @@ struct MeetupLocationPicker: View {
 
 private struct ChallengeReviewCard: View {
     let title: String
+    let summary: String?
     let sport: ATHLTHChallengeSport
     let scoring: ATHLTHChallengeScoring
     let verification: ChallengeVerificationPolicy
+    let coverArtworkName: String?
+    let customImageData: Data?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: {
-                    switch sport {
-                    case .running:
-                        return [
-                            ATHLTHTheme.accent.opacity(0.90),
-                            .black
-                        ]
-                    case .strength:
-                        return [
-                            .orange.opacity(0.80),
-                            .black
-                        ]
-                    case .heartRate:
-                        return [
-                            .pink.opacity(0.88),
-                            .red.opacity(0.72),
-                            .black
-                        ]
-                    }
-                }(),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Group {
+                if let customImageData,
+                   let image = UIImage(data: customImageData) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ChallengeCoverArtworkView(
+                        sport: sport,
+                        artworkName: coverArtworkName,
+                        remoteURL: nil
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .clipped()
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.10))
-                .frame(width: 160, height: 115)
-                .offset(x: 190, y: -30)
+            LinearGradient(
+                colors: [.clear, .clear, .black.opacity(0.48)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Label("ATHLTH CHALLENGE", systemImage: sport.systemImage)
@@ -3171,16 +3502,25 @@ private struct ChallengeReviewCard: View {
 
                 Text(title)
                     .font(.title2.bold())
+                    .lineLimit(2)
+
+                if let summary, !summary.isEmpty {
+                    Text(summary)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.86))
+                        .lineLimit(2)
+                }
 
                 Text("\(scoring.title) · \(verification.title)")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.74))
+                    .foregroundStyle(.white.opacity(0.76))
             }
             .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.24), radius: 4, y: 2)
             .padding()
         }
-        .frame(height: 175)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .frame(height: 205)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }
 
@@ -3459,38 +3799,21 @@ struct ChallengeDetailView: View {
         }
     }
 
-    private func detailHero(_ challenge: ATHLTHChallenge) -> some View {
+    private func detailHero(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
         ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: {
-                    switch challenge.sport {
-                    case .running:
-                        return [
-                            ATHLTHTheme.accent.opacity(0.95),
-                            .black
-                        ]
-                    case .strength:
-                        return [
-                            .orange.opacity(0.86),
-                            .black
-                        ]
-                    case .heartRate:
-                        return [
-                            .pink.opacity(0.92),
-                            .red.opacity(0.70),
-                            .black
-                        ]
-                    }
-                }(),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ChallengeCoverArtworkView(
+                sport: challenge.sport,
+                artworkName: challenge.rules.coverArtworkName,
+                remoteURL: challenge.rules.coverImageURL
             )
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.09))
-                .frame(width: 220, height: 160)
-                .rotationEffect(.degrees(-12))
-                .offset(x: 160, y: -55)
+            LinearGradient(
+                colors: [.clear, .clear, .black.opacity(0.50)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -3512,18 +3835,30 @@ struct ChallengeDetailView: View {
                     .font(.system(size: 31, weight: .bold))
                     .lineLimit(2)
 
+                if let summary = challenge.rules.summary,
+                   !summary.isEmpty {
+                    Text(summary)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.86))
+                        .lineLimit(2)
+                }
+
                 HStack {
-                    Label(challenge.rules.scoring.title, systemImage: challenge.sport.systemImage)
+                    Label(
+                        challenge.rules.scoring.title,
+                        systemImage: challenge.sport.systemImage
+                    )
                     Spacer()
                     Text(timeText(challenge))
                 }
                 .font(.caption)
             }
             .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.24), radius: 5, y: 2)
             .padding(20)
         }
-        .frame(height: 235)
-        .clipShape(RoundedRectangle(cornerRadius: 26))
+        .frame(height: 250)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private func leaderboardCard(_ challenge: ATHLTHChallenge) -> some View {
