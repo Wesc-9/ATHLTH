@@ -271,7 +271,8 @@ struct ATHLTHHomeView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.premiumGold.opacity(0.44)
+                accent: ATHLTHTheme.premiumGold.opacity(0.44),
+                pullDownFadeBridge: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHHomeDashboardHero(
@@ -3908,7 +3909,8 @@ struct ATHLTHTrainView: View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
                 accent: Color.green.opacity(0.42),
-                showsTopSheen: false
+                showsTopSheen: false,
+                pullDownFadeBridge: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHExclusiveHomeHero(
@@ -5953,7 +5955,8 @@ struct ATHLTHRecoveryView: View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
                 accent: Color.blue.opacity(0.36),
-                showsTopSheen: false
+                showsTopSheen: false,
+                pullDownFadeBridge: true
             ) {
                 ATHLTHExclusiveHomeHero(
                     imageName: "RecoveryHero",
