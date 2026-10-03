@@ -998,7 +998,7 @@ struct FriendProfileView: View {
                     ProgressView("Loading profile…")
                         .padding(.top, 70)
                 } else if let profile {
-                    followStats(profile)
+                    remoteProfileStats(profile)
                     actionBar(profile)
 
                     if profile.card.isPrivateProfile &&
@@ -1006,9 +1006,20 @@ struct FriendProfileView: View {
                         privateProfileNotice
                     }
 
-                    // Public profiles always present Recent Activity as a
-                    // first-class section. RLS still decides which workouts
-                    // are actually visible to the viewer.
+                    // Keep the same visual order as the owner's profile.
+                    // Privacy/RLS still controls which remote data exists.
+                    if !profile.trophies.isEmpty {
+                        trophyCard(profile.trophies)
+                    }
+
+                    if let performance = profile.performance {
+                        performanceCard(performance)
+                    }
+
+                    if !profile.gear.isEmpty {
+                        remoteGearCard(profile.gear)
+                    }
+
                     let workouts = profile.recentActivities.filter {
                         $0.activity.kind == "workout"
                     }
@@ -1018,22 +1029,8 @@ struct FriendProfileView: View {
                         workoutHistoryCard(workouts)
                     }
 
-                    // Match the owner's remaining profile order. RLS simply
-                    // returns no rows for sections the athlete has not shared.
-                    if !profile.gear.isEmpty {
-                        remoteGearCard(profile.gear)
-                    }
-
                     if !profile.goals.isEmpty {
                         remoteGoalsCard(profile.goals)
-                    }
-
-                    if let performance = profile.performance {
-                        performanceCard(performance)
-                    }
-
-                    if !profile.trophies.isEmpty {
-                        trophyCard(profile.trophies)
                     }
                 } else {
                     ContentUnavailableView(
@@ -1296,7 +1293,7 @@ struct FriendProfileView: View {
                 .padding(.bottom, 24)
             }
         }
-        .frame(height: 236)
+        .frame(height: 264)
         .clipped()
     }
 
@@ -1314,6 +1311,156 @@ struct FriendProfileView: View {
                 in: Capsule()
             )
             .lineLimit(1)
+    }
+
+    private func remoteProfileStats(
+        _ profile: SocialFriendProfile
+    ) -> some View {
+        HStack(spacing: 6) {
+            remoteHeroStat(
+                value:
+                    followOverview
+                        .followerCount
+                        .formatted(),
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Followers",
+                        norwegian: "Følgere"
+                    ),
+                icon: "person.fill"
+            )
+
+            remoteHeroStat(
+                value:
+                    followOverview
+                        .followingCount
+                        .formatted(),
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Following",
+                        norwegian: "Følger"
+                    ),
+                icon: "person.2.fill"
+            )
+
+            remoteHeroStat(
+                value:
+                    (profile.performance?
+                        .totalWorkoutCount ?? 0)
+                        .formatted(),
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Workouts",
+                        norwegian: "Økter"
+                    ),
+                icon: "figure.run"
+            )
+
+            remoteHeroStat(
+                value:
+                    remoteLifetimeDistance(
+                        profile.performance
+                    ),
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Total km",
+                        norwegian: "Km totalt"
+                    ),
+                icon: "chart.bar.fill"
+            )
+        }
+    }
+
+    private func remoteHeroStat(
+        value: String,
+        title: String,
+        icon: String
+    ) -> some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .semibold
+                        )
+                    )
+                    .frame(width: 15)
+
+                Text(value)
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 8.5,
+                        weight: .medium
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .foregroundStyle(
+            ATHLTHTheme.primaryText
+        )
+        .frame(maxWidth: .infinity)
+        .frame(height: 58)
+        .background(
+            Color.white.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.10),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private func remoteLifetimeDistance(
+        _ performance:
+            SocialPerformanceStats?
+    ) -> String {
+        guard let meters =
+                performance?
+                    .totalRunningDistanceMeters,
+              meters > 0 else {
+            return "0"
+        }
+
+        let kilometers =
+            meters / 1_000
+
+        if kilometers >= 1_000 {
+            return String(
+                format: "%.0f",
+                kilometers
+            )
+        }
+
+        return String(
+            format: "%.1f",
+            kilometers
+        )
     }
 
     @ViewBuilder
