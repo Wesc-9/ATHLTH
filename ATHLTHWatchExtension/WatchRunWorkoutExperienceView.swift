@@ -102,6 +102,12 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                 } else if
                     workoutManager.kind ==
+                        .strength {
+                    alwaysOnStrengthContent(
+                        compact: compact
+                    )
+                } else if
+                    workoutManager.kind ==
                         .walking {
                     alwaysOnWalkingContent(
                         compact: compact
@@ -127,6 +133,666 @@ struct WatchRunWorkoutExperienceView: View {
         .background(
             Color.black
                 .ignoresSafeArea()
+        )
+    }
+
+    private func alwaysOnStrengthContent(
+        compact: Bool
+    ) -> some View {
+        Group {
+            if let session =
+                    workoutManager
+                        .strengthSession {
+                if session.isResting,
+                   let restEndsAt =
+                        session.restEndsAt {
+                    TimelineView(
+                        .periodic(
+                            from: .now,
+                            by: 1
+                        )
+                    ) { context in
+                        alwaysOnStrengthRestContent(
+                            session: session,
+                            restEndsAt:
+                                restEndsAt,
+                            now:
+                                context.date,
+                            compact: compact
+                        )
+                    }
+                } else {
+                    alwaysOnStrengthSetContent(
+                        session: session,
+                        compact: compact
+                    )
+                }
+            } else {
+                alwaysOnStrengthBasicContent(
+                    compact: compact
+                )
+            }
+        }
+    }
+
+    private func alwaysOnStrengthSetContent(
+        session:
+            WatchStrengthSessionSnapshot,
+        compact: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 5 : 7
+        ) {
+            alwaysOnHeader(
+                compact: compact
+            )
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            Text(
+                session.exerciseName ??
+                session.title
+            )
+            .font(
+                .system(
+                    size:
+                        compact
+                            ? 9
+                            : 10,
+                    weight: .bold
+                )
+            )
+            .tracking(0.65)
+            .textCase(.uppercase)
+            .foregroundStyle(
+                Color.white.opacity(
+                    0.55
+                )
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.68)
+
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 5
+            ) {
+                Text(
+                    strengthWeightText(
+                        session
+                            .draftWeightKilograms
+                    )
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 31
+                                : 36,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+                Text("KG")
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 8
+                                    : 9,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.48
+                        )
+                    )
+
+                Text("×")
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 13
+                                    : 15,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.38
+                        )
+                    )
+
+                Text(
+                    "\(session.draftReps)"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 24
+                                : 28,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+            }
+
+            Text(
+                "SET \(max(session.setIndex + 1, 1)) / \(max(session.setCount, 1))"
+            )
+            .font(
+                .system(
+                    size:
+                        compact
+                            ? 7.5
+                            : 8.5,
+                    weight: .bold
+                )
+            )
+            .tracking(0.9)
+            .foregroundStyle(
+                strengthAlwaysOnAccent
+                    .opacity(0.78)
+            )
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            HStack {
+                Text(
+                    "\(session.completedSets) / \(max(session.totalSets, 1)) SETS"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.48
+                    )
+                )
+
+                Spacer()
+
+                Text(
+                    durationText(
+                        workoutManager
+                            .elapsedTime
+                    )
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 9
+                                : 10,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.52
+                    )
+                )
+            }
+
+            alwaysOnStrengthFooter(
+                session: session,
+                compact: compact
+            )
+        }
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
+        )
+        .padding(
+            .vertical,
+            compact ? 6 : 8
+        )
+    }
+
+    private func alwaysOnStrengthRestContent(
+        session:
+            WatchStrengthSessionSnapshot,
+        restEndsAt: Date,
+        now: Date,
+        compact: Bool
+    ) -> some View {
+        let remaining =
+            max(
+                restEndsAt
+                    .timeIntervalSince(now),
+                0
+            )
+
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 5 : 7
+        ) {
+            alwaysOnHeader(
+                compact: compact
+            )
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            Text("REST")
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.1)
+                .foregroundStyle(
+                    strengthAlwaysOnAccent
+                        .opacity(0.82)
+                )
+
+            Text(
+                durationText(
+                    remaining
+                )
+            )
+            .font(
+                .system(
+                    size:
+                        compact
+                            ? 34
+                            : 40,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+
+            Text("NEXT SET")
+                .font(
+                    .system(
+                        size: 7.5,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.0)
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.40
+                    )
+                )
+
+            Spacer(
+                minLength: compact ? 1 : 3
+            )
+
+            HStack(
+                alignment:
+                    .firstTextBaseline
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 1
+                ) {
+                    Text(
+                        session.exerciseName ??
+                        session.title
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 9
+                                    : 10,
+                            weight: .semibold
+                        )
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.60
+                        )
+                    )
+
+                    Text(
+                        strengthSetSummary(
+                            session
+                        )
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 12
+                                    : 14,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                }
+
+                Spacer()
+
+                Text(
+                    "\(min(session.setIndex + 2, max(session.setCount, 1))) / \(max(session.setCount, 1))"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 9
+                                : 10,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.50
+                    )
+                )
+            }
+
+            alwaysOnStrengthFooter(
+                session: session,
+                compact: compact
+            )
+        }
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
+        )
+        .padding(
+            .vertical,
+            compact ? 6 : 8
+        )
+    }
+
+    private func alwaysOnStrengthBasicContent(
+        compact: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: compact ? 6 : 8
+        ) {
+            alwaysOnHeader(
+                compact: compact
+            )
+
+            Spacer()
+
+            Text("STRENGTH")
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.1)
+                .foregroundStyle(
+                    strengthAlwaysOnAccent
+                        .opacity(0.76)
+                )
+
+            Text(
+                durationText(
+                    workoutManager
+                        .elapsedTime
+                )
+            )
+            .font(
+                .system(
+                    size:
+                        compact
+                            ? 34
+                            : 40,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+
+            HStack {
+                Image(
+                    systemName:
+                        "heart.fill"
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 8
+                                : 9
+                    )
+                )
+                .foregroundStyle(
+                    Color.white.opacity(
+                        0.44
+                    )
+                )
+
+                Text(
+                    heartRateText
+                )
+                .font(
+                    .system(
+                        size:
+                            compact
+                                ? 13
+                                : 15,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+
+                Text("bpm")
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7
+                                    : 8,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.46
+                        )
+                    )
+
+                Spacer()
+            }
+
+            Spacer()
+
+            Capsule()
+                .fill(
+                    strengthAlwaysOnAccent
+                        .opacity(0.40)
+                )
+                .frame(height: 1.5)
+        }
+        .padding(
+            .horizontal,
+            compact ? 9 : 11
+        )
+        .padding(
+            .vertical,
+            compact ? 7 : 9
+        )
+    }
+
+    private func alwaysOnStrengthFooter(
+        session:
+            WatchStrengthSessionSnapshot,
+        compact: Bool
+    ) -> some View {
+        VStack(spacing: 4) {
+            GeometryReader { proxy in
+                ZStack(
+                    alignment: .leading
+                ) {
+                    Capsule()
+                        .fill(
+                            Color.white
+                                .opacity(0.09)
+                        )
+
+                    Capsule()
+                        .fill(
+                            strengthAlwaysOnAccent
+                                .opacity(0.62)
+                        )
+                        .frame(
+                            width:
+                                proxy.size
+                                    .width *
+                                strengthWorkoutProgress(
+                                    session
+                                )
+                        )
+                }
+            }
+            .frame(height: 2)
+
+            HStack {
+                Text("STRENGTH")
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7
+                                    : 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.85)
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.44
+                        )
+                    )
+
+                Spacer()
+
+                if session.exerciseCount > 0 {
+                    Text(
+                        "\(min(session.exerciseIndex + 1, session.exerciseCount))/\(session.exerciseCount)"
+                    )
+                    .font(
+                        .system(
+                            size:
+                                compact
+                                    ? 7.5
+                                    : 8.5,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        Color.white.opacity(
+                            0.50
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private var strengthAlwaysOnAccent:
+        Color {
+        Color(
+            red: 0.83,
+            green: 0.66,
+            blue: 0.36
+        )
+    }
+
+    private func strengthWeightText(
+        _ kilograms: Double
+    ) -> String {
+        if kilograms.rounded() ==
+            kilograms {
+            return String(
+                Int(kilograms)
+            )
+        }
+
+        return String(
+            format: "%.1f",
+            kilograms
+        )
+    }
+
+    private func strengthSetSummary(
+        _ session:
+            WatchStrengthSessionSnapshot
+    ) -> String {
+        strengthWeightText(
+            session
+                .draftWeightKilograms
+        ) +
+        " kg × " +
+        String(session.draftReps)
+    }
+
+    private func strengthWorkoutProgress(
+        _ session:
+            WatchStrengthSessionSnapshot
+    ) -> CGFloat {
+        guard session.totalSets > 0
+        else {
+            return 0
+        }
+
+        return CGFloat(
+            min(
+                max(
+                    Double(
+                        session
+                            .completedSets
+                    ) /
+                    Double(
+                        session.totalSets
+                    ),
+                    0
+                ),
+                1
+            )
         )
     }
 
