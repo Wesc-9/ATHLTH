@@ -17,3 +17,4 @@ exact-bundle-signing-release-dryrun
 verify-app-group-association
 
 validate-release-build-45
+1.5.9 release hardening dry-run
