@@ -100,6 +100,36 @@ struct ATHLTHCommunityV4View: View {
         }
     }
 
+    private var joinedUpcomingChallenges:
+        [ATHLTHChallenge] {
+        activeChallenges.filter {
+            $0.status == .active ||
+            $0.status == .upcoming
+        }
+    }
+
+    private var discoveryGroups:
+        [CommunityGroupRecord] {
+        let joined = groups.groups.filter {
+            groups.joinedGroupIDs.contains($0.id)
+        }
+        let publicUnjoined = publicDiscoveryGroups
+
+        return Array(
+            (joined + publicUnjoined)
+                .reduce(
+                    into: [CommunityGroupRecord]()
+                ) { result, group in
+                    if !result.contains(
+                        where: { $0.id == group.id }
+                    ) {
+                        result.append(group)
+                    }
+                }
+                .prefix(5)
+        )
+    }
+
     private var publicDiscoveryGroups:
         [CommunityGroupRecord] {
         groups.groups.filter {
@@ -414,7 +444,7 @@ struct ATHLTHCommunityV4View: View {
     }
 
     private var referenceDiscoverySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             CommunityReferenceSectionTitle(
                 title: "Discovery",
                 destinationTitle:
@@ -429,19 +459,28 @@ struct ATHLTHCommunityV4View: View {
                 }
             )
 
-            let hasGroup =
-                !publicDiscoveryGroups.isEmpty
-            let hasChallenge =
-                !publicDiscoveryChallenges.isEmpty
-            let hasEvent =
-                !publicDiscoveryEvents.isEmpty
+            discoveryGroupStrip
+            discoveryEventChallengeStrip
+        }
+    }
 
-            if hasGroup ||
-                hasChallenge ||
-                hasEvent {
-                VStack(spacing: 0) {
-                    if let group =
-                            publicDiscoveryGroups.first {
+    private var discoveryGroupStrip: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Clubs",
+                    norwegian: "Grupper"
+                )
+            )
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                LazyHStack(spacing: 9) {
+                    ForEach(discoveryGroups) { group in
                         NavigationLink {
                             CommunityGroupDetailView(
                                 group: group
@@ -449,33 +488,77 @@ struct ATHLTHCommunityV4View: View {
                         } label: {
                             CommunityDiscoveryNowRow(
                                 eyebrow:
-                                    ATHLTHLocalization.choose(
+                                    groups.joinedGroupIDs
+                                        .contains(group.id)
+                                    ? ATHLTHLocalization.choose(
+                                        english: "YOUR CLUB",
+                                        norwegian: "DIN GRUPPE"
+                                    )
+                                    : ATHLTHLocalization.choose(
                                         english: "PUBLIC CLUB",
-                                        norwegian: "OFFENTLIG KLUBB"
+                                        norwegian: "OFFENTLIG GRUPPE"
                                     ),
                                 title: group.name,
                                 detail:
-                                    group.locationName
-                                        .isEmpty
-                                        ? group.summary
-                                        : group.locationName,
+                                    group.locationName.isEmpty
+                                    ? group.summary
+                                    : group.locationName,
                                 icon: "person.3.fill",
                                 tint: .green
                             )
+                            .frame(width: 220)
                         }
                         .buttonStyle(.plain)
                     }
 
-                    if let challenge =
-                            publicDiscoveryChallenges.first {
-                        if hasGroup {
-                            CommunityDiscoveryDivider()
-                        }
+                    if discoveryGroups.isEmpty {
+                        CommunityDiscoveryNowRow(
+                            eyebrow: "DISCOVERY",
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Discover clubs",
+                                    norwegian: "Oppdag grupper"
+                                ),
+                            detail:
+                                ATHLTHLocalization.choose(
+                                    english: "Public clubs will appear here.",
+                                    norwegian: "Offentlige grupper vises her."
+                                ),
+                            icon: "person.3.fill",
+                            tint: .green
+                        )
+                        .frame(width: 220)
+                    }
+                }
+            }
+        }
+    }
 
+    private var discoveryEventChallengeStrip: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Events & challenges",
+                    norwegian: "Events & challenges"
+                )
+            )
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                LazyHStack(spacing: 9) {
+                    ForEach(
+                        Array(
+                            publicDiscoveryChallenges
+                                .prefix(3)
+                        )
+                    ) { challenge in
                         NavigationLink {
                             ChallengeDetailView(
-                                challengeID:
-                                    challenge.id
+                                challengeID: challenge.id
                             )
                         } label: {
                             CommunityDiscoveryNowRow(
@@ -484,31 +567,26 @@ struct ATHLTHCommunityV4View: View {
                                         english: "PUBLIC CHALLENGE",
                                         norwegian: "OFFENTLIG CHALLENGE"
                                     ),
-                                title:
-                                    challenge.title,
-                                detail:
-                                    challenge.sport.title,
+                                title: challenge.title,
+                                detail: challenge.sport.title,
                                 icon:
-                                    challenge
-                                        .sport
-                                        .systemImage,
+                                    challenge.sport.systemImage,
                                 tint: .orange
                             )
+                            .frame(width: 220)
                         }
                         .buttonStyle(.plain)
                     }
 
-                    if let event =
-                            publicDiscoveryEvents.first {
-                        if hasGroup ||
-                            hasChallenge {
-                            CommunityDiscoveryDivider()
-                        }
-
+                    ForEach(
+                        Array(
+                            publicDiscoveryEvents
+                                .prefix(2)
+                        )
+                    ) { event in
                         NavigationLink {
                             CommunityEventDetailView(
-                                eventID:
-                                    event.id
+                                eventID: event.id
                             )
                         } label: {
                             CommunityDiscoveryNowRow(
@@ -517,8 +595,7 @@ struct ATHLTHCommunityV4View: View {
                                         english: "PUBLIC EVENT",
                                         norwegian: "OFFENTLIG EVENT"
                                     ),
-                                title:
-                                    event.event.title,
+                                title: event.event.title,
                                 detail:
                                     event.event.startsAt
                                         .formatted(
@@ -528,70 +605,39 @@ struct ATHLTHCommunityV4View: View {
                                 icon: "calendar",
                                 tint: .blue
                             )
+                            .frame(width: 220)
                         }
                         .buttonStyle(.plain)
                     }
+
+                    if publicDiscoveryChallenges.isEmpty &&
+                        publicDiscoveryEvents.isEmpty {
+                        CommunityDiscoveryNowRow(
+                            eyebrow: "DISCOVERY",
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Discover what's next",
+                                    norwegian: "Oppdag det som skjer"
+                                ),
+                            detail:
+                                ATHLTHLocalization.choose(
+                                    english: "Public events and challenges will appear here.",
+                                    norwegian: "Offentlige events og challenges vises her."
+                                ),
+                            icon: "sparkles",
+                            tint: ATHLTHTheme.premiumGold
+                        )
+                        .frame(width: 220)
+                    }
                 }
-                .background(
-                    Color.white.opacity(0.88),
-                    in: RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.black.opacity(0.04),
-                        lineWidth: 0.7
-                    )
-                }
-            } else {
-                NavigationLink {
-                    CommunityDiscoveryView()
-                } label: {
-                    CommunityDiscoveryNowRow(
-                        eyebrow:
-                            ATHLTHLocalization.choose(
-                                english: "DISCOVERY",
-                                norwegian: "DISCOVERY"
-                            ),
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Explore the community",
-                                norwegian: "Utforsk fellesskapet"
-                            ),
-                        detail:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Find public clubs, events and challenges.",
-                                norwegian:
-                                    "Finn offentlige klubber, events og challenges."
-                            ),
-                        icon: "sparkles",
-                        tint:
-                            ATHLTHTheme.premiumGold
-                    )
-                }
-                .buttonStyle(.plain)
-                .background(
-                    Color.white.opacity(0.88),
-                    in: RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
-                    )
-                )
             }
         }
     }
 
     @ViewBuilder
     private var referenceUpcomingSection: some View {
-        if let nextEvent =
-            joinedUpcomingEvents.first {
+        if !joinedUpcomingEvents.isEmpty ||
+            !joinedUpcomingChallenges.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 CommunityReferenceSectionTitle(
                     title:
@@ -611,16 +657,56 @@ struct ATHLTHCommunityV4View: View {
                     }
                 )
 
-                NavigationLink {
-                    CommunityEventDetailView(
-                        eventID: nextEvent.id
-                    )
-                } label: {
-                    CommunityReferenceUpcomingEventCard(
-                        item: nextEvent
-                    )
+                ScrollView(
+                    .horizontal,
+                    showsIndicators: false
+                ) {
+                    LazyHStack(spacing: 9) {
+                        ForEach(
+                            joinedUpcomingEvents
+                                .prefix(3)
+                        ) { event in
+                            NavigationLink {
+                                CommunityEventDetailView(
+                                    eventID: event.id
+                                )
+                            } label: {
+                                CommunityReferenceUpcomingEventCard(
+                                    item: event
+                                )
+                                .frame(width: 300)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(
+                            joinedUpcomingChallenges
+                                .prefix(3)
+                        ) { challenge in
+                            NavigationLink {
+                                ChallengeDetailView(
+                                    challengeID:
+                                        challenge.id
+                                )
+                            } label: {
+                                CommunityDiscoveryNowRow(
+                                    eyebrow:
+                                        ATHLTHLocalization.choose(
+                                            english: "JOINED CHALLENGE",
+                                            norwegian: "PÅMELDT CHALLENGE"
+                                        ),
+                                    title: challenge.title,
+                                    detail: challenge.sport.title,
+                                    icon:
+                                        challenge.sport.systemImage,
+                                    tint: .orange
+                                )
+                                .frame(width: 260)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -1256,11 +1342,6 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
-                    .shadow(
-                        color: .black.opacity(0.46),
-                        radius: 5,
-                        y: 1
-                    )
 
                 Text(challenge.subtitle)
                     .font(
@@ -1277,11 +1358,6 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .frame(
                         maxWidth: 260,
                         alignment: .leading
-                    )
-                    .shadow(
-                        color: .black.opacity(0.50),
-                        radius: 4,
-                        y: 1
                     )
 
                 Spacer(minLength: 0)
