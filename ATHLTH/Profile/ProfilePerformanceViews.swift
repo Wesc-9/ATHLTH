@@ -3320,6 +3320,52 @@ struct PerformanceStatsView: View {
                 )
             }
 
+            if let longestWorkout =
+                    record(
+                        .longestWorkout
+                    ) {
+                editorialMilestoneRow(
+                    icon: "clock.fill",
+                    tint: .indigo,
+                    title:
+                        text(
+                            "Longest workout",
+                            "Lengste økt"
+                        ),
+                    value:
+                        longestWorkout
+                            .formattedValue,
+                    detail:
+                        formatDate(
+                            longestWorkout
+                                .date
+                        )
+                )
+            }
+
+            if let calories =
+                    record(
+                        .mostActiveCalories
+                    ) {
+                editorialMilestoneRow(
+                    icon: "flame.fill",
+                    tint: .orange,
+                    title:
+                        text(
+                            "Most active calories",
+                            "Flest aktive kalorier"
+                        ),
+                    value:
+                        calories
+                            .formattedValue,
+                    detail:
+                        formatDate(
+                            calories
+                                .date
+                        )
+                )
+            }
+
             editorialMilestoneRow(
                 icon:
                     "chart.line.uptrend.xyaxis",
@@ -3374,7 +3420,14 @@ struct PerformanceStatsView: View {
         value: String,
         detail: String
     ) -> some View {
-        HStack(spacing: 8) {
+        NavigationLink {
+            PerformanceMilestonesDetailView(
+                stats: stats,
+                healthRecords:
+                    resolvedHealthRecords
+            )
+        } label: {
+            HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(
                     .system(
@@ -3456,8 +3509,11 @@ struct PerformanceStatsView: View {
                 ATHLTHTheme
                     .mutedText
             )
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 4)
+        .buttonStyle(.plain)
     }
 
     private var passportHero: some View {
@@ -5378,7 +5434,8 @@ private struct PerformanceTrainingVolumeDetailView:
                     Array(
                         selectedWorkouts
                             .prefix(12)
-                    )
+                    ),
+                    id: \.id
                 ) {
                     workout in
 
