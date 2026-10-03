@@ -143,8 +143,7 @@ final class MessagingStore: ObservableObject {
 
         if !force,
            let lastRefreshAt,
-           Date().timeIntervalSince(lastRefreshAt) < 60,
-           !conversations.isEmpty {
+           Date().timeIntervalSince(lastRefreshAt) < 60 {
             return
         }
 

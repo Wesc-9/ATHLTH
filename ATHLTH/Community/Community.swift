@@ -606,8 +606,7 @@ final class CommunityEventStore: ObservableObject {
 
         if !force,
            let lastRefreshAt,
-           Date().timeIntervalSince(lastRefreshAt) < 120,
-           !events.isEmpty {
+           Date().timeIntervalSince(lastRefreshAt) < 120 {
             return
         }
 

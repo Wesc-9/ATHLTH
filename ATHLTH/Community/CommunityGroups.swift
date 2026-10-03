@@ -1308,8 +1308,7 @@ final class CommunityGroupStore: ObservableObject {
 
         if !force,
            let lastRefreshAt,
-           Date().timeIntervalSince(lastRefreshAt) < 180,
-           !groups.isEmpty {
+           Date().timeIntervalSince(lastRefreshAt) < 180 {
             return
         }
 

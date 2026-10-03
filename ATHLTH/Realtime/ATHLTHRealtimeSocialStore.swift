@@ -412,8 +412,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
         if !force,
            let lastOnlineRefreshAt,
-           Date().timeIntervalSince(lastOnlineRefreshAt) < 30,
-           !onlineUserIDs.isEmpty {
+           Date().timeIntervalSince(lastOnlineRefreshAt) < 30 {
             return
         }
 
@@ -457,8 +456,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
            let lastVisibleSessionsRefreshAt,
            Date().timeIntervalSince(
                 lastVisibleSessionsRefreshAt
-           ) < 20,
-           !visibleLiveSessions.isEmpty {
+           ) < 20 {
             return
         }
 
