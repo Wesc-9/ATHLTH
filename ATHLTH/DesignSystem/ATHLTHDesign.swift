@@ -1,3 +1,5 @@
+import Foundation
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -1142,6 +1144,156 @@ enum ATHLTHStandardArtwork: String, CaseIterable, Identifiable, Codable, Hashabl
     }
 }
 
+private struct ATHLTHPreparedRemoteImage:
+    @unchecked Sendable {
+    let image: UIImage
+}
+
+private enum ATHLTHRemoteImageDecoder {
+    static func decode(
+        _ data: Data,
+        maxPixelSize: Int
+    ) -> ATHLTHPreparedRemoteImage? {
+        guard let source =
+                CGImageSourceCreateWithData(
+                    data as CFData,
+                    nil
+                )
+        else {
+            return nil
+        }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize:
+                maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: false
+        ]
+
+        guard let cgImage =
+                CGImageSourceCreateThumbnailAtIndex(
+                    source,
+                    0,
+                    options as CFDictionary
+                )
+        else {
+            return nil
+        }
+
+        return ATHLTHPreparedRemoteImage(
+            image: UIImage(cgImage: cgImage)
+        )
+    }
+}
+
+@MainActor
+private final class ATHLTHRemoteArtworkCache {
+    static let shared = ATHLTHRemoteArtworkCache()
+
+    private let images = NSCache<NSString, UIImage>()
+
+    private init() {
+        images.countLimit = 48
+        images.totalCostLimit = 48 * 1_024 * 1_024
+    }
+
+    func image(
+        for key: String
+    ) -> UIImage? {
+        images.object(
+            forKey: key as NSString
+        )
+    }
+
+    func store(
+        _ image: UIImage,
+        for key: String
+    ) {
+        let cost = Int(
+            image.size.width *
+            image.size.height *
+            image.scale *
+            image.scale *
+            4
+        )
+        images.setObject(
+            image,
+            forKey: key as NSString,
+            cost: cost
+        )
+    }
+}
+
+private struct ATHLTHRemoteArtworkImage: View {
+    let url: URL
+    let fallbackAssetName: String
+    let maxPixelSize: Int
+
+    @State private var image: UIImage?
+
+    private var cacheKey: String {
+        "\(maxPixelSize)|\(url.absoluteString)"
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(fallbackAssetName)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .task(id: cacheKey) {
+            if let cached =
+                    ATHLTHRemoteArtworkCache
+                        .shared
+                        .image(for: cacheKey) {
+                image = cached
+                return
+            }
+
+            do {
+                let (data, _) =
+                    try await URLSession.shared.data(
+                        from: url
+                    )
+
+                let prepared =
+                    await Task.detached(
+                        priority: .utility
+                    ) {
+                        ATHLTHRemoteImageDecoder.decode(
+                            data,
+                            maxPixelSize: maxPixelSize
+                        )
+                    }
+                    .value
+
+                guard !Task.isCancelled,
+                      let prepared
+                else {
+                    return
+                }
+
+                ATHLTHRemoteArtworkCache
+                    .shared
+                    .store(
+                        prepared.image,
+                        for: cacheKey
+                    )
+                image = prepared.image
+            } catch {
+                return
+            }
+        }
+    }
+}
+
 struct ATHLTHArtworkImage: View {
     let reference: String?
     var fallbackAssetName: String = "CommunityHero"
@@ -1165,21 +1317,12 @@ struct ATHLTHArtworkImage: View {
                             url.scheme?
                                 .lowercased() ?? ""
                         ) {
-                AsyncImage(url: url) {
-                    phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        Image(
-                            fallbackAssetName
-                        )
-                        .resizable()
-                        .scaledToFill()
-                    }
-                }
+                ATHLTHRemoteArtworkImage(
+                    url: url,
+                    fallbackAssetName:
+                        fallbackAssetName,
+                    maxPixelSize: 900
+                )
             } else {
                 Image(fallbackAssetName)
                     .resizable()
