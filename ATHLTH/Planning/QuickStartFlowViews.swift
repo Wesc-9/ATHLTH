@@ -2438,7 +2438,12 @@ struct StrengthQuickStartSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("Quick Strength")
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                )
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2453,7 +2458,11 @@ struct StrengthQuickStartSheet: View {
     private var emptySession: PlannedSession {
         PlannedSession(
             id: UUID(),
-            title: "Freestyle Strength",
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                ),
             kind: .strength,
             scheduledStart: nil,
             durationMinutes: nil,
