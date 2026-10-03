@@ -3635,125 +3635,329 @@ struct CommunityGroupsView: View {
 
     @State private var query = ""
     @State private var showingCreate = false
+    @State private var discoverFilter:
+        ClubDiscoveryFilter = .all
 
-    private var matchingGroups: [CommunityGroupRecord] {
-        let publicGroups = groups.groups.filter {
-            $0.visibility == "public" &&
-            !groups.joinedGroupIDs.contains($0.id) &&
-            groups.pendingInvite(for: $0.id) == nil
+    private var clubForest: Color {
+        Color(red: 0.025, green: 0.30, blue: 0.21)
+    }
+
+    private var clubEmerald: Color {
+        Color(red: 0.055, green: 0.49, blue: 0.32)
+    }
+
+    private var clubMint: Color {
+        Color(red: 0.90, green: 0.96, blue: 0.92)
+    }
+
+    private var clubSage: Color {
+        Color(red: 0.77, green: 0.88, blue: 0.81)
+    }
+
+    private enum ClubDiscoveryFilter:
+        String,
+        CaseIterable,
+        Identifiable {
+        case all
+        case running
+        case strength
+        case hyrox
+        case outdoors
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .all:
+                return ATHLTHLocalization.choose(
+                    english: "All",
+                    norwegian: "Alle"
+                )
+            case .running:
+                return ATHLTHLocalization.choose(
+                    english: "Running",
+                    norwegian: "Løping"
+                )
+            case .strength:
+                return ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                )
+            case .hyrox:
+                return "Hyrox"
+            case .outdoors:
+                return ATHLTHLocalization.choose(
+                    english: "Outdoors",
+                    norwegian: "Tur"
+                )
+            }
         }
 
-        let clean = query
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        guard !clean.isEmpty else {
-            return publicGroups
+        var icon: String {
+            switch self {
+            case .all:
+                return "sparkles"
+            case .running:
+                return "figure.run"
+            case .strength:
+                return "dumbbell.fill"
+            case .hyrox:
+                return "trophy.fill"
+            case .outdoors:
+                return "mountain.2.fill"
+            }
         }
+
+        func matches(
+            _ group: CommunityGroupRecord
+        ) -> Bool {
+            guard self != .all else {
+                return true
+            }
+
+            let searchable =
+                [
+                    group.name,
+                    group.summary,
+                    group.locationName
+                ]
+                .joined(separator: " ")
+                .lowercased()
+
+            switch self {
+            case .all:
+                return true
+            case .running:
+                return searchable.contains("run") ||
+                    searchable.contains("løp") ||
+                    searchable.contains("jogg")
+            case .strength:
+                return searchable.contains("strength") ||
+                    searchable.contains("styrke") ||
+                    searchable.contains("gym")
+            case .hyrox:
+                return searchable.contains("hyrox")
+            case .outdoors:
+                return searchable.contains("tur") ||
+                    searchable.contains("hike") ||
+                    searchable.contains("fjell") ||
+                    searchable.contains("trail")
+            }
+        }
+    }
+
+    private var matchingGroups:
+        [CommunityGroupRecord] {
+        let publicGroups =
+            groups.groups.filter {
+                $0.visibility == "public" &&
+                !groups.joinedGroupIDs
+                    .contains($0.id) &&
+                groups.pendingInvite(
+                    for: $0.id
+                ) == nil
+            }
+
+        let clean =
+            query
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .lowercased()
 
         return publicGroups.filter {
-            $0.name.lowercased().contains(clean) ||
-            $0.locationName.lowercased().contains(clean) ||
-            $0.summary.lowercased().contains(clean)
+            group in
+
+            let matchesQuery: Bool
+            if clean.isEmpty {
+                matchesQuery = true
+            } else {
+                matchesQuery =
+                    group.name
+                        .lowercased()
+                        .contains(clean) ||
+                    group.locationName
+                        .lowercased()
+                        .contains(clean) ||
+                    group.summary
+                        .lowercased()
+                        .contains(clean)
+            }
+
+            return matchesQuery &&
+                discoverFilter.matches(
+                    group
+                )
         }
+    }
+
+    private var discoveryColumns:
+        [GridItem] {
+        [
+            GridItem(
+                .flexible(),
+                spacing: 10
+            ),
+            GridItem(
+                .flexible(),
+                spacing: 10
+            )
+        ]
     }
 
     var body: some View {
         ZStack {
             ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accentDeep.opacity(0.34)
+                accent:
+                    clubEmerald
+                        .opacity(0.16)
             )
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 18
+                ) {
                     publicGroupSearchBar
                     introCard
 
-                    if !groups.ownInvites.isEmpty {
-                        sectionTitle("INVITATIONS")
+                    if !groups.ownInvites
+                        .isEmpty {
+                        sectionHeader(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Invitations",
+                                norwegian:
+                                    "Invitasjoner"
+                            )
+                        )
+
                         ForEach(
                             groups.ownInvites,
                             id: \.groupID
-                        ) { invite in
-                            if let group = groups.group(
-                                for: invite.groupID
-                            ) {
+                        ) {
+                            invite in
+
+                            if let group =
+                                groups.group(
+                                    for:
+                                        invite
+                                            .groupID
+                                ) {
                                 invitationCard(
                                     invite,
-                                    group: group
+                                    group:
+                                        group
                                 )
                             }
                         }
                     }
 
-                    if !groups.joinedGroups.isEmpty {
-                        sectionTitle("YOUR GROUPS")
-                        ForEach(groups.joinedGroups) { group in
-                            groupLink(group, joined: true)
-                        }
-                    }
-
-                    sectionTitle("DISCOVER PUBLIC GROUPS")
-                    if matchingGroups.isEmpty {
-                        ContentUnavailableView(
-                            "No groups found",
-                            systemImage: "person.3",
-                            description: Text(
-                                "Create a group for your city, area or training community."
+                    if !groups.joinedGroups
+                        .isEmpty {
+                        sectionHeader(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "My Clubs",
+                                norwegian:
+                                    "Mine Clubs"
                             )
                         )
-                        .padding(.vertical, 36)
-                    } else {
-                        ForEach(matchingGroups) { group in
-                            groupLink(group, joined: false)
-                        }
 
-                        if groups.canLoadMoreGroups {
-                            Button {
-                                Task {
-                                    await groups.loadMoreGroups()
-                                }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if groups.isLoadingMoreGroups {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    }
+                        ForEach(
+                            groups.joinedGroups
+                        ) {
+                            group in
 
-                                    Text(
-                                        groups.isLoadingMoreGroups
-                                            ? "Loading more clubs…"
-                                            : "Load more clubs"
-                                    )
-                                    .font(.subheadline.weight(.semibold))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 11)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(groups.isLoadingMoreGroups)
-                            .padding(.top, 6)
+                            joinedGroupCard(
+                                group
+                            )
                         }
                     }
+
+                    discoverySection
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
         }
-        .navigationTitle("Clubs")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Clubs",
+                norwegian: "Klubber"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(
+                placement:
+                    .topBarTrailing
+            ) {
                 Button {
                     showingCreate = true
                 } label: {
-                    Image(systemName: "plus")
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                clubForest,
+                                clubEmerald
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
+                    .shadow(
+                        color:
+                            clubForest
+                                .opacity(
+                                    0.16
+                                ),
+                        radius: 8,
+                        y: 4
+                    )
                 }
-                .accessibilityLabel("Create group")
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Create Club",
+                        norwegian:
+                            "Opprett Club"
+                    )
+                )
             }
         }
-        .sheet(isPresented: $showingCreate) {
+        .sheet(
+            isPresented:
+                $showingCreate
+        ) {
             CommunityGroupCreateView()
         }
         .task {
@@ -3764,149 +3968,1306 @@ struct CommunityGroupsView: View {
         }
     }
 
-    private var publicGroupSearchBar: some View {
+    private var publicGroupSearchBar:
+        some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 15,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
 
             TextField(
-                "Search public groups",
+                ATHLTHLocalization.choose(
+                    english:
+                        "Search Clubs, places or activities",
+                    norwegian:
+                        "Søk Clubs, steder eller aktiviteter"
+                ),
                 text: $query
             )
-            .textInputAutocapitalization(.never)
+            .textInputAutocapitalization(
+                .never
+            )
             .autocorrectionDisabled()
 
             if !query.isEmpty {
                 Button {
                     query = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText.opacity(0.72)
-                        )
+                    Image(
+                        systemName:
+                            "xmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                            .opacity(0.68)
+                    )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear group search")
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Clear Club search",
+                        norwegian:
+                            "Tøm Club-søk"
+                    )
+                )
             }
         }
-        .padding(.horizontal, 14)
-        .frame(height: 48)
+        .padding(.horizontal, 15)
+        .frame(height: 50)
         .background(
-            Color.white.opacity(0.82),
-            in: RoundedRectangle(
-                cornerRadius: 17,
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.96),
+                    clubMint
+                        .opacity(0.62)
+                ],
+                startPoint:
+                    .leading,
+                endPoint:
+                    .trailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.48
+                ),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.04
+                ),
+            radius: 10,
+            y: 4
+        )
+    }
+
+    private var introCard:
+        some View {
+        ZStack(
+            alignment: .leading
+        ) {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+                .frame(height: 112)
+                .clipped()
+                .opacity(0.78)
+
+            LinearGradient(
+                colors: [
+                    clubMint
+                        .opacity(0.98),
+                    clubMint
+                        .opacity(0.90),
+                    Color.white
+                        .opacity(0.28),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            HStack(spacing: 13) {
+                Image(
+                    systemName:
+                        "person.3.fill"
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+                .background(
+                    LinearGradient(
+                        colors: [
+                            clubForest,
+                            clubEmerald
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style:
+                                .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Train with your community",
+                            norwegian:
+                                "Tren med fellesskapet ditt"
+                        )
+                    )
+                    .font(
+                        .headline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Find public Clubs, train together and take on shared challenges.",
+                            norwegian:
+                                "Finn offentlige Clubs, tren sammen og delta i felles utfordringer."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(2)
+                }
+
+                Spacer(
+                    minLength: 8
+                )
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .caption.bold()
+                )
+                .foregroundStyle(
+                    .white
+                        .opacity(0.92)
+                )
+                .frame(
+                    width: 32,
+                    height: 32
+                )
+                .background(
+                    Color.black
+                        .opacity(0.16),
+                    in: Circle()
+                )
+            }
+            .padding(14)
+        }
+        .frame(height: 112)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 17,
+                cornerRadius: 22,
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border.opacity(0.72),
-                lineWidth: 1
+                Color.white.opacity(
+                    0.62
+                ),
+                lineWidth: 0.8
             )
         }
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.07
+                ),
+            radius: 14,
+            y: 6
+        )
     }
 
-    private var introCard: some View {
-        ATHLTHCard {
-            HStack(spacing: 14) {
-                Image(systemName: "person.3.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        ATHLTHTheme.accentDeep.opacity(0.09),
-                        in: RoundedRectangle(cornerRadius: 15)
-                    )
+    private var discoverySection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            sectionHeader(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Discover Clubs",
+                    norwegian:
+                        "Oppdag Clubs"
+                ),
+                actionTitle:
+                    query.isEmpty &&
+                    discoverFilter ==
+                        .all
+                        ? nil
+                        : ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Reset",
+                                norwegian:
+                                    "Nullstill"
+                            ),
+                action: {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        query = ""
+                        discoverFilter =
+                            .all
+                    }
+                }
+            )
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Train with your community")
-                        .font(.headline)
-                    Text(
-                        "Find public groups, train together and take on shared challenges."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            discoveryFilters
+
+            if matchingGroups
+                .isEmpty {
+                discoveryEmptyState
+            } else {
+                LazyVGrid(
+                    columns:
+                        discoveryColumns,
+                    alignment:
+                        .leading,
+                    spacing: 10
+                ) {
+                    ForEach(
+                        matchingGroups
+                    ) {
+                        group in
+
+                        discoverGroupCard(
+                            group
+                        )
+                    }
                 }
 
-                Spacer()
+                if groups
+                    .canLoadMoreGroups {
+                    Button {
+                        Task {
+                            await groups
+                                .loadMoreGroups()
+                        }
+                    } label: {
+                        HStack(
+                            spacing: 8
+                        ) {
+                            if groups
+                                .isLoadingMoreGroups {
+                                ProgressView()
+                                    .controlSize(
+                                        .small
+                                    )
+                            }
+
+                            Text(
+                                groups
+                                    .isLoadingMoreGroups
+                                    ? ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Loading more Clubs…",
+                                            norwegian:
+                                                "Laster flere Clubs…"
+                                        )
+                                    : ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Load more Clubs",
+                                            norwegian:
+                                                "Last inn flere Clubs"
+                                        )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                        }
+                        .foregroundStyle(
+                            clubForest
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 42)
+                        .background(
+                            clubMint,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        15,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        groups
+                            .isLoadingMoreGroups
+                    )
+                }
             }
         }
     }
 
+    private var discoveryFilters:
+        some View {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 8) {
+                ForEach(
+                    ClubDiscoveryFilter
+                        .allCases
+                ) {
+                    filter in
+
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration:
+                                    0.16
+                            )
+                        ) {
+                            discoverFilter =
+                                filter
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(
+                                systemName:
+                                    filter.icon
+                            )
+                            .font(
+                                .system(
+                                    size: 11,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+
+                            Text(
+                                filter.title
+                            )
+                        }
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            discoverFilter ==
+                                filter
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .primaryText
+                        )
+                        .padding(
+                            .horizontal,
+                            12
+                        )
+                        .frame(height: 34)
+                        .background {
+                            if discoverFilter ==
+                                filter {
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                clubForest,
+                                                clubEmerald
+                                            ],
+                                            startPoint:
+                                                .leading,
+                                            endPoint:
+                                                .trailing
+                                        )
+                                    )
+                            } else {
+                                Capsule()
+                                    .fill(
+                                        Color.white
+                                            .opacity(
+                                                0.90
+                                            )
+                                    )
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(
+                                                clubSage
+                                                    .opacity(
+                                                        0.54
+                                                    ),
+                                                lineWidth:
+                                                    0.7
+                                            )
+                                    }
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private var discoveryEmptyState:
+        some View {
+        HStack(spacing: 13) {
+            Image(
+                systemName:
+                    "person.3.sequence.fill"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 46,
+                height: 46
+            )
+            .background(
+                clubMint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No Clubs here yet",
+                        norwegian:
+                            "Ingen Clubs å vise ennå"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Try another category or create a Club for your training community.",
+                        norwegian:
+                            "Prøv en annen kategori, eller opprett en Club for treningsmiljøet ditt."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.95),
+                    clubMint
+                        .opacity(0.66)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.48
+                ),
+                lineWidth: 0.8
+            )
+        }
+    }
+
     private func invitationCard(
-        _ invite: CommunityGroupInviteRecord,
-        group: CommunityGroupRecord
+        _ invite:
+            CommunityGroupInviteRecord,
+        group:
+            CommunityGroupRecord
     ) -> some View {
-        ATHLTHCard {
+        VStack(spacing: 12) {
             HStack(spacing: 12) {
                 groupImage(
                     group,
-                    size: 46,
-                    cornerRadius: 14
+                    size: 50,
+                    cornerRadius: 15
                 )
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
                     Text(group.name)
-                        .font(.subheadline.weight(.semibold))
-                    Text("You were invited to join")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "You were invited to join",
+                            norwegian:
+                                "Du er invitert til å bli med"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
                 }
 
                 Spacer()
             }
 
             HStack(spacing: 10) {
-                Button("Decline") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Decline",
+                        norwegian:
+                            "Avslå"
+                    )
+                ) {
                     Task {
-                        _ = await groups.respondToInvite(
-                            groupID: invite.groupID,
-                            accept: false
-                        )
+                        _ = await groups
+                            .respondToInvite(
+                                groupID:
+                                    invite
+                                        .groupID,
+                                accept:
+                                    false
+                            )
                     }
                 }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(
+                    .bordered
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
 
-                Button("Join") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Join",
+                        norwegian:
+                            "Bli med"
+                    )
+                ) {
                     Task {
-                        _ = await groups.respondToInvite(
-                            groupID: invite.groupID,
-                            accept: true
-                        )
+                        _ = await groups
+                            .respondToInvite(
+                                groupID:
+                                    invite
+                                        .groupID,
+                                accept:
+                                    true
+                            )
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(clubForest)
+                .frame(
+                    maxWidth: .infinity
+                )
             }
-            .padding(.top, 10)
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(
+                0.94
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.40
+                ),
+                lineWidth: 0.8
+            )
         }
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .tracking(1.7)
-            .foregroundStyle(ATHLTHTheme.mutedText)
+    private func sectionHeader(
+        _ title: String,
+        actionTitle:
+            String? = nil,
+        action:
+            @escaping () -> Void =
+                {}
+    ) -> some View {
+        HStack(
+            alignment: .center
+        ) {
+            Text(title)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            Spacer()
+
+            if let actionTitle {
+                Button(
+                    action: action
+                ) {
+                    HStack(spacing: 4) {
+                        Text(actionTitle)
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func joinedGroupCard(
+        _ group:
+            CommunityGroupRecord
+    ) -> some View {
+        NavigationLink {
+            CommunityGroupDetailView(
+                group: group
+            )
+        } label: {
+            VStack(spacing: 0) {
+                groupArtwork(group)
+                    .frame(height: 66)
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                    .clipped()
+
+                HStack(spacing: 11) {
+                    groupImage(
+                        group,
+                        size: 54,
+                        cornerRadius: 15
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.white,
+                            lineWidth: 2
+                        )
+                    }
+                    .offset(y: -13)
+                    .padding(
+                        .bottom,
+                        -13
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(group.name)
+                            .font(
+                                .headline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+
+                        groupMetaLine(
+                            group
+                        )
+                    }
+
+                    Spacer(
+                        minLength: 6
+                    )
+
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "checkmark"
+                        )
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Member",
+                                norwegian:
+                                    "Medlem"
+                            )
+                        )
+                    }
+                    .font(
+                        .caption2
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .padding(
+                        .horizontal,
+                        10
+                    )
+                    .frame(height: 30)
+                    .background(
+                        clubMint,
+                        in: Capsule()
+                    )
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .caption.bold()
+                    )
+                    .foregroundStyle(
+                        clubForest
+                            .opacity(0.52)
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    13
+                )
+                .padding(
+                    .vertical,
+                    11
+                )
+            }
+            .background(
+                Color.white.opacity(
+                    0.96
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style:
+                            .continuous
+                    )
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+                .stroke(
+                    clubSage.opacity(
+                        0.44
+                    ),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    clubForest
+                        .opacity(0.06),
+                radius: 13,
+                y: 6
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func discoverGroupCard(
+        _ group:
+            CommunityGroupRecord
+    ) -> some View {
+        let pending =
+            groups.pendingJoinRequest(
+                for: group.id
+            ) != nil
+
+        let inviteOnly =
+            group.joinMode ==
+                "invite_only"
+
+        return VStack(
+            alignment: .leading,
+            spacing: 0
+        ) {
+            NavigationLink {
+                CommunityGroupDetailView(
+                    group: group
+                )
+            } label: {
+                VStack(
+                    alignment: .leading,
+                    spacing: 0
+                ) {
+                    ZStack(
+                        alignment:
+                            .topLeading
+                    ) {
+                        groupArtwork(
+                            group
+                        )
+                        .frame(height: 92)
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .clipped()
+
+                        if !group
+                            .locationName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            Label(
+                                group
+                                    .locationName,
+                                systemImage:
+                                    "location.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 9.5,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .padding(
+                                .horizontal,
+                                8
+                            )
+                            .frame(
+                                height: 25
+                            )
+                            .background(
+                                Color.white
+                                    .opacity(
+                                        0.91
+                                    ),
+                                in: Capsule()
+                            )
+                            .padding(8)
+                        }
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
+                        Text(group.name)
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(
+                                0.80
+                            )
+
+                        if !group.summary
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            Text(
+                                group.summary
+                            )
+                            .font(
+                                .system(
+                                    size: 9.5
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .lineLimit(2)
+                        } else {
+                            groupMetaLine(
+                                group
+                            )
+                        }
+                    }
+                    .padding(
+                        .horizontal,
+                        10
+                    )
+                    .padding(
+                        .top,
+                        9
+                    )
+                    .padding(
+                        .bottom,
+                        7
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                guard !pending,
+                      !inviteOnly
+                else {
+                    return
+                }
+
+                Task {
+                    _ = await groups
+                        .requestJoin(
+                            group
+                        )
+                }
+            } label: {
+                Text(
+                    pending
+                        ? ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Requested",
+                                norwegian:
+                                    "Forespurt"
+                            )
+                        : inviteOnly
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Invitation",
+                                    norwegian:
+                                        "Invitasjon"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Join",
+                                    norwegian:
+                                        "Bli med"
+                                )
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    clubForest
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 34)
+                .background(
+                    clubMint,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style:
+                                .continuous
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                pending ||
+                inviteOnly
+            )
+            .padding(
+                .horizontal,
+                9
+            )
+            .padding(
+                .bottom,
+                9
+            )
+        }
+        .background(
+            Color.white.opacity(
+                0.96
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style:
+                        .continuous
+                )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(
+                    0.42
+                ),
+                lineWidth: 0.7
+            )
+        }
+        .shadow(
+            color:
+                clubForest.opacity(
+                    0.045
+                ),
+            radius: 10,
+            y: 4
+        )
+    }
+
+    @ViewBuilder
+    private func groupArtwork(
+        _ group:
+            CommunityGroupRecord
+    ) -> some View {
+        if let reference =
+                group.headerImageURL ??
+                group.imageURL,
+           !reference
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .isEmpty {
+            ATHLTHArtworkImage(
+                reference: reference,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
+        } else {
+            Image(
+                "CommunityHero"
+            )
+            .resizable()
+            .interpolation(.medium)
+            .scaledToFill()
+        }
+    }
+
+    @ViewBuilder
+    private func groupMetaLine(
+        _ group:
+            CommunityGroupRecord
+    ) -> some View {
+        let memberCount =
+            groups.members(
+                in: group.id
+            ).count
+
+        HStack(spacing: 5) {
+            Image(
+                systemName:
+                    group.visibility ==
+                        "private"
+                        ? "lock.fill"
+                        : "globe"
+            )
+
+            Text(
+                group.visibility ==
+                    "private"
+                    ? ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Private",
+                            norwegian:
+                                "Privat"
+                        )
+                    : ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Public",
+                            norwegian:
+                                "Offentlig"
+                        )
+            )
+
+            if memberCount > 0 {
+                Text("·")
+                Text(
+                    ATHLTHLocalization.counted(
+                        memberCount,
+                        englishSingular:
+                            "member",
+                        englishPlural:
+                            "members",
+                        norwegianSingular:
+                            "medlem",
+                        norwegianPlural:
+                            "medlemmer"
+                    )
+                )
+            }
+        }
+        .font(
+            .caption2
+                .weight(.medium)
+        )
+        .foregroundStyle(
+            ATHLTHTheme
+                .mutedText
+        )
+        .lineLimit(1)
     }
 
     @ViewBuilder
     private func groupImage(
-        _ group: CommunityGroupRecord,
+        _ group:
+            CommunityGroupRecord,
         size: CGFloat,
         cornerRadius: CGFloat
     ) -> some View {
-        if let value = group.imageURL,
-           let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
+        if let value =
+                group.imageURL,
+           let url =
+                URL(string: value) {
+            AsyncImage(url: url) {
+                phase in
+
                 switch phase {
-                case .success(let image):
+                case .success(
+                    let image
+                ):
                     image
                         .resizable()
                         .scaledToFill()
@@ -3914,103 +5275,54 @@ struct CommunityGroupsView: View {
                     groupImageFallback
                 }
             }
-            .frame(width: size, height: size)
+            .frame(
+                width: size,
+                height: size
+            )
             .clipShape(
                 RoundedRectangle(
-                    cornerRadius: cornerRadius,
-                    style: .continuous
+                    cornerRadius:
+                        cornerRadius,
+                    style:
+                        .continuous
                 )
             )
         } else {
             groupImageFallback
-                .frame(width: size, height: size)
+                .frame(
+                    width: size,
+                    height: size
+                )
         }
     }
 
-    private var groupImageFallback: some View {
-        Image(systemName: "person.3.fill")
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(ATHLTHTheme.accentDeep)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(
-                ATHLTHTheme.accentDeep.opacity(0.09),
-                in: RoundedRectangle(
+    private var groupImageFallback:
+        some View {
+        Image(
+            systemName:
+                "person.3.fill"
+        )
+        .font(
+            .system(
+                size: 18,
+                weight: .semibold
+            )
+        )
+        .foregroundStyle(
+            clubForest
+        )
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity
+        )
+        .background(
+            clubMint,
+            in:
+                RoundedRectangle(
                     cornerRadius: 14,
                     style: .continuous
                 )
-            )
-    }
-
-    private func groupLink(
-        _ group: CommunityGroupRecord,
-        joined: Bool
-    ) -> some View {
-        NavigationLink {
-            CommunityGroupDetailView(group: group)
-        } label: {
-            HStack(spacing: 13) {
-                groupImage(
-                    group,
-                    size: 46,
-                    cornerRadius: 14
-                )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(group.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    if !group.locationName
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        .isEmpty {
-                        Label(
-                            group.locationName,
-                            systemImage: "location.fill"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Label(
-                        group.visibility == "private"
-                            ? "Private"
-                            : "Public",
-                        systemImage:
-                            group.visibility == "private"
-                                ? "lock.fill"
-                                : "globe"
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        group.visibility == "private"
-                            ? ATHLTHTheme.mutedText
-                            : ATHLTHTheme.accentDeep
-                    )
-                }
-
-                Spacer()
-
-                if joined {
-                    Text("Joined")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2.bold())
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(13)
-            .background(
-                ATHLTHTheme.card,
-                in: RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
+        )
     }
 }
 
