@@ -2189,7 +2189,6 @@ struct HomePersonalActivityHistoryView:
                 LazyVStack(
                     spacing: 14
                 ) {
-                    summaryHeader
                     scopeBar
                     typeBar
 
@@ -2231,9 +2230,9 @@ struct HomePersonalActivityHistoryView:
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
-                    "Activity",
+                    "Activity Log",
                 norwegian:
-                    "Aktivitet"
+                    "Aktivitetslogg"
             )
         )
         .navigationBarTitleDisplayMode(
@@ -2284,16 +2283,9 @@ struct HomePersonalActivityHistoryView:
             .buttonStyle(.plain)
 
         case .following(let socialItem):
-            NavigationLink {
-                HomeFollowingWorkoutDetailView(
-                    item: socialItem
-                )
-            } label: {
-                HomeFollowingHistoryCard(
-                    item: socialItem
-                )
-            }
-            .buttonStyle(.plain)
+            HomeFollowingSocialFeedCard(
+                item: socialItem
+            )
         }
     }
 
@@ -3037,6 +3029,406 @@ private struct HomePersonalHistoryCard:
         }
 
         return "—"
+    }
+}
+
+// MARK: - Social activity feed card
+
+private struct HomeFollowingSocialFeedCard: View {
+    @EnvironmentObject private var social: SocialStore
+
+    let item: SocialFeedItem
+
+    @State private var commentText = ""
+    @State private var showingComments = false
+
+    private var activity: WorkoutActivity {
+        HomeFollowingWorkoutPresentation
+            .activity(for: item)
+    }
+
+    private var isLiked: Bool {
+        guard let userID = social.currentUserID else {
+            return false
+        }
+        return item.reactions.contains {
+            $0.userID == userID &&
+            $0.reaction == .heart
+        }
+    }
+
+    private var caption: String? {
+        let value =
+            item.activity.metadata?["caption"] ??
+            item.activity.metadata?["note"] ??
+            item.activity.subtitle
+        guard let value,
+              !value.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ).isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                NavigationLink {
+                    FriendProfileView(
+                        userID: item.actor.userID
+                    )
+                } label: {
+                    SocialAvatar(
+                        profile: item.actor,
+                        size: 42
+                    )
+                }
+                .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.actor.resolvedName)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(
+                        item.activity.createdAt,
+                        style: .relative
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer()
+
+                Image(systemName: "ellipsis")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(14)
+
+            NavigationLink {
+                HomeFollowingWorkoutDetailView(
+                    item: item
+                )
+            } label: {
+                HomeFollowingWorkoutArtwork(
+                    activity: activity,
+                    height: 190
+                )
+                .overlay(alignment: .bottomLeading) {
+                    Label(
+                        activityLabel,
+                        systemImage: activity.icon
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(
+                        Color.black.opacity(0.30),
+                        in: Capsule()
+                    )
+                    .padding(12)
+                }
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 11) {
+                Text(item.activity.title)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                metrics
+
+                if let caption {
+                    Text(caption)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(3)
+                }
+
+                if item.reactions.count > 0 ||
+                    item.comments.count > 0 {
+                    HStack {
+                        if item.reactions.count > 0 {
+                            Text(
+                                "\(item.reactions.count) " +
+                                ATHLTHLocalization.choose(
+                                    english: "likes",
+                                    norwegian: "liker"
+                                )
+                            )
+                        }
+
+                        Spacer()
+
+                        if item.comments.count > 0 {
+                            Button {
+                                showingComments = true
+                            } label: {
+                                Text(
+                                    "\(item.comments.count) " +
+                                    ATHLTHLocalization.choose(
+                                        english: "comments",
+                                        norwegian: "kommentarer"
+                                    )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Divider().opacity(0.55)
+
+                HStack(spacing: 8) {
+                    Button {
+                        Task {
+                            await social.setReaction(
+                                activityID: item.id,
+                                reaction:
+                                    isLiked ? nil : .heart
+                            )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Like",
+                                norwegian: "Lik"
+                            ),
+                            systemImage:
+                                isLiked
+                                ? "heart.fill"
+                                : "heart"
+                        )
+                        .foregroundStyle(
+                            isLiked
+                            ? Color.red
+                            : ATHLTHTheme.primaryText
+                        )
+                    }
+
+                    Button {
+                        showingComments = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Comment",
+                                norwegian: "Kommenter"
+                            ),
+                            systemImage: "bubble.left"
+                        )
+                    }
+
+                    Spacer()
+
+                    ShareLink(
+                        item: item.activity.title
+                    ) {
+                        Image(
+                            systemName:
+                                "square.and.arrow.up"
+                        )
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .buttonStyle(.plain)
+            }
+            .padding(14)
+        }
+        .background(
+            Color.white.opacity(0.97),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color: Color.black.opacity(0.04),
+            radius: 14,
+            y: 6
+        )
+        .sheet(isPresented: $showingComments) {
+            HomeActivityCommentsSheet(
+                item: item
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var metrics: some View {
+        HStack(spacing: 14) {
+            if let distance =
+                    HomeFollowingWorkoutPresentation
+                        .distanceText(for: item) {
+                Label(distance, systemImage: "ruler")
+            }
+
+            if let duration =
+                    HomeFollowingWorkoutPresentation
+                        .durationText(for: item) {
+                Label(duration, systemImage: "clock")
+            }
+
+            if activity == .strength,
+               let volume =
+                    HomeFollowingWorkoutPresentation
+                        .volumeText(for: item) {
+                Label(volume, systemImage: "scalemass.fill")
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(ATHLTHTheme.primaryText)
+    }
+
+    private var activityLabel: String {
+        switch activity {
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "RUN",
+                norwegian: "LØP"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "STRENGTH",
+                norwegian: "STYRKE"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "WALK",
+                norwegian: "GÅTUR"
+            )
+        default:
+            return activity.rawValue.uppercased()
+        }
+    }
+}
+
+private struct HomeActivityCommentsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var social: SocialStore
+
+    let item: SocialFeedItem
+    @State private var text = ""
+
+    private var currentItem: SocialFeedItem {
+        social.feed.first(where: { $0.id == item.id }) ??
+        item
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(currentItem.comments) { comment in
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(comment.body)
+                                        .font(.subheadline)
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                    Text(
+                                        comment.createdAt,
+                                        style: .relative
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(
+                                Color.black.opacity(0.025),
+                                in: RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style: .continuous
+                                )
+                            )
+                        }
+                    }
+                    .padding(16)
+                }
+
+                HStack(spacing: 10) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Write a comment…",
+                            norwegian: "Skriv en kommentar…"
+                        ),
+                        text: $text
+                    )
+                    .textFieldStyle(.plain)
+
+                    Button {
+                        let body =
+                            text.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                        guard !body.isEmpty else { return }
+                        text = ""
+                        Task {
+                            await social.addComment(
+                                activityID: item.id,
+                                body: body
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(12)
+                .background(.ultraThinMaterial)
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Comments",
+                    norwegian: "Kommentarer"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
