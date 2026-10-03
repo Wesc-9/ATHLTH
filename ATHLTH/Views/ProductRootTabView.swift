@@ -9733,51 +9733,115 @@ struct ATHLTHProfileView: View {
 
     private var heroStatRow: some View {
         HStack(spacing: 6) {
-            heroStat(
-                value:
-                    social.followerCount
-                        .formatted(),
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Followers",
-                        norwegian: "Følgere"
-                    ),
-                icon: "person.fill"
+            NavigationLink {
+                ProfileFollowListView(
+                    mode: .followers
+                )
+            } label: {
+                heroStat(
+                    value:
+                        social.followerCount
+                            .formatted(),
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Followers",
+                            norwegian: "Følgere"
+                        ),
+                    icon: "person.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Open your followers",
+                    norwegian:
+                        "Åpne følgerne dine"
+                )
             )
 
-            heroStat(
-                value:
-                    social.followingCount
-                        .formatted(),
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Following",
-                        norwegian: "Følger"
-                    ),
-                icon: "person.2.fill"
+            NavigationLink {
+                ProfileFollowListView(
+                    mode: .following
+                )
+            } label: {
+                heroStat(
+                    value:
+                        social.followingCount
+                            .formatted(),
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
+                    icon: "person.2.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Open profiles you follow",
+                    norwegian:
+                        "Åpne profiler du følger"
+                )
             )
 
-            heroStat(
-                value:
-                    profileWorkoutCount
-                        .formatted(),
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Workouts",
-                        norwegian: "Økter"
-                    ),
-                icon: "figure.run"
+            NavigationLink {
+                HomePersonalActivityHistoryView(
+                    showOnlyMine: true
+                )
+            } label: {
+                heroStat(
+                    value:
+                        profileWorkoutCount
+                            .formatted(),
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Workouts",
+                            norwegian: "Økter"
+                        ),
+                    icon: "figure.run"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Open your workout history",
+                    norwegian:
+                        "Åpne treningshistorikken din"
+                )
             )
 
-            heroStat(
-                value:
-                    lifetimeDistanceText,
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Total km",
-                        norwegian: "Km totalt"
-                    ),
-                icon: "chart.bar.fill"
+            NavigationLink {
+                PerformanceStatsView(
+                    stats:
+                        performanceStats,
+                    healthRecords:
+                        personalRecords
+                )
+            } label: {
+                heroStat(
+                    value:
+                        lifetimeDistanceText,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Total km",
+                            norwegian: "Km totalt"
+                        ),
+                    icon:
+                        "chart.bar.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Open performance statistics",
+                    norwegian:
+                        "Åpne prestasjonsstatistikk"
+                )
             )
         }
     }
