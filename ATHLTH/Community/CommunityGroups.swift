@@ -12447,10 +12447,6 @@ private struct CommunityContentCoverPicker: View {
                             1.16,
                             anchor: .trailing
                         )
-                        .scaleEffect(
-                            1.16,
-                            anchor: .trailing
-                        )
                 } else if let selectedArtwork,
                           let image =
                             selectedArtwork
@@ -12458,6 +12454,10 @@ private struct CommunityContentCoverPicker: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
+                        .scaleEffect(
+                            1.16,
+                            anchor: .trailing
+                        )
                 } else {
                     LinearGradient(
                         colors: [
