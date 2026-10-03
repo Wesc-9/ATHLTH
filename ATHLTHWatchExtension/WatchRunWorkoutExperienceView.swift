@@ -180,7 +180,7 @@ struct WatchRunWorkoutExperienceView: View {
             WatchStrengthSessionSnapshot,
         compact: Bool
     ) -> some View {
-        VStack(
+        return VStack(
             alignment: .leading,
             spacing: compact ? 5 : 7
         ) {
