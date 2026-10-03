@@ -3255,6 +3255,10 @@ private struct HomePersonalWorkoutVisual:
         HealthKitManager
     @EnvironmentObject private var exerciseLibrary:
         ExerciseLibraryStore
+    @EnvironmentObject private var settings:
+        AppSettingsStore
+    @EnvironmentObject private var session:
+        AppSessionStore
 
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
@@ -3300,6 +3304,50 @@ private struct HomePersonalWorkoutVisual:
             .profile
     }
 
+    private var strengthFigureStyle:
+        StrengthBodyPresentation {
+        switch settings
+            .strengthFigurePreference {
+        case .female:
+            return .female
+
+        case .male:
+            return .male
+
+        case .neutral:
+            return .neutral
+
+        case .automatic:
+            let healthSex =
+                session
+                    .onboardingProfile?
+                    .healthSex ??
+                health
+                    .personalDetails
+                    .healthSex
+
+            switch healthSex {
+            case .female:
+                return .female
+            case .male:
+                return .male
+            case .other,
+                 .preferNotToSay,
+                 .none:
+                return .neutral
+            }
+        }
+    }
+
+    private var strengthActivationTint:
+        Color {
+        Color(
+            red: 0.91,
+            green: 0.54,
+            blue: 0.24
+        )
+    }
+
     var body: some View {
         ZStack {
             background
@@ -3317,9 +3365,17 @@ private struct HomePersonalWorkoutVisual:
                         )
                     )
                     .foregroundStyle(
-                        Color.white.opacity(
-                            0.94
-                        )
+                        workout.activity ==
+                            .strength
+                            ? Color(
+                                red: 0.11,
+                                green: 0.12,
+                                blue: 0.13
+                            )
+                            : Color.white
+                                .opacity(
+                                    0.94
+                                )
                     )
                     .padding(
                         .horizontal,
@@ -3327,11 +3383,28 @@ private struct HomePersonalWorkoutVisual:
                     )
                     .frame(height: 30)
                     .background(
-                        Color.black.opacity(
-                            0.24
-                        ),
+                        workout.activity ==
+                            .strength
+                            ? Color.white
+                                .opacity(0.80)
+                            : Color.black
+                                .opacity(0.24),
                         in: Capsule()
                     )
+                    .overlay {
+                        if workout.activity ==
+                            .strength {
+                            Capsule()
+                                .stroke(
+                                    Color.black
+                                        .opacity(
+                                            0.055
+                                        ),
+                                    lineWidth:
+                                        0.7
+                                )
+                        }
+                    }
 
                     Spacer()
                 }
@@ -3367,14 +3440,14 @@ private struct HomePersonalWorkoutVisual:
             LinearGradient(
                 colors: [
                     Color(
-                        red: 0.10,
-                        green: 0.17,
-                        blue: 0.14
+                        red: 0.995,
+                        green: 0.990,
+                        blue: 0.978
                     ),
                     Color(
-                        red: 0.04,
-                        green: 0.06,
-                        blue: 0.07
+                        red: 0.972,
+                        green: 0.966,
+                        blue: 0.948
                     )
                 ],
                 startPoint:
@@ -3383,70 +3456,114 @@ private struct HomePersonalWorkoutVisual:
                     .bottomTrailing
             )
 
+            RadialGradient(
+                colors: [
+                    strengthActivationTint
+                        .opacity(0.16),
+                    strengthActivationTint
+                        .opacity(0.045),
+                    Color.clear
+                ],
+                center:
+                    UnitPoint(
+                        x: 0.72,
+                        y: 0.48
+                    ),
+                startRadius: 4,
+                endRadius:
+                    max(
+                        height * 0.90,
+                        130
+                    )
+            )
+
             if !muscleProfile
                 .activations
                 .isEmpty {
-                HStack {
-                    Spacer()
+                HStack(
+                    spacing: 0
+                ) {
+                    Spacer(
+                        minLength:
+                            height < 125
+                                ? 54
+                                : 66
+                    )
 
                     StrengthMuscleMapView(
                         profile:
                             muscleProfile,
-                        compact: true
+                        compact: true,
+                        figureStyle:
+                            strengthFigureStyle,
+                        activationTint:
+                            strengthActivationTint
                     )
                     .frame(
                         width:
                             min(
-                                height * 1.08,
-                                205
+                                height * 1.14,
+                                214
                             ),
                         height:
                             max(
-                                height - 18,
+                                height - 10,
                                 120
                             )
                     )
                     .padding(
                         .trailing,
-                        12
+                        8
                     )
-                    .opacity(0.94)
+                    .opacity(0.98)
                 }
+
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.70),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .center
+                )
             } else {
                 Image(
-                    systemName:
-                        "figure.strengthtraining.traditional"
+                    "StrengthPostWorkoutHero"
                 )
-                .font(
-                    .system(
-                        size:
-                            min(
-                                height * 0.54,
-                                92
-                            ),
-                        weight: .medium
-                    )
+                .resizable()
+                .scaledToFill()
+                .saturation(0.72)
+                .contrast(0.92)
+                .opacity(0.88)
+
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.66),
+                        Color.white
+                            .opacity(0.14),
+                        Color(
+                            red: 0.92,
+                            green: 0.78,
+                            blue: 0.57
+                        )
+                        .opacity(0.10)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
                 )
-                .symbolRenderingMode(
-                    .hierarchical
-                )
-                .foregroundStyle(
-                    Color.white.opacity(
-                        0.15
-                    )
-                )
-                .offset(x: 86)
             }
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(
-                        0.10
-                    ),
+                    Color.white
+                        .opacity(0.20),
                     Color.clear,
-                    Color.black.opacity(
-                        0.22
-                    )
+                    Color.black
+                        .opacity(0.035)
                 ],
                 startPoint:
                     .topLeading,
