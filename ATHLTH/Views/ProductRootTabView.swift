@@ -2547,7 +2547,11 @@ struct ATHLTHHomeView: View {
     private var homeFreestyleStrengthSession: PlannedSession {
         PlannedSession(
             id: UUID(),
-            title: "Freestyle Strength",
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                ),
             kind: .strength,
             scheduledStart: nil,
             durationMinutes: nil,
