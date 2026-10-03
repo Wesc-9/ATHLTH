@@ -63,6 +63,38 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
     }
 }
 
+enum ChallengeCreationPolicy {
+    static func automaticTitle(
+        sport: ATHLTHChallengeSport,
+        scoring: ATHLTHChallengeScoring
+    ) -> String {
+        "\(sport.title) · \(scoring.title)"
+    }
+
+    static func resolvedTitle(
+        _ title: String,
+        sport: ATHLTHChallengeSport,
+        scoring: ATHLTHChallengeScoring
+    ) -> String {
+        let clean = title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return clean.isEmpty
+            ? automaticTitle(
+                sport: sport,
+                scoring: scoring
+            )
+            : String(clean.prefix(60))
+    }
+
+    static func requiresDirectInvite(
+        visibility: ProfileVisibility
+    ) -> Bool {
+        visibility != .publicProfile
+    }
+}
+
 enum ChallengeVerificationPolicy: String, CaseIterable, Identifiable, Codable, Hashable {
     case verifiedRequired
     case verifiedPreferredManualAllowed
