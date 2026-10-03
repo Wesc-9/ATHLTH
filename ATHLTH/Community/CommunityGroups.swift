@@ -11502,6 +11502,8 @@ struct CommunityGroupCreateView: View {
     @State private var membersCanCreateContent = true
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImageData: Data?
+    @State private var cropRequest:
+        CommunityImageCropRequest?
     @State private var selectedHeaderPhoto: PhotosPickerItem?
     @State private var selectedHeaderImageData: Data?
     @State private var selectedHeaderArtwork:
@@ -11532,6 +11534,38 @@ struct CommunityGroupCreateView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(ATHLTHTheme.accentDeep)
+
+                        if let selectedImageData,
+                           let image =
+                            UIImage(
+                                data:
+                                    selectedImageData
+                            ) {
+                            Button {
+                                cropRequest =
+                                    CommunityImageCropRequest(
+                                        image: image,
+                                        target:
+                                            .clubImage
+                                    )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Adjust crop",
+                                        norwegian:
+                                            "Juster utsnitt"
+                                    ),
+                                    systemImage:
+                                        "crop"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        }
 
                         if selectedImageData != nil {
                             Button(role: .destructive) {
@@ -11730,134 +11764,63 @@ struct CommunityGroupCreateView: View {
 
                 Task {
                     do {
-                        guard let data = try await item
-                            .loadTransferable(type: Data.self)
-                        else {
-                            groups.errorMessage =
-                                "ATHLTH could not prepare that image. Try another photo."
-                            return
-                        }
-
-                        guard let jpeg =
-                                await CommunityImageProcessor
-                                    .prepareJPEG(
-                                        data,
-                                        maxPixelSize: 1_600,
-                                        quality: 0.80
+                        guard let data =
+                                try await item
+                                    .loadTransferable(
+                                        type:
+                                            Data.self
                                     )
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that image. Try another photo."
+                            selectedPhoto = nil
                             return
                         }
 
-                        selectedImageData = jpeg
+                        guard let prepared =
+                                await CommunityImageProcessor
+                                    .prepareJPEG(
+                                        data,
+                                        maxPixelSize:
+                                            2_400,
+                                        quality: 0.92
+                                    ),
+                              let image =
+                                UIImage(
+                                    data:
+                                        prepared
+                                )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that image. Try another photo."
+                            selectedPhoto = nil
+                            return
+                        }
+
+                        selectedPhoto = nil
+                        cropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .clubImage
+                            )
                     } catch {
+                        selectedPhoto = nil
                         groups.errorMessage =
                             error.localizedDescription
                     }
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private var createCoverPreview: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let selectedImageData,
-                   let image = UIImage(
-                       data: selectedImageData
-                   ) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accentDeep.opacity(0.22),
-                            ATHLTHTheme.cardWarm,
-                            ATHLTHTheme.canvasTop
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+            .fullScreenCover(
+                item: $cropRequest
+            ) { request in
+                CommunityImageCropEditor(
+                    request: request
+                ) { croppedData in
+                    selectedImageData =
+                        croppedData
                 }
             }
-
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(
-                        selectedImageData == nil
-                            ? 0.16
-                            : 0.88
-                    ),
-                    ATHLTHTheme.cardWarm.opacity(
-                        selectedImageData == nil
-                            ? 0.10
-                            : 0.60
-                    ),
-                    Color.clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    ATHLTHTheme.canvasBottom.opacity(0.28)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("CLUB")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.5)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep.opacity(0.62)
-                    )
-
-                Text(
-                    name.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
-                        ? "Your Club"
-                        : name
-                )
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-            }
-            .padding(16)
-        }
-        .frame(height: 150)
-        .frame(maxWidth: .infinity)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(ATHLTHTheme.border, lineWidth: 1)
-        }
-    }
-
-    private var joinModeDescription: String {
-        switch joinMode {
-        case "open":
-            return "Anyone can join immediately."
-        case "approval":
-            return "People request access. Owner or Admin approves them."
-        default:
-            return "Only people invited by Owner or Admin can join."
         }
     }
 }
