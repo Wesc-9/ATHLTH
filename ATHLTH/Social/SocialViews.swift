@@ -1501,14 +1501,22 @@ struct FriendProfileView: View {
             if canBrowseConnections {
                 NavigationLink {
                     ProfileConnectionsView(
-                        title: "Following",
+                        title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
                         profiles: followOverview.following,
                         totalCount: followOverview.followingCount
                     )
                 } label: {
                     followStat(
                         value: followOverview.followingCount,
-                        title: "Following",
+                        title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
                         icon: "person.badge.plus"
                     )
                 }
@@ -1516,7 +1524,11 @@ struct FriendProfileView: View {
             } else {
                 followStat(
                     value: followOverview.followingCount,
-                    title: "Following",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
                     icon: "person.badge.plus"
                 )
             }
@@ -1579,7 +1591,7 @@ struct FriendProfileView: View {
     private func actionBar(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             mainFollowButton(profile)
 
             NavigationLink {
@@ -1588,7 +1600,11 @@ struct FriendProfileView: View {
                 )
             } label: {
                 profileActionLabel(
-                    title: "Message",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Message",
+                            norwegian: "Melding"
+                        ),
                     icon: "message.fill",
                     tint: ATHLTHTheme.accentDeep,
                     emphasized: true
@@ -1602,15 +1618,37 @@ struct FriendProfileView: View {
                 profileActionLabel(
                     title: "Challenge",
                     icon: "bolt.fill",
-                    tint: .orange,
+                    tint: ATHLTHTheme.premiumGold,
                     emphasized: false
                 )
             }
             .buttonStyle(.plain)
             .accessibilityHint(
-                "Send this athlete a challenge request"
+                ATHLTHLocalization.choose(
+                    english:
+                        "Send this athlete a challenge request",
+                    norwegian:
+                        "Send denne utøveren en challenge"
+                )
             )
         }
+        .padding(6)
+        .background(
+            .ultraThinMaterial,
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.white.opacity(0.70),
+                    lineWidth: 0.8
+                )
+        }
+        .shadow(
+            color: Color.black.opacity(0.045),
+            radius: 14,
+            y: 6
+        )
     }
 
     private func profileActionLabel(
@@ -1619,68 +1657,48 @@ struct FriendProfileView: View {
         tint: Color,
         emphasized: Bool
     ) -> some View {
-        VStack(spacing: 7) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(
                     .system(
-                        size: 17,
+                        size: 12,
                         weight: .semibold
                     )
                 )
-                .foregroundStyle(
-                    emphasized
-                        ? Color.white
-                        : tint
-                )
-                .frame(width: 34, height: 34)
-                .background(
-                    emphasized
-                        ? Color.white.opacity(0.14)
-                        : tint.opacity(0.10),
-                    in: Circle()
-                )
 
             Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(
-                    emphasized
-                        ? Color.white
-                        : ATHLTHTheme.primaryText
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold
+                    )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.80)
+                .minimumScaleFactor(0.76)
         }
+        .foregroundStyle(
+            emphasized
+                ? Color.white
+                : ATHLTHTheme.primaryText
+        )
         .frame(maxWidth: .infinity)
-        .frame(height: 78)
+        .frame(height: 38)
+        .padding(.horizontal, 8)
         .background(
             emphasized
                 ? ATHLTHTheme.accentDeep
-                : Color.white.opacity(0.78),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
+                : tint.opacity(0.10),
+            in: Capsule()
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                emphasized
-                    ? Color.white.opacity(0.08)
-                    : Color.white.opacity(0.90),
-                lineWidth: 0.8
-            )
+            Capsule()
+                .stroke(
+                    emphasized
+                        ? Color.white.opacity(0.10)
+                        : tint.opacity(0.16),
+                    lineWidth: 0.8
+                )
         }
-        .shadow(
-            color:
-                emphasized
-                    ? ATHLTHTheme.accentDeep.opacity(0.10)
-                    : Color.black.opacity(0.025),
-            radius: 8,
-            y: 4
-        )
     }
 
     @ViewBuilder
@@ -1714,7 +1732,11 @@ struct FriendProfileView: View {
                 }
             } label: {
                 profileActionLabel(
-                    title: "Following",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Following",
+                            norwegian: "Følger"
+                        ),
                     icon: "person.fill.checkmark",
                     tint: ATHLTHTheme.accentDeep,
                     emphasized: false
@@ -1724,14 +1746,22 @@ struct FriendProfileView: View {
             .disabled(followActionInProgress)
         } else if relationship == .outgoingPending {
             profileActionLabel(
-                title: "Requested",
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Requested",
+                        norwegian: "Forespurt"
+                    ),
                 icon: "clock.fill",
                 tint: ATHLTHTheme.mutedText,
                 emphasized: false
             )
         } else if relationship == .blocked {
             profileActionLabel(
-                title: "Blocked",
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Blocked",
+                        norwegian: "Blokkert"
+                    ),
                 icon: "nosign",
                 tint: .red,
                 emphasized: false
@@ -1758,8 +1788,14 @@ struct FriendProfileView: View {
                 profileActionLabel(
                     title:
                         followsYou
-                            ? "Follow back"
-                            : "Follow",
+                            ? ATHLTHLocalization.choose(
+                                english: "Follow back",
+                                norwegian: "Følg tilbake"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Follow",
+                                norwegian: "Følg"
+                            ),
                     icon: "person.badge.plus",
                     tint: ATHLTHTheme.accentDeep,
                     emphasized: false
@@ -1791,8 +1827,14 @@ struct FriendProfileView: View {
                 profileActionLabel(
                     title:
                         followsYou
-                            ? "Follow back"
-                            : "Follow",
+                            ? ATHLTHLocalization.choose(
+                                english: "Follow back",
+                                norwegian: "Følg tilbake"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Follow",
+                                norwegian: "Følg"
+                            ),
                     icon: "person.badge.plus",
                     tint: ATHLTHTheme.accentDeep,
                     emphasized: false
