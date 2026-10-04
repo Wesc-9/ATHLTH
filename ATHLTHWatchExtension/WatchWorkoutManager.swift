@@ -4080,19 +4080,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let session = WCSession.default
 
+        // Keep a durable copy even when the iPhone is currently
+        // reachable. HealthKit finalization can outlive the foreground
+        // connection by several seconds, so relying on sendMessage alone can
+        // lose the completion handshake when reachability changes at the
+        // wrong moment. The iPhone de-duplicates results by result.id.
+        session.transferUserInfo(
+            payload
+        )
+
         if session.activationState == .activated,
            session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler:
-                    Self.makeWorkoutResultFallbackHandler(
-                        payload: payload
-                    )
-            )
-        } else {
-            session.transferUserInfo(
-                payload
+                errorHandler: nil
             )
         }
     }
