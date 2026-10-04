@@ -60,7 +60,9 @@ struct PlannedWorkoutWatchBuilder {
                 steps: structured.flatMap {
                     runningSteps(from: $0)
                 },
-                routeAlerts: routeAlerts,
+                routeAlerts:
+                    workout.routeAlertConfiguration ??
+                    routeAlerts,
                 targetAlerts:
                     workout.targetAlertConfiguration,
                 autoPauseEnabled:
@@ -119,7 +121,9 @@ struct PlannedWorkoutWatchBuilder {
         return WatchRunningWorkoutTransfer(
             title: workout.title,
             steps: [fallback],
-            routeAlerts: routeAlerts,
+            routeAlerts:
+                workout.routeAlertConfiguration ??
+                routeAlerts,
             targetAlerts:
                 workout.targetAlertConfiguration,
             autoPauseEnabled:
