@@ -1690,8 +1690,21 @@ final class SocialStore: ObservableObject {
                     challenge
                 )
             } catch {
-                errorMessage =
+                let description =
                     error.localizedDescription
+
+                if description
+                    .localizedCaseInsensitiveContains(
+                        "challenge has been deleted"
+                    ) {
+                    challengeStore.remove(
+                        challenge.id
+                    )
+                    continue
+                }
+
+                errorMessage =
+                    description
             }
         }
     }
