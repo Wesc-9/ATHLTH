@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import Network
 import Security
+import UserNotifications
 import UIKit
 
 struct HomeAssistantDiscoveredInstance: Identifiable, Hashable, Sendable {
@@ -769,11 +770,23 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
         for command in fresh {
             processed.insert(command.id)
-            NotificationCenter.default.post(
-                name:
-                    .athlthHomeAssistantCommandReceived,
-                object: command
-            )
+
+            switch command.type {
+            case "notification",
+                 "training_reminder",
+                 "show_next_workout":
+                await scheduleLocalNotification(
+                    for: command
+                )
+            case "sync_now":
+                NotificationCenter.default.post(
+                    name:
+                        .athlthHomeAssistantCommandReceived,
+                    object: command
+                )
+            default:
+                break
+            }
         }
 
         let trimmed =
@@ -796,6 +809,40 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 "ids": .array(ids)
             ]
         )
+    }
+
+    private func scheduleLocalNotification(
+        for command: HomeAssistantInboundCommand
+    ) async {
+        let content =
+            UNMutableNotificationContent()
+        content.title =
+            command.title ??
+            ATHLTHLocalization.choose(
+                english: "ATHLTH",
+                norwegian: "ATHLTH"
+            )
+        content.body =
+            command.message ??
+            ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant sent an ATHLTH update.",
+                norwegian:
+                    "Home Assistant sendte en ATHLTH-oppdatering."
+            )
+        content.sound = .default
+
+        let request =
+            UNNotificationRequest(
+                identifier:
+                    "athlth-home-assistant-\(command.id)",
+                content: content,
+                trigger: nil
+            )
+
+        try? await UNUserNotificationCenter
+            .current()
+            .add(request)
     }
 
     private func sendReliably(
