@@ -886,7 +886,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         SecItemDelete(query as CFDictionary)
     }
 
-    private static func instance(
+    nonisolated private static func instance(
         from result: NWBrowser.Result
     ) -> HomeAssistantDiscoveredInstance? {
         guard case .bonjour(let txtRecord) = result.metadata
@@ -919,7 +919,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
-    private static func serviceName(
+    nonisolated private static func serviceName(
         from endpoint: NWEndpoint
     ) -> String? {
         guard case let .service(name, _, _, _) = endpoint
@@ -929,7 +929,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         return nonEmpty(name)
     }
 
-    private static func url(from raw: String?) -> URL? {
+    nonisolated private static func url(from raw: String?) -> URL? {
         guard let raw = nonEmpty(raw),
               let url = URL(string: raw),
               let scheme = url.scheme?.lowercased(),
@@ -1125,7 +1125,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         return "Unknown Home Assistant error"
     }
 
-    private static func nonEmpty(_ value: String?) -> String? {
+    nonisolated private static func nonEmpty(_ value: String?) -> String? {
         guard let value = value?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !value.isEmpty
