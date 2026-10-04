@@ -12,6 +12,7 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var currentSetIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var restEndsAt: Date? { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftDurationSeconds = 60 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRestSeconds = 90 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRPE = 8.0 { didSet { scheduleCheckpointPersist() } }
@@ -33,6 +34,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var setIndex: Int
         var restEndsAt: Date?
         var reps: Int
+        var durationSeconds: Int? = nil
         var weight: Double
         var rest: Int
         var rpe: Double
@@ -58,6 +60,8 @@ final class StrengthWorkoutStore: ObservableObject {
         currentSetIndex = checkpoint?.setIndex ?? 0
         restEndsAt = checkpoint?.restEndsAt
         draftReps = checkpoint?.reps ?? 8
+        draftDurationSeconds =
+            checkpoint?.durationSeconds ?? 60
         draftWeightKilograms = checkpoint?.weight ?? 20
         draftRestSeconds = checkpoint?.rest ?? 90
         draftRPE = checkpoint?.rpe ?? 8
@@ -100,6 +104,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 setIndex: currentSetIndex,
                 restEndsAt: restEndsAt,
                 reps: draftReps,
+                durationSeconds: draftDurationSeconds,
                 weight: draftWeightKilograms,
                 rest: draftRestSeconds,
                 rpe: draftRPE,
@@ -518,6 +523,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func setDraft(
         reps: Int? = nil,
+        durationSeconds: Int? = nil,
         weightKilograms: Double? = nil,
         restSeconds: Int? = nil,
         rpe: Double? = nil,
@@ -529,6 +535,14 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         if let reps {
             draftReps = max(reps, 0)
+        }
+
+        if let durationSeconds {
+            draftDurationSeconds =
+                min(
+                    max(durationSeconds, 15),
+                    7_200
+                )
         }
 
         if let weightKilograms {
@@ -569,6 +583,7 @@ final class StrengthWorkoutStore: ObservableObject {
     func reloadDraftFromCurrentSet() {
         guard let set = currentSet else {
             draftReps = 8
+            draftDurationSeconds = 60
             draftWeightKilograms = 20
             draftRestSeconds = 90
             draftRPE = 8
@@ -581,6 +596,10 @@ final class StrengthWorkoutStore: ObservableObject {
             set.completedReps ??
             set.plannedReps ??
             8
+        draftDurationSeconds =
+            set.completedDurationSeconds ??
+            set.plannedDurationSeconds ??
+            60
         draftWeightKilograms =
             set.completedWeightKilograms ??
             set.plannedWeightKilograms ??
@@ -705,6 +724,8 @@ final class StrengthWorkoutStore: ObservableObject {
         _ exercise: Exercise,
         sets: Int = 3,
         reps: Int? = 8,
+        targetKind: StrengthExerciseTargetKind = .reps,
+        targetDurationSeconds: Int? = nil,
         targetWeightKilograms: Double? = nil,
         restSeconds: Int? = 90,
         warmUpSets: Int = 0
@@ -720,7 +741,10 @@ final class StrengthWorkoutStore: ObservableObject {
                 StrengthSetLog(
                     id: UUID(),
                     setNumber: number,
-                    plannedReps: reps,
+                    plannedReps:
+                        targetKind == .reps
+                            ? reps
+                            : nil,
                     plannedWeightKilograms: targetWeightKilograms,
                     completedReps: nil,
                     completedWeightKilograms: nil,
@@ -736,6 +760,17 @@ final class StrengthWorkoutStore: ObservableObject {
                             0
                         )
                             ? true
+                            : nil,
+                    targetKind: targetKind,
+                    plannedDurationSeconds:
+                        targetKind == .time
+                            ? max(
+                                targetDurationSeconds ??
+                                    exercise
+                                        .snapshot
+                                        .defaultStrengthTargetDurationSeconds,
+                                15
+                            )
                             : nil
                 )
             },
@@ -773,13 +808,18 @@ final class StrengthWorkoutStore: ObservableObject {
                     StrengthSetLog(
                         id: UUID(),
                         setNumber: setNumber,
-                        plannedReps: planned.reps,
+                        plannedReps:
+                            planned.resolvedTargetReps,
                         plannedWeightKilograms: planned.targetWeightKilograms,
                         completedReps: nil,
                         completedWeightKilograms: nil,
                         rpe: nil,
                         completedAt: nil,
-                        restSeconds: planned.restSeconds
+                        restSeconds: planned.restSeconds,
+                        targetKind:
+                            planned.resolvedTargetKind,
+                        plannedDurationSeconds:
+                            planned.resolvedTargetDurationSeconds
                     )
                 },
                 completedAt: nil
@@ -818,6 +858,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func completeCurrentSet(
         reps: Int?,
+        durationSeconds: Int? = nil,
         weightKilograms: Double?,
         rpe: Double?,
         rir: Double? = nil,
@@ -833,7 +874,16 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         var set = workout.exercises[currentExerciseIndex].sets[currentSetIndex]
-        set.completedReps = reps.map { max($0, 0) }
+        set.completedReps =
+            set.resolvedTargetKind == .reps
+                ? reps.map { max($0, 0) }
+                : nil
+        set.completedDurationSeconds =
+            set.resolvedTargetKind == .time
+                ? durationSeconds.map {
+                    min(max($0, 0), 7_200)
+                }
+                : nil
         set.completedWeightKilograms = weightKilograms.map { max($0, 0) }
         set.rpe = rpe
         set.rir = rir
@@ -955,8 +1005,19 @@ final class StrengthWorkoutStore: ObservableObject {
                 .effortMetric ??
             .off
 
+        let targetKind =
+            currentSet?.resolvedTargetKind ??
+            .reps
+
         completeCurrentSet(
-            reps: draftReps,
+            reps:
+                targetKind == .reps
+                    ? draftReps
+                    : nil,
+            durationSeconds:
+                targetKind == .time
+                    ? draftDurationSeconds
+                    : nil,
             weightKilograms:
                 draftWeightKilograms,
             rpe:
@@ -1144,7 +1205,11 @@ final class StrengthWorkoutStore: ObservableObject {
                             set.restSeconds,
                         rir: nil,
                         isWarmUp:
-                            set.isWarmUp
+                            set.isWarmUp,
+                        targetKind:
+                            set.targetKind,
+                        plannedDurationSeconds:
+                            set.plannedDurationSeconds
                     )
                 }
 
@@ -1194,7 +1259,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 )
                 .lowercased()
 
-        guard !name.isEmpty else {
+        guard !name.isEmpty,
+              exercise.sets.first?.resolvedTargetKind != .time
+        else {
             return nil
         }
 
@@ -1488,6 +1555,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         draftReps = 8
+        draftDurationSeconds = 60
         draftWeightKilograms = 20
         draftRestSeconds = 90
         draftRPE = 8
