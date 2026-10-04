@@ -1536,7 +1536,7 @@ struct FriendProfileView: View {
                     .frame(height: 236)
             }
         } content: {
-            LazyVStack(spacing: 18) {
+            LazyVStack(spacing: 12) {
                 if loading && profile == nil {
                     ProgressView("Loading profile…")
                         .padding(.top, 70)
@@ -1588,9 +1588,6 @@ struct FriendProfileView: View {
                             )
                         }
 
-                        remoteGearCard(
-                            profile.gear
-                        )
                         remoteHighlightsCard(
                             profile.workoutMedia
                         )
@@ -1607,7 +1604,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 168)
+            .padding(.top, 50)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1889,7 +1886,7 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .frame(height: 300)
+        .frame(height: 236)
         .clipped()
     }
 
@@ -1912,7 +1909,7 @@ struct FriendProfileView: View {
     private func remoteProfileStats(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 6) {
             remoteHeroStat(
                 value:
                     followOverview
@@ -1977,16 +1974,16 @@ struct FriendProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 10.5,
+                            size: 11.5,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 13)
+                    .frame(width: 14)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 12,
+                            size: 14,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1999,7 +1996,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 7.4,
+                        size: 9,
                         weight: .medium
                     )
                 )
@@ -2007,19 +2004,19 @@ struct FriendProfileView: View {
                 .minimumScaleFactor(0.58)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 1)
+        .padding(.horizontal, 2)
         .frame(maxWidth: .infinity)
-        .frame(height: 36)
+        .frame(height: 46)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 13,
+                cornerRadius: 16,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 13,
+                cornerRadius: 16,
                 style: .continuous
             )
             .stroke(
@@ -2728,17 +2725,20 @@ struct FriendProfileView: View {
 
                 Spacer()
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Shared",
-                        norwegian: "Delt"
+                HStack(spacing: 3) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "See all",
+                            norwegian: "Se alle"
+                        )
                     )
-                )
+                    Image(systemName: "chevron.right")
+                }
                 .font(
                     .caption.weight(.semibold)
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.mutedText
+                    ATHLTHTheme.accentDeep
                 )
             }
 
@@ -3116,17 +3116,20 @@ struct FriendProfileView: View {
 
                 Spacer()
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Shared",
-                        norwegian: "Delt"
+                HStack(spacing: 3) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "See all",
+                            norwegian: "Se alle"
+                        )
                     )
-                )
+                    Image(systemName: "chevron.right")
+                }
                 .font(
                     .caption.weight(.semibold)
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.mutedText
+                    ATHLTHTheme.accentDeep
                 )
             }
 
@@ -3431,12 +3434,15 @@ struct FriendProfileView: View {
 
                 Spacer()
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Shared",
-                        norwegian: "Delt"
+                HStack(spacing: 3) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "See all",
+                            norwegian: "Se alle"
+                        )
                     )
-                )
+                    Image(systemName: "chevron.right")
+                }
                 .font(
                     .caption.weight(
                         .semibold
