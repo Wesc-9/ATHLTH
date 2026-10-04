@@ -2776,6 +2776,26 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
+        if let workout = workouts
+            .filter({
+                $0.workoutActivityType == .swimming &&
+                $0.athlthDistanceMeters != nil
+            })
+            .max(by: {
+                ($0.athlthDistanceMeters ?? 0) <
+                ($1.athlthDistanceMeters ?? 0)
+            }),
+           let distance = workout.athlthDistanceMeters,
+           distance > 0 {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .longestSwim,
+                    value: distance,
+                    date: workout.startDate
+                )
+            )
+        }
+
         if let workout = workouts.max(by: { $0.duration < $1.duration }),
            workout.duration > 0 {
             records.append(
@@ -2786,6 +2806,71 @@ final class HealthKitManager: ObservableObject {
                 )
             )
         }
+
+        func appendLongestDurationRecord(
+            _ kind: HealthPersonalRecordKind,
+            activities: Set<HKWorkoutActivityType>
+        ) {
+            guard let workout =
+                    workouts
+                        .filter {
+                            activities.contains(
+                                $0.workoutActivityType
+                            )
+                        }
+                        .max(
+                            by: {
+                                $0.duration <
+                                $1.duration
+                            }
+                        ),
+                  workout.duration > 0
+            else {
+                return
+            }
+
+            records.append(
+                HealthPersonalRecord(
+                    kind: kind,
+                    value: workout.duration,
+                    date: workout.startDate
+                )
+            )
+        }
+
+        appendLongestDurationRecord(
+            .longestStrengthWorkout,
+            activities: [
+                .traditionalStrengthTraining,
+                .functionalStrengthTraining
+            ]
+        )
+        appendLongestDurationRecord(
+            .longestHIITWorkout,
+            activities: [
+                .highIntensityIntervalTraining
+            ]
+        )
+        appendLongestDurationRecord(
+            .longestRowingWorkout,
+            activities: [.rowing]
+        )
+        appendLongestDurationRecord(
+            .longestEllipticalWorkout,
+            activities: [.elliptical]
+        )
+        appendLongestDurationRecord(
+            .longestStairClimbingWorkout,
+            activities: [.stairClimbing]
+        )
+        appendLongestDurationRecord(
+            .longestYogaWorkout,
+            activities: [.yoga]
+        )
+        appendLongestDurationRecord(
+            .longestCoreWorkout,
+            activities: [.coreTraining]
+        )
 
         if let activeEnergyType =
                 HKObjectType.quantityType(
@@ -2824,6 +2909,53 @@ final class HealthKitManager: ObservableObject {
                 HealthPersonalRecord(
                     kind: .mostActiveCalories,
                     value: record.calories,
+                    date: record.workout.startDate
+                )
+            )
+        }
+
+        if let stepType =
+                HKObjectType.quantityType(
+                    forIdentifier: .stepCount
+                ),
+           let record =
+                workouts
+                    .compactMap({
+                        workout ->
+                            (
+                                workout: HKWorkout,
+                                steps: Double
+                            )? in
+
+                        guard let quantity =
+                                workout.statistics(
+                                    for: stepType
+                                )?.sumQuantity(),
+                              let steps =
+                                Self.safeDoubleValue(
+                                    quantity,
+                                    unit: .count()
+                                ),
+                              steps > 0
+                        else {
+                            return nil
+                        }
+
+                        return (
+                            workout: workout,
+                            steps: steps
+                        )
+                    })
+                    .max(
+                        by: {
+                            $0.steps <
+                            $1.steps
+                        }
+                    ) {
+            records.append(
+                HealthPersonalRecord(
+                    kind: .mostStepsInWorkout,
+                    value: record.steps,
                     date: record.workout.startDate
                 )
             )
