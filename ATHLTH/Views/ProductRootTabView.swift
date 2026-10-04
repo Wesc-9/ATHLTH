@@ -240,39 +240,33 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @State private var presentationReady = false
+    @State private var showingLiveWorkout = false
 
     private var presentationTrigger: String {
-        "\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+        "\(workoutMirroring.presentationGeneration)-\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+    }
+
+    private var canPresentMirroredWorkout: Bool {
+        guard scenePhase == .active,
+              workoutMirroring.isPresentationRequested,
+              !workoutMirroring.isUserMinimized
+        else {
+            return false
+        }
+
+        if let kind = workoutMirroring.snapshot?.kind,
+           kind == .strength || kind == .functional {
+            return false
+        }
+
+        return workoutMirroring.snapshot != nil
     }
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .sheet(
-                isPresented: Binding(
-                    get: {
-                        guard presentationReady,
-                              scenePhase == .active,
-                              workoutMirroring.isPresentationRequested
-                        else {
-                            return false
-                        }
-
-                        if let kind = workoutMirroring.snapshot?.kind,
-                           kind == .strength || kind == .functional {
-                            return false
-                        }
-
-                        return true
-                    },
-                    set: { presented in
-                        if !presented &&
-                            !workoutMirroring.hasActiveMirroredWorkout {
-                            workoutMirroring.dismissSummary()
-                        }
-                    }
-                ),
+            .fullScreenCover(
+                isPresented: $showingLiveWorkout,
                 onDismiss: {
                     if !workoutMirroring.hasActiveMirroredWorkout {
                         workoutMirroring.dismissSummary()
@@ -287,60 +281,54 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
                     .environmentObject(workoutMirroring)
             }
             .task(id: presentationTrigger) {
-                guard scenePhase == .active,
-                      workoutMirroring.isPresentationRequested
-                else {
-                    presentationReady = false
+                guard canPresentMirroredWorkout else {
+                    showingLiveWorkout = false
                     return
                 }
 
-                presentationReady = false
-
-                // The mirroring callback can arrive while authentication is
-                // swapping the launch gate for the product tabs. Give SwiftUI
-                // one short, cancellable settling window before presenting a
-                // sheet from the new root hierarchy.
-                try? await Task.sleep(
-                    for: .milliseconds(400)
-                )
-
-                guard !Task.isCancelled,
-                      scenePhase == .active,
-                      workoutMirroring.isPresentationRequested
-                else {
-                    return
-                }
-
-                presentationReady = true
-
-                // A Watch workout can begin while the quick-start sheet is
-                // still dismissing. SwiftUI may drop that first presentation
-                // request even though the binding stays true. Retry only when
-                // the live view never became visible, and never reopen a
-                // workout the user explicitly minimized.
+                // Mirroring can attach while the quick-start sheet is still
+                // dismissing. Own the cover with local state and retry the
+                // actual presentation, so SwiftUI cannot leave an active
+                // workout hidden behind a stale true binding.
                 for delay in [
-                    Duration.milliseconds(750),
-                    Duration.milliseconds(1_250)
+                    Duration.milliseconds(350),
+                    Duration.milliseconds(650),
+                    Duration.milliseconds(1_100),
+                    Duration.milliseconds(1_800)
                 ] {
+                    try? await Task.sleep(for: delay)
+
+                    guard !Task.isCancelled,
+                          canPresentMirroredWorkout
+                    else {
+                        showingLiveWorkout = false
+                        return
+                    }
+
+                    if workoutMirroring.liveViewIsVisible {
+                        return
+                    }
+
+                    showingLiveWorkout = false
+                    await Task.yield()
                     try? await Task.sleep(
-                        for: delay
+                        for: .milliseconds(70)
                     )
 
                     guard !Task.isCancelled,
-                          scenePhase == .active,
-                          workoutMirroring
-                            .isPresentationRequested,
-                          !workoutMirroring
-                            .isUserMinimized,
-                          !workoutMirroring
-                            .liveViewIsVisible
+                          canPresentMirroredWorkout
                     else {
                         return
                     }
 
-                    presentationReady = false
-                    await Task.yield()
-                    presentationReady = true
+                    showingLiveWorkout = true
+                }
+            }
+            .onChange(
+                of: workoutMirroring.isPresentationRequested
+            ) { _, requested in
+                if !requested {
+                    showingLiveWorkout = false
                 }
             }
     }
