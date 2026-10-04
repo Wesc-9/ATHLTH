@@ -548,3 +548,5 @@ validate-profile-record-rebuild-v1.6.0
 1.6.0 profile final source validation
 Home Assistant integration validation 2026-10-04
 Home Assistant integration clean validation 2026-10-04
+
+1.6.0 Home Assistant multi-client Watch-only validation 2026-10-04
