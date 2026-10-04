@@ -714,9 +714,8 @@ struct AppRootView: View {
         lastFullLifecycleRefreshAt = Date()
     }
 
-    private var lifecycleContent: some View {
+    private var lifecycleRootContent: AnyView {
         AnyView(
-            AnyView(
                 Group {
             if appSession.previewModeEnabled {
                 AnyView(ProductRootTabView())
@@ -728,6 +727,12 @@ struct AppRootView: View {
                 AnyView(ProductRootTabView())
             }
         }
+        )
+    }
+
+    private var lifecycleWorkoutContent: AnyView {
+        AnyView(
+            lifecycleRootContent
         .task {
             await runLifecycleStartupTask()
         }
@@ -780,6 +785,12 @@ struct AppRootView: View {
         .onChange(of: spotifyPlayback.connectionState) { _, _ in
             syncSpotifyPlaybackToWatch()
         }
+        )
+    }
+
+    private var lifecycleChromeContent: AnyView {
+        AnyView(
+            lifecycleWorkoutContent
         .overlay(alignment: .top) {
             if appSession.signedIn,
                phoneWorkout.active != nil,
@@ -893,6 +904,12 @@ struct AppRootView: View {
             ATHLTHArtworkImage
                 .clearRemoteCache()
         }
+        )
+    }
+
+    private var lifecycleSessionContent: AnyView {
+        AnyView(
+            lifecycleChromeContent
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 spotifyPlayback
@@ -989,6 +1006,12 @@ struct AppRootView: View {
                 notification
             )
         }
+        )
+    }
+
+    private var lifecycleHealthSyncContent: AnyView {
+        AnyView(
+            lifecycleSessionContent
         .onReceive(phoneWorkout.$active) { workout in
             handlePhoneWorkoutLiveUpdate(
                 workout
@@ -1084,8 +1107,12 @@ struct AppRootView: View {
                     allowed: settings.backgroundHealthSyncEnabled
                 )
             }
-        }
-        )
+        }        )
+    }
+
+    private var lifecycleCompletionContent: AnyView {
+        AnyView(
+            lifecycleHealthSyncContent
         .onChange(of: health.personalDetails) { _, details in
             guard let source = appSession.onboardingProfile?.personalDetailsSource,
                   source == .appleHealth || source == .mixed,
@@ -1172,8 +1199,12 @@ struct AppRootView: View {
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
             handleStrengthWorkoutCompletion(workout)
-        }
-        )
+        }        )
+    }
+
+    private var lifecycleSocialContent: AnyView {
+        AnyView(
+            lifecycleCompletionContent
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
                 from: updatedChallenges,
@@ -1310,6 +1341,12 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        )
+    }
+
+    private var lifecycleAccountContent: AnyView {
+        AnyView(
+            lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
@@ -1437,6 +1474,11 @@ struct AppRootView: View {
                 AthleteToolsRuntimeObserver()
             }
         }
+        )
+    }
+
+    private var lifecycleContent: some View {
+        lifecycleAccountContent
     }
 
     var body: some View {
