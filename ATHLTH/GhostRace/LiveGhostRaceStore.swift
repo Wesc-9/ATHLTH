@@ -37,6 +37,10 @@ struct LiveGhostRaceRoomRecord:
     let startsAt: Date?
     let finishedAt: Date?
     let winnerID: UUID?
+    let senderMaxLeadMeters: Double
+    let recipientMaxLeadMeters: Double
+    let leadChangeCount: Int
+    let lastLeaderID: UUID?
     let createdAt: Date
     let updatedAt: Date
 
@@ -51,6 +55,14 @@ struct LiveGhostRaceRoomRecord:
         case startsAt = "starts_at"
         case finishedAt = "finished_at"
         case winnerID = "winner_id"
+        case senderMaxLeadMeters =
+            "sender_max_lead_meters"
+        case recipientMaxLeadMeters =
+            "recipient_max_lead_meters"
+        case leadChangeCount =
+            "lead_change_count"
+        case lastLeaderID =
+            "last_leader_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
