@@ -1561,6 +1561,12 @@ struct FriendProfileView: View {
                         remoteGearCard(profile.gear)
                     }
 
+                    if !profile.workoutMedia.isEmpty {
+                        remoteHighlightsCard(
+                            profile.workoutMedia
+                        )
+                    }
+
                     let workouts = profile.recentActivities.filter {
                         $0.activity.kind == "workout"
                     }
@@ -2450,57 +2456,266 @@ struct FriendProfileView: View {
     private func remoteGearCard(
         _ items: [ProfileGearItem]
     ) -> some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Gear")
-                        .font(.headline)
-                    Spacer()
-                    Text("\(items.count)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                }
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Gear",
+                        norwegian: "Utstyr"
+                    ),
+                    systemImage:
+                        "shoeprints.fill"
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
 
-                ForEach(Array(items.prefix(4))) { item in
-                    HStack(spacing: 12) {
-                        Image(systemName: item.category.systemImage)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 42, height: 42)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 13,
-                                    style: .continuous
+                Spacer()
+
+                Text(
+                    "\(items.count)"
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            HStack(spacing: 8) {
+                ForEach(
+                    Array(items.prefix(3))
+                ) { item in
+                    HStack(spacing: 7) {
+                        Image(
+                            systemName:
+                                item.category
+                                    .systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 15,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .accentSoft,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        10,
+                                    style:
+                                        .continuous
+                                )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 1
+                        ) {
+                            Text(item.name)
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.66
+                                )
+
+                            Text(
+                                item.category
+                                    .shortTitle
+                            )
+                            .font(
+                                .system(
+                                    size: 8
                                 )
                             )
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                            Text(item.category.shortTitle)
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .lineLimit(1)
                         }
 
-                        Spacer()
-
-                        if item.isFeatured {
-                            Image(systemName: "star.fill")
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.premiumGold
-                                )
-                        }
+                        Spacer(
+                            minLength: 0
+                        )
                     }
+                    .padding(8)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 58
+                    )
+                    .background(
+                        Color.black
+                            .opacity(0.022),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
                 }
             }
         }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border
+                    .opacity(0.56),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
+    }
+
+    private func remoteHighlightsCard(
+        _ media: [WorkoutMediaRecord]
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Photos & highlights",
+                        norwegian:
+                            "Bilder og høydepunkter"
+                    ),
+                    systemImage:
+                        "photo.on.rectangle.angled"
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+
+                Spacer()
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Shared",
+                        norwegian: "Delt"
+                    )
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            HStack(spacing: 8) {
+                ForEach(
+                    Array(media.prefix(4))
+                ) { item in
+                    AsyncImage(
+                        url:
+                            URL(
+                                string:
+                                    item.imageURL
+                            )
+                    ) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        default:
+                            Rectangle()
+                                .fill(
+                                    ATHLTHTheme
+                                        .accentSoft
+                                )
+                                .overlay {
+                                    Image(
+                                        systemName:
+                                            "photo"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                    )
+                                }
+                        }
+                    }
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 82)
+                    .clipped()
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border
+                    .opacity(0.56),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
     private func workoutHistoryCard(
