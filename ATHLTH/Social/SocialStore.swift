@@ -2298,6 +2298,48 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func markChallengeEventsRead(
+        from actorID: UUID
+    ) async {
+        let challengeKinds:
+            Set<String> = [
+                "challenge_invite",
+                "challenge_result",
+                "challenge_accepted",
+                "challenge_declined",
+                "challenge_withdrawn"
+            ]
+
+        let matching =
+            inboxEvents.filter {
+                $0.actorID == actorID &&
+                challengeKinds.contains(
+                    $0.kind
+                ) &&
+                $0.readAt == nil
+            }
+
+        guard !matching.isEmpty else {
+            return
+        }
+
+        do {
+            for event in matching {
+                try await service
+                    .markInboxEventRead(
+                        event.id
+                    )
+            }
+
+            inboxEvents =
+                try await service
+                    .loadInboxEvents()
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     func markChallengeInviteRead(
         challengeID: UUID
     ) async {
