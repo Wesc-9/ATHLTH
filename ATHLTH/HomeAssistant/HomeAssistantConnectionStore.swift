@@ -504,32 +504,73 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             body: body
         )
 
-        var request = URLRequest(url: pairing.webhookURL)
-        request.timeoutInterval = 15
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue(
-            "application/json",
-            forHTTPHeaderField: "Content-Type"
-        )
-        request.setValue(
-            timestamp,
-            forHTTPHeaderField: "X-ATHLTH-Timestamp"
-        )
-        request.setValue(
-            nonce,
-            forHTTPHeaderField: "X-ATHLTH-Nonce"
-        )
-        request.setValue(
-            "sha256=\(signature)",
-            forHTTPHeaderField: "X-ATHLTH-Signature"
-        )
+        do {
+            let status = try await Self.sendWebhookRequest(
+                to: pairing.webhookURL,
+                body: body,
+                timestamp: timestamp,
+                nonce: nonce,
+                signature: signature
+            )
 
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200..<300).contains(httpResponse.statusCode)
-        else {
-            throw HomeAssistantConnectionError.webhookRejected
+            guard (200..<300).contains(status) else {
+                if Self.shouldTryWebhookFallback(
+                    after: status
+                ),
+                   let fallback =
+                    Self.fallbackWebhookURL(
+                        for: pairing
+                    ),
+                   fallback != pairing.webhookURL {
+                    let fallbackStatus =
+                        try await Self.sendWebhookRequest(
+                            to: fallback,
+                            body: body,
+                            timestamp: timestamp,
+                            nonce: nonce,
+                            signature: signature
+                        )
+
+                    guard (200..<300)
+                        .contains(
+                            fallbackStatus
+                        ) ||
+                        fallbackStatus == 409
+                    else {
+                        throw HomeAssistantConnectionError
+                            .webhookRejected
+                    }
+                    return
+                }
+
+                throw HomeAssistantConnectionError.webhookRejected
+            }
+        } catch let error as HomeAssistantConnectionError {
+            throw error
+        } catch {
+            guard let fallback =
+                    Self.fallbackWebhookURL(
+                        for: pairing
+                    ),
+                  fallback != pairing.webhookURL
+            else {
+                throw error
+            }
+
+            let fallbackStatus =
+                try await Self.sendWebhookRequest(
+                    to: fallback,
+                    body: body,
+                    timestamp: timestamp,
+                    nonce: nonce,
+                    signature: signature
+                )
+
+            guard (200..<300).contains(fallbackStatus) ||
+                    fallbackStatus == 409
+            else {
+                throw HomeAssistantConnectionError.webhookRejected
+            }
         }
     }
 
@@ -1509,6 +1550,75 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         return components.percentEncodedQuery?.data(
             using: .utf8
         )
+    }
+
+    private static func sendWebhookRequest(
+        to url: URL,
+        body: Data,
+        timestamp: String,
+        nonce: String,
+        signature: String
+    ) async throws -> Int {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.setValue(
+            timestamp,
+            forHTTPHeaderField: "X-ATHLTH-Timestamp"
+        )
+        request.setValue(
+            nonce,
+            forHTTPHeaderField: "X-ATHLTH-Nonce"
+        )
+        request.setValue(
+            "sha256=\(signature)",
+            forHTTPHeaderField: "X-ATHLTH-Signature"
+        )
+
+        let (_, response) =
+            try await URLSession.shared.data(
+                for: request
+            )
+
+        guard let httpResponse =
+                response as? HTTPURLResponse
+        else {
+            throw HomeAssistantConnectionError
+                .invalidResponse
+        }
+
+        return httpResponse.statusCode
+    }
+
+    private static func shouldTryWebhookFallback(
+        after statusCode: Int
+    ) -> Bool {
+        statusCode == 404 ||
+            statusCode == 408 ||
+            statusCode == 410 ||
+            statusCode == 429 ||
+            statusCode >= 500
+    }
+
+    private static func fallbackWebhookURL(
+        for pairing: HomeAssistantStoredPairing
+    ) -> URL? {
+        guard var components = URLComponents(
+            url: pairing.instanceURL,
+            resolvingAgainstBaseURL: false
+        ) else {
+            return nil
+        }
+
+        components.path = pairing.webhookPath
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 
     private static func validatePairResponse(
