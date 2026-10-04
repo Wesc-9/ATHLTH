@@ -421,48 +421,49 @@ struct WatchActiveWorkoutView: View {
 
     private var activeContent: some View {
         Group {
-            VStack(spacing: 8) {
-                HStack {
-                    Label(
-                        workoutManager.kind.title,
-                        systemImage: workoutManager.kind.systemImage
-                    )
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(WatchTheme.green)
-
-                    Spacer()
-
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(
-                                workoutManager.state == .paused
-                                    ? Color.orange
-                                    : WatchTheme.green
-                            )
-                            .frame(width: 6, height: 6)
-
-                        Text(stateTitle)
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(WatchTheme.muted)
-                    }
-                }
-
-                Text(durationText(workoutManager.elapsedTime))
-                    .font(
-                        .system(
-                            size:
-                                workoutManager.kind == .strength
-                                    ? 24
-                                    : 34,
-                            weight: .semibold,
-                            design: .rounded
+            if workoutManager.kind == .strength {
+                strengthWorkoutHeader
+            } else {
+                VStack(spacing: 8) {
+                    HStack {
+                        Label(
+                            workoutManager.kind.title,
+                            systemImage: workoutManager.kind.systemImage
                         )
-                    )
-                    .monospacedDigit()
-                    .frame(maxWidth: .infinity)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(WatchTheme.green)
+
+                        Spacer()
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(
+                                    workoutManager.state == .paused
+                                        ? Color.orange
+                                        : WatchTheme.green
+                                )
+                                .frame(width: 6, height: 6)
+
+                            Text(stateTitle)
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(WatchTheme.muted)
+                        }
+                    }
+
+                    Text(durationText(workoutManager.elapsedTime))
+                        .font(
+                            .system(
+                                size: 34,
+                                weight: .semibold,
+                                design: .rounded
+                            )
+                        )
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(11)
+                .watchSurface(radius: 18)
             }
-            .padding(11)
-            .watchSurface(radius: 18)
 
             if workoutManager.kind == .strength {
                 strengthTrackingContent
@@ -560,6 +561,54 @@ struct WatchActiveWorkoutView: View {
 
 
         }
+    }
+
+    private var strengthWorkoutHeader: some View {
+        HStack(spacing: 7) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Strength",
+                    norwegian: "Styrke"
+                ),
+                systemImage: "dumbbell.fill"
+            )
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(WatchTheme.green)
+
+            Spacer()
+
+            Circle()
+                .fill(
+                    workoutManager.state == .paused
+                        ? Color.orange
+                        : WatchTheme.green
+                )
+                .frame(width: 5, height: 5)
+
+            Text(
+                workoutManager.state == .paused
+                    ? ATHLTHLocalization.choose(
+                        english: "Paused",
+                        norwegian: "Pause"
+                    )
+                    : "Live"
+            )
+            .font(.system(size: 8, weight: .semibold))
+            .foregroundStyle(WatchTheme.muted)
+
+            Text(durationText(workoutManager.elapsedTime))
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .watchSurface(radius: 18)
     }
 
     private var nonRunningControlsPage: some View {
@@ -676,116 +725,132 @@ struct WatchActiveWorkoutView: View {
     @ViewBuilder
     private var strengthTrackingContent: some View {
         if let snapshot = workoutManager.strengthSession {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(
-                        snapshot.exerciseName ??
-                        "Strength"
-                    )
-                    .font(.system(size: 15, weight: .bold))
-                    .lineLimit(2)
-
-                    Spacer()
-
-                    if snapshot.exerciseCount > 0 {
-                        Text(
-                            "\(snapshot.exerciseIndex + 1)/\(snapshot.exerciseCount)"
-                        )
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(WatchTheme.green)
-                    }
-                }
-
-                if !snapshot.primaryMuscles.isEmpty {
-                    Text(
-                        snapshot.primaryMuscles
-                            .prefix(2)
-                            .joined(separator: " · ")
-                    )
-                    .font(.system(size: 9))
-                    .foregroundStyle(WatchTheme.muted)
-                    .lineLimit(1)
-                }
-
-                if let setNumber = snapshot.setNumber,
-                   snapshot.setCount > 0 {
-                    Text(
-                        "Set \(setNumber) of \(snapshot.setCount) · \(snapshot.completedSets)/\(snapshot.totalSets) total"
-                    )
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
-                }
-            }
-            .padding(10)
-            .watchSurface()
-
             if snapshot.inputMode == .iPhone {
-                VStack(spacing: 7) {
-                    Image(systemName: "iphone")
-                        .font(.title3)
-                        .foregroundStyle(WatchTheme.green)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(
+                            snapshot.exerciseName ??
+                            ATHLTHLocalization.choose(
+                                english: "Strength",
+                                norwegian: "Styrke"
+                            )
+                        )
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .lineLimit(2)
 
-                    Text("Log reps and weight on iPhone")
-                        .font(.system(size: 11, weight: .bold))
-                        .multilineTextAlignment(.center)
+                        Spacer()
+
+                        if snapshot.exerciseCount > 0 {
+                            Text(
+                                "\(snapshot.exerciseIndex + 1)/\(snapshot.exerciseCount)"
+                            )
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(WatchTheme.green)
+                        }
+                    }
+
+                    if snapshot.exerciseName != nil {
+                        HStack(spacing: 8) {
+                            WatchStrengthStaticPrimaryMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Reps",
+                                    norwegian: "Reps"
+                                ),
+                                valueText: "\(snapshot.draftReps)",
+                                icon: "repeat",
+                                tint: WatchTheme.accent
+                            )
+
+                            WatchStrengthStaticPrimaryMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Weight",
+                                    norwegian: "Vekt"
+                                ),
+                                valueText: String(
+                                    format: "%.1f kg",
+                                    snapshot.draftWeightKilograms
+                                ),
+                                icon: "scalemass.fill",
+                                tint: WatchTheme.slate
+                            )
+                        }
+                    }
 
                     Text(
                         snapshot.isResting
-                            ? "Rest timer stays synchronized here."
-                            : "Apple Watch continues recording heart rate, calories and duration."
+                            ? ATHLTHLocalization.choose(
+                                english: "Rest timer stays synchronized with iPhone.",
+                                norwegian: "Pausetid synkroniseres med iPhone."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Logging is controlled on iPhone.",
+                                norwegian: "Registreringen styres på iPhone."
+                            )
                     )
                     .font(.system(size: 8))
                     .foregroundStyle(WatchTheme.muted)
-                    .multilineTextAlignment(.center)
-
-                    if snapshot.isResting,
-                       let restEndsAt = snapshot.restEndsAt {
-                        TimelineView(
-                            .periodic(
-                                from: .now,
-                                by: 1
-                            )
-                        ) { context in
-                            let remaining =
-                                max(
-                                    Int(
-                                        restEndsAt
-                                            .timeIntervalSince(
-                                                context.date
-                                            )
-                                            .rounded(.up)
-                                    ),
-                                    0
-                                )
-
-                            Text("\(remaining) s")
-                                .font(
-                                    .system(
-                                        size: 18,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                )
-                                .monospacedDigit()
-                        }
-                    }
                 }
                 .padding(10)
-                .frame(maxWidth: .infinity)
-                .watchSurface()
+                .watchSurface(radius: 18)
+
+                if snapshot.isResting,
+                   let restEndsAt = snapshot.restEndsAt {
+                    WatchStrengthRestView(
+                        restEndsAt: restEndsAt,
+                        onAdd: {
+                            workoutManager.addStrengthRest(seconds: 30)
+                        },
+                        onSkip: {
+                            workoutManager.skipStrengthRest()
+                        }
+                    )
+                }
             } else if snapshot.isResting,
-               let restEndsAt = snapshot.restEndsAt {
+                      let restEndsAt = snapshot.restEndsAt {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(
+                        snapshot.exerciseName ??
+                        ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        )
+                    )
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+
+                    if snapshot.currentExerciseComplete,
+                       snapshot.hasNextExercise,
+                       let nextName = strengthNextExerciseName(snapshot) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Next: \(nextName)",
+                                norwegian: "Neste: \(nextName)"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(WatchTheme.muted)
+                        .lineLimit(1)
+                    } else if let setNumber = snapshot.setNumber,
+                              snapshot.setCount > 0 {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Next set: \(setNumber)/\(snapshot.setCount)",
+                                norwegian: "Neste sett: \(setNumber)/\(snapshot.setCount)"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                .padding(.horizontal, 2)
+
                 WatchStrengthRestView(
                     restEndsAt: restEndsAt,
                     onAdd: {
-                        workoutManager
-                            .addStrengthRest(
-                                seconds: 30
-                            )
+                        workoutManager.addStrengthRest(seconds: 30)
                     },
                     onSkip: {
-                        workoutManager
-                            .skipStrengthRest()
+                        workoutManager.skipStrengthRest()
                     }
                 )
             } else if snapshot.currentExerciseComplete {
@@ -801,19 +866,27 @@ struct WatchActiveWorkoutView: View {
 
                     Text(
                         snapshot.allExercisesComplete
-                            ? "Workout exercises complete"
-                            : "Exercise complete"
+                            ? ATHLTHLocalization.choose(
+                                english: "Workout exercises complete",
+                                norwegian: "Alle øvelser er fullført"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Exercise complete",
+                                norwegian: "Øvelse fullført"
+                            )
                     )
                     .font(.system(size: 12, weight: .bold))
                     .multilineTextAlignment(.center)
 
                     if snapshot.hasNextExercise {
                         Button {
-                            workoutManager
-                                .moveToNextStrengthExercise()
+                            workoutManager.moveToNextStrengthExercise()
                         } label: {
                             Label(
-                                "Next Exercise",
+                                ATHLTHLocalization.choose(
+                                    english: "Next Exercise",
+                                    norwegian: "Neste øvelse"
+                                ),
                                 systemImage: "arrow.right"
                             )
                             .font(.system(size: 12, weight: .bold))
@@ -821,13 +894,13 @@ struct WatchActiveWorkoutView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(WatchTheme.green)
-                        .disabled(
-                            workoutManager
-                                .strengthActionPending
-                        )
+                        .disabled(workoutManager.strengthActionPending)
                     } else {
                         Text(
-                            "Use the red stop button below when you're finished."
+                            ATHLTHLocalization.choose(
+                                english: "End the workout when you are finished.",
+                                norwegian: "Avslutt økten når du er ferdig."
+                            )
                         )
                         .font(.system(size: 8))
                         .foregroundStyle(WatchTheme.muted)
@@ -837,94 +910,169 @@ struct WatchActiveWorkoutView: View {
                 .padding(10)
                 .watchSurface()
             } else if snapshot.exerciseName != nil {
-                if snapshot.loadKindRaw ==
-                    "resistanceLevel" {
-                    WatchStrengthCrownControl(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Resistance",
-                                norwegian: "Motstand"
-                            ),
-                        valueText:
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(snapshot.exerciseName ?? "")
+                            .font(
+                                .system(
+                                    size: 18,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.76)
+
+                        Spacer(minLength: 4)
+
+                        if snapshot.exerciseCount > 0 {
+                            Text(
+                                "\(snapshot.exerciseIndex + 1)/\(snapshot.exerciseCount)"
+                            )
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(WatchTheme.green)
+                        }
+                    }
+
+                    if let setNumber = snapshot.setNumber,
+                       snapshot.setCount > 0 {
+                        Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Level \(snapshot.draftResistanceLevel ?? 5)",
+                                    "Set \(setNumber) of \(snapshot.setCount) · \(snapshot.completedSets)/\(snapshot.totalSets) total",
                                 norwegian:
-                                    "Steg \(snapshot.draftResistanceLevel ?? 5)"
-                            ),
-                        value:
-                            strengthResistanceBinding,
-                        range: 1...10,
-                        step: 1,
-                        icon: "dial.medium",
-                        tint: WatchTheme.slate
-                    )
-                } else {
-                    WatchStrengthCrownControl(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Weight",
-                                norwegian: "Vekt"
-                            ),
-                        valueText: String(
-                            format: "%.1f kg",
-                            snapshot.draftWeightKilograms
-                        ),
-                        value: strengthWeightBinding,
-                        range: 0...500,
-                        step: 0.5,
-                        icon: "scalemass.fill",
-                        tint: WatchTheme.slate
-                    )
-                }
+                                    "Sett \(setNumber) av \(snapshot.setCount) · \(snapshot.completedSets)/\(snapshot.totalSets) totalt"
+                            )
+                        )
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(WatchTheme.muted)
+                    }
 
-                if snapshot.targetKindRaw ==
-                    "time" {
-                    WatchStrengthCrownControl(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Duration",
-                                norwegian: "Varighet"
-                            ),
-                        valueText:
-                            durationText(
-                                TimeInterval(
-                                    snapshot
-                                        .draftDurationSeconds ??
-                                    60
-                                )
-                            ),
-                        value:
-                            strengthDurationBinding,
-                        range: 15...7_200,
-                        step: 15,
-                        icon: "timer",
-                        tint: WatchTheme.accent
+                    HStack(spacing: 7) {
+                        if snapshot.targetKindRaw == "time" {
+                            WatchStrengthPrimaryCrownMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Duration",
+                                    norwegian: "Varighet"
+                                ),
+                                valueText: durationText(
+                                    TimeInterval(
+                                        snapshot.draftDurationSeconds ?? 60
+                                    )
+                                ),
+                                value: strengthDurationBinding,
+                                range: 15...7_200,
+                                step: 15,
+                                icon: "timer",
+                                tint: WatchTheme.accent
+                            )
+                        } else {
+                            WatchStrengthPrimaryCrownMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Reps",
+                                    norwegian: "Reps"
+                                ),
+                                valueText: "\(snapshot.draftReps)",
+                                value: strengthRepsBinding,
+                                range: 0...100,
+                                step: 1,
+                                icon: "repeat",
+                                tint: WatchTheme.accent
+                            )
+                        }
+
+                        if snapshot.loadKindRaw == "resistanceLevel" {
+                            WatchStrengthPrimaryCrownMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Resistance",
+                                    norwegian: "Motstand"
+                                ),
+                                valueText: ATHLTHLocalization.choose(
+                                    english:
+                                        "Level \(snapshot.draftResistanceLevel ?? 5)",
+                                    norwegian:
+                                        "Steg \(snapshot.draftResistanceLevel ?? 5)"
+                                ),
+                                value: strengthResistanceBinding,
+                                range: 1...10,
+                                step: 1,
+                                icon: "dial.medium",
+                                tint: WatchTheme.slate
+                            )
+                        } else {
+                            WatchStrengthPrimaryCrownMetric(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Weight",
+                                    norwegian: "Vekt"
+                                ),
+                                valueText: String(
+                                    format: "%.1f kg",
+                                    snapshot.draftWeightKilograms
+                                ),
+                                value: strengthWeightBinding,
+                                range: 0...500,
+                                step: 0.5,
+                                icon: "scalemass.fill",
+                                tint: WatchTheme.slate
+                            )
+                        }
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Tap reps or load, then turn the Digital Crown.",
+                            norwegian: "Trykk reps eller belastning, og bruk Digital Crown."
+                        )
                     )
-                } else {
-                    WatchStrengthCrownControl(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Reps",
-                                norwegian: "Repetisjoner"
-                            ),
-                        valueText:
-                            "\(snapshot.draftReps)",
-                        value:
-                            strengthRepsBinding,
-                        range: 0...100,
-                        step: 1,
-                        icon: "repeat",
-                        tint: WatchTheme.accent
-                    )
+                    .font(.system(size: 7))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(2)
                 }
+                .padding(10)
+                .watchSurface(radius: 18)
+
+                Button {
+                    workoutManager.completeStrengthSet()
+                } label: {
+                    Label(
+                        workoutManager.strengthActionPending
+                            ? ATHLTHLocalization.choose(
+                                english: "Syncing…",
+                                norwegian: "Synkroniserer…"
+                            )
+                            : (
+                                snapshot.setCount > 0 &&
+                                snapshot.setIndex + 1 >= snapshot.setCount
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Complete Exercise",
+                                        norwegian: "Fullfør øvelse"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Complete Set",
+                                        norwegian: "Fullfør sett"
+                                    )
+                            ),
+                        systemImage:
+                            workoutManager.strengthActionPending
+                                ? "arrow.triangle.2.circlepath"
+                                : "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(WatchTheme.green)
+                .disabled(workoutManager.strengthActionPending)
 
                 WatchStrengthCrownControl(
-                    title: "Rest",
-                    valueText:
-                        strengthRestText(
-                            snapshot.draftRestSeconds
-                        ),
+                    title: ATHLTHLocalization.choose(
+                        english: "Rest after set",
+                        norwegian: "Pause etter sett"
+                    ),
+                    valueText: strengthRestText(
+                        snapshot.draftRestSeconds
+                    ),
                     value: strengthRestBinding,
                     range: 0...600,
                     step: 15,
@@ -935,26 +1083,23 @@ struct WatchActiveWorkoutView: View {
                 if snapshot.effortMetricRaw == "rpe" {
                     WatchStrengthCrownControl(
                         title: "RPE",
-                        valueText:
-                            String(
-                                format: "%.1f",
-                                snapshot.draftRPE ?? 8
-                            ),
+                        valueText: String(
+                            format: "%.1f",
+                            snapshot.draftRPE ?? 8
+                        ),
                         value: strengthRPEBinding,
                         range: 1...10,
                         step: 0.5,
                         icon: "gauge.with.dots.needle.50percent",
                         tint: WatchTheme.accent
                     )
-                } else if
-                    snapshot.effortMetricRaw == "rir" {
+                } else if snapshot.effortMetricRaw == "rir" {
                     WatchStrengthCrownControl(
                         title: "RIR",
-                        valueText:
-                            String(
-                                format: "%.1f",
-                                snapshot.draftRIR ?? 2
-                            ),
+                        valueText: String(
+                            format: "%.1f",
+                            snapshot.draftRIR ?? 2
+                        ),
                         value: strengthRIRBinding,
                         range: 0...10,
                         step: 0.5,
@@ -965,14 +1110,19 @@ struct WatchActiveWorkoutView: View {
 
                 Button {
                     workoutManager.updateStrengthDraft(
-                        isWarmUp:
-                            !(snapshot.isWarmUp ?? false)
+                        isWarmUp: !(snapshot.isWarmUp ?? false)
                     )
                 } label: {
                     Label(
                         snapshot.isWarmUp == true
-                            ? "Warm-up set"
-                            : "Working set",
+                            ? ATHLTHLocalization.choose(
+                                english: "Warm-up set",
+                                norwegian: "Oppvarmingssett"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Working set",
+                                norwegian: "Arbeidssett"
+                            ),
                         systemImage:
                             snapshot.isWarmUp == true
                                 ? "flame.fill"
@@ -982,43 +1132,26 @@ struct WatchActiveWorkoutView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-
-                Button {
-                    workoutManager.completeStrengthSet()
-                } label: {
-                    Label(
-                        workoutManager
-                            .strengthActionPending
-                            ? "Syncing…"
-                            : "Complete Set",
-                        systemImage:
-                            workoutManager
-                                .strengthActionPending
-                                ? "arrow.triangle.2.circlepath"
-                                : "checkmark.circle.fill"
-                    )
-                    .font(.system(size: 13, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(WatchTheme.green)
-                .disabled(
-                    workoutManager
-                        .strengthActionPending
-                )
             } else {
                 VStack(spacing: 7) {
                     Image(systemName: "iphone")
                         .font(.title3)
                         .foregroundStyle(WatchTheme.green)
 
-                    Text("Add an exercise on iPhone")
-                        .font(.system(size: 11, weight: .bold))
-                        .multilineTextAlignment(.center)
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Add an exercise on iPhone",
+                            norwegian: "Legg til en øvelse på iPhone"
+                        )
+                    )
+                    .font(.system(size: 11, weight: .bold))
+                    .multilineTextAlignment(.center)
 
                     Text(
-                        "The Watch will update automatically."
+                        ATHLTHLocalization.choose(
+                            english: "The Watch will update automatically.",
+                            norwegian: "Klokken oppdateres automatisk."
+                        )
                     )
                     .font(.system(size: 8))
                     .foregroundStyle(WatchTheme.muted)
@@ -1035,19 +1168,21 @@ struct WatchActiveWorkoutView: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english:
-                            "Preparing strength workout…",
-                        norwegian:
-                            "Klargjør styrkeøkt…"
+                        english: "Preparing strength workout…",
+                        norwegian: "Klargjør styrkeøkt…"
                     )
                 )
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
-                    .multilineTextAlignment(.center)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(WatchTheme.muted)
+                .multilineTextAlignment(.center)
 
-                Button("Sync") {
-                    workoutManager
-                        .requestStrengthSnapshot()
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Sync",
+                        norwegian: "Synkroniser"
+                    )
+                ) {
+                    workoutManager.requestStrengthSnapshot()
                 }
                 .buttonStyle(.bordered)
             }
@@ -1055,6 +1190,18 @@ struct WatchActiveWorkoutView: View {
             .frame(maxWidth: .infinity)
             .watchSurface()
         }
+    }
+
+    private func strengthNextExerciseName(
+        _ snapshot: WatchStrengthSessionSnapshot
+    ) -> String? {
+        snapshot.exerciseQueue?
+            .first(
+                where: {
+                    $0.index > snapshot.exerciseIndex
+                }
+            )?
+            .name
     }
 
     private var strengthWeightBinding: Binding<Double> {
@@ -1655,6 +1802,160 @@ struct WatchSpotifyRemotePage: View {
         // Spotify playback can be controlled while the iPhone is left behind.
         NowPlayingView()
             .ignoresSafeArea()
+    }
+}
+
+
+private struct WatchStrengthPrimaryCrownMetric: View {
+    let title: String
+    let valueText: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let icon: String
+    let tint: Color
+
+    @FocusState private var crownFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+
+            Text(valueText)
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+
+            HStack(spacing: 3) {
+                Image(
+                    systemName:
+                        "digitalcrown.horizontal.arrow.clockwise"
+                )
+                .font(.system(size: 8, weight: .bold))
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Crown",
+                        norwegian: "Krone"
+                    )
+                )
+                .font(.system(size: 7, weight: .semibold))
+            }
+            .foregroundStyle(
+                crownFocused
+                    ? tint
+                    : WatchTheme.muted
+            )
+        }
+        .padding(8)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 76,
+            alignment: .leading
+        )
+        .background(
+            tint.opacity(
+                crownFocused ? 0.15 : 0.07
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(
+                    crownFocused ? 0.48 : 0.14
+                ),
+                lineWidth:
+                    crownFocused ? 1.2 : 0.8
+            )
+        }
+        .contentShape(Rectangle())
+        .focusable()
+        .focused($crownFocused)
+        .digitalCrownRotation(
+            $value,
+            from: range.lowerBound,
+            through: range.upperBound,
+            by: step,
+            sensitivity: .medium,
+            isContinuous: false,
+            isHapticFeedbackEnabled: true
+        )
+        .onTapGesture {
+            crownFocused = true
+        }
+    }
+}
+
+private struct WatchStrengthStaticPrimaryMetric: View {
+    let title: String
+    let valueText: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(tint)
+
+                Text(title)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+
+                Spacer(minLength: 0)
+            }
+
+            Text(valueText)
+                .font(
+                    .system(
+                        size: 21,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .padding(8)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 64,
+            alignment: .leading
+        )
+        .background(
+            tint.opacity(0.07),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
     }
 }
 
