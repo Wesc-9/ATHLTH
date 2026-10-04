@@ -271,9 +271,11 @@ struct MirroredWorkoutLiveView: View {
             await syncLivePosition()
         }
         .onAppear {
+            mirroring.liveViewDidAppear()
             updateScreenAwakeState()
         }
         .onDisappear {
+            mirroring.liveViewDidDisappear()
             ATHLTHWorkoutScreenAwake.set(
                 false,
                 reason: "watch-mirrored-workout"
