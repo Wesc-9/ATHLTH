@@ -205,8 +205,17 @@ enum HealthPersonalRecordKind: String, Hashable {
     case fastestMarathon
     case longestRide
     case longestWalkOrHike
+    case longestSwim
     case longestWorkout
+    case longestStrengthWorkout
+    case longestHIITWorkout
+    case longestRowingWorkout
+    case longestEllipticalWorkout
+    case longestStairClimbingWorkout
+    case longestYogaWorkout
+    case longestCoreWorkout
     case mostActiveCalories
+    case mostStepsInWorkout
 
     var title: String {
         switch self {
@@ -219,8 +228,53 @@ enum HealthPersonalRecordKind: String, Hashable {
         case .fastestMarathon: return ATHLTHLocalization.string( "Fastest Marathon")
         case .longestRide: return ATHLTHLocalization.string( "Longest Ride")
         case .longestWalkOrHike: return ATHLTHLocalization.string( "Longest Walk / Hike")
+        case .longestSwim:
+            return ATHLTHLocalization.choose(
+                english: "Longest Swim",
+                norwegian: "Lengste svømmetur"
+            )
         case .longestWorkout: return ATHLTHLocalization.string( "Longest Workout")
+        case .longestStrengthWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Strength Workout",
+                norwegian: "Lengste styrkeøkt"
+            )
+        case .longestHIITWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest HIIT Workout",
+                norwegian: "Lengste HIIT-økt"
+            )
+        case .longestRowingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Rowing Workout",
+                norwegian: "Lengste roøkt"
+            )
+        case .longestEllipticalWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Elliptical Workout",
+                norwegian: "Lengste ellipseøkt"
+            )
+        case .longestStairClimbingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Stair Workout",
+                norwegian: "Lengste trappeøkt"
+            )
+        case .longestYogaWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Yoga Workout",
+                norwegian: "Lengste yogaøkt"
+            )
+        case .longestCoreWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest Core Workout",
+                norwegian: "Lengste kjernestyrkeøkt"
+            )
         case .mostActiveCalories: return ATHLTHLocalization.string( "Most Active Calories")
+        case .mostStepsInWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Most Steps in a Workout",
+                norwegian: "Flest steg i én økt"
+            )
         }
     }
 
@@ -239,10 +293,28 @@ enum HealthPersonalRecordKind: String, Hashable {
             return "figure.outdoor.cycle"
         case .longestWalkOrHike:
             return "figure.hiking"
+        case .longestSwim:
+            return "figure.pool.swim"
         case .longestWorkout:
             return "clock.fill"
+        case .longestStrengthWorkout:
+            return "dumbbell.fill"
+        case .longestHIITWorkout:
+            return "figure.highintensity.intervaltraining"
+        case .longestRowingWorkout:
+            return "figure.rower"
+        case .longestEllipticalWorkout:
+            return "figure.elliptical"
+        case .longestStairClimbingWorkout:
+            return "figure.stair.stepper"
+        case .longestYogaWorkout:
+            return "figure.yoga"
+        case .longestCoreWorkout:
+            return "figure.core.training"
         case .mostActiveCalories:
             return "flame.fill"
+        case .mostStepsInWorkout:
+            return "shoeprints.fill"
         }
     }
 
@@ -283,7 +355,10 @@ struct HealthPersonalRecord: Identifiable, Equatable {
 
     var formattedValue: String {
         switch kind {
-        case .longestRun, .longestRide, .longestWalkOrHike:
+        case .longestRun,
+             .longestRide,
+             .longestWalkOrHike,
+             .longestSwim:
             return String(format: "%.1f km", value / 1_000)
 
         case .fastest1K,
@@ -308,7 +383,14 @@ struct HealthPersonalRecord: Identifiable, Equatable {
 
             return String(format: "%d:%02d", minutes, seconds)
 
-        case .longestWorkout:
+        case .longestWorkout,
+             .longestStrengthWorkout,
+             .longestHIITWorkout,
+             .longestRowingWorkout,
+             .longestEllipticalWorkout,
+             .longestStairClimbingWorkout,
+             .longestYogaWorkout,
+             .longestCoreWorkout:
             let totalMinutes = Int((value / 60).rounded())
             let hours = totalMinutes / 60
             let minutes = totalMinutes % 60
