@@ -1340,9 +1340,17 @@ struct ATHLTHHomeView: View {
                         GoalCoverView(
                             goal: goal
                         )
+                        // Some Goal artwork files include a small light
+                        // edge in the source image. Overscan the Home
+                        // thumbnail so the artwork always reaches the
+                        // rounded crop on every side.
                         .frame(
                             width: 90,
                             height: 90
+                        )
+                        .scaleEffect(
+                            1.18,
+                            anchor: .center
                         )
                         .clipped()
                         .clipShape(
