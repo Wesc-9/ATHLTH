@@ -398,6 +398,13 @@ struct HealthPersonalRecord: Identifiable, Equatable {
 
         case .mostActiveCalories:
             return "\(Int(value.rounded())) kcal"
+
+        case .mostStepsInWorkout:
+            return ATHLTHLocalization.format(
+                english: "%d steps",
+                norwegian: "%d steg",
+                Int(value.rounded())
+            )
         }
     }
 }
