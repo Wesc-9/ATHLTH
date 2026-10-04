@@ -553,60 +553,91 @@ struct GhostRaceHubView: View {
     }
 
     private var liveFriendEntry: some View {
-        ATHLTHCard {
-            HStack(spacing: 12) {
-                Image(
-                    systemName:
-                        "person.2.wave.2.fill"
-                )
-                .font(.title3)
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-                .frame(
-                    width: 42,
-                    height: 42
-                )
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 13,
-                            style: .continuous
-                        )
-                )
+        NavigationLink {
+            GhostFriendRaceHubView()
+        } label: {
+            ATHLTHCard {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "person.2.wave.2.fill"
+                    )
+                    .font(.title3)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                    )
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text("Race a friend")
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Race a friend",
+                                norwegian: "Konkurrer mot en venn"
+                            )
+                        )
                         .font(
                             .subheadline
                                 .weight(.semibold)
                         )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
 
-                    Text(
-                        "Use an existing friend Ghost challenge when you want a shared head-to-head session."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Use an existing friend Ghost challenge when you want a shared head-to-head session.",
+                                norwegian:
+                                    "Bruk en eksisterende Ghost-utfordring med en venn når du vil ha en delt én-mot-én-økt."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                NavigationLink {
-                    GhostFriendRaceHubView()
-                } label: {
                     Image(
                         systemName:
                             "chevron.right"
                     )
                     .font(.caption.bold())
+                    .foregroundStyle(.secondary)
                 }
+                .contentShape(Rectangle())
             }
         }
         .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english: "Race a friend",
+                norwegian: "Konkurrer mot en venn"
+            )
+        )
+        .accessibilityHint(
+            ATHLTHLocalization.choose(
+                english:
+                    "Open friend Ghost Races",
+                norwegian:
+                    "Åpner Ghost Race med venner"
+            )
+        )
     }
 
     @ViewBuilder
