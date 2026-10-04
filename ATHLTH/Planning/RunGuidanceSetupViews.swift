@@ -191,8 +191,10 @@ struct RunGuidanceSetupView: View {
         RunningWorkoutTemplate?
 
     var body: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(spacing: 14) {
+                guidanceHero
+
                 NavigationLink {
                     PerWorkoutAudioCoachView(
                         draft:
@@ -205,103 +207,467 @@ struct RunGuidanceSetupView: View {
                             structuredWorkout != nil
                     )
                 } label: {
-                    guidanceRow(
+                    guidanceFeatureCard(
                         title: "Audio Coach",
                         subtitle:
                             audioCoach.enabled
-                                ? "On for this workout"
-                                : "Off for this workout",
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "On · spoken pace, distance and workout cues",
+                                    norwegian:
+                                        "På · tempo, distanse og øktinstruksjoner"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Off · tap to configure spoken guidance",
+                                    norwegian:
+                                        "Av · trykk for å sette opp talestyring"
+                                ),
                         icon:
-                            "waveform.and.mic"
+                            "waveform.and.person.filled",
+                        tint:
+                            ATHLTHTheme
+                                .premiumGold,
+                        enabled:
+                            audioCoach.enabled
                     )
                 }
+                .buttonStyle(.plain)
 
                 if route != nil {
-                    NavigationLink {
-                        PerWorkoutRouteGuardianView(
-                            draft:
-                                $routeGuardian
-                        )
-                    } label: {
-                        guidanceRow(
-                            title: "Route Guardian",
-                            subtitle:
-                                routeGuardian.enabled
-                                    ? "Alert at \(Int(routeGuardian.deviationMeters.rounded())) m"
-                                    : "Off for this workout",
-                            icon:
-                                "location.fill"
-                        )
-                    }
-
                     NavigationLink {
                         PerWorkoutGhostView(
                             draft: $ghost,
                             route: route
                         )
                     } label: {
-                        guidanceRow(
-                            title: "Ghost Updates",
+                        guidanceFeatureCard(
+                            title: "Ghost",
                             subtitle:
                                 ghost.enabled
-                                    ? "Target \(ghost.targetTimeText)"
-                                    : "Off for this workout",
+                                    ? ATHLTHLocalization.format(
+                                        english:
+                                            "On · target %@ with live race updates",
+                                        norwegian:
+                                            "På · mål %@ med live sammenligning",
+                                        ghost.targetTimeText
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Race a target time on this route",
+                                        norwegian:
+                                            "Konkurrer mot en måltid på denne ruten"
+                                    ),
                             icon:
-                                "figure.run.circle"
+                                "figure.run.circle.fill",
+                            tint:
+                                ATHLTHTheme
+                                    .accentDeep,
+                            enabled:
+                                ghost.enabled
                         )
                     }
-                }
-            } header: {
-                Text("Guidance & Alerts")
-            } footer: {
-                Text(
-                    "These choices apply only to this workout. Your defaults remain unchanged in Settings → Workout Guidance."
-                )
-            }
+                    .buttonStyle(.plain)
 
-            Section {
+                    NavigationLink {
+                        PerWorkoutRouteGuardianView(
+                            draft:
+                                $routeGuardian
+                        )
+                    } label: {
+                        guidanceFeatureCard(
+                            title:
+                                "Route Guardian",
+                            subtitle:
+                                routeGuardian.enabled
+                                    ? ATHLTHLocalization.format(
+                                        english:
+                                            "On · alert after %.0f m off route",
+                                        norwegian:
+                                            "På · varsle etter %.0f m utenfor ruten",
+                                        routeGuardian
+                                            .deviationMeters
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Off · tap to configure route alerts",
+                                        norwegian:
+                                            "Av · trykk for å sette opp rutevarsler"
+                                    ),
+                            icon:
+                                "location.fill",
+                            tint:
+                                ATHLTHTheme
+                                    .vitality,
+                            enabled:
+                                routeGuardian
+                                    .enabled
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    ATHLTHCard {
+                        HStack(spacing: 12) {
+                            Image(
+                                systemName:
+                                    "map.circle"
+                            )
+                            .font(
+                                .system(
+                                    size: 20,
+                                    weight: .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .frame(
+                                width: 44,
+                                height: 44
+                            )
+                            .background(
+                                Color.primary
+                                    .opacity(0.04),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius: 13,
+                                        style: .continuous
+                                    )
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Ghost + Route Guardian",
+                                        norwegian:
+                                            "Ghost + Route Guardian"
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Choose a route to unlock route-aware guidance.",
+                                        norwegian:
+                                            "Velg en rute for å aktivere ruteavhengig veiledning."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
+                    }
+                    .opacity(0.72)
+                }
+
                 NavigationLink {
                     ATHLTHWorkoutGuidanceSettingsView()
                 } label: {
-                    Label(
-                        "Edit global defaults",
-                        systemImage: "gearshape"
+                    HStack(spacing: 11) {
+                        Image(
+                            systemName:
+                                "gearshape.fill"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Global Workout Guidance defaults",
+                                norwegian:
+                                    "Standardvalg for treningsveiledning"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                    }
+                    .padding(14)
+                    .background(
+                        Color.white
+                            .opacity(0.70),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 18,
+                                style: .continuous
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+        }
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Run Guidance",
+                norwegian:
+                    "Løpeveiledning"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+    }
+
+    private var guidanceHero:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                Text("RUN SMARTER")
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(2.2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Coach. Compare. Stay on route.",
+                        norwegian:
+                            "Coach. Sammenlign. Hold ruten."
+                    )
+                )
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "These tools run live on iPhone and Apple Watch and are configured for this workout only.",
+                        norwegian:
+                            "Disse verktøyene følger økten live på iPhone og Apple Watch, og gjelder kun denne økten."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .secondary
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+                HStack(spacing: 8) {
+                    heroPill(
+                        "Coach",
+                        icon:
+                            "waveform.and.mic"
+                    )
+                    heroPill(
+                        "Ghost",
+                        icon:
+                            "figure.run"
+                    )
+                    heroPill(
+                        ATHLTHLocalization.choose(
+                            english: "Alerts",
+                            norwegian: "Varsler"
+                        ),
+                        icon:
+                            "bell.badge"
                     )
                 }
             }
         }
-        .navigationTitle("Guidance & Alerts")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder
-    private func guidanceRow(
-        title: String,
-        subtitle: String,
+    private func heroPill(
+        _ title: String,
         icon: String
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
-                .frame(width: 30)
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .system(
+                size: 10,
+                weight: .semibold
+            )
+        )
+        .foregroundStyle(
+            ATHLTHTheme
+                .accentDeep
+        )
+        .padding(
+            .horizontal,
+            10
+        )
+        .frame(height: 30)
+        .background(
+            ATHLTHTheme
+                .accentSoft,
+            in: Capsule()
+        )
+    }
 
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
+    private func guidanceFeatureCard(
+        title: String,
+        subtitle: String,
+        icon: String,
+        tint: Color,
+        enabled: Bool
+    ) -> some View {
+        ATHLTHCard {
+            HStack(spacing: 13) {
+                Image(
+                    systemName: icon
+                )
+                .font(
+                    .system(
+                        size: 19,
+                        weight: .semibold
                     )
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 46,
+                    height: 46
+                )
+                .background(
+                    tint.opacity(0.10),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    HStack(spacing: 7) {
+                        Text(title)
+                            .font(
+                                .headline
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                        Text(
+                            enabled
+                                ? ATHLTHLocalization.choose(
+                                    english: "ON",
+                                    norwegian: "PÅ"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "OFF",
+                                    norwegian: "AV"
+                                )
+                        )
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            enabled
+                                ? ATHLTHTheme
+                                    .vitality
+                                : ATHLTHTheme
+                                    .mutedText
+                        )
+                        .padding(
+                            .horizontal,
+                            6
+                        )
+                        .padding(
+                            .vertical,
+                            3
+                        )
+                        .background(
+                            (
+                                enabled
+                                    ? ATHLTHTheme
+                                        .vitalitySoft
+                                    : Color.primary
+                                        .opacity(0.04)
+                            ),
+                            in: Capsule()
+                        )
+                    }
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(
+                    .tertiary
+                )
             }
         }
-        .padding(.vertical, 3)
     }
 }
 
