@@ -3571,134 +3571,81 @@ private struct FreestyleExercisePrescriptionView: View {
 
     private var targetRow:
         some View {
-        HStack(spacing: 12) {
-            Menu {
-                Button {
-                    targetKind = .reps
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Target reps",
-                            norwegian: "Målreps"
-                        ),
-                        systemImage:
-                            targetKind == .reps
-                                ? "checkmark"
-                                : "repeat"
+        Group {
+            if targetKind == .reps {
+                Stepper(
+                    value: $reps,
+                    in: 1...100
+                ) {
+                    targetMenu(
+                        value: "\(reps)"
                     )
                 }
-
-                Button {
-                    targetKind = .time
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Duration",
-                            norwegian: "Varighet"
-                        ),
-                        systemImage:
-                            targetKind == .time
-                                ? "checkmark"
-                                : "timer"
-                    )
-                }
-            } label: {
-                HStack(spacing: 5) {
-                    Text(targetKind.title)
-                        .foregroundStyle(
-                            .primary
-                        )
-
-                    Image(
-                        systemName:
-                            "chevron.up.chevron.down"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        .secondary
+            } else {
+                Stepper(
+                    value: $durationSeconds,
+                    in: 15...7_200,
+                    step: 15
+                ) {
+                    targetMenu(
+                        value:
+                            TimeInterval(
+                                durationSeconds
+                            )
+                            .clockDuration
                     )
                 }
             }
-
-            Spacer()
-
-            Button {
-                adjustTarget(by: -1)
-            } label: {
-                Image(systemName: "minus")
-                    .frame(
-                        width: 30,
-                        height: 30
-                    )
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(
-                targetKind == .reps
-                    ? reps <= 1
-                    : durationSeconds <= 15
-            )
-
-            Text(targetValue)
-                .font(
-                    .body
-                        .monospacedDigit()
-                )
-                .frame(
-                    minWidth: 52
-                )
-
-            Button {
-                adjustTarget(by: 1)
-            } label: {
-                Image(systemName: "plus")
-                    .frame(
-                        width: 30,
-                        height: 30
-                    )
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
-    private var targetValue: String {
-        switch targetKind {
-        case .reps:
-            return "\(reps)"
-        case .time:
-            return
-                TimeInterval(
-                    durationSeconds
-                )
-                .clockDuration
-        }
-    }
-
-    private func adjustTarget(
-        by direction: Int
-    ) {
-        switch targetKind {
-        case .reps:
-            reps =
-                min(
-                    max(
-                        reps + direction,
-                        1
+    private func targetMenu(
+        value: String
+    ) -> some View {
+        Menu {
+            Button {
+                targetKind = .reps
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Target reps",
+                        norwegian: "Målreps"
                     ),
-                    100
+                    systemImage:
+                        targetKind == .reps
+                            ? "checkmark"
+                            : "repeat"
                 )
+            }
 
-        case .time:
-            durationSeconds =
-                min(
-                    max(
-                        durationSeconds +
-                            direction * 15,
-                        15
+            Button {
+                targetKind = .time
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Duration",
+                        norwegian: "Varighet"
                     ),
-                    7_200
+                    systemImage:
+                        targetKind == .time
+                            ? "checkmark"
+                            : "timer"
                 )
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(
+                    "\(targetKind.title): \(value)"
+                )
+                .foregroundStyle(.primary)
+
+                Image(
+                    systemName:
+                        "chevron.down"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 }
