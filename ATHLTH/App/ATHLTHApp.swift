@@ -673,19 +673,21 @@ struct AppRootView: View {
                 await syncHomeAssistantSnapshot()
             }
         }
-        .onChange(of: appSession.profile.presence) { _, presence in
+        .onChange(of: appSession.profile.presence) { previous, presence in
             guard appSession.signedIn else {
                 return
             }
 
             Task {
-                if presence.state == .training {
+                if presence.state == .training,
+                   previous.state != .training {
                     await homeAssistant.sendWorkoutStarted(
                         name: presence.workoutTitle,
                         startedAt: presence.startedAt
                     )
-                } else {
-                    await homeAssistant.sendWorkoutCancelled()
+                } else if previous.state == .training,
+                          presence.state != .training {
+                    await homeAssistant.sendWorkoutStopped()
                 }
 
                 if social.privacy?
