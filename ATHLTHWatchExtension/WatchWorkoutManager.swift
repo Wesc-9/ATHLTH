@@ -64,6 +64,8 @@ private struct WatchPersistedWorkoutState: Codable {
     var automaticPauseEnabled: Bool? = nil
     var strengthSession:
         WatchStrengthSessionSnapshot? = nil
+    var strengthCommands:
+        [WatchStrengthCommand]? = nil
 }
 
 enum WatchWorkoutState: Equatable {
@@ -115,6 +117,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         WatchAudioCoachConfiguration = .disabled
     @Published private(set) var structuredRunningWorkout:
         WatchRunningWorkoutTransfer?
+    @Published private(set) var treadmillInclinePercent:
+        Double?
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
@@ -192,6 +196,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         "athlth.watch.activeWorkoutRecovery.v1"
     private var recoveryInProgress = false
     private var workoutInitiatedLocallyOnWatch = false
+    private var strengthCommandJournal:
+        [WatchStrengthCommand] = []
 
     private override init() {
         super.init()
@@ -307,6 +313,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         publish {
             self.structuredRunningWorkout =
                 workout.steps.isEmpty ? nil : workout
+            self.treadmillInclinePercent =
+                workout.treadmillInclinePercent
             self.structuredStepIndex = 0
 
             if let routeAlerts = workout.routeAlerts {
@@ -1017,7 +1025,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func updateStrengthDraft(
         reps: Int? = nil,
+        durationSeconds: Int? = nil,
         weightKilograms: Double? = nil,
+        resistanceLevel: Int? = nil,
         restSeconds: Int? = nil,
         rpe: Double? = nil,
         rir: Double? = nil,
@@ -1031,9 +1041,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let reps {
             snapshot.draftReps = max(reps, 0)
         }
+        if let durationSeconds {
+            snapshot.draftDurationSeconds =
+                min(max(durationSeconds, 0), 7_200)
+        }
         if let weightKilograms {
             snapshot.draftWeightKilograms =
                 max(weightKilograms, 0)
+        }
+        if let resistanceLevel {
+            snapshot.draftResistanceLevel =
+                min(max(resistanceLevel, 1), 10)
         }
         if let restSeconds {
             snapshot.draftRestSeconds =
@@ -1067,6 +1085,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     snapshot.draftWeightKilograms,
                 restSeconds:
                     snapshot.draftRestSeconds,
+                durationSeconds:
+                    snapshot.draftDurationSeconds,
+                resistanceLevel:
+                    snapshot.draftResistanceLevel,
                 addRestSeconds: nil,
                 sentAt: Date(),
                 rpe: snapshot.draftRPE,
@@ -1104,6 +1126,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     restSeconds:
                         snapshot
                             .draftRestSeconds,
+                    durationSeconds:
+                        snapshot
+                            .draftDurationSeconds,
+                    resistanceLevel:
+                        snapshot
+                            .draftResistanceLevel,
                     addRestSeconds: nil,
                     sentAt: Date(),
                     rpe:
@@ -1120,16 +1148,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
         if sent {
-            if strengthCompanionReachable {
-                publish {
-                    self.strengthActionPending =
-                        true
-                }
-            } else {
-                applyOptimisticStrengthCompletion(
-                    snapshot
-                )
-            }
+            // Watch is the local source of truth for interaction. Advance
+            // immediately even when iPhone is reachable; the returned iPhone
+            // snapshot can only confirm/equal this state and cannot roll it
+            // backwards.
+            applyOptimisticStrengthCompletion(
+                snapshot
+            )
         }
     }
 
@@ -1152,8 +1177,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
 
-        if sent &&
-            !strengthCompanionReachable {
+        if sent {
             publish {
                 var updated = snapshot
                 updated.isResting = false
@@ -1187,8 +1211,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
 
-        if sent &&
-            !strengthCompanionReachable {
+        if sent {
             publish {
                 var updated = snapshot
                 let base =
@@ -1243,16 +1266,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
         if sent {
-            if strengthCompanionReachable {
-                publish {
-                    self.strengthActionPending =
-                        true
-                }
-            } else {
-                applyOptimisticNextStrengthExercise(
-                    snapshot
-                )
-            }
+            applyOptimisticNextStrengthExercise(
+                snapshot
+            )
         }
     }
 
@@ -1288,6 +1304,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 false
             updated.allExercisesComplete =
                 false
+            applyStrengthPlanDefaults(
+                to: &updated,
+                exerciseIndex:
+                    snapshot.exerciseIndex,
+                setIndex:
+                    nextSetIndex
+            )
         } else {
             updated.currentExerciseComplete =
                 true
@@ -1369,6 +1392,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         updated.allExercisesComplete =
             false
+        applyStrengthPlanDefaults(
+            to: &updated,
+            exerciseIndex:
+                next.index,
+            setIndex: 0
+        )
         updated.isResting = false
         updated.restEndsAt = nil
         updated.updatedAt = Date()
@@ -1393,19 +1422,45 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 addRestSeconds: nil,
                 sentAt: Date(),
                 initiatedOnWatch:
+                    workoutInitiatedLocallyOnWatch,
+                bootstrapSnapshot:
                     workoutInitiatedLocallyOnWatch
+                        ? strengthSession
+                        : nil
             )
         )
     }
 
     @discardableResult
     private func sendStrengthCommand(
-        _ command: WatchStrengthCommand
+        _ rawCommand: WatchStrengthCommand
     ) -> Bool {
-        guard WCSession.isSupported(),
-              WCSession.default.activationState ==
-                .activated,
-              let data =
+        var command = rawCommand
+        if command.kind == .requestSnapshot,
+           command.bootstrapSnapshot == nil,
+           workoutInitiatedLocallyOnWatch {
+            command.bootstrapSnapshot =
+                strengthSession
+        }
+
+        if !strengthCommandJournal
+            .contains(where: {
+                $0.id == command.id
+            }) {
+            strengthCommandJournal.append(
+                command
+            )
+            if strengthCommandJournal.count >
+                512 {
+                strengthCommandJournal =
+                    Array(
+                        strengthCommandJournal
+                            .suffix(384)
+                    )
+            }
+        }
+
+        guard let data =
                 try? JSONEncoder()
                     .encode(command)
         else {
@@ -1424,21 +1479,28 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .timeIntervalSince1970
         ]
 
-        if WCSession.default.isReachable {
-            WCSession.default.sendMessage(
-                payload,
-                replyHandler: nil,
-                errorHandler:
-                    Self
-                        .makeStrengthCommandFallbackHandler(
-                            payload: payload
-                        )
+        if WCSession.isSupported(),
+           WCSession.default.activationState ==
+                .activated {
+            // Always queue a durable copy. sendMessage remains the low-latency
+            // fast path, while transferUserInfo guarantees replay after hours
+            // away from iPhone or the internet.
+            WCSession.default.transferUserInfo(
+                payload
             )
-        } else {
-            WCSession.default
-                .transferUserInfo(payload)
+
+            if WCSession.default.isReachable {
+                WCSession.default.sendMessage(
+                    payload,
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            }
         }
 
+        // No companion session is required for local Watch logging. The full
+        // journal is also embedded in WatchWorkoutResult at finish.
+        persistWorkoutRecoveryState()
         return true
     }
 
@@ -1449,6 +1511,229 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             WCSession.default
                 .transferUserInfo(payload)
         }
+    }
+
+    private func ensureStandaloneStrengthSession(
+        title: String =
+            ATHLTHLocalization.choose(
+                english: "Freestyle Strength",
+                norwegian: "Fri styrke"
+            )
+    ) {
+        guard strengthSession == nil else {
+            return
+        }
+
+        let workoutID = UUID()
+        let setPlans =
+            (1...3).map {
+                WatchStrengthSetPlan(
+                    setNumber: $0,
+                    reps: 8,
+                    weightKilograms: 20,
+                    restSeconds: 90,
+                    isWarmUp: nil
+                )
+            }
+
+        let exercise =
+            WatchStrengthExerciseSummary(
+                index: 0,
+                name:
+                    ATHLTHLocalization.choose(
+                        english: "Strength",
+                        norwegian: "Styrke"
+                    ),
+                primaryMuscles: [],
+                setCount: setPlans.count,
+                instructions: [],
+                secondaryMuscles: [],
+                equipment: [],
+                setPlans: setPlans
+            )
+
+        let snapshot =
+            WatchStrengthSessionSnapshot(
+                workoutID: workoutID,
+                title: title,
+                exerciseIndex: 0,
+                exerciseCount: 1,
+                exerciseName:
+                    exercise.name,
+                primaryMuscles: [],
+                setIndex: 0,
+                setCount:
+                    exercise.setCount,
+                setNumber: 1,
+                completedSets: 0,
+                totalSets:
+                    exercise.setCount,
+                draftReps: 8,
+                draftWeightKilograms: 20,
+                draftRestSeconds: 90,
+                draftDurationSeconds: nil,
+                draftResistanceLevel: nil,
+                targetKindRaw: "reps",
+                loadKindRaw:
+                    "weightKilograms",
+                isResting: false,
+                restEndsAt: nil,
+                currentExerciseComplete:
+                    false,
+                hasNextExercise: false,
+                allExercisesComplete: false,
+                updatedAt: Date(),
+                inputMode: .appleWatch,
+                draftRPE: 8,
+                draftRIR: 2,
+                isWarmUp: false,
+                effortMetricRaw: "rpe",
+                exerciseQueue: [exercise],
+                startedAt: Date(),
+                plannedSessionID: nil,
+                allowsLiveExerciseBuilding:
+                    true
+            )
+
+        strengthCommandJournal = []
+        publish {
+            self.strengthSession =
+                snapshot
+            self.strengthActionPending =
+                false
+        }
+        persistWorkoutRecoveryState()
+    }
+
+    private func markStandaloneStrengthStarted() {
+        guard var snapshot =
+                strengthSession
+        else {
+            return
+        }
+
+        let now = Date()
+        snapshot.startedAt = now
+        snapshot.updatedAt = now
+        snapshot.inputMode =
+            .appleWatch
+        snapshot.isResting = false
+        snapshot.restEndsAt = nil
+        snapshot.completedSets = 0
+        snapshot.allExercisesComplete =
+            false
+        snapshot.currentExerciseComplete =
+            false
+        snapshot.exerciseIndex = 0
+        snapshot.setIndex = 0
+        snapshot.setNumber =
+            snapshot.setCount > 0
+                ? 1
+                : nil
+
+        if let first =
+                snapshot.exerciseQueue?
+                    .sorted(by: {
+                        $0.index < $1.index
+                    })
+                    .first {
+            snapshot.exerciseName =
+                first.name
+            snapshot.primaryMuscles =
+                first.primaryMuscles
+            snapshot.setCount =
+                first.setCount
+            snapshot.hasNextExercise =
+                (snapshot.exerciseQueue?.count ??
+                    0) > 1
+            applyStrengthPlanDefaults(
+                to: &snapshot,
+                exerciseIndex:
+                    first.index,
+                setIndex: 0
+            )
+        }
+
+        strengthCommandJournal = []
+        publish {
+            self.strengthSession =
+                snapshot
+            self.strengthActionPending =
+                false
+        }
+        persistWorkoutRecoveryState()
+    }
+
+    private func applyStrengthPlanDefaults(
+        to snapshot:
+            inout WatchStrengthSessionSnapshot,
+        exerciseIndex: Int,
+        setIndex: Int
+    ) {
+        guard let exercise =
+                snapshot.exerciseQueue?
+                    .first(
+                        where: {
+                            $0.index ==
+                                exerciseIndex
+                        }
+                    ),
+              let plans =
+                exercise.setPlans,
+              plans.indices.contains(setIndex)
+        else {
+            return
+        }
+
+        let plan = plans[setIndex]
+
+        if let reps = plan.reps {
+            snapshot.draftReps =
+                max(reps, 0)
+            snapshot
+                .targetKindRaw =
+                "reps"
+        }
+
+        if let duration =
+                plan.durationSeconds {
+            snapshot.draftDurationSeconds =
+                max(duration, 0)
+            snapshot
+                .targetKindRaw =
+                "time"
+        } else {
+            snapshot.draftDurationSeconds =
+                nil
+        }
+
+        if let weight =
+                plan.weightKilograms {
+            snapshot.draftWeightKilograms =
+                max(weight, 0)
+            snapshot.loadKindRaw =
+                "weightKilograms"
+        }
+
+        if let resistance =
+                plan.resistanceLevel {
+            snapshot.draftResistanceLevel =
+                min(max(resistance, 1), 10)
+            snapshot.loadKindRaw =
+                "resistanceLevel"
+        } else {
+            snapshot.draftResistanceLevel =
+                nil
+        }
+
+        if let rest =
+                plan.restSeconds {
+            snapshot.draftRestSeconds =
+                min(max(rest, 0), 600)
+        }
+
+        snapshot.isWarmUp =
+            plan.isWarmUp
     }
 
     var currentStructuredRunningStep: WatchRunningWorkoutStep? {
@@ -1614,6 +1899,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         route: WatchRouteTransfer? = nil
     ) async {
         workoutInitiatedLocallyOnWatch = true
+
+        if kind == .strength {
+            ensureStandaloneStrengthSession()
+            markStandaloneStrengthStarted()
+        }
+
         let configuration =
             HKWorkoutConfiguration()
         configuration.activityType =
@@ -1666,7 +1957,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 automaticPauseEnabled:
                     automaticPauseEnabled,
                 strengthSession:
-                    strengthSession
+                    strengthSession,
+                strengthCommands:
+                    strengthCommandJournal
             )
 
         guard let data =
@@ -1705,6 +1998,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             snapshot.startedAt
         ghostRaceConfiguration =
             snapshot.ghostRace
+        strengthCommandJournal =
+            snapshot.strengthCommands ?? []
         structuredStepStartElapsedTime =
             snapshot
                 .structuredStepStartElapsedTime
@@ -1775,6 +2070,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutInitiatedLocallyOnWatch = true
         prepareForLocalWorkoutStart()
 
+        if kind == .strength {
+            ensureStandaloneStrengthSession()
+            markStandaloneStrengthStarted()
+        }
+
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = activityType(for: kind)
         configuration.locationType = kind.usesOutdoorLocation ? .outdoor : .indoor
@@ -1793,6 +2093,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         publish {
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
+            self.treadmillInclinePercent = nil
             self.structuredStepIndex = 0
             self.plannedRoute = nil
             self.routeProgressPercent = nil
@@ -1897,6 +2198,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
         audioCoachReadyAnnouncedForWorkout = false
+        strengthCommandJournal = []
         guidancePriorityGate.reset()
         publish {
             self.state = .idle
@@ -1928,6 +2230,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.plannedRoute = nil
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
+            self.treadmillInclinePercent = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
             self.strengthActionPending = false
@@ -3614,6 +3917,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
+        if audioCoachConfiguration
+                .shouldPreferIPhoneAudioWhenReachable,
+           WCSession.isSupported(),
+           WCSession.default.activationState ==
+                .activated,
+           WCSession.default.isReachable {
+            // iPhone is actively mirroring this workout and owns spoken
+            // guidance while reachable. If reachability drops, Watch resumes
+            // Audio Coach automatically on the next cue.
+            return
+        }
+
         let audioIsBusy =
             speechSynthesizer.isSpeaking ||
             audioCoachActivationTask != nil
@@ -3901,7 +4216,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let routeCompletion =
             routeCompletionAnalysis()
 
-        let result = WatchWorkoutResult(
+        var result = WatchWorkoutResult(
             id: UUID(),
             kind: kind,
             healthKitWorkoutUUID: workout.uuid,
@@ -3945,6 +4260,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeTitle:
                 plannedRoute?.title
         )
+
+        if kind == .strength {
+            result.strengthSnapshot =
+                strengthSession
+            result.strengthCommands =
+                strengthCommandJournal
+        }
 
         sendToPhone(result)
 
@@ -4062,19 +4384,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let session = WCSession.default
 
+        // Keep a durable copy even when the iPhone is currently
+        // reachable. HealthKit finalization can outlive the foreground
+        // connection by several seconds, so relying on sendMessage alone can
+        // lose the completion handshake when reachability changes at the
+        // wrong moment. The iPhone de-duplicates results by result.id.
+        session.transferUserInfo(
+            payload
+        )
+
         if session.activationState == .activated,
            session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler:
-                    Self.makeWorkoutResultFallbackHandler(
-                        payload: payload
-                    )
-            )
-        } else {
-            session.transferUserInfo(
-                payload
+                errorHandler: nil
             )
         }
     }
@@ -4157,6 +4481,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 kind.title,
             currentPaceSecondsPerKilometer:
                 currentPaceSecondsPerKilometer,
+            treadmillInclinePercent:
+                treadmillInclinePercent,
             routeRemainingMeters:
                 routeRemainingMeters,
             routeDeviationMeters:

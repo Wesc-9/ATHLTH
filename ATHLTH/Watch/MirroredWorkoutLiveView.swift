@@ -34,35 +34,59 @@ struct MirroredWorkoutLiveView: View {
                             )
                         }
 
-                        timer(snapshot)
-
-                        HStack(spacing: 12) {
-                            metricCard(
-                                title: "Heart rate",
-                                value: snapshot.heartRate > 0
-                                    ? "\(Int(snapshot.heartRate.rounded()))"
-                                    : "—",
-                                unit: "bpm",
-                                icon: "heart.fill"
+                        if snapshot.kind ==
+                            .running {
+                            runningDashboard(
+                                snapshot
                             )
+                        } else {
+                            timer(snapshot)
 
-                            metricCard(
-                                title: "Calories",
-                                value: "\(Int(snapshot.activeCalories.rounded()))",
-                                unit: "kcal",
-                                icon: "flame.fill"
-                            )
-
-                            if snapshot.kind.supportsDistanceMetric {
+                            HStack(
+                                spacing: 12
+                            ) {
                                 metricCard(
-                                    title: "Distance",
-                                    value: String(
-                                        format: "%.2f",
-                                        snapshot.distanceMeters / 1000
-                                    ),
-                                    unit: "km",
-                                    icon: "location.fill"
+                                    title:
+                                        "Heart rate",
+                                    value:
+                                        snapshot
+                                            .heartRate >
+                                        0
+                                            ? "\(Int(snapshot.heartRate.rounded()))"
+                                            : "—",
+                                    unit: "bpm",
+                                    icon:
+                                        "heart.fill"
                                 )
+
+                                metricCard(
+                                    title:
+                                        "Calories",
+                                    value:
+                                        "\(Int(snapshot.activeCalories.rounded()))",
+                                    unit: "kcal",
+                                    icon:
+                                        "flame.fill"
+                                )
+
+                                if snapshot.kind
+                                    .supportsDistanceMetric {
+                                    metricCard(
+                                        title:
+                                            "Distance",
+                                        value:
+                                            String(
+                                                format:
+                                                    "%.2f",
+                                                snapshot
+                                                    .distanceMeters /
+                                                1000
+                                            ),
+                                        unit: "km",
+                                        icon:
+                                            "location.fill"
+                                    )
+                                }
                             }
                         }
 
@@ -106,25 +130,58 @@ struct MirroredWorkoutLiveView: View {
                             .buttonStyle(.plain)
                         }
 
-                        ATHLTHCard {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("Apple Watch")
-                                        .font(.headline)
+                        if snapshot.kind !=
+                            .running {
+                            ATHLTHCard {
+                                HStack {
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 5
+                                    ) {
+                                        Text(
+                                            "Apple Watch"
+                                        )
+                                        .font(
+                                            .headline
+                                        )
 
-                                    Text(mirroring.connectionText)
+                                        Text(
+                                            mirroring
+                                                .connectionText
+                                        )
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    Label(
+                                        statusTitle(
+                                            snapshot
+                                                .state
+                                        ),
+                                        systemImage:
+                                            statusIcon(
+                                                snapshot
+                                                    .state
+                                            )
+                                    )
+                                    .font(
+                                        .caption
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        statusColor(
+                                            snapshot
+                                                .state
+                                        )
+                                    )
                                 }
-
-                                Spacer()
-
-                                Label(
-                                    statusTitle(snapshot.state),
-                                    systemImage: statusIcon(snapshot.state)
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(statusColor(snapshot.state))
                             }
                         }
 
@@ -153,8 +210,58 @@ struct MirroredWorkoutLiveView: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Live Workout")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Live Workout",
+                    norwegian: "Live økt"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                if mirroring
+                    .hasActiveMirroredWorkout {
+                    ToolbarItem(
+                        placement:
+                            .topBarLeading
+                    ) {
+                        Button {
+                            mirroring
+                                .minimizeWorkout()
+                        } label: {
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                        }
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Minimize workout",
+                                norwegian:
+                                    "Legg ned økten"
+                            )
+                        )
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    ATHLTHAudioRouteControl(
+                        compact: true
+                    )
+                }
+            }
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
         .task(
@@ -164,9 +271,11 @@ struct MirroredWorkoutLiveView: View {
             await syncLivePosition()
         }
         .onAppear {
+            mirroring.liveViewDidAppear()
             updateScreenAwakeState()
         }
         .onDisappear {
+            mirroring.liveViewDidDisappear()
             ATHLTHWorkoutScreenAwake.set(
                 false,
                 reason: "watch-mirrored-workout"
@@ -591,6 +700,314 @@ struct MirroredWorkoutLiveView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func runningDashboard(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) -> some View {
+        VStack(spacing: 12) {
+            ATHLTHCard {
+                VStack(spacing: 4) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "TIME",
+                            norwegian: "TID"
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .tracking(1.4)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    TimelineView(
+                        .periodic(
+                            from: .now,
+                            by: 1
+                        )
+                    ) { context in
+                        Text(
+                            durationText(
+                                displayedElapsedTime(
+                                    snapshot:
+                                        snapshot,
+                                    now:
+                                        context.date
+                                )
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 80,
+                                weight: .bold,
+                                design:
+                                    .rounded
+                            )
+                        )
+                        .monospacedDigit()
+                        .minimumScaleFactor(
+                            0.72
+                        )
+                        .lineLimit(1)
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+
+            HStack(spacing: 12) {
+                runningMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "DISTANCE",
+                            norwegian:
+                                "DISTANSE"
+                        ),
+                    value:
+                        String(
+                            format: "%.2f",
+                            snapshot
+                                .distanceMeters /
+                            1_000
+                        ),
+                    unit: "km"
+                )
+
+                runningMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "PACE",
+                            norwegian: "TEMPO"
+                        ),
+                    value:
+                        runningPaceText(
+                            snapshot
+                        ),
+                    unit: "/km"
+                )
+            }
+
+            HStack(spacing: 12) {
+                runningMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "HEART RATE",
+                            norwegian:
+                                "PULS"
+                        ),
+                    value:
+                        snapshot.heartRate >
+                            0
+                            ? "\(Int(snapshot.heartRate.rounded()))"
+                            : "—",
+                    unit: "bpm"
+                )
+
+                if let incline =
+                        snapshot
+                            .treadmillInclinePercent {
+                    runningMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "INCLINE",
+                                norwegian:
+                                    "STIGNING"
+                            ),
+                        value:
+                            String(
+                                format: "%.1f",
+                                incline
+                            ),
+                        unit: "%"
+                    )
+                }
+            }
+
+            HStack(spacing: 7) {
+                Image(
+                    systemName:
+                        snapshot
+                            .treadmillInclinePercent !=
+                            nil
+                            ? "figure.run.treadmill"
+                            : "applewatch"
+                )
+
+                Text(
+                    snapshot
+                        .treadmillInclinePercent !=
+                        nil
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Treadmill · live from Apple Watch",
+                            norwegian:
+                                "Tredemølle · live fra Apple Watch"
+                        )
+                        : mirroring
+                            .connectionText
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+
+                Spacer()
+
+                Label(
+                    statusTitle(
+                        snapshot.state
+                    ),
+                    systemImage:
+                        statusIcon(
+                            snapshot.state
+                        )
+                )
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    statusColor(
+                        snapshot.state
+                    )
+                )
+            }
+            .foregroundStyle(
+                .secondary
+            )
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private func runningMetric(
+        title: String,
+        value: String,
+        unit: String
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                Text(title)
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                    )
+                    .tracking(1.15)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                Spacer(
+                    minLength: 3
+                )
+
+                Text(value)
+                    .font(
+                        .system(
+                            size: 58,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .minimumScaleFactor(
+                        0.65
+                    )
+                    .lineLimit(1)
+
+                Text(unit)
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+            }
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 148,
+                alignment: .leading
+            )
+        }
+    }
+
+    private func runningPaceText(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) -> String {
+        guard let pace =
+                snapshot
+                    .currentPaceSecondsPerKilometer,
+              pace.isFinite,
+              pace > 0
+        else {
+            return "—"
+        }
+
+        return paceText(pace)
+    }
+
+    private func averageRunningPaceText(
+        _ snapshot:
+            WatchWorkoutLiveSnapshot
+    ) -> String {
+        guard snapshot.distanceMeters >
+                20,
+              snapshot.elapsedTime > 0
+        else {
+            return "—"
+        }
+
+        let pace =
+            snapshot.elapsedTime /
+            snapshot.distanceMeters *
+            1_000
+
+        guard pace.isFinite,
+              pace > 0
+        else {
+            return "—"
+        }
+
+        return paceText(pace)
+    }
+
+    private func paceText(
+        _ seconds:
+            TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(
+                    seconds.rounded()
+                ),
+                0
+            )
+        return String(
+            format: "%d:%02d",
+            total / 60,
+            total % 60
+        )
     }
 
     @ViewBuilder

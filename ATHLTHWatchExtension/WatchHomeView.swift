@@ -413,6 +413,15 @@ struct WatchHomeView: View {
                 )
         }
 
+        if workout.kind == .strength,
+           let strength =
+                workout.strengthWorkout {
+            workoutManager
+                .configureStrengthSession(
+                    strength
+                )
+        }
+
         Task {
             await workoutManager
                 .startPreparedWorkout(

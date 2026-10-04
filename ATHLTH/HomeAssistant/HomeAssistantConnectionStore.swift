@@ -127,6 +127,21 @@ struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
     let type: String
     let title: String?
     let message: String?
+    let data: [String: HomeAssistantJSONValue]?
+
+    init(
+        id: String,
+        type: String,
+        title: String? = nil,
+        message: String? = nil,
+        data: [String: HomeAssistantJSONValue]? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.message = message
+        self.data = data
+    }
 }
 
 private struct HomeAssistantWebhookResponse: Decodable {
@@ -210,6 +225,35 @@ enum HomeAssistantJSONValue: Codable, Hashable, Sendable {
             try container.encode(value)
         case .null:
             try container.encodeNil()
+        }
+    }
+
+    var stringValue: String? {
+        guard case .string(let value) = self else {
+            return nil
+        }
+        return value
+    }
+
+    var intValue: Int? {
+        switch self {
+        case .int(let value):
+            return value
+        case .double(let value):
+            return Int(value)
+        default:
+            return nil
+        }
+    }
+
+    var doubleValue: Double? {
+        switch self {
+        case .double(let value):
+            return value
+        case .int(let value):
+            return Double(value)
+        default:
+            return nil
         }
     }
 }
@@ -350,6 +394,33 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareLiveWorkoutDetails: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareLiveWorkoutDetails,
+                forKey: Self.shareLiveWorkoutDetailsKey
+            )
+        }
+    }
+
+    @Published var shareStrengthDetails: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareStrengthDetails,
+                forKey: Self.shareStrengthDetailsKey
+            )
+        }
+    }
+
+    @Published var shareMilestoneEvents: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareMilestoneEvents,
+                forKey: Self.shareMilestoneEventsKey
+            )
+        }
+    }
+
     private static let shareWorkoutStateKey =
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
@@ -374,6 +445,12 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareTrainingCalendar"
     private static let shareGoalsKey =
         "athlth.homeAssistant.shareGoals"
+    private static let shareLiveWorkoutDetailsKey =
+        "athlth.homeAssistant.shareLiveWorkoutDetails"
+    private static let shareStrengthDetailsKey =
+        "athlth.homeAssistant.shareStrengthDetails"
+    private static let shareMilestoneEventsKey =
+        "athlth.homeAssistant.shareMilestoneEvents"
     private static let processedCommandIDsKey =
         "athlth.homeAssistant.processedCommandIDs"
 
@@ -527,6 +604,21 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             key: Self.shareGoalsKey,
             defaultValue: false
         )
+        shareLiveWorkoutDetails = Self.storedBool(
+            defaults,
+            key: Self.shareLiveWorkoutDetailsKey,
+            defaultValue: false
+        )
+        shareStrengthDetails = Self.storedBool(
+            defaults,
+            key: Self.shareStrengthDetailsKey,
+            defaultValue: false
+        )
+        shareMilestoneEvents = Self.storedBool(
+            defaults,
+            key: Self.shareMilestoneEventsKey,
+            defaultValue: false
+        )
 
         storedPairing = restored
         pendingDeliveries =
@@ -614,6 +706,62 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         if !isConnected,
            case .discovering = connectionState {
             connectionState = .disconnected
+        }
+    }
+
+    func pairLocally(
+        to instance: HomeAssistantDiscoveredInstance,
+        pairingCode: String
+    ) {
+        guard let baseURL = instance.preferredURL else {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant was found, but it did not advertise a usable local URL.",
+                norwegian:
+                    "Home Assistant ble funnet, men annonserte ingen brukbar lokal adresse."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        Task {
+            await completeLocalPairing(
+                baseURL: baseURL,
+                instanceName: instance.name,
+                pairingCode: pairingCode
+            )
+        }
+    }
+
+    func pairLocallyManually(
+        address: String,
+        pairingCode: String
+    ) {
+        guard let baseURL =
+                Self.normalizedBaseURL(
+                    from: address
+                )
+        else {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Enter a valid Home Assistant address.",
+                norwegian:
+                    "Skriv inn en gyldig Home Assistant-adresse."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        Task {
+            await completeLocalPairing(
+                baseURL: baseURL,
+                instanceName:
+                    baseURL.host
+                    ?? "Home Assistant",
+                pairingCode: pairingCode
+            )
         }
     }
 
@@ -836,7 +984,18 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 await scheduleLocalNotification(
                     for: command
                 )
-            case "sync_now":
+            case "open_planned_workout":
+                await scheduleLocalNotification(
+                    for: command
+                )
+                NotificationCenter.default.post(
+                    name:
+                        .athlthHomeAssistantCommandReceived,
+                    object: command
+                )
+            case "sync_now",
+                 "schedule_extra_workout",
+                 "move_planned_workout":
                 NotificationCenter.default.post(
                     name:
                         .athlthHomeAssistantCommandReceived,
@@ -1400,6 +1559,279 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+
+    func sendWorkoutLiveUpdate(
+        phase: String,
+        name: String?,
+        type: String?,
+        elapsedSeconds: TimeInterval?,
+        distanceMeters: Double?,
+        paceSecondsPerKilometer: TimeInterval?,
+        speedKilometersPerHour: Double?,
+        heartRateBPM: Double? = nil,
+        heartRateZone: Int? = nil,
+        environment: String?,
+        treadmillInclinePercent: Double?,
+        device: String = "iPhone"
+    ) async {
+        guard isConnected,
+              shareWorkoutState,
+              shareLiveWorkoutDetails
+        else {
+            return
+        }
+
+        let allowedPhases = Set([
+            "preparing",
+            "warmup",
+            "active",
+            "rest",
+            "cooldown",
+            "paused",
+            "finished"
+        ])
+        let resolvedPhase =
+            allowedPhases.contains(phase)
+                ? phase
+                : "active"
+
+        var state: [String: HomeAssistantJSONValue] = [
+            "workout_phase": .string(resolvedPhase),
+            "active_workout_device": .string(device)
+        ]
+
+        if let name = Self.sanitizedText(name) {
+            state["active_workout"] = .string(name)
+        }
+        if let type = Self.sanitizedText(type) {
+            state["active_workout_type"] = .string(type)
+        }
+        if let elapsedSeconds,
+           elapsedSeconds.isFinite {
+            state["active_workout_elapsed_seconds"] =
+                .double(
+                    min(
+                        max(elapsedSeconds, 0),
+                        604_800
+                    )
+                )
+        }
+        if let distanceMeters,
+           distanceMeters.isFinite {
+            state["active_workout_distance_meters"] =
+                .double(
+                    min(
+                        max(distanceMeters, 0),
+                        5_000_000
+                    )
+                )
+        }
+        if let paceSecondsPerKilometer,
+           paceSecondsPerKilometer.isFinite {
+            state["active_workout_pace_seconds_per_km"] =
+                .double(
+                    min(
+                        max(
+                            paceSecondsPerKilometer,
+                            0
+                        ),
+                        7_200
+                    )
+                )
+        }
+        if let speedKilometersPerHour,
+           speedKilometersPerHour.isFinite {
+            state["active_workout_speed_kmh"] =
+                .double(
+                    min(
+                        max(
+                            speedKilometersPerHour,
+                            0
+                        ),
+                        100
+                    )
+                )
+        }
+        if let heartRateBPM,
+           heartRateBPM.isFinite {
+            state["active_workout_heart_rate_bpm"] =
+                .double(
+                    min(
+                        max(heartRateBPM, 20),
+                        260
+                    )
+                )
+        }
+        if let heartRateZone {
+            state["active_workout_heart_rate_zone"] =
+                .int(
+                    min(
+                        max(heartRateZone, 1),
+                        5
+                    )
+                )
+        }
+        if let environment =
+                Self.sanitizedText(environment) {
+            state["active_workout_environment"] =
+                .string(environment)
+        }
+        if let treadmillInclinePercent,
+           treadmillInclinePercent.isFinite {
+            state["treadmill_incline_percent"] =
+                .double(
+                    min(
+                        max(
+                            treadmillInclinePercent,
+                            -20
+                        ),
+                        40
+                    )
+                )
+        }
+
+        try? await send(
+            event: "workout_updated",
+            payload: [
+                "phase": .string(resolvedPhase),
+                "entity_state": .object(state)
+            ]
+        )
+    }
+
+    func sendStrengthSetUpdate(
+        exercise: String,
+        exerciseIndex: Int,
+        setNumber: Int,
+        setIndex: Int,
+        setTotal: Int,
+        reps: Int?,
+        weightKilograms: Double?,
+        resistanceLevel: Int?,
+        restSeconds: Int?,
+        rowDistanceMeters: Double?,
+        completed: Bool
+    ) async {
+        guard isConnected,
+              shareWorkoutState,
+              shareStrengthDetails
+        else {
+            return
+        }
+
+        var payload: [String: HomeAssistantJSONValue] = [
+            "current_exercise":
+                .string(
+                    Self.sanitizedText(exercise) ??
+                    "Exercise"
+                ),
+            "current_exercise_index":
+                .int(max(exerciseIndex, 0)),
+            "current_set":
+                .int(max(setNumber, 1)),
+            "current_set_index":
+                .int(max(setIndex, 0)),
+            "current_set_total":
+                .int(max(setTotal, 1))
+        ]
+
+        if let reps {
+            payload["current_reps"] =
+                .int(
+                    min(
+                        max(reps, 0),
+                        10_000
+                    )
+                )
+        }
+        if let weightKilograms,
+           weightKilograms.isFinite {
+            payload["current_weight_kg"] =
+                .double(
+                    min(
+                        max(weightKilograms, 0),
+                        2_000
+                    )
+                )
+        }
+        if let resistanceLevel {
+            payload["current_resistance_level"] =
+                .int(
+                    min(
+                        max(resistanceLevel, 1),
+                        10
+                    )
+                )
+        }
+        if let restSeconds {
+            payload["current_rest_seconds"] =
+                .int(
+                    min(
+                        max(restSeconds, 0),
+                        7_200
+                    )
+                )
+        }
+        if let rowDistanceMeters,
+           rowDistanceMeters.isFinite {
+            payload["current_row_distance_meters"] =
+                .double(
+                    min(
+                        max(rowDistanceMeters, 0),
+                        1_000_000
+                    )
+                )
+        }
+
+        try? await send(
+            event:
+                completed
+                    ? "strength_set_completed"
+                    : "strength_set_updated",
+            payload: payload
+        )
+    }
+
+    func sendMilestoneEvent(
+        event: String,
+        title: String,
+        detail: String? = nil,
+        value: String? = nil
+    ) async {
+        guard isConnected,
+              shareMilestoneEvents,
+              [
+                "personal_record",
+                "achievement_unlocked",
+                "goal_completed",
+                "challenge_completed"
+              ].contains(event)
+        else {
+            return
+        }
+
+        var payload: [String: HomeAssistantJSONValue] = [
+            "title":
+                .string(
+                    Self.sanitizedText(title) ??
+                    "ATHLTH"
+                )
+        ]
+        if let detail =
+                Self.sanitizedText(detail) {
+            payload["detail"] = .string(detail)
+        }
+        if let value =
+                Self.sanitizedText(value) {
+            payload["value"] = .string(value)
+        }
+
+        await sendReliably(
+            event: event,
+            payload: payload
+        )
+    }
+
     func sendWorkoutStopped() async {
         guard isConnected,
               shareWorkoutState
@@ -1884,6 +2316,37 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             state["workout_active"] = .bool(false)
             state["active_workout"] = .null
         }
+        if !shareLiveWorkoutDetails {
+            for key in [
+                "workout_phase",
+                "active_workout_elapsed_seconds",
+                "active_workout_distance_meters",
+                "active_workout_pace_seconds_per_km",
+                "active_workout_speed_kmh",
+                "active_workout_heart_rate_bpm",
+                "active_workout_heart_rate_zone",
+                "active_workout_environment",
+                "treadmill_incline_percent"
+            ] {
+                state[key] = .null
+            }
+        }
+        if !shareStrengthDetails {
+            for key in [
+                "current_exercise",
+                "current_exercise_index",
+                "current_set",
+                "current_set_index",
+                "current_set_total",
+                "current_reps",
+                "current_weight_kg",
+                "current_resistance_level",
+                "current_rest_seconds",
+                "current_row_distance_meters"
+            ] {
+                state[key] = .null
+            }
+        }
         if !shareCompletedWorkouts {
             state["last_workout"] = .null
         }
@@ -1934,6 +2397,181 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 "state": .object(state)
             ]
         )
+    }
+
+    private func completeLocalPairing(
+        baseURL: URL,
+        instanceName: String,
+        pairingCode: String
+    ) async {
+        let normalizedCode =
+            pairingCode.filter(\.isNumber)
+
+        guard normalizedCode.count == 6 else {
+            let message =
+                HomeAssistantConnectionError
+                    .invalidLocalPairingCode
+                    .localizedDescription
+            lastErrorMessage = message
+            connectionState =
+                .error(message)
+            return
+        }
+
+        stopDiscovery()
+        lastErrorMessage = nil
+        connectionState = .pairing
+
+        do {
+            let response =
+                try await requestLocalPairing(
+                    pairingCode:
+                        normalizedCode,
+                    baseURL: baseURL
+                )
+
+            try Self.validatePairResponse(
+                response
+            )
+
+            let pairing =
+                HomeAssistantStoredPairing(
+                    instanceName:
+                        instanceName,
+                    instanceURL:
+                        baseURL,
+                    protocolVersion:
+                        response
+                            .protocolVersion,
+                    clientID:
+                        response.clientID,
+                    webhookID:
+                        response.webhookID,
+                    webhookURL:
+                        response.webhookURL,
+                    webhookPath:
+                        response.webhookPath,
+                    sharedSecret:
+                        response.sharedSecret,
+                    signatureAlgorithm:
+                        response
+                            .signatureAlgorithm,
+                    capabilities:
+                        response.capabilities,
+                    pairedAt: Date()
+                )
+
+            try storePairing(pairing)
+            storedPairing = pairing
+            connectedInstanceName =
+                instanceName
+            connectedInstanceURL =
+                baseURL
+            lastErrorMessage = nil
+            connectionState = .connected
+
+            await sendReliably(
+                event: "sync_snapshot",
+                payload: [
+                    "state": .object([
+                        "workout_active":
+                            .bool(false),
+                        "active_workout":
+                            .null
+                    ])
+                ]
+            )
+        } catch {
+            lastErrorMessage =
+                error.localizedDescription
+            connectionState =
+                .error(
+                    error.localizedDescription
+                )
+        }
+    }
+
+    private func requestLocalPairing(
+        pairingCode: String,
+        baseURL: URL
+    ) async throws
+        -> HomeAssistantPairResponse {
+        let endpoint =
+            baseURL.appending(
+                path:
+                    "api/athlth/pair/local",
+                directoryHint:
+                    .notDirectory
+            )
+
+        var request =
+            URLRequest(url: endpoint)
+        request.timeoutInterval = 15
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField:
+                "Accept"
+        )
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField:
+                "Content-Type"
+        )
+        request.setValue(
+            "no-store",
+            forHTTPHeaderField:
+                "Cache-Control"
+        )
+        request.httpBody =
+            try JSONSerialization.data(
+                withJSONObject: [
+                    "pairing_code":
+                        pairingCode,
+                    "client_id":
+                        clientInstallationID(),
+                    "client_name":
+                        "ATHLTH iPhone"
+                ]
+            )
+
+        let (data, response) =
+            try await URLSession.shared
+                .data(for: request)
+
+        guard let httpResponse =
+                response
+                    as? HTTPURLResponse
+        else {
+            throw HomeAssistantConnectionError
+                .invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200..<300:
+            return try JSONDecoder()
+                .decode(
+                    HomeAssistantPairResponse
+                        .self,
+                    from: data
+                )
+        case 401:
+            throw HomeAssistantConnectionError
+                .invalidLocalPairingCode
+        case 403:
+            throw HomeAssistantConnectionError
+                .localNetworkPairingRequired
+        case 404:
+            throw HomeAssistantConnectionError
+                .integrationMissing
+        default:
+            throw HomeAssistantConnectionError
+                .pairingFailed(
+                    Self.errorMessage(
+                        from: data
+                    )
+                )
+        }
     }
 
     private func beginAuthorization(
@@ -2976,6 +3614,8 @@ private enum HomeAssistantConnectionError: LocalizedError {
     case invalidResponse
     case authorizationFailed(String)
     case integrationMissing
+    case invalidLocalPairingCode
+    case localNetworkPairingRequired
     case adminRequired
     case pairingFailed(String)
     case unsupportedProtocol(Int)
@@ -3011,6 +3651,20 @@ private enum HomeAssistantConnectionError: LocalizedError {
                     "Install and add the ATHLTH integration in Home Assistant first.",
                 norwegian:
                     "Installer og legg til ATHLTH-integrasjonen i Home Assistant først."
+            )
+        case .invalidLocalPairingCode:
+            return ATHLTHLocalization.choose(
+                english:
+                    "The Home Assistant pairing code is invalid or has expired. Generate a new code in Home Assistant and try again.",
+                norwegian:
+                    "Paringskoden fra Home Assistant er ugyldig eller har utløpt. Generer en ny kode i Home Assistant og prøv igjen."
+            )
+        case .localNetworkPairingRequired:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Code pairing only works on the same local network as Home Assistant. Use Home Assistant sign-in as a fallback.",
+                norwegian:
+                    "Kodeparing fungerer bare på samme lokalnett som Home Assistant. Bruk Home Assistant-innlogging som reserve."
             )
         case .adminRequired:
             return ATHLTHLocalization.choose(

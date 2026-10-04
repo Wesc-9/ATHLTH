@@ -4873,6 +4873,10 @@ private struct WorkoutInviteLaunchSheet: View {
                                         runningWorkout,
                                     captureDevice:
                                         captureDevice,
+                                    environment:
+                                        .outdoor,
+                                    treadmillInclinePercent:
+                                        nil,
                                     audioCoach:
                                         workout
                                             .audioCoachConfiguration ??

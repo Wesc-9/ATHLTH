@@ -302,7 +302,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     @MainActor
-    func startWorkoutOnWatch(_ kind: WatchWorkoutKind) async throws {
+    func startWorkoutOnWatch(
+        _ kind: WatchWorkoutKind,
+        indoor: Bool? = nil
+    ) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
         }
@@ -341,9 +344,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             configuration.activityType = .other
         }
 
-        configuration.locationType = kind.usesOutdoorLocation
-            ? .outdoor
-            : .indoor
+        configuration.locationType =
+            indoor.map {
+                $0 ? .indoor : .outdoor
+            } ??
+            (
+                kind.usesOutdoorLocation
+                    ? .outdoor
+                    : .indoor
+            )
 
         // Queue the current display preferences before the Watch workout
         // starts. Delivery is independent of the workout launch itself.
@@ -431,7 +440,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     ) {
         sendWatchPayload(
             configuration,
-            kind: .audioCoachConfiguration
+            kind: .audioCoachConfiguration,
+            durable: true
         )
     }
 
@@ -440,7 +450,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     ) {
         sendWatchPayload(
             workout,
-            kind: .runningWorkout
+            kind: .runningWorkout,
+            durable: true
         )
     }
 
@@ -619,7 +630,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     private func sendWatchPayload<T: Encodable>(
         _ value: T,
-        kind: WatchTransferKind
+        kind: WatchTransferKind,
+        durable: Bool = false
     ) {
         guard
             let session,
@@ -636,17 +648,28 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 Date().timeIntervalSince1970
         ]
 
+        // Launch-critical configuration must survive the iPhone being put
+        // down or losing Watch reachability immediately after workout start.
+        // The Watch rejects older timestamped payloads, so the queued copy is
+        // safe even when the immediate message arrived first.
+        if durable {
+            session.transferUserInfo(payload)
+        }
+
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler: Self.makeDurableMessageErrorHandler(
-                    session: session,
-                    payload: payload,
-                    store: self
-                )
+                errorHandler:
+                    durable
+                        ? nil
+                        : Self.makeDurableMessageErrorHandler(
+                            session: session,
+                            payload: payload,
+                            store: self
+                        )
             )
-        } else {
+        } else if !durable {
             session.transferUserInfo(payload)
         }
     }
@@ -731,24 +754,31 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 Date().timeIntervalSince1970
         ]
 
+        // Ending a workout must be durable. sendMessage is the fast path,
+        // while transferUserInfo guarantees delivery if the Watch app or
+        // connection changes state during HealthKit finalization. Duplicate
+        // .end commands are harmless because WatchWorkoutManager.end() only
+        // acts while the workout is running or paused.
+        if command == .end {
+            session.transferUserInfo(
+                payload
+            )
+        }
+
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
                 errorHandler:
                     command == .end
-                        ? Self.makeDurableMessageErrorHandler(
-                            session: session,
-                            payload: payload,
+                        ? Self.makeMessageErrorHandler(
                             store: self
                         )
                         : Self.makeMessageErrorHandler(
                             store: self
                         )
             )
-        } else if command == .end {
-            session.transferUserInfo(payload)
-        } else {
+        } else if command != .end {
             workoutLaunchError =
                 ATHLTHLocalization.choose(
                     english:

@@ -321,6 +321,168 @@ struct Exercise: Identifiable, Codable, Hashable {
     }
 }
 
+enum StrengthExerciseLoadKind: String, CaseIterable, Identifiable, Codable, Hashable {
+    case weightKilograms
+    case resistanceLevel
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weightKilograms:
+            return ATHLTHLocalization.choose(
+                english: "Weight",
+                norwegian: "Vekt"
+            )
+        case .resistanceLevel:
+            return ATHLTHLocalization.choose(
+                english: "Resistance",
+                norwegian: "Motstand"
+            )
+        }
+    }
+}
+
+enum StrengthExerciseTargetKind: String, CaseIterable, Identifiable, Codable, Hashable {
+    case reps
+    case time
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .reps:
+            return ATHLTHLocalization.choose(
+                english: "Target reps",
+                norwegian: "Målreps"
+            )
+        case .time:
+            return ATHLTHLocalization.choose(
+                english: "Duration",
+                norwegian: "Varighet"
+            )
+        }
+    }
+}
+
+extension ExerciseSnapshot {
+    private var normalizedStrengthEquipmentText: String {
+        ([name] + equipment)
+            .joined(separator: " ")
+            .folding(
+                options: [.diacriticInsensitive, .caseInsensitive],
+                locale: .current
+            )
+            .lowercased()
+    }
+
+    var defaultStrengthLoadKind: StrengthExerciseLoadKind {
+        let resistanceKeywords = [
+            "rowing",
+            "rowerg",
+            "rower",
+            "rowing machine",
+            "concept2 row",
+            "ski erg",
+            "skierg"
+        ]
+
+        return resistanceKeywords.contains {
+            normalizedStrengthEquipmentText.contains($0)
+        }
+            ? .resistanceLevel
+            : .weightKilograms
+    }
+
+    var supportsStrengthDistanceResult: Bool {
+        let distanceKeywords = [
+            "rowing",
+            "rowerg",
+            "rower",
+            "rowing machine",
+            "concept2 row",
+            "ski erg",
+            "skierg"
+        ]
+
+        return distanceKeywords.contains {
+            normalizedStrengthEquipmentText.contains($0)
+        }
+    }
+
+    var defaultStrengthTargetKind: StrengthExerciseTargetKind {
+        let normalized =
+            ([name] + equipment)
+                .joined(separator: " ")
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: .current
+                )
+                .lowercased()
+
+        let timeBasedKeywords = [
+            "rowing machine",
+            "rower",
+            "concept2 row",
+            "ski erg",
+            "skierg",
+            "treadmill",
+            "stationary bike",
+            "exercise bike",
+            "air bike",
+            "assault bike",
+            "elliptical",
+            "stair climber",
+            "stairmaster",
+            "battle rope",
+            "plank",
+            "wall sit",
+            "dead hang",
+            "hollow hold",
+            "isometric hold"
+        ]
+
+        return timeBasedKeywords.contains {
+            normalized.contains($0)
+        }
+            ? .time
+            : .reps
+    }
+
+    var defaultStrengthTargetDurationSeconds: Int {
+        let normalized =
+            ([name] + equipment)
+                .joined(separator: " ")
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: .current
+                )
+                .lowercased()
+
+        let cardioMachineKeywords = [
+            "rowing machine",
+            "rower",
+            "concept2 row",
+            "ski erg",
+            "skierg",
+            "treadmill",
+            "stationary bike",
+            "exercise bike",
+            "air bike",
+            "assault bike",
+            "elliptical",
+            "stair climber",
+            "stairmaster"
+        ]
+
+        return cardioMachineKeywords.contains {
+            normalized.contains($0)
+        }
+            ? 300
+            : 60
+    }
+}
+
 struct PlannedExercise: Identifiable, Codable, Hashable {
     let id: UUID
     var exerciseID: UUID?
@@ -334,6 +496,122 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     var targetRIR: Double? = nil
     var supersetGroupID: UUID? = nil
     var progression: StrengthProgressionRule? = nil
+
+    // Optional keeps plans created before target-type support decodable.
+    // nil means use the exercise's normal default (reps for most exercises,
+    // time for common timed/cardio exercises).
+    var targetKind: StrengthExerciseTargetKind? = nil
+    var targetDurationSeconds: Int? = nil
+
+    // Optional load metadata keeps older plans compatible while allowing
+    // machine settings such as a RowErg damper/resistance level.
+    var loadKind: StrengthExerciseLoadKind? = nil
+    var targetResistanceLevel: Int? = nil
+
+    var resolvedLoadKind: StrengthExerciseLoadKind {
+        loadKind ??
+            embeddedExercise.defaultStrengthLoadKind
+    }
+
+    var resolvedTargetResistanceLevel: Int? {
+        guard resolvedLoadKind == .resistanceLevel else {
+            return nil
+        }
+
+        return min(
+            max(targetResistanceLevel ?? 5, 1),
+            10
+        )
+    }
+
+    var resolvedTargetKind: StrengthExerciseTargetKind {
+        targetKind ??
+            embeddedExercise.defaultStrengthTargetKind
+    }
+
+    var resolvedTargetDurationSeconds: Int? {
+        guard resolvedTargetKind == .time else {
+            return nil
+        }
+
+        return max(
+            targetDurationSeconds ??
+                embeddedExercise
+                    .defaultStrengthTargetDurationSeconds,
+            15
+        )
+    }
+
+    var resolvedTargetReps: Int? {
+        resolvedTargetKind == .reps
+            ? reps
+            : nil
+    }
+
+    var compactLoadSummary: String? {
+        switch resolvedLoadKind {
+        case .weightKilograms:
+            guard let targetWeightKilograms else {
+                return nil
+            }
+            return String(
+                format: "%.1f kg",
+                targetWeightKilograms
+            )
+
+        case .resistanceLevel:
+            guard let level =
+                    resolvedTargetResistanceLevel
+            else {
+                return nil
+            }
+            return ATHLTHLocalization.choose(
+                english: "Resistance \(level)",
+                norwegian: "Motstand \(level)"
+            )
+        }
+    }
+
+    var compactTargetSummary: String {
+        switch resolvedTargetKind {
+        case .reps:
+            return
+                "\(sets) × \(reps ?? 0)"
+
+        case .time:
+            let totalSeconds =
+                max(
+                    resolvedTargetDurationSeconds ??
+                        embeddedExercise
+                            .defaultStrengthTargetDurationSeconds,
+                    0
+                )
+            let hours =
+                totalSeconds / 3_600
+            let minutes =
+                (totalSeconds % 3_600) / 60
+            let seconds =
+                totalSeconds % 60
+            let duration =
+                hours > 0
+                    ? String(
+                        format:
+                            "%d:%02d:%02d",
+                        hours,
+                        minutes,
+                        seconds
+                    )
+                    : String(
+                        format:
+                            "%02d:%02d",
+                        minutes,
+                        seconds
+                    )
+
+            return
+                "\(sets) × \(duration)"
+        }
+    }
 }
 
 struct PlannedSession: Identifiable, Codable, Hashable {

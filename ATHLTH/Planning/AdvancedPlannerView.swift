@@ -6249,7 +6249,15 @@ struct SessionEditorView: View {
                 supersetGroupID:
                     clonedSupersetID,
                 progression:
-                    exercise.progression
+                    exercise.progression,
+                targetKind:
+                    exercise.targetKind,
+                targetDurationSeconds:
+                    exercise.targetDurationSeconds,
+                loadKind:
+                    exercise.loadKind,
+                targetResistanceLevel:
+                    exercise.targetResistanceLevel
             )
         }
     }
@@ -6605,11 +6613,12 @@ struct SessionEditorView: View {
         _ planned: PlannedExercise
     ) -> String {
         var parts = [
-            "\(planned.sets) × \(planned.reps ?? 0)"
+            planned.compactTargetSummary
         ]
 
-        if let weight = planned.targetWeightKilograms {
-            parts.append(String(format: "%.1f kg", weight))
+        if let load =
+                planned.compactLoadSummary {
+            parts.append(load)
         }
 
         if let rpe = planned.targetRPE {
@@ -6972,9 +6981,15 @@ struct PlannedExerciseEditorView: View {
     let onSave: (PlannedExercise) -> Void
 
     @State private var sets: Int
+    @State private var targetKind:
+        StrengthExerciseTargetKind
     @State private var reps: Int
+    @State private var durationSeconds: Int
+    @State private var loadKind:
+        StrengthExerciseLoadKind
     @State private var weight: Double
-    @State private var useWeight: Bool
+    @State private var resistanceLevel: Int
+    @State private var useLoadTarget: Bool
 
     @State private var useRPE: Bool
     @State private var rpe: Double
@@ -6997,12 +7012,40 @@ struct PlannedExerciseEditorView: View {
         self.onSave = onSave
 
         _sets = State(initialValue: exercise.sets)
-        _reps = State(initialValue: exercise.reps ?? 8)
+        _targetKind = State(
+            initialValue:
+                exercise.resolvedTargetKind
+        )
+        _reps = State(
+            initialValue:
+                exercise.reps ?? 8
+        )
+        _durationSeconds = State(
+            initialValue:
+                exercise
+                    .resolvedTargetDurationSeconds ??
+                exercise
+                    .embeddedExercise
+                    .defaultStrengthTargetDurationSeconds
+        )
+        _loadKind = State(
+            initialValue:
+                exercise.resolvedLoadKind
+        )
         _weight = State(
             initialValue: exercise.targetWeightKilograms ?? 20
         )
-        _useWeight = State(
-            initialValue: exercise.targetWeightKilograms != nil
+        _resistanceLevel = State(
+            initialValue:
+                exercise
+                    .resolvedTargetResistanceLevel ??
+                5
+        )
+        _useLoadTarget = State(
+            initialValue:
+                exercise.targetWeightKilograms != nil ||
+                exercise.targetResistanceLevel != nil ||
+                exercise.resolvedLoadKind == .resistanceLevel
         )
 
         _useRPE = State(
@@ -7039,48 +7082,52 @@ struct PlannedExerciseEditorView: View {
             Form {
                 Section(original.embeddedExercise.name) {
                     Stepper(
-                        "Sets: \(sets)",
+                        ATHLTHLocalization.format(
+                            english: "Sets: %d",
+                            norwegian: "Sett: %d",
+                            sets
+                        ),
                         value: $sets,
                         in: 1...20
                     )
 
-                    Stepper(
-                        "Reps: \(reps)",
-                        value: $reps,
-                        in: 1...100
-                    )
+                    targetRow
 
                     Toggle(
-                        "Target weight",
-                        isOn: $useWeight
+                        loadKind == .resistanceLevel
+                            ? ATHLTHLocalization.choose(
+                                english: "Resistance target",
+                                norwegian: "Motstandsmål"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Target weight",
+                                norwegian: "Målvekt"
+                            ),
+                        isOn: $useLoadTarget
                     )
 
-                    if useWeight {
-                        HStack {
-                            Text("Weight")
-                            Spacer()
-                            TextField(
-                                "kg",
-                                value: $weight,
-                                format: .number.precision(.fractionLength(0...2))
-                            )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 100)
-                            Text("kg")
-                                .foregroundStyle(.secondary)
-                        }
+                    if useLoadTarget {
+                        loadTargetRow
                     }
 
                     Stepper(
-                        "Rest: \(restSeconds) sec",
+                        ATHLTHLocalization.format(
+                            english: "Rest: %d sec",
+                            norwegian: "Hvile: %d sek",
+                            restSeconds
+                        ),
                         value: $restSeconds,
                         in: 0...600,
                         step: 15
                     )
                 }
 
-                Section("Effort") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Effort",
+                        norwegian: "Anstrengelse"
+                    )
+                ) {
                     Toggle("Use RPE", isOn: $useRPE)
 
                     if useRPE {
@@ -7110,67 +7157,70 @@ struct PlannedExerciseEditorView: View {
                     }
                 }
 
-                Section("Progression") {
-                    Picker(
-                        "Rule",
-                        selection: $progressionKind
-                    ) {
-                        ForEach(
-                            StrengthProgressionKind.allCases
-                        ) { kind in
-                            Text(kind.title).tag(kind)
+                if targetKind == .reps &&
+                    loadKind == .weightKilograms {
+                    Section("Progression") {
+                        Picker(
+                            "Rule",
+                            selection: $progressionKind
+                        ) {
+                            ForEach(
+                                StrengthProgressionKind.allCases
+                            ) { kind in
+                                Text(kind.title).tag(kind)
+                            }
                         }
-                    }
 
-                    if progressionKind != .none {
-                        HStack {
+                        if progressionKind != .none {
+                            HStack {
+                                Text(
+                                    progressionKind == .addReps
+                                        ? "Reps to add"
+                                        : progressionKind == .percentage
+                                            ? "Percent"
+                                            : "Weight to add"
+                                )
+
+                                Spacer()
+
+                                TextField(
+                                    "Amount",
+                                    value: $progressionAmount,
+                                    format: .number.precision(.fractionLength(0...2))
+                                )
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 90)
+
+                                Text(
+                                    progressionKind == .percentage
+                                        ? "%"
+                                        : progressionKind == .addReps
+                                            ? "reps"
+                                            : "kg"
+                                )
+                                .foregroundStyle(.secondary)
+                            }
+
+                            if progressionKind == .doubleProgression {
+                                Stepper(
+                                    "Rep range start: \(minimumReps)",
+                                    value: $minimumReps,
+                                    in: 1...50
+                                )
+                                Stepper(
+                                    "Rep range end: \(maximumReps)",
+                                    value: $maximumReps,
+                                    in: minimumReps...100
+                                )
+                            }
+
                             Text(
-                                progressionKind == .addReps
-                                    ? "Reps to add"
-                                    : progressionKind == .percentage
-                                        ? "Percent"
-                                        : "Weight to add"
+                                "The next prescription can use this rule after all planned sets are completed. ATHLTH keeps the rule separate from the recorded workout history."
                             )
-
-                            Spacer()
-
-                            TextField(
-                                "Amount",
-                                value: $progressionAmount,
-                                format: .number.precision(.fractionLength(0...2))
-                            )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 90)
-
-                            Text(
-                                progressionKind == .percentage
-                                    ? "%"
-                                    : progressionKind == .addReps
-                                        ? "reps"
-                                        : "kg"
-                            )
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                         }
-
-                        if progressionKind == .doubleProgression {
-                            Stepper(
-                                "Rep range start: \(minimumReps)",
-                                value: $minimumReps,
-                                in: 1...50
-                            )
-                            Stepper(
-                                "Rep range end: \(maximumReps)",
-                                value: $maximumReps,
-                                in: minimumReps...100
-                            )
-                        }
-
-                        Text(
-                            "The next prescription can use this rule after all planned sets are completed. ATHLTH keeps the rule separate from the recorded workout history."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -7196,9 +7246,28 @@ struct PlannedExerciseEditorView: View {
                     Button("Save") {
                         var updated = original
                         updated.sets = sets
-                        updated.reps = reps
+                        updated.targetKind =
+                            targetKind
+                        updated.reps =
+                            targetKind == .reps
+                                ? reps
+                                : nil
+                        updated.targetDurationSeconds =
+                            targetKind == .time
+                                ? durationSeconds
+                                : nil
+                        updated.loadKind =
+                            loadKind
                         updated.targetWeightKilograms =
-                            useWeight ? weight : nil
+                            useLoadTarget &&
+                            loadKind == .weightKilograms
+                                ? weight
+                                : nil
+                        updated.targetResistanceLevel =
+                            useLoadTarget &&
+                            loadKind == .resistanceLevel
+                                ? resistanceLevel
+                                : nil
                         updated.targetRPE =
                             useRPE ? rpe : nil
                         updated.targetRIR =
@@ -7209,19 +7278,23 @@ struct PlannedExerciseEditorView: View {
                                 in: .whitespacesAndNewlines
                             )
                             .nilIfEmpty
-                        updated.progression = StrengthProgressionRule(
-                            kind: progressionKind,
-                            amount: max(progressionAmount, 0),
-                            minimumReps:
-                                progressionKind == .doubleProgression
-                                    ? minimumReps
-                                    : nil,
-                            maximumReps:
-                                progressionKind == .doubleProgression
-                                    ? maximumReps
-                                    : nil,
-                            applyWhenAllSetsCompleted: true
-                        )
+                        updated.progression =
+                            targetKind == .reps &&
+                            loadKind == .weightKilograms
+                                ? StrengthProgressionRule(
+                                    kind: progressionKind,
+                                    amount: max(progressionAmount, 0),
+                                    minimumReps:
+                                        progressionKind == .doubleProgression
+                                            ? minimumReps
+                                            : nil,
+                                    maximumReps:
+                                        progressionKind == .doubleProgression
+                                            ? maximumReps
+                                            : nil,
+                                    applyWhenAllSetsCompleted: true
+                                )
+                                : StrengthProgressionRule.none
 
                         onSave(updated)
                         dismiss()
@@ -7229,6 +7302,210 @@ struct PlannedExerciseEditorView: View {
                 }
             }
         }
+    }
+
+    private var loadTargetRow:
+        some View {
+        Group {
+            if loadKind == .resistanceLevel {
+                Stepper(
+                    value: $resistanceLevel,
+                    in: 1...10
+                ) {
+                    loadMenu(
+                        value:
+                            ATHLTHLocalization.choose(
+                                english: "Level \(resistanceLevel)",
+                                norwegian: "Steg \(resistanceLevel)"
+                            )
+                    )
+                }
+            } else {
+                HStack(spacing: 12) {
+                    loadMenu(
+                        value:
+                            String(
+                                format:
+                                    "%.1f kg",
+                                weight
+                            )
+                    )
+
+                    Spacer()
+
+                    TextField(
+                        "kg",
+                        value: $weight,
+                        format:
+                            .number
+                            .precision(
+                                .fractionLength(0...2)
+                            )
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 84)
+
+                    Text("kg")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func loadMenu(
+        value: String
+    ) -> some View {
+        Menu {
+            Button {
+                loadKind = .weightKilograms
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Weight",
+                        norwegian: "Vekt"
+                    ),
+                    systemImage:
+                        loadKind == .weightKilograms
+                            ? "checkmark"
+                            : "scalemass"
+                )
+            }
+
+            Button {
+                loadKind = .resistanceLevel
+                useLoadTarget = true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Resistance",
+                        norwegian: "Motstand"
+                    ),
+                    systemImage:
+                        loadKind == .resistanceLevel
+                            ? "checkmark"
+                            : "dial.medium"
+                )
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(
+                    "\(loadKind.title): \(value)"
+                )
+                .foregroundStyle(.primary)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var targetRow:
+        some View {
+        Group {
+            if targetKind == .reps {
+                Stepper(
+                    value: $reps,
+                    in: 1...100
+                ) {
+                    targetMenu(
+                        value: "\(reps)"
+                    )
+                }
+            } else {
+                Stepper(
+                    value: $durationSeconds,
+                    in: 15...7_200,
+                    step: 15
+                ) {
+                    targetMenu(
+                        value:
+                            formattedDuration(
+                                durationSeconds
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    private func targetMenu(
+        value: String
+    ) -> some View {
+        Menu {
+            Button {
+                targetKind = .reps
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Target reps",
+                        norwegian: "Målreps"
+                    ),
+                    systemImage:
+                        targetKind == .reps
+                            ? "checkmark"
+                            : "repeat"
+                )
+            }
+
+            Button {
+                targetKind = .time
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Duration",
+                        norwegian: "Varighet"
+                    ),
+                    systemImage:
+                        targetKind == .time
+                            ? "checkmark"
+                            : "timer"
+                )
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(
+                    "\(targetKind.title): \(value)"
+                )
+                .foregroundStyle(.primary)
+
+                Image(
+                    systemName:
+                        "chevron.down"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func formattedDuration(
+        _ seconds: Int
+    ) -> String {
+        let safe = max(seconds, 0)
+        let hours = safe / 3_600
+        let minutes =
+            (safe % 3_600) / 60
+        let seconds =
+            safe % 60
+
+        if hours > 0 {
+            return String(
+                format:
+                    "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format:
+                "%02d:%02d",
+            minutes,
+            seconds
+        )
     }
 }
 

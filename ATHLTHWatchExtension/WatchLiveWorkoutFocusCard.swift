@@ -208,6 +208,17 @@ struct WatchLiveWorkoutFocusCard: View {
             liveGhostAge.map {
                 $0 > 10
             } ?? false
+        let liveConnection =
+            liveGhost?.connectionText
+        let liveGhostNeedsAttention =
+            liveGhost != nil &&
+            (
+                liveGhostIsStale ||
+                (
+                    liveConnection != nil &&
+                    liveConnection != "LIVE"
+                )
+            )
 
         return VStack(
             alignment: .leading,
@@ -215,23 +226,25 @@ struct WatchLiveWorkoutFocusCard: View {
         ) {
             HStack {
                 Label(
-                    liveGhost != nil &&
-                    workoutManager
-                        .ghostRaceTitle == nil
+                    liveGhost != nil
                         ? (
-                            liveGhostIsStale
-                                ? "GHOST STALE"
+                            liveGhostNeedsAttention
+                                ? (
+                                    liveConnection ??
+                                    "GHOST STALE"
+                                )
+                                .uppercased()
                                 : "LIVE GHOST"
                         )
                         : "GHOST GAP",
                     systemImage:
-                        liveGhostIsStale
+                        liveGhostNeedsAttention
                             ? "arrow.triangle.2.circlepath"
                             : "figure.run"
                 )
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(
-                    liveGhostIsStale
+                    liveGhostNeedsAttention
                         ? .orange
                         : WatchTheme.green
                 )
@@ -255,9 +268,15 @@ struct WatchLiveWorkoutFocusCard: View {
                     .minimumScaleFactor(0.72)
 
                 Text(
-                    liveGhostIsStale &&
-                    liveGhostAge != nil
-                        ? "\(title) · \(Int((liveGhostAge ?? 0).rounded()))s ago"
+                    liveGhost != nil
+                        ? [
+                            title,
+                            liveConnection
+                        ]
+                        .compactMap { $0 }
+                        .joined(
+                            separator: " · "
+                        )
                         : title
                 )
                 .font(.system(size: 9, weight: .semibold))

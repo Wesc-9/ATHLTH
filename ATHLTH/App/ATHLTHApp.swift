@@ -300,6 +300,11 @@ struct AppRootView: View {
     @State private var showingNotificationPermissionPrimer = false
     @State private var showingRelayedStrengthWorkout = false
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
+    @State private var lastHomeAssistantLiveWorkoutSyncAt = Date.distantPast
+    @State private var lastHomeAssistantStrengthSyncAt = Date.distantPast
+    @State private var homeAssistantReportedStrengthSetIDs: Set<String> = []
+    @State private var homeAssistantReportedImpactIDs: Set<String> = []
+    @State private var homeAssistantReportedPersonalRecordIDs: Set<String> = []
 
     @AppStorage("athlth.notifications.permissionPrimerShown")
     private var notificationPermissionPrimerShown = false
@@ -392,6 +397,12 @@ struct AppRootView: View {
                     route: payload.route,
                     workout: runningWorkout,
                     captureDevice: captureDevice,
+                    environment:
+                        envelope.runEnvironment ??
+                        .outdoor,
+                    treadmillInclinePercent:
+                        envelope
+                            .treadmillInclinePercent,
                     audioCoach:
                         envelope.watchAudioCoach ??
                         payload.workout
@@ -434,7 +445,9 @@ struct AppRootView: View {
                     spotify:
                         spotifyPlayback,
                     ghostRace:
-                        ghostRace
+                        ghostRace,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .walk:
@@ -472,7 +485,9 @@ struct AppRootView: View {
                     watchConnection:
                         watchConnection,
                     spotify:
-                        spotifyPlayback
+                        spotifyPlayback,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .strength:
@@ -549,9 +564,158 @@ struct AppRootView: View {
         }
     }
 
-    private var lifecycleContent: some View {
+    private func runLifecycleStartupTask() async {
+        // Compatibility preview is a CI-only rendering surface. Do not
+        // compete with the first frame by starting auth, StoreKit or
+        // backend work that the preview neither needs nor can use.
+        if appSession.previewModeEnabled {
+            startupAuthenticationResolved = true
+            await Task.yield()
+            return
+        }
+
+        await resolveStartupAuthentication()
+        scheduleNotificationPermissionPrimerIfNeeded()
+
+        // Give SwiftUI one render turn after authentication changes the
+        // root surface. This keeps cold launch responsive on small phones
+        // before secondary account/network work begins.
+        await Task.yield()
+
+        // Only the paired iPhone owns Apple Watch connectivity. iPad is a
+        // controller/secondary screen and never activates WatchConnectivity.
+        if ATHLTHDeviceRole.supportsDirectAppleWatch {
+            watchConnection.connect()
+            syncSpotifyPlaybackToWatch()
+        }
+
+        startDeviceRelayIfNeeded()
+
+        // If Apple Watch already owns a workout, HealthKit may deliver the
+        // mirroring callback just after app activation. Give that callback
+        // first priority before any later Health refresh decisions.
+        await allowWatchMirroringToAttachIfNeeded()
+
+        await subscriptionStore.start()
+        appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
+        await submitLatestStoreProofIfPossible()
+
+        if appSession.signedIn {
+            // Keep launch responsive: load only Home-critical account
+            // context first and let independent network work overlap.
+            async let pushToken: Void =
+                APNsPushManager.shared.syncCurrentToken()
+            async let pushPreferences: Void =
+                syncPushPreferences()
+            async let socialHome: Void =
+                refreshSocialHomeCore()
+            async let messages: Void =
+                messaging.refresh()
+            async let gearRefresh: Void =
+                gear.refresh()
+            async let calendarRefresh: Void =
+                syncCalendarIfAllowed()
+
+            _ = await (
+                pushToken,
+                pushPreferences,
+                socialHome,
+                messages,
+                gearRefresh,
+                calendarRefresh
+            )
+
+            if ATHLTHDeviceRole.isIPhone {
+                await realtimeSocial
+                    .configureOnlinePresence(
+                        appIsActive: true,
+                        enabled:
+                            social.privacy?
+                                .showOnlineStatus ??
+                            true
+                    )
+            }
+            await realtimeSocial
+                .refreshVisibleLiveSessions()
+        }
+
+        // Reconcile the app-local marker with HealthKit before deciding
+        // whether Health is connected. This keeps existing permissions
+        // intact across TestFlight/app updates and local defaults migrations
+        // without presenting the Health permission sheet.
+        _ = await health.restoreAuthorizationStateFromSystem()
+
+        if health.needsHealthRefreshRecovery {
+            // Give the UI a stable launch first. Clearing the recovery
+            // latch here only affects future launches because this
+            // process remains deferred until it exits.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            health.resumeAutomaticRefresh()
+        }
+
+        guard health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork
+        else {
+            return
+        }
+
+        await health.configureBackgroundSync(
+            allowed: settings.backgroundHealthSyncEnabled
+        )
+
+        // Opening ATHLTH while the Watch owns an active workout should
+        // prioritize the mirroring session. A full Health refresh can
+        // wait until the workout finishes; the completion path refreshes
+        // Health immediately afterwards.
+        guard !workoutMirroring.hasActiveMirroredWorkout,
+              !ATHLTHWatchWorkoutRuntime
+                .isMirroredWorkoutActive
+        else {
+            return
+        }
+
+        await health.refreshIfStale(maxAge: 90)
+        await officialWeeklyChallenges.syncCompletionState(
+            workouts: health.workouts
+        )
+        syncAppleHealthProfileDetailsIfNeeded()
+        await goals.refreshAutomaticMilestones(
+            health: health,
+            strength: strengthWorkout
+        )
+        notifications.syncGoalEvents(from: goals.goals)
+        challengeStore.refreshStatuses()
+        notifications.syncChallengeEvents(
+            from: challengeStore.challenges,
+            currentUserID: appSession.profile.userID
+        )
+        let startupUserID =
+            appSession.profile.userID
+
+        // Trophies and owned social snapshots are valuable but not needed
+        // to make Home interactive. Let the first frame and gestures win,
+        // then refresh these secondary surfaces shortly afterwards.
+        Task { @MainActor in
+            try? await Task.sleep(
+                for: .milliseconds(700)
+            )
+
+            guard appSession.signedIn,
+                  appSession.profile.userID ==
+                    startupUserID
+            else {
+                return
+            }
+
+            await refreshTrophiesAndNotifications()
+            await syncSocialOwnedData()
+        }
+
+        lastFullLifecycleRefreshAt = Date()
+    }
+
+    private var lifecycleRootContent: AnyView {
         AnyView(
-            AnyView(
                 Group {
             if appSession.previewModeEnabled {
                 AnyView(ProductRootTabView())
@@ -563,158 +727,38 @@ struct AppRootView: View {
                 AnyView(ProductRootTabView())
             }
         }
+        )
+    }
+
+    private var lifecycleWorkoutContent: AnyView {
+        AnyView(
+            lifecycleRootContent
         .task {
-            // Compatibility preview is a CI-only rendering surface. Do not
-            // compete with the first frame by starting auth, StoreKit or
-            // backend work that the preview neither needs nor can use.
-            if appSession.previewModeEnabled {
-                startupAuthenticationResolved = true
-                await Task.yield()
-                return
-            }
-
-            await resolveStartupAuthentication()
-            scheduleNotificationPermissionPrimerIfNeeded()
-
-            // Give SwiftUI one render turn after authentication changes the
-            // root surface. This keeps cold launch responsive on small phones
-            // before secondary account/network work begins.
-            await Task.yield()
-
-            // Only the paired iPhone owns Apple Watch connectivity. iPad is a
-            // controller/secondary screen and never activates WatchConnectivity.
-            if ATHLTHDeviceRole.supportsDirectAppleWatch {
-                watchConnection.connect()
-                syncSpotifyPlaybackToWatch()
-            }
-
-            startDeviceRelayIfNeeded()
-
-            // If Apple Watch already owns a workout, HealthKit may deliver the
-            // mirroring callback just after app activation. Give that callback
-            // first priority before any later Health refresh decisions.
-            await allowWatchMirroringToAttachIfNeeded()
-
-            await subscriptionStore.start()
-            appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
-            await submitLatestStoreProofIfPossible()
-
-            if appSession.signedIn {
-                // Keep launch responsive: load only Home-critical account
-                // context first and let independent network work overlap.
-                async let pushToken: Void =
-                    APNsPushManager.shared.syncCurrentToken()
-                async let pushPreferences: Void =
-                    syncPushPreferences()
-                async let socialHome: Void =
-                    refreshSocialHomeCore()
-                async let messages: Void =
-                    messaging.refresh()
-                async let gearRefresh: Void =
-                    gear.refresh()
-                async let calendarRefresh: Void =
-                    syncCalendarIfAllowed()
-
-                _ = await (
-                    pushToken,
-                    pushPreferences,
-                    socialHome,
-                    messages,
-                    gearRefresh,
-                    calendarRefresh
-                )
-
-                if ATHLTHDeviceRole.isIPhone {
-                    await realtimeSocial
-                        .configureOnlinePresence(
-                            appIsActive: true,
-                            enabled:
-                                social.privacy?
-                                    .showOnlineStatus ??
-                                true
-                        )
-                }
-                await realtimeSocial
-                    .refreshVisibleLiveSessions()
-            }
-
-            // Reconcile the app-local marker with HealthKit before deciding
-            // whether Health is connected. This keeps existing permissions
-            // intact across TestFlight/app updates and local defaults migrations
-            // without presenting the Health permission sheet.
-            _ = await health.restoreAuthorizationStateFromSystem()
-
-            if health.needsHealthRefreshRecovery {
-                // Give the UI a stable launch first. Clearing the recovery
-                // latch here only affects future launches because this
-                // process remains deferred until it exits.
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                health.resumeAutomaticRefresh()
-            }
-
-            guard health.hasRequestedAuthorization,
-                  !health.shouldDeferAutomaticHealthWork
-            else {
-                return
-            }
-
-            await health.configureBackgroundSync(
-                allowed: settings.backgroundHealthSyncEnabled
-            )
-
-            // Opening ATHLTH while the Watch owns an active workout should
-            // prioritize the mirroring session. A full Health refresh can
-            // wait until the workout finishes; the completion path refreshes
-            // Health immediately afterwards.
-            guard !workoutMirroring.hasActiveMirroredWorkout,
-                  !ATHLTHWatchWorkoutRuntime
-                    .isMirroredWorkoutActive
-            else {
-                return
-            }
-
-            await health.refreshIfStale(maxAge: 90)
-            await officialWeeklyChallenges.syncCompletionState(
-                workouts: health.workouts
-            )
-            syncAppleHealthProfileDetailsIfNeeded()
-            await goals.refreshAutomaticMilestones(
-                health: health,
-                strength: strengthWorkout
-            )
-            notifications.syncGoalEvents(from: goals.goals)
-            challengeStore.refreshStatuses()
-            notifications.syncChallengeEvents(
-                from: challengeStore.challenges,
-                currentUserID: appSession.profile.userID
-            )
-            let startupUserID =
-                appSession.profile.userID
-
-            // Trophies and owned social snapshots are valuable but not needed
-            // to make Home interactive. Let the first frame and gestures win,
-            // then refresh these secondary surfaces shortly afterwards.
-            Task { @MainActor in
-                try? await Task.sleep(
-                    for: .milliseconds(700)
-                )
-
-                guard appSession.signedIn,
-                      appSession.profile.userID ==
-                        startupUserID
-                else {
-                    return
-                }
-
-                await refreshTrophiesAndNotifications()
-                await syncSocialOwnedData()
-            }
-
-            lastFullLifecycleRefreshAt = Date()
+            await runLifecycleStartupTask()
         }
-        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) {
-            IPhoneWorkoutView()
+        .overlay {
+            if phoneWorkout.showingWorkout,
+               phoneWorkout.active != nil {
+                IPhoneWorkoutView()
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                    .background(
+                        Color(.systemGroupedBackground)
+                            .ignoresSafeArea()
+                    )
+                    .transition(
+                        .move(edge: .bottom)
+                            .combined(with: .opacity)
+                    )
+                    .zIndex(100)
+            }
         }
+        .animation(
+            .easeInOut(duration: 0.20),
+            value: phoneWorkout.showingWorkout
+        )
         .fullScreenCover(
             isPresented:
                 $showingRelayedStrengthWorkout
@@ -741,12 +785,73 @@ struct AppRootView: View {
         .onChange(of: spotifyPlayback.connectionState) { _, _ in
             syncSpotifyPlaybackToWatch()
         }
+        )
+    }
+
+    private var lifecycleChromeContent: AnyView {
+        AnyView(
+            lifecycleWorkoutContent
         .overlay(alignment: .top) {
-            if appSession.signedIn, phoneWorkout.active != nil {
-                Button { phoneWorkout.showingWorkout = true } label: {
-                    Label("Return to iPhone workout", systemImage: "figure.run")
-                        .padding(10).background(.regularMaterial, in: Capsule())
-                }.padding(.top, 4)
+            if appSession.signedIn,
+               phoneWorkout.active != nil,
+               phoneWorkout.isUserMinimized {
+                Button {
+                    phoneWorkout.presentWorkout()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "figure.run")
+                            .font(
+                                .system(
+                                    size: 20,
+                                    weight: .semibold
+                                )
+                            )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Return to iPhone workout",
+                                norwegian:
+                                    "Tilbake til iPhone-økt"
+                            )
+                        )
+                        .font(
+                            .headline
+                                .weight(.semibold)
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .padding(.horizontal, 22)
+                    .frame(height: 58)
+                    .background(
+                        .regularMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black.opacity(
+                                    0.05
+                                ),
+                                lineWidth: 0.8
+                            )
+                    }
+                    .shadow(
+                        color: Color.black.opacity(0.10),
+                        radius: 14,
+                        y: 6
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 10)
+                .padding(.horizontal, 18)
+                .transition(
+                    .move(edge: .top)
+                        .combined(with: .opacity)
+                )
+                .zIndex(60)
             }
         }
         .overlay(alignment: .top) {
@@ -799,6 +904,12 @@ struct AppRootView: View {
             ATHLTHArtworkImage
                 .clearRemoteCache()
         }
+        )
+    }
+
+    private var lifecycleSessionContent: AnyView {
+        AnyView(
+            lifecycleChromeContent
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 spotifyPlayback
@@ -891,35 +1002,47 @@ struct AppRootView: View {
                     .athlthHomeAssistantCommandReceived
             )
         ) { notification in
-            guard let command =
-                    notification.object
-                        as? HomeAssistantInboundCommand,
-                  command.type == "sync_now"
-            else {
-                return
-            }
+            handleHomeAssistantCommandNotification(
+                notification
+            )
+        }
+        )
+    }
 
-            Task {
-                await syncHomeAssistantSnapshot()
-            }
+    private var lifecycleHealthSyncContent: AnyView {
+        AnyView(
+            lifecycleSessionContent
+        .onReceive(phoneWorkout.$active) { workout in
+            handlePhoneWorkoutLiveUpdate(
+                workout
+            )
+        }
+        .onReceive(strengthWorkout.$activeWorkout) { workout in
+            handleStrengthWorkoutLiveUpdate(
+                workout
+            )
+        }
+        .onChange(
+            of: strengthWorkout.currentExerciseIndex
+        ) { _, _ in
+            handleStrengthWorkoutProgressChanged()
+        }
+        .onChange(
+            of: strengthWorkout.currentSetIndex
+        ) { _, _ in
+            handleStrengthWorkoutProgressChanged()
+        }
+        .onChange(
+            of: strengthWorkout.restEndsAt
+        ) { _, _ in
+            handleStrengthWorkoutProgressChanged()
         }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationReceived
             )
         ) { _ in
-            guard appSession.signedIn else { return }
-
-            Task {
-                // The backend already delivered this event through APNs.
-                // Pull the authoritative inbox immediately so the Home bell
-                // updates while ATHLTH is open, without scheduling a duplicate
-                // local system notification for the same event.
-                await refreshSocialHomeCore(
-                    deliverSystemAlertsForImportedInbox: false,
-                    force: true
-                )
-            }
+            handleRemoteNotificationReceived()
         }
         .onChange(of: health.workouts.map(\.id)) { _, _ in
             guard appSession.signedIn else { return }
@@ -984,8 +1107,12 @@ struct AppRootView: View {
                     allowed: settings.backgroundHealthSyncEnabled
                 )
             }
-        }
-        )
+        }        )
+    }
+
+    private var lifecycleCompletionContent: AnyView {
+        AnyView(
+            lifecycleHealthSyncContent
         .onChange(of: health.personalDetails) { _, details in
             guard let source = appSession.onboardingProfile?.personalDetailsSource,
                   source == .appleHealth || source == .mixed,
@@ -1072,8 +1199,12 @@ struct AppRootView: View {
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
             handleStrengthWorkoutCompletion(workout)
-        }
-        )
+        }        )
+    }
+
+    private var lifecycleSocialContent: AnyView {
+        AnyView(
+            lifecycleCompletionContent
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
                 from: updatedChallenges,
@@ -1210,6 +1341,12 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        )
+    }
+
+    private var lifecycleAccountContent: AnyView {
+        AnyView(
+            lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
@@ -1334,8 +1471,14 @@ struct AppRootView: View {
                 ATHLTHGhostRuntimeObserver()
                 ATHLTHStrengthWatchSyncObserver()
                 ATHLTHBackupDirtyObserver()
+                AthleteToolsRuntimeObserver()
             }
         }
+        )
+    }
+
+    private var lifecycleContent: some View {
+        lifecycleAccountContent
     }
 
     var body: some View {
@@ -1733,6 +1876,41 @@ struct AppRootView: View {
                 result
             )
 
+        // A standalone Watch can complete an entire strength session without
+        // iPhone or internet. Recreate the local ATHLTH strength log from the
+        // embedded prescription and replay the durable Watch action journal
+        // before the ordinary completion path attaches HealthKit metrics.
+        if result.kind == .strength,
+           let snapshot =
+                result.strengthSnapshot {
+            let alreadyCompleted =
+                strengthWorkout
+                    .completedWorkout?
+                    .id ==
+                snapshot.workoutID
+
+            if strengthWorkout.activeWorkout == nil,
+               !alreadyCompleted {
+                strengthWorkout
+                    .startFromWatchSnapshot(
+                        snapshot,
+                        watchSessionID:
+                            result.id
+                    )
+            }
+
+            if strengthWorkout.activeWorkout?
+                    .id ==
+                snapshot.workoutID {
+                strengthWorkout
+                    .replayOfflineWatchCommands(
+                        result
+                            .strengthCommands ??
+                        []
+                    )
+            }
+        }
+
         let watchFinishedActiveStrength =
             result.kind == .strength &&
             strengthWorkout.activeWorkout?
@@ -1877,6 +2055,12 @@ struct AppRootView: View {
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
+                )
+
+            await realtimeSocial
+                .finishCurrentLiveGhostRace(
+                    elapsedSeconds:
+                        result.duration
                 )
 
             await social.finishActiveWorkout(
@@ -2045,6 +2229,12 @@ struct AppRootView: View {
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
+                )
+
+            await realtimeSocial
+                .finishCurrentLiveGhostRace(
+                    elapsedSeconds:
+                        publishable.duration
                 )
 
             await social.finishActiveWorkout(
@@ -2240,6 +2430,16 @@ struct AppRootView: View {
             gear: gear,
             trophies: trophies
         )
+
+        emitHomeAssistantImpactEvents(
+            for: workout.id
+        )
+
+        Task {
+            await emitHomeAssistantPersonalRecords(
+                for: workout
+            )
+        }
     }
 
     private func handleCompletedWorkoutReview(
@@ -2321,6 +2521,77 @@ struct AppRootView: View {
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
         pendingWorkoutReview = workout
+    }
+
+    private func handleHomeAssistantCommandNotification(
+        _ notification: Notification
+    ) {
+        guard let command =
+                notification.object as? HomeAssistantInboundCommand
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await handleHomeAssistantCommand(
+                command
+            )
+        }
+    }
+
+    private func handlePhoneWorkoutLiveUpdate(
+        _ workout: PhoneWorkout?
+    ) {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        Task { @MainActor in
+            await syncHomeAssistantPhoneWorkoutLiveState(
+                workout
+            )
+        }
+    }
+
+    private func handleStrengthWorkoutProgressChanged() {
+        Task { @MainActor in
+            await syncHomeAssistantStrengthLiveState(
+                strengthWorkout.activeWorkout,
+                force: true
+            )
+        }
+    }
+
+    private func handleStrengthWorkoutLiveUpdate(
+        _ workout: StrengthWorkoutLog?
+    ) {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        Task { @MainActor in
+            await syncHomeAssistantStrengthLiveState(
+                workout
+            )
+            await emitNewHomeAssistantStrengthSetEvents(
+                workout
+            )
+        }
+    }
+
+    private func handleRemoteNotificationReceived() {
+        guard appSession.signedIn else { return }
+
+        Task { @MainActor in
+            // The backend already delivered this event through APNs.
+            // Pull the authoritative inbox immediately so the Home bell
+            // updates while ATHLTH is open, without scheduling a duplicate
+            // local system notification for the same event.
+            await refreshSocialHomeCore(
+                deliverSystemAlertsForImportedInbox: false,
+                force: true
+            )
+        }
     }
 
     private func refreshSocialHomeCore(
@@ -2476,6 +2747,542 @@ struct AppRootView: View {
         }
     }
 
+    @MainActor
+    private func handleHomeAssistantCommand(
+        _ command: HomeAssistantInboundCommand
+    ) async {
+        guard ATHLTHDeviceRole.isIPhone,
+              appSession.signedIn
+        else {
+            return
+        }
+
+        switch command.type {
+        case "sync_now":
+            await syncHomeAssistantSnapshot()
+
+        case "schedule_extra_workout":
+            guard let data = command.data,
+                  let title =
+                    data["title"]?.stringValue,
+                  let scheduledRaw =
+                    data["scheduled_at"]?
+                        .stringValue,
+                  let scheduledAt =
+                    ISO8601DateFormatter()
+                        .date(
+                            from: scheduledRaw
+                        )
+            else {
+                return
+            }
+
+            let workoutID =
+                data["workout_id"]?
+                    .stringValue
+                    .flatMap(UUID.init(uuidString:))
+                    ?? UUID()
+
+            let kind: WorkoutKind
+            switch data["workout_type"]?
+                .stringValue {
+            case "running":
+                kind = .running
+            case "strength":
+                kind = .strength
+            case "mobility":
+                kind = .mobility
+            default:
+                kind = .custom
+            }
+
+            let session =
+                PlannedSession(
+                    id: workoutID,
+                    title: title,
+                    kind: kind,
+                    scheduledStart:
+                        scheduledAt,
+                    durationMinutes:
+                        data[
+                            "duration_minutes"
+                        ]?.intValue,
+                    targetDistanceKilometers:
+                        nil,
+                    targetPaceSecondsPerKilometer:
+                        nil,
+                    routeID: nil,
+                    exercises: [],
+                    notes:
+                        data["notes"]?
+                            .stringValue
+                )
+
+            // Home Assistant always creates a standalone extra session.
+            // It never mutates the active training plan.
+            appSession
+                .addStandalonePlannedSession(
+                    session
+                )
+            await syncHomeAssistantSnapshot()
+
+        case "move_planned_workout":
+            guard let data = command.data,
+                  let workoutIDRaw =
+                    data["workout_id"]?
+                        .stringValue,
+                  let workoutID =
+                    UUID(
+                        uuidString:
+                            workoutIDRaw
+                    ),
+                  let scheduledRaw =
+                    data["scheduled_at"]?
+                        .stringValue,
+                  let scheduledAt =
+                    ISO8601DateFormatter()
+                        .date(
+                            from: scheduledRaw
+                        ),
+                  var session =
+                    appSession
+                        .standalonePlannedSessions
+                        .first(
+                            where: {
+                                $0.id ==
+                                    workoutID
+                            }
+                        )
+            else {
+                return
+            }
+
+            session.scheduledStart =
+                scheduledAt
+            appSession
+                .updateStandalonePlannedSession(
+                    session
+                )
+            await syncHomeAssistantSnapshot()
+
+        case "open_planned_workout":
+            // HomeAssistantConnectionStore also schedules a local
+            // notification for this command. Refreshing here guarantees
+            // the surfaced workout uses the latest calendar state.
+            await syncHomeAssistantSnapshot()
+
+        default:
+            break
+        }
+    }
+
+    @MainActor
+    private func syncHomeAssistantPhoneWorkoutLiveState(
+        _ workout: PhoneWorkout?,
+        force: Bool = false
+    ) async {
+        guard homeAssistant.isConnected,
+              homeAssistant
+                .shareLiveWorkoutDetails,
+              let workout
+        else {
+            return
+        }
+
+        let now = Date()
+        guard force ||
+                now.timeIntervalSince(
+                    lastHomeAssistantLiveWorkoutSyncAt
+                ) >= 5
+        else {
+            return
+        }
+        lastHomeAssistantLiveWorkoutSyncAt =
+            now
+
+        let pace =
+            workout
+                .currentPaceSecondsPerKilometer
+        let speed: Double? =
+            pace.flatMap { value -> Double? in
+                guard value > 0 else {
+                    return nil
+                }
+                return 3_600.0 / value
+            }
+        let environment =
+            String(
+                describing:
+                    workout.runEnvironment ??
+                    .outdoor
+            )
+            .lowercased()
+
+        await homeAssistant
+            .sendWorkoutLiveUpdate(
+                phase:
+                    phoneWorkout
+                        .automaticPauseActive
+                        ? "paused"
+                        : "active",
+                name: workout.title,
+                type:
+                    workout.walking
+                        ? "walking"
+                        : "running",
+                elapsedSeconds:
+                    workout.elapsed(
+                        at: now
+                    ),
+                distanceMeters:
+                    workout.distanceMeters,
+                paceSecondsPerKilometer:
+                    pace,
+                speedKilometersPerHour:
+                    speed,
+                environment:
+                    environment,
+                treadmillInclinePercent:
+                    workout
+                        .treadmillInclinePercent
+            )
+    }
+
+    @MainActor
+    private func syncHomeAssistantStrengthLiveState(
+        _ workout: StrengthWorkoutLog?,
+        force: Bool = false
+    ) async {
+        guard homeAssistant.isConnected,
+              homeAssistant
+                .shareStrengthDetails,
+              let workout,
+              workout.exercises.indices
+                .contains(
+                    strengthWorkout
+                        .currentExerciseIndex
+                )
+        else {
+            return
+        }
+
+        let now = Date()
+        guard force ||
+                now.timeIntervalSince(
+                    lastHomeAssistantStrengthSyncAt
+                ) >= 1
+        else {
+            return
+        }
+        lastHomeAssistantStrengthSyncAt =
+            now
+
+        let exerciseIndex =
+            strengthWorkout
+                .currentExerciseIndex
+        let exercise =
+            workout.exercises[
+                exerciseIndex
+            ]
+        let setIndex =
+            min(
+                max(
+                    strengthWorkout
+                        .currentSetIndex,
+                    0
+                ),
+                max(
+                    exercise.sets.count - 1,
+                    0
+                )
+            )
+        guard exercise.sets.indices
+                .contains(setIndex)
+        else {
+            return
+        }
+
+        let set =
+            exercise.sets[setIndex]
+        let remainingRest =
+            strengthWorkout
+                .restEndsAt
+                .map {
+                    max(
+                        Int(
+                            $0.timeIntervalSince(
+                                now
+                            )
+                            .rounded(.up)
+                        ),
+                        0
+                    )
+                }
+
+        await homeAssistant
+            .sendStrengthSetUpdate(
+                exercise:
+                    exercise.exercise.name,
+                exerciseIndex:
+                    exerciseIndex,
+                setNumber:
+                    set.setNumber,
+                setIndex:
+                    setIndex,
+                setTotal:
+                    exercise.sets.count,
+                reps:
+                    set.resolvedCompletedReps ??
+                    strengthWorkout
+                        .draftReps,
+                weightKilograms:
+                    set.completedWeightKilograms ??
+                    strengthWorkout
+                        .draftWeightKilograms,
+                resistanceLevel:
+                    set.completedResistanceLevel ??
+                    strengthWorkout
+                        .draftResistanceLevel,
+                restSeconds:
+                    remainingRest,
+                rowDistanceMeters:
+                    set
+                        .resolvedCompletedDistanceMeters,
+                completed: false
+            )
+    }
+
+    @MainActor
+    private func emitNewHomeAssistantStrengthSetEvents(
+        _ workout: StrengthWorkoutLog?
+    ) async {
+        guard homeAssistant
+                .shareStrengthDetails,
+              let workout
+        else {
+            return
+        }
+
+        for (
+            exerciseIndex,
+            exercise
+        ) in workout.exercises
+            .enumerated() {
+            for (
+                setIndex,
+                set
+            ) in exercise.sets
+                .enumerated()
+            where set.isCompleted {
+                let key =
+                    workout.id.uuidString +
+                    "|" +
+                    set.id.uuidString
+
+                guard !homeAssistantReportedStrengthSetIDs
+                    .contains(key)
+                else {
+                    continue
+                }
+
+                homeAssistantReportedStrengthSetIDs
+                    .insert(key)
+
+                await homeAssistant
+                    .sendStrengthSetUpdate(
+                        exercise:
+                            exercise
+                                .exercise
+                                .name,
+                        exerciseIndex:
+                            exerciseIndex,
+                        setNumber:
+                            set.setNumber,
+                        setIndex:
+                            setIndex,
+                        setTotal:
+                            exercise
+                                .sets
+                                .count,
+                        reps:
+                            set.resolvedCompletedReps,
+                        weightKilograms:
+                            set.completedWeightKilograms,
+                        resistanceLevel:
+                            set.completedResistanceLevel,
+                        restSeconds:
+                            set.restSeconds,
+                        rowDistanceMeters:
+                            set
+                                .resolvedCompletedDistanceMeters,
+                        completed: true
+                    )
+            }
+        }
+    }
+
+    @MainActor
+    private func emitHomeAssistantImpactEvents(
+        for workoutID: UUID
+    ) {
+        guard homeAssistant
+                .shareMilestoneEvents,
+              let impact =
+                workoutCompletion
+                    .impact(
+                        for: workoutID
+                    )
+        else {
+            return
+        }
+
+        for item in impact.items {
+            let key =
+                workoutID.uuidString +
+                "|" +
+                item.id
+
+            guard !homeAssistantReportedImpactIDs
+                .contains(key)
+            else {
+                continue
+            }
+
+            let event: String?
+            switch item.kind {
+            case .achievement:
+                event =
+                    "achievement_unlocked"
+            case .goal:
+                event =
+                    item.detail
+                        .localizedCaseInsensitiveContains(
+                            "goal completed"
+                        )
+                        ? "goal_completed"
+                        : nil
+            case .challenge:
+                event =
+                    item.detail
+                        .localizedCaseInsensitiveContains(
+                            "completed"
+                        )
+                        ? "challenge_completed"
+                        : nil
+            case .gear:
+                event = nil
+            }
+
+            guard let event else {
+                continue
+            }
+
+            homeAssistantReportedImpactIDs
+                .insert(key)
+
+            Task {
+                await homeAssistant
+                    .sendMilestoneEvent(
+                        event: event,
+                        title: item.title,
+                        detail: item.detail
+                    )
+            }
+        }
+    }
+
+    @MainActor
+    private func emitHomeAssistantPersonalRecords(
+        for workout:
+            SocialPublishableWorkout
+    ) async {
+        guard homeAssistant
+                .shareMilestoneEvents
+        else {
+            return
+        }
+
+        if workout.activity == .strength {
+            for record in
+                strengthWorkout
+                    .repPersonalRecords
+            where record.sourceWorkoutID ==
+                    workout.id {
+                let key =
+                    workout.id.uuidString +
+                    "|strength-pr|" +
+                    record.id
+
+                guard !homeAssistantReportedPersonalRecordIDs
+                    .contains(key)
+                else {
+                    continue
+                }
+
+                homeAssistantReportedPersonalRecordIDs
+                    .insert(key)
+
+                await homeAssistant
+                    .sendMilestoneEvent(
+                        event:
+                            "personal_record",
+                        title:
+                            record.title,
+                        value:
+                            record.value
+                    )
+            }
+        }
+
+        guard let records =
+                try? await health
+                    .personalRecords(
+                        forceRefresh: true
+                    )
+        else {
+            return
+        }
+
+        for record in records {
+            guard record.date >=
+                    workout.startDate
+                        .addingTimeInterval(
+                            -2
+                        ),
+                  record.date <=
+                    workout.endDate
+                        .addingTimeInterval(
+                            2
+                        )
+            else {
+                continue
+            }
+
+            let key =
+                workout.id.uuidString +
+                "|health-pr|" +
+                record.id
+
+            guard !homeAssistantReportedPersonalRecordIDs
+                .contains(key)
+            else {
+                continue
+            }
+
+            homeAssistantReportedPersonalRecordIDs
+                .insert(key)
+
+            await homeAssistant
+                .sendMilestoneEvent(
+                    event: "personal_record",
+                    title:
+                        record.kind.title,
+                    value:
+                        record.formattedValue
+                )
+        }
+    }
+
     private func refreshTrophiesAndNotifications() async {
         await trophies.refresh(
             health: health,
@@ -2594,6 +3401,15 @@ struct AppRootView: View {
                 goalDaysRemaining,
             calendarEvents:
                 homeAssistantCalendarEvents()
+        )
+
+        await syncHomeAssistantPhoneWorkoutLiveState(
+            phoneWorkout.active,
+            force: true
+        )
+        await syncHomeAssistantStrengthLiveState(
+            strengthWorkout.activeWorkout,
+            force: true
         )
     }
 

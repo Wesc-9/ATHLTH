@@ -837,28 +837,87 @@ struct WatchActiveWorkoutView: View {
                 .padding(10)
                 .watchSurface()
             } else if snapshot.exerciseName != nil {
-                WatchStrengthCrownControl(
-                    title: "Weight",
-                    valueText: String(
-                        format: "%.1f kg",
-                        snapshot.draftWeightKilograms
-                    ),
-                    value: strengthWeightBinding,
-                    range: 0...500,
-                    step: 0.5,
-                    icon: "scalemass.fill",
-                    tint: WatchTheme.slate
-                )
+                if snapshot.loadKindRaw ==
+                    "resistanceLevel" {
+                    WatchStrengthCrownControl(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Resistance",
+                                norwegian: "Motstand"
+                            ),
+                        valueText:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Level \(snapshot.draftResistanceLevel ?? 5)",
+                                norwegian:
+                                    "Steg \(snapshot.draftResistanceLevel ?? 5)"
+                            ),
+                        value:
+                            strengthResistanceBinding,
+                        range: 1...10,
+                        step: 1,
+                        icon: "dial.medium",
+                        tint: WatchTheme.slate
+                    )
+                } else {
+                    WatchStrengthCrownControl(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Weight",
+                                norwegian: "Vekt"
+                            ),
+                        valueText: String(
+                            format: "%.1f kg",
+                            snapshot.draftWeightKilograms
+                        ),
+                        value: strengthWeightBinding,
+                        range: 0...500,
+                        step: 0.5,
+                        icon: "scalemass.fill",
+                        tint: WatchTheme.slate
+                    )
+                }
 
-                WatchStrengthCrownControl(
-                    title: "Reps",
-                    valueText: "\(snapshot.draftReps)",
-                    value: strengthRepsBinding,
-                    range: 0...100,
-                    step: 1,
-                    icon: "repeat",
-                    tint: WatchTheme.accent
-                )
+                if snapshot.targetKindRaw ==
+                    "time" {
+                    WatchStrengthCrownControl(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Duration",
+                                norwegian: "Varighet"
+                            ),
+                        valueText:
+                            durationText(
+                                TimeInterval(
+                                    snapshot
+                                        .draftDurationSeconds ??
+                                    60
+                                )
+                            ),
+                        value:
+                            strengthDurationBinding,
+                        range: 15...7_200,
+                        step: 15,
+                        icon: "timer",
+                        tint: WatchTheme.accent
+                    )
+                } else {
+                    WatchStrengthCrownControl(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Reps",
+                                norwegian: "Repetisjoner"
+                            ),
+                        valueText:
+                            "\(snapshot.draftReps)",
+                        value:
+                            strengthRepsBinding,
+                        range: 0...100,
+                        step: 1,
+                        icon: "repeat",
+                        tint: WatchTheme.accent
+                    )
+                }
 
                 WatchStrengthCrownControl(
                     title: "Rest",
@@ -974,7 +1033,14 @@ struct WatchActiveWorkoutView: View {
                 ProgressView()
                     .tint(WatchTheme.green)
 
-                Text("Syncing strength workout…")
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Preparing strength workout…",
+                        norwegian:
+                            "Klargjør styrkeøkt…"
+                    )
+                )
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(WatchTheme.muted)
                     .multilineTextAlignment(.center)
@@ -1002,6 +1068,68 @@ struct WatchActiveWorkoutView: View {
                 workoutManager.updateStrengthDraft(
                     weightKilograms: $0
                 )
+            }
+        )
+    }
+
+    private var strengthResistanceBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                Double(
+                    workoutManager
+                        .strengthSession?
+                        .draftResistanceLevel ??
+                    5
+                )
+            },
+            set: {
+                workoutManager
+                    .updateStrengthDraft(
+                        resistanceLevel:
+                            min(
+                                max(
+                                    Int(
+                                        $0.rounded()
+                                    ),
+                                    1
+                                ),
+                                10
+                            )
+                    )
+            }
+        )
+    }
+
+    private var strengthDurationBinding:
+        Binding<Double> {
+        Binding(
+            get: {
+                Double(
+                    workoutManager
+                        .strengthSession?
+                        .draftDurationSeconds ??
+                    60
+                )
+            },
+            set: {
+                let rounded =
+                    Int(
+                        ($0 / 15)
+                            .rounded()
+                    ) * 15
+
+                workoutManager
+                    .updateStrengthDraft(
+                        durationSeconds:
+                            min(
+                                max(
+                                    rounded,
+                                    15
+                                ),
+                                7_200
+                            )
+                    )
             }
         )
     }

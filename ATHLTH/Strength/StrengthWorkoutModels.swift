@@ -227,6 +227,31 @@ struct LinkedHealthWorkoutMetrics: Codable, Hashable {
     var maxHeartRate: Double?
 }
 
+struct StrengthSetEffortSegment: Identifiable, Codable, Hashable {
+    let id: UUID
+    var reps: Int?
+    var weightKilograms: Double?
+    var durationSeconds: Int?
+    var distanceMeters: Double?
+    var resistanceLevel: Int?
+
+    init(
+        id: UUID = UUID(),
+        reps: Int? = nil,
+        weightKilograms: Double? = nil,
+        durationSeconds: Int? = nil,
+        distanceMeters: Double? = nil,
+        resistanceLevel: Int? = nil
+    ) {
+        self.id = id
+        self.reps = reps
+        self.weightKilograms = weightKilograms
+        self.durationSeconds = durationSeconds
+        self.distanceMeters = distanceMeters
+        self.resistanceLevel = resistanceLevel
+    }
+}
+
 struct StrengthSetLog: Identifiable, Codable, Hashable {
     let id: UUID
     var setNumber: Int
@@ -240,6 +265,140 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     // Optional fields preserve decoding of workouts created before this strength upgrade.
     var rir: Double? = nil
     var isWarmUp: Bool? = nil
+
+    // Optional keeps workout history created before timed strength targets
+    // fully decodable. Legacy sets remain repetition-based.
+    var targetKind: StrengthExerciseTargetKind? = nil
+    var plannedDurationSeconds: Int? = nil
+    var completedDurationSeconds: Int? = nil
+
+    // Optional machine/result metadata keeps older workout history decodable.
+    var loadKind: StrengthExerciseLoadKind? = nil
+    var plannedResistanceLevel: Int? = nil
+    var completedResistanceLevel: Int? = nil
+    var completedDistanceMeters: Double? = nil
+
+    // A completed set can contain multiple effort segments. Example:
+    // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.
+    var effortSegments: [StrengthSetEffortSegment]? = nil
+
+    var resolvedLoadKind: StrengthExerciseLoadKind {
+        loadKind ??
+            (plannedResistanceLevel != nil ||
+             completedResistanceLevel != nil
+                ? .resistanceLevel
+                : .weightKilograms)
+    }
+
+    var resolvedTargetKind: StrengthExerciseTargetKind {
+        targetKind ??
+            (plannedDurationSeconds != nil ? .time : .reps)
+    }
+
+    var resolvedCompletedReps: Int? {
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            let total =
+                effortSegments
+                    .compactMap(\.reps)
+                    .reduce(0, +)
+            return total > 0 ? total : nil
+        }
+
+        return completedReps
+    }
+
+    var resolvedCompletedDurationSeconds: Int? {
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            let total =
+                effortSegments
+                    .compactMap(\.durationSeconds)
+                    .reduce(0, +)
+            return total > 0 ? total : completedDurationSeconds
+        }
+
+        return completedDurationSeconds
+    }
+
+    var resolvedCompletedDistanceMeters: Double? {
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            let total =
+                effortSegments
+                    .compactMap(\.distanceMeters)
+                    .reduce(0, +)
+            return total > 0 ? total : completedDistanceMeters
+        }
+
+        return completedDistanceMeters
+    }
+
+    func completedReps(
+        atOrAboveWeightKilograms target: Double
+    ) -> Int {
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            return effortSegments.reduce(0) {
+                partial,
+                segment in
+
+                guard let reps = segment.reps,
+                      let weight =
+                        segment.weightKilograms,
+                      weight + 0.01 >= target
+                else {
+                    return partial
+                }
+
+                return partial + reps
+            }
+        }
+
+        guard let weight =
+                completedWeightKilograms,
+              weight + 0.01 >= target
+        else {
+            return 0
+        }
+
+        return completedReps ?? 0
+    }
+
+    var volumeKilograms: Double {
+        guard countsTowardTrainingLoad else {
+            return 0
+        }
+
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            return effortSegments.reduce(0) {
+                partial,
+                segment in
+
+                guard let reps = segment.reps,
+                      let weight =
+                        segment.weightKilograms,
+                      reps > 0,
+                      weight > 0
+                else {
+                    return partial
+                }
+
+                return partial +
+                    Double(reps) * weight
+            }
+        }
+
+        guard let reps = completedReps,
+              let weight =
+                completedWeightKilograms
+        else {
+            return 0
+        }
+
+        return Double(reps) * weight
+    }
 
     var isCompleted: Bool {
         completedAt != nil
@@ -290,6 +449,7 @@ struct StrengthProgressionSuggestion: Hashable {
     let previousReps: Int
     let suggestedWeightKilograms: Double
     let suggestedReps: Int
+    var reason: String? = nil
 }
 
 struct StrengthPersonalRecord: Identifiable, Hashable {
@@ -366,16 +526,8 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var totalVolumeKilograms: Double {
         exercises
             .flatMap(\.sets)
-            .reduce(0) { partial, set in
-                guard
-                    set.countsTowardTrainingLoad,
-                    let reps = set.completedReps,
-                    let weight = set.completedWeightKilograms
-                else {
-                    return partial
-                }
-
-                return partial + (Double(reps) * weight)
+            .reduce(0) {
+                $0 + $1.volumeKilograms
             }
     }
 

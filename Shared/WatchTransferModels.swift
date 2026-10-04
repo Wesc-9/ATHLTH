@@ -378,6 +378,16 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
 
+    // When a workout was launched from iPhone, iPhone owns spoken guidance
+    // while WatchConnectivity remains reachable so Spotify/AirPods can stay on
+    // the phone. Watch automatically becomes the voice fallback if the phone
+    // leaves range. Optional keeps older payloads fully compatible.
+    var preferIPhoneAudioWhenReachable: Bool? = nil
+
+    var shouldPreferIPhoneAudioWhenReachable: Bool {
+        preferIPhoneAudioWhenReachable ?? false
+    }
+
     // Strength-specific Audio Coach cues. Optional fields keep older queued
     // Watch payloads and persisted configurations backwards compatible.
     var announceStrengthSetComplete: Bool? = nil
@@ -776,6 +786,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var steps: [WatchRunningWorkoutStep]
     var routeAlerts: WatchRouteAlertConfiguration? = nil
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
+    // Non-nil means this is an indoor treadmill run, including a valid 0%.
+    // Optional keeps transfers from older builds decodable.
+    var treadmillInclinePercent: Double? = nil
     // Optional keeps payloads from older builds decodable. The sender resolves
     // app default vs per-workout override before launch.
     var autoPauseEnabled: Bool? = nil
@@ -794,6 +807,9 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
     var routeID: UUID?
     var runningWorkout: WatchRunningWorkoutTransfer?
     var audioCoach: WatchAudioCoachConfiguration?
+    // Optional so older iPhone/Watch pairs still decode. When present, the
+    // Watch has the entire strength prescription before it leaves the phone.
+    var strengthWorkout: WatchStrengthSessionSnapshot? = nil
     var updatedAt: Date
 }
 
@@ -838,11 +854,28 @@ enum WatchStrengthInputMode:
     }
 }
 
+struct WatchStrengthSetPlan: Codable, Hashable {
+    var setNumber: Int
+    var reps: Int? = nil
+    var durationSeconds: Int? = nil
+    var weightKilograms: Double? = nil
+    var resistanceLevel: Int? = nil
+    var restSeconds: Int? = nil
+    var isWarmUp: Bool? = nil
+}
+
 struct WatchStrengthExerciseSummary: Codable, Hashable {
     var index: Int
     var name: String
     var primaryMuscles: [String]
     var setCount: Int
+
+    // Optional details let Apple Watch carry the whole strength prescription
+    // without iPhone reachability. Defaults keep older snapshots decodable.
+    var instructions: [String]? = nil
+    var secondaryMuscles: [String]? = nil
+    var equipment: [String]? = nil
+    var setPlans: [WatchStrengthSetPlan]? = nil
 }
 
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
@@ -860,6 +893,13 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var draftReps: Int
     var draftWeightKilograms: Double
     var draftRestSeconds: Int
+
+    // Optional machine/time fields preserve compatibility with Watch builds
+    // that only knew reps + kilograms.
+    var draftDurationSeconds: Int? = nil
+    var draftResistanceLevel: Int? = nil
+    var targetKindRaw: String? = nil
+    var loadKindRaw: String? = nil
     var isResting: Bool
     var restEndsAt: Date?
     var currentExerciseComplete: Bool
@@ -873,6 +913,12 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var effortMetricRaw: String? = nil
     var exerciseQueue:
         [WatchStrengthExerciseSummary]? = nil
+
+    // Offline ownership metadata. A Watch-started workout can be rebuilt on
+    // iPhone from this snapshot after hours without connectivity.
+    var startedAt: Date? = nil
+    var plannedSessionID: UUID? = nil
+    var allowsLiveExerciseBuilding: Bool? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
@@ -892,6 +938,9 @@ struct WatchStrengthCommand: Codable, Hashable {
     var reps: Int?
     var weightKilograms: Double?
     var restSeconds: Int?
+    var durationSeconds: Int? = nil
+    var resistanceLevel: Int? = nil
+    var distanceMeters: Double? = nil
     var addRestSeconds: Int?
     var sentAt: Date
     var rpe: Double? = nil
@@ -902,6 +951,10 @@ struct WatchStrengthCommand: Codable, Hashable {
     // True only when the strength workout was initiated from the Watch UI.
     // Older queued commands remain decodable because this is optional.
     var initiatedOnWatch: Bool? = nil
+
+    // The first durable request from a standalone Watch carries enough state
+    // for iPhone to recreate the strength log before replaying queued actions.
+    var bootstrapSnapshot: WatchStrengthSessionSnapshot? = nil
 }
 
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
@@ -929,6 +982,12 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routeLeaderboardEligible: Bool? = nil
     var routeComparisonID: UUID? = nil
     var routeTitle: String? = nil
+
+    // Strength work performed while iPhone is unavailable is shipped together
+    // with the final HealthKit result. This makes offline completion atomic
+    // instead of depending on WatchConnectivity delivery order.
+    var strengthSnapshot: WatchStrengthSessionSnapshot? = nil
+    var strengthCommands: [WatchStrengthCommand]? = nil
 }
 
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
@@ -970,6 +1029,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // Optional presentation fields for Dynamic Island, Lock Screen and Watch.
     // Defaults keep older mirrored snapshots backwards compatible.
     var currentPaceSecondsPerKilometer: TimeInterval? = nil
+    // Non-nil identifies a treadmill run and carries the user-selected incline.
+    var treadmillInclinePercent: Double? = nil
     var routeRemainingMeters: Double? = nil
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil

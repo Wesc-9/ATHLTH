@@ -274,11 +274,57 @@ enum RunQuickStartMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
+    case outdoor
+    case treadmill
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .outdoor:
+            return ATHLTHLocalization.choose(
+                english: "Outdoor",
+                norwegian: "Ute"
+            )
+        case .treadmill:
+            return ATHLTHLocalization.choose(
+                english: "Treadmill",
+                norwegian: "Tredemølle"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .outdoor:
+            return ATHLTHLocalization.choose(
+                english: "GPS route, pace and elevation",
+                norwegian: "GPS-rute, tempo og høyde"
+            )
+        case .treadmill:
+            return ATHLTHLocalization.choose(
+                english: "Indoor run without GPS",
+                norwegian: "Innendørs løping uten GPS"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .outdoor: return "figure.run"
+        case .treadmill: return "figure.run.treadmill"
+        }
+    }
+}
+
 struct RunQuickStartConfiguration {
     let mode: RunQuickStartMode
     let route: TrainingRoute?
     let workout: RunningWorkoutTemplate?
     let captureDevice: WorkoutCaptureDevice
+    let environment: RunEnvironment
+    let treadmillInclinePercent: Double?
     let audioCoach: WatchAudioCoachConfiguration
     let routeAlerts: WatchRouteAlertConfiguration
     let ghostTargetDurationSeconds: TimeInterval?
@@ -871,6 +917,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -882,6 +929,8 @@ struct RunQuickStartSheet: View {
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
+    @State private var environment: RunEnvironment = .outdoor
+    @State private var treadmillInclinePercent: Double = 0
     @StateObject private var routeLocationProbe =
         QuickStartRouteLocationProbe()
 
@@ -964,6 +1013,7 @@ struct RunQuickStartSheet: View {
                 VStack(spacing: 16) {
                     introCard
                     modeCard
+                    runEnvironmentCard
 
                     runDeviceCard
 
@@ -976,11 +1026,13 @@ struct RunQuickStartSheet: View {
                                 activity: .running
                             )
 
-                            QuickStartAutoPauseCard(
-                                preference: $autoPausePreference,
-                                appDefaultEnabled:
-                                    settings.autoPauseOutdoorWorkouts
-                            )
+                            if environment == .outdoor {
+                                QuickStartAutoPauseCard(
+                                    preference: $autoPausePreference,
+                                    appDefaultEnabled:
+                                        settings.autoPauseOutdoorWorkouts
+                                )
+                            }
 
                             QuickStartSpotifyCard(
                                 playlist:
@@ -1235,6 +1287,22 @@ struct RunQuickStartSheet: View {
 
                 routeLocationProbe.refresh()
             }
+            .onDisappear {
+                guard captureDevice == .iPhone,
+                      phoneWorkout.active != nil,
+                      !phoneWorkout.isUserMinimized
+                else {
+                    return
+                }
+
+                Task { @MainActor in
+                    await Task.yield()
+                    try? await Task.sleep(
+                        for: .milliseconds(120)
+                    )
+                    phoneWorkout.presentWorkout()
+                }
+            }
             .onChange(
                 of: selectedRoute?.id
             ) { _, _ in
@@ -1251,6 +1319,19 @@ struct RunQuickStartSheet: View {
                     route: guidanceRoute,
                     settings: settings
                 )
+            }
+            .onChange(of: environment) { _, newValue in
+                if newValue == .treadmill,
+                   mode == .route {
+                    mode = .free
+                    selectedRoute = nil
+                }
+
+                if newValue == .treadmill {
+                    routeGuardianDraft.enabled = false
+                    ghostDraft.enabled = false
+                    autoPausePreference = .off
+                }
             }
         }
     }
@@ -1516,6 +1597,118 @@ struct RunQuickStartSheet: View {
         )
     }
 
+    private var runEnvironmentCard: some View {
+        ATHLTHCard {
+            ATHLTHSectionHeader(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Where are you running?",
+                        norwegian: "Hvor løper du?"
+                    ),
+                actionTitle: nil
+            )
+
+            HStack(spacing: 10) {
+                ForEach(RunEnvironment.allCases) { option in
+                    Button {
+                        environment = option
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: option.systemImage)
+                                .font(
+                                    .system(
+                                        size: 22,
+                                        weight: .semibold
+                                    )
+                                )
+
+                            Text(option.title)
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+
+                            Text(option.subtitle)
+                                .font(.caption2)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                        }
+                        .foregroundStyle(
+                            environment == option
+                                ? Color.white
+                                : ATHLTHTheme.primaryText
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 112
+                        )
+                        .background(
+                            environment == option
+                                ? ATHLTHTheme.accentDeep
+                                : Color.primary.opacity(0.025),
+                            in: RoundedRectangle(
+                                cornerRadius: 18,
+                                style: .continuous
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 10)
+
+            if environment == .treadmill {
+                VStack(alignment: .leading, spacing: 10) {
+                    Divider()
+                        .padding(.top, 4)
+
+                    HStack {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Incline",
+                                norwegian: "Stigning"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Spacer()
+
+                        Text(
+                            String(
+                                format: "%.1f%%",
+                                treadmillInclinePercent
+                            )
+                        )
+                        .font(
+                            .title3
+                                .weight(.bold)
+                                .monospacedDigit()
+                        )
+                    }
+
+                    Slider(
+                        value: $treadmillInclinePercent,
+                        in: 0...20,
+                        step: 0.5
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Set the treadmill incline for this workout. You can change it in 0.5% steps before starting.",
+                            norwegian:
+                                "Angi stigningen på tredemøllen for denne økten. Du kan justere i trinn på 0,5 % før start."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
     private var modeCard: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(
@@ -1525,7 +1718,12 @@ struct RunQuickStartSheet: View {
 
             VStack(spacing: 8) {
                 ForEach(RunQuickStartMode.allCases) { option in
+                    let disabled =
+                        environment == .treadmill &&
+                        option == .route
+
                     Button {
+                        guard !disabled else { return }
                         mode = option
                     } label: {
                         HStack(spacing: 12) {
@@ -1580,6 +1778,8 @@ struct RunQuickStartSheet: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(disabled)
+                    .opacity(disabled ? 0.48 : 1)
                 }
             }
             .padding(.top, 10)
@@ -1596,10 +1796,24 @@ struct RunQuickStartSheet: View {
                         .foregroundStyle(ATHLTHTheme.accent)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("No destination. No target.")
-                            .font(.subheadline.weight(.semibold))
                         Text(
-                            "ATHLTH records your run, GPS route, time, distance and available heart-rate data."
+                            environment == .treadmill
+                                ? ATHLTHLocalization.choose(
+                                    english: "Indoor treadmill run",
+                                    norwegian: "Innendørs tredemølleøkt"
+                                )
+                                : "No destination. No target."
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        Text(
+                            environment == .treadmill
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH records time and the incline you selected. GPS and route tracking stay off indoors.",
+                                    norwegian:
+                                        "ATHLTH registrerer tid og valgt stigning. GPS og rutesporing er av innendørs."
+                                )
+                                : "ATHLTH records your run, GPS route, time, distance and available heart-rate data."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1832,6 +2046,11 @@ struct RunQuickStartSheet: View {
                             ? selectedWorkout
                             : nil,
                     captureDevice: captureDevice,
+                    environment: environment,
+                    treadmillInclinePercent:
+                        environment == .treadmill
+                            ? treadmillInclinePercent
+                            : nil,
                     audioCoach:
                         isAdvancedSetup
                             ? audioCoachConfiguration
@@ -1853,6 +2072,7 @@ struct RunQuickStartSheet: View {
                                 .ghostRaceAudioConfiguration
                             : nil,
                     autoPauseEnabled:
+                        environment == .outdoor &&
                         (
                             isAdvancedSetup
                                 ? autoPausePreference
@@ -1951,6 +2171,10 @@ struct RunQuickStartSheet: View {
     private var guidanceRoute:
         TrainingRoute?
     {
+        guard environment == .outdoor else {
+            return nil
+        }
+
         if mode == .route {
             return selectedRoute
         }
@@ -2763,13 +2987,12 @@ struct StrengthQuickBuilderView: View {
         _ exercise: PlannedExercise
     ) -> String {
         var parts = [
-            "\(exercise.sets) × \(exercise.reps ?? 0)"
+            exercise.compactTargetSummary
         ]
 
-        if let weight = exercise.targetWeightKilograms {
-            parts.append(
-                String(format: "%.1f kg", weight)
-            )
+        if let load =
+                exercise.compactLoadSummary {
+            parts.append(load)
         }
 
         if let rpe = exercise.targetRPE {

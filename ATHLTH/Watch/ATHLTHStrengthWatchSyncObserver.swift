@@ -78,19 +78,33 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     return false
                 }
 
-                var configuration =
-                    StrengthAdvancedConfiguration
-                        .savedDefaults()
-                configuration.inputMode = .both
+                if let bootstrap =
+                        command
+                            .bootstrapSnapshot {
+                    strengthWorkout
+                        .startFromWatchSnapshot(
+                            bootstrap,
+                            watchSessionID:
+                                command.id
+                        )
+                } else {
+                    var configuration =
+                        StrengthAdvancedConfiguration
+                            .savedDefaults()
+                    configuration.inputMode =
+                        .both
 
-                strengthWorkout.startFreestyle(
-                    watchSessionID:
-                        command.id,
-                    trackingMode: .advanced,
-                    captureDevice: .appleWatch,
-                    advancedConfiguration:
-                        configuration
-                )
+                    strengthWorkout.startFreestyle(
+                        watchSessionID:
+                            command.id,
+                        trackingMode:
+                            .advanced,
+                        captureDevice:
+                            .appleWatch,
+                        advancedConfiguration:
+                            configuration
+                    )
+                }
             }
 
             sendSnapshotNow()
@@ -189,11 +203,18 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
             strengthWorkout.setDraft(
                 reps: command.reps,
-                weightKilograms: command.weightKilograms,
-                restSeconds: command.restSeconds,
+                durationSeconds:
+                    command.durationSeconds,
+                weightKilograms:
+                    command.weightKilograms,
+                resistanceLevel:
+                    command.resistanceLevel,
+                restSeconds:
+                    command.restSeconds,
                 rpe: command.rpe,
                 rir: command.rir,
-                warmUp: command.isWarmUp,
+                warmUp:
+                    command.isWarmUp,
                 origin: .watch
             )
 
@@ -207,17 +228,80 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     .lastPhoneDraftMutationAt {
                 strengthWorkout.setDraft(
                     reps: command.reps,
+                    durationSeconds:
+                        command
+                            .durationSeconds,
                     weightKilograms:
-                        command.weightKilograms,
+                        command
+                            .weightKilograms,
+                    resistanceLevel:
+                        command
+                            .resistanceLevel,
                     restSeconds:
-                        command.restSeconds,
+                        command
+                            .restSeconds,
                     rpe: command.rpe,
                     rir: command.rir,
-                    warmUp: command.isWarmUp,
+                    warmUp:
+                        command.isWarmUp,
                     origin: .watch
                 )
             }
-            strengthWorkout.completeCurrentDraftSet()
+
+            if command.distanceMeters != nil {
+                let set =
+                    strengthWorkout
+                        .currentSet
+                strengthWorkout
+                    .completeCurrentSet(
+                        reps:
+                            set?
+                                .resolvedTargetKind ==
+                                .reps
+                                ? strengthWorkout
+                                    .draftReps
+                                : nil,
+                        durationSeconds:
+                            set?
+                                .resolvedTargetKind ==
+                                .time
+                                ? strengthWorkout
+                                    .draftDurationSeconds
+                                : nil,
+                        weightKilograms:
+                            set?
+                                .resolvedLoadKind ==
+                                .weightKilograms
+                                ? strengthWorkout
+                                    .draftWeightKilograms
+                                : nil,
+                        resistanceLevel:
+                            set?
+                                .resolvedLoadKind ==
+                                .resistanceLevel
+                                ? strengthWorkout
+                                    .draftResistanceLevel
+                                : nil,
+                        distanceMeters:
+                            command
+                                .distanceMeters,
+                        rpe:
+                            strengthWorkout
+                                .draftRPE,
+                        rir:
+                            strengthWorkout
+                                .draftRIR,
+                        isWarmUp:
+                            strengthWorkout
+                                .draftWarmUp,
+                        restSeconds:
+                            strengthWorkout
+                                .draftRestSeconds
+                    )
+            } else {
+                strengthWorkout
+                    .completeCurrentDraftSet()
+            }
 
         case .completeSetWithoutDetails:
             if let restSeconds = command.restSeconds {

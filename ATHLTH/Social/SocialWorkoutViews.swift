@@ -1,3 +1,4 @@
+import CoreLocation
 import MapKit
 import SwiftUI
 import UIKit
@@ -4644,6 +4645,10 @@ struct WorkoutPublishView: View {
     @State private var caption = ""
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
+    @State private var includeRoute = false
+    @State private var hideRouteStartAndEnd = true
+    @State private var sharingRoute: [CLLocation] = []
+    @State private var loadingRoute = false
     @State private var successMessage: String?
 
     init(initialWorkoutID: UUID? = nil) {
@@ -4767,6 +4772,32 @@ struct WorkoutPublishView: View {
                         }
                     }
 
+                    Section("Route privacy") {
+                        Toggle("Include route map", isOn: $includeRoute)
+                            .disabled(loadingRoute || sharingRoute.count < 2)
+                        Toggle("Hide route start & end", isOn: $hideRouteStartAndEnd)
+                        Text("Review this choice for each post. The first and last 250 m areas stay hidden when protection is on.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if loadingRoute {
+                            ProgressView("Loading route…")
+                        } else if includeRoute {
+                            let preview = WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd)
+                            if preview.isEmpty {
+                                Text("A safe route preview is unavailable. The map will stay private.")
+                                    .font(.caption)
+                            } else {
+                                WorkoutRouteSharePreview(coordinates: preview)
+                            }
+                            if !hideRouteStartAndEnd {
+                                Label("The full route may reveal your home or workplace.", systemImage: "exclamationmark.shield")
+                                    .font(.caption).foregroundStyle(.orange)
+                            }
+                        } else {
+                            Text("The GPS route is not included in this post.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+
                     Section("Post") {
                         TextField(
                             "Add a caption (optional)",
@@ -4833,6 +4864,10 @@ struct WorkoutPublishView: View {
                 }
             }
             .task(id: selectedWorkoutID) {
+                includeRoute = false
+                sharingRoute = []
+                loadingRoute = false
+                hideRouteStartAndEnd = settings.hideRouteStartAndEnd
                 guard let selectedWorkoutID else {
                     selectedAlreadyPublished = false
                     caption = ""
@@ -4855,6 +4890,13 @@ struct WorkoutPublishView: View {
                     caption = ""
                     visibility = settings.defaultActivityVisibility
                 }
+                guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID,
+                      let workout = selectedWorkout, workout.isIndoor != true else { return }
+                loadingRoute = true
+                let detail = await health.workoutDetail(for: workout.id)
+                guard !Task.isCancelled else { return }
+                sharingRoute = detail.route
+                loadingRoute = false
             }
         }
     }
@@ -4869,7 +4911,9 @@ struct WorkoutPublishView: View {
         let success = await social.publishWorkout(
             workout,
             visibility: visibility,
-            caption: caption
+            caption: caption,
+            routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
+            hideRouteStartAndEnd: hideRouteStartAndEnd
         )
 
         if success {

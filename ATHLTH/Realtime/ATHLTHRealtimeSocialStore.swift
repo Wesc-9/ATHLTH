@@ -329,6 +329,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private let deviceSessionID = UUID()
     private var heartbeatTask: Task<Void, Never>?
     private var watcherTask: Task<Void, Never>?
+    private var locationRealtimeTask: Task<Void, Never>?
     private var appIsActive = false
     private var onlineEnabled = false
     private var lastPublishedLocationAt: Date?
@@ -491,8 +492,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                         where: {
                             $0.id == restoredID &&
                             $0.activity == "running" &&
-                            $0.ownerID !=
-                                currentUserID
+                            (
+                                $0.ownerID !=
+                                    currentUserID ||
+                                (
+                                    $0.ghostChallengeID != nil &&
+                                    $0.opponentUserID ==
+                                        currentUserID
+                                )
+                            )
                         }
                     ) {
                 selectedLiveGhostSessionID =
@@ -1007,10 +1015,18 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         }
 
-        guard session.activity == "running",
-              session.ownerID != currentUserID
+        guard session.activity == "running"
         else {
             return
+        }
+
+        if session.ownerID == currentUserID {
+            guard
+                session.ghostChallengeID != nil,
+                session.opponentUserID != nil
+            else {
+                return
+            }
         }
 
         selectedLiveGhostSessionID =
@@ -1043,13 +1059,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     ) -> ATHLTHLiveGhostComparison? {
         guard let selectedSession =
                 selectedLiveGhostSession,
+              let opponentUserID =
+                liveGhostOpponentUserID(
+                    in: selectedSession
+                ),
               let livePoint =
                 liveLocations.first(
                     where: {
                         $0.sessionID ==
                             selectedSession.id &&
                         $0.userID ==
-                            selectedSession.ownerID
+                            opponentUserID
                     }
                 )
         else {
@@ -1123,7 +1143,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 sessionID:
                     selectedSession.id,
                 opponentUserID:
-                    selectedSession.ownerID,
+                    opponentUserID,
                 opponentDistanceMeters:
                     livePoint.distanceMeters,
                 opponentElapsedSeconds:
@@ -1202,6 +1222,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         )
     }
 
+    private func liveGhostOpponentUserID(
+        in session:
+            ATHLTHLiveWorkoutSession
+    ) -> UUID? {
+        guard let currentUserID else {
+            return session.ownerID
+        }
+
+        if session.ownerID ==
+            currentUserID {
+            return session
+                .opponentUserID
+        }
+
+        return session.ownerID
+    }
+
     private func sanitizedRouteProgress(
         _ value: Double?
     ) -> Double? {
@@ -1258,6 +1295,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         _ session: ATHLTHLiveWorkoutSession
     ) {
         watcherTask?.cancel()
+        locationRealtimeTask?.cancel()
         liveTrails = [:]
 
         if let currentUserID,
@@ -1265,6 +1303,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
            session.opponentUserID == currentUserID {
             currentSession = session
         }
+
+        startLocationRealtime(
+            sessionID: session.id
+        )
 
         watcherTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -1281,12 +1323,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
 
                 switch self.liveGhostConnectionState {
                 case .reconnecting:
-                    interval = .seconds(6)
+                    interval = .seconds(5)
                 case .delayed:
-                    interval = .seconds(4)
-                case .waiting, .live:
-                    interval =
-                        self.liveRefreshInterval
+                    interval = .seconds(7)
+                case .waiting:
+                    interval = .seconds(5)
+                case .live:
+                    interval = .seconds(12)
                 }
 
                 try? await Task.sleep(
@@ -1329,6 +1372,52 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         }
     }
 
+    private func startLocationRealtime(
+        sessionID: UUID
+    ) {
+        locationRealtimeTask =
+            Task {
+                @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                let channel =
+                    await self.client
+                        .channel(
+                            "live-workout-location-\(sessionID.uuidString.lowercased())"
+                        )
+
+                let changes =
+                    await channel
+                        .postgresChange(
+                            AnyAction.self,
+                            schema: "public",
+                            table:
+                                "live_workout_locations"
+                        )
+
+                await channel.subscribe()
+
+                for await _ in changes {
+                    guard
+                        !Task.isCancelled
+                    else {
+                        break
+                    }
+
+                    await self
+                        .refreshLocations(
+                            sessionID:
+                                sessionID
+                        )
+                }
+
+                await channel
+                    .unsubscribe()
+            }
+    }
+
     private func watchedSessionIsStillActive(
         _ sessionID: UUID
     ) async -> Bool {
@@ -1365,7 +1454,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         keepCurrentSession: Bool = true
     ) {
         watcherTask?.cancel()
+        locationRealtimeTask?.cancel()
         watcherTask = nil
+        locationRealtimeTask = nil
         liveLocations = []
         liveTrails = [:]
 
@@ -1424,6 +1515,72 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             $0.userID == currentUserID
         }
         liveTrails[currentUserID] = nil
+    }
+
+    func finishCurrentLiveGhostRace(
+        elapsedSeconds: TimeInterval
+    ) async {
+        guard
+            let session = currentSession,
+            let challengeID =
+                session.ghostChallengeID,
+            let currentUserID
+        else {
+            return
+        }
+
+        struct FinishWrite: Encodable {
+            let finishedAt: Date
+            let elapsedSeconds:
+                TimeInterval
+            let updatedAt: Date
+
+            enum CodingKeys:
+                String,
+                CodingKey
+            {
+                case finishedAt =
+                    "finished_at"
+                case elapsedSeconds =
+                    "elapsed_seconds"
+                case updatedAt =
+                    "updated_at"
+            }
+        }
+
+        do {
+            try await client
+                .from(
+                    "live_ghost_race_participants"
+                )
+                .update(
+                    FinishWrite(
+                        finishedAt: Date(),
+                        elapsedSeconds:
+                            max(
+                                elapsedSeconds,
+                                0
+                            ),
+                        updatedAt: Date()
+                    )
+                )
+                .eq(
+                    "challenge_id",
+                    value:
+                        challengeID
+                )
+                .eq(
+                    "user_id",
+                    value:
+                        currentUserID
+                )
+                .execute()
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
     }
 
     func leaveCurrentLiveWorkout() async {
@@ -1718,18 +1875,18 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             }()
 
         guard let inferredSpeed else {
-            return 3
+            return 2
         }
 
         if inferredSpeed >= 1.0 {
-            return 3
+            return 1.5
         }
 
         if inferredSpeed >= 0.35 {
-            return 5
+            return 3
         }
 
-        return 8
+        return 6
     }
 
     private func shouldPublishLiveLocation(

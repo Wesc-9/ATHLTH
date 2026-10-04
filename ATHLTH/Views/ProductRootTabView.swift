@@ -30,6 +30,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
 
 struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
 
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
@@ -132,6 +133,89 @@ struct ProductRootTabView: View {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
         }
+        .overlay(alignment: .top) {
+            if workoutMirroring
+                    .hasActiveMirroredWorkout,
+               workoutMirroring
+                    .isUserMinimized {
+                Button {
+                    workoutMirroring
+                        .presentWorkout()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(
+                            systemName:
+                                "figure.run"
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight:
+                                    .semibold
+                            )
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Return to Apple Watch workout",
+                                norwegian:
+                                    "Tilbake til Apple Watch-økt"
+                            )
+                        )
+                        .font(
+                            .headline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .padding(
+                        .horizontal,
+                        22
+                    )
+                    .frame(height: 58)
+                    .background(
+                        .regularMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black
+                                    .opacity(
+                                        0.05
+                                    ),
+                                lineWidth:
+                                    0.8
+                            )
+                    }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(
+                                    0.10
+                                ),
+                        radius: 14,
+                        y: 6
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 8)
+                .transition(
+                    .move(edge: .top)
+                        .combined(
+                            with:
+                                .opacity
+                        )
+                )
+                .zIndex(50)
+            }
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: {
@@ -156,39 +240,33 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @State private var presentationReady = false
+    @State private var showingLiveWorkout = false
 
     private var presentationTrigger: String {
-        "\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+        "\(workoutMirroring.presentationGeneration)-\(workoutMirroring.isPresentationRequested)-\(scenePhase == .active)"
+    }
+
+    private var canPresentMirroredWorkout: Bool {
+        guard scenePhase == .active,
+              workoutMirroring.isPresentationRequested,
+              !workoutMirroring.isUserMinimized
+        else {
+            return false
+        }
+
+        if let kind = workoutMirroring.snapshot?.kind,
+           kind == .strength || kind == .functional {
+            return false
+        }
+
+        return workoutMirroring.snapshot != nil
     }
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .sheet(
-                isPresented: Binding(
-                    get: {
-                        guard presentationReady,
-                              scenePhase == .active,
-                              workoutMirroring.isPresentationRequested
-                        else {
-                            return false
-                        }
-
-                        if let kind = workoutMirroring.snapshot?.kind,
-                           kind == .strength || kind == .functional {
-                            return false
-                        }
-
-                        return true
-                    },
-                    set: { presented in
-                        if !presented &&
-                            !workoutMirroring.hasActiveMirroredWorkout {
-                            workoutMirroring.dismissSummary()
-                        }
-                    }
-                ),
+            .fullScreenCover(
+                isPresented: $showingLiveWorkout,
                 onDismiss: {
                     if !workoutMirroring.hasActiveMirroredWorkout {
                         workoutMirroring.dismissSummary()
@@ -203,31 +281,55 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
                     .environmentObject(workoutMirroring)
             }
             .task(id: presentationTrigger) {
-                guard scenePhase == .active,
-                      workoutMirroring.isPresentationRequested
-                else {
-                    presentationReady = false
+                guard canPresentMirroredWorkout else {
+                    showingLiveWorkout = false
                     return
                 }
 
-                presentationReady = false
+                // Mirroring can attach while the quick-start sheet is still
+                // dismissing. Own the cover with local state and retry the
+                // actual presentation, so SwiftUI cannot leave an active
+                // workout hidden behind a stale true binding.
+                for delay in [
+                    Duration.milliseconds(350),
+                    Duration.milliseconds(650),
+                    Duration.milliseconds(1_100),
+                    Duration.milliseconds(1_800)
+                ] {
+                    try? await Task.sleep(for: delay)
 
-                // The mirroring callback can arrive while authentication is
-                // swapping the launch gate for the product tabs. Give SwiftUI
-                // one short, cancellable settling window before presenting a
-                // sheet from the new root hierarchy.
-                try? await Task.sleep(
-                    for: .milliseconds(400)
-                )
+                    guard !Task.isCancelled,
+                          canPresentMirroredWorkout
+                    else {
+                        showingLiveWorkout = false
+                        return
+                    }
 
-                guard !Task.isCancelled,
-                      scenePhase == .active,
-                      workoutMirroring.isPresentationRequested
-                else {
-                    return
+                    if workoutMirroring.liveViewIsVisible {
+                        return
+                    }
+
+                    showingLiveWorkout = false
+                    await Task.yield()
+                    try? await Task.sleep(
+                        for: .milliseconds(70)
+                    )
+
+                    guard !Task.isCancelled,
+                          canPresentMirroredWorkout
+                    else {
+                        return
+                    }
+
+                    showingLiveWorkout = true
                 }
-
-                presentationReady = true
+            }
+            .onChange(
+                of: workoutMirroring.isPresentationRequested
+            ) { _, requested in
+                if !requested {
+                    showingLiveWorkout = false
+                }
             }
     }
 }
@@ -490,7 +592,9 @@ struct ATHLTHHomeView: View {
                                         spotify:
                                             spotifyPlayback,
                                         ghostRace:
-                                            ghostRace
+                                            ghostRace,
+                                        workoutMirroring:
+                                            workoutMirroring
                                     )
                                 _ = await social
                                     .confirmCurrentJoinedWorkoutStarted()
@@ -2718,9 +2822,205 @@ struct ATHLTHHomeView: View {
                     runningWorkout,
                 audioCoach:
                     audioCoach,
+                strengthWorkout:
+                    watchKind == .strength
+                        ? homeStrengthWatchSnapshot(
+                            workout
+                        )
+                        : nil,
                 updatedAt: Date()
             )
         )
+    }
+
+    private func homeStrengthWatchSnapshot(
+        _ workout: PlannedSession
+    ) -> WatchStrengthSessionSnapshot? {
+        guard workout.kind == .strength,
+              !workout.exercises.isEmpty
+        else {
+            return nil
+        }
+
+        let queue =
+            workout.exercises
+                .enumerated()
+                .map {
+                    index,
+                    planned in
+
+                    let setCount =
+                        max(
+                            planned.sets,
+                            1
+                        )
+                    let plans =
+                        (1...setCount)
+                            .map {
+                                setNumber in
+
+                                WatchStrengthSetPlan(
+                                    setNumber:
+                                        setNumber,
+                                    reps:
+                                        planned
+                                            .resolvedTargetReps,
+                                    durationSeconds:
+                                        planned
+                                            .resolvedTargetDurationSeconds,
+                                    weightKilograms:
+                                        planned
+                                            .resolvedLoadKind ==
+                                            .weightKilograms
+                                            ? planned
+                                                .targetWeightKilograms
+                                            : nil,
+                                    resistanceLevel:
+                                        planned
+                                            .resolvedLoadKind ==
+                                            .resistanceLevel
+                                            ? planned
+                                                .resolvedTargetResistanceLevel
+                                            : nil,
+                                    restSeconds:
+                                        planned
+                                            .restSeconds,
+                                    isWarmUp: nil
+                                )
+                            }
+
+                    return WatchStrengthExerciseSummary(
+                        index: index,
+                        name:
+                            planned
+                                .embeddedExercise
+                                .name,
+                        primaryMuscles:
+                            planned
+                                .embeddedExercise
+                                .primaryMuscles,
+                        setCount:
+                            setCount,
+                        instructions:
+                            planned
+                                .embeddedExercise
+                                .instructions,
+                        secondaryMuscles:
+                            planned
+                                .embeddedExercise
+                                .secondaryMuscles,
+                        equipment:
+                            planned
+                                .embeddedExercise
+                                .equipment,
+                        setPlans:
+                            plans
+                    )
+                }
+
+        guard let first =
+                queue.first,
+              let firstPlan =
+                first.setPlans?.first
+        else {
+            return nil
+        }
+
+        return WatchStrengthSessionSnapshot(
+            workoutID:
+                workout.id,
+            title:
+                workout.title,
+            exerciseIndex: 0,
+            exerciseCount:
+                queue.count,
+            exerciseName:
+                first.name,
+            primaryMuscles:
+                first.primaryMuscles,
+            setIndex: 0,
+            setCount:
+                first.setCount,
+            setNumber: 1,
+            completedSets: 0,
+            totalSets:
+                queue.reduce(0) {
+                    $0 + $1.setCount
+                },
+            draftReps:
+                firstPlan.reps ?? 8,
+            draftWeightKilograms:
+                firstPlan
+                    .weightKilograms ??
+                20,
+            draftRestSeconds:
+                firstPlan.restSeconds ??
+                90,
+            draftDurationSeconds:
+                firstPlan
+                    .durationSeconds,
+            draftResistanceLevel:
+                firstPlan
+                    .resistanceLevel,
+            targetKindRaw:
+                firstPlan
+                    .durationSeconds != nil
+                    ? "time"
+                    : "reps",
+            loadKindRaw:
+                firstPlan
+                    .resistanceLevel != nil
+                    ? "resistanceLevel"
+                    : "weightKilograms",
+            isResting: false,
+            restEndsAt: nil,
+            currentExerciseComplete:
+                false,
+            hasNextExercise:
+                queue.count > 1,
+            allExercisesComplete:
+                false,
+            updatedAt: Date(),
+            inputMode:
+                .appleWatch,
+            draftRPE:
+                plannedDefaultRPE(
+                    workout
+                ),
+            draftRIR:
+                plannedDefaultRIR(
+                    workout
+                ),
+            isWarmUp:
+                firstPlan.isWarmUp,
+            effortMetricRaw:
+                "rpe",
+            exerciseQueue:
+                queue,
+            startedAt: nil,
+            plannedSessionID:
+                workout.id,
+            allowsLiveExerciseBuilding:
+                false
+        )
+    }
+
+    private func plannedDefaultRPE(
+        _ workout: PlannedSession
+    ) -> Double? {
+        workout.exercises
+            .first?
+            .targetRPE ??
+        8
+    }
+
+    private func plannedDefaultRIR(
+        _ workout: PlannedSession
+    ) -> Double? {
+        workout.exercises
+            .first?
+            .targetRIR ??
+        2
     }
 
     private func homeTodaySessions(
@@ -3963,6 +4263,7 @@ struct ATHLTHTrainView: View {
         ATHLTHTrainNavigationRequest?
 
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
@@ -4182,7 +4483,9 @@ struct ATHLTHTrainView: View {
                                     spotify:
                                         spotifyPlayback,
                                     ghostRace:
-                                        ghostRace
+                                        ghostRace,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -4228,7 +4531,9 @@ struct ATHLTHTrainView: View {
                                     watchConnection:
                                         watchConnection,
                                     spotify:
-                                        spotifyPlayback
+                                        spotifyPlayback,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -4366,7 +4671,9 @@ struct ATHLTHTrainView: View {
                                     spotify:
                                         spotifyPlayback,
                                     ghostRace:
-                                        ghostRace
+                                        ghostRace,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()

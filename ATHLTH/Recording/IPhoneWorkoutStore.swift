@@ -91,6 +91,8 @@ struct PhoneWorkout: Codable, Identifiable {
     // New recordings use this to preserve pause/resume timing in HKWorkoutBuilder.
     var pauses: [PhoneWorkoutPauseInterval]? = nil
     var autoPauseEnabled: Bool? = nil
+    var runEnvironment: RunEnvironment? = nil
+    var treadmillInclinePercent: Double? = nil
     var distanceMeters: Double = 0
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
@@ -161,6 +163,8 @@ final class IPhoneWorkoutStore:
     @Published private(set) var active: PhoneWorkout?
     @Published private(set) var history: [PhoneWorkout] = []
     @Published var showingWorkout = false
+    @Published private(set) var liveViewIsVisible = false
+    @Published private(set) var isUserMinimized = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
     @Published private(set) var automaticPauseActive = false
@@ -170,6 +174,8 @@ final class IPhoneWorkoutStore:
     var lastRouteCompletion: PhoneRouteCompletionSummary?
     private var accountID: UUID?
     private var pendingWalking: Bool?
+    private var pendingRunEnvironment: RunEnvironment = .outdoor
+    private var pendingTreadmillInclinePercent: Double?
     private var pendingRoute: TrainingRoute?
     private var pendingWorkoutTitle: String?
     private var pendingAudioCoach:
@@ -204,6 +210,7 @@ final class IPhoneWorkoutStore:
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
     private var lastActiveCheckpointWriteAt: Date?
+    private var livePresentationRetryTask: Task<Void, Never>?
     private let activeCheckpointInterval: TimeInterval = 5
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
@@ -225,6 +232,8 @@ final class IPhoneWorkoutStore:
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
+        pendingRunEnvironment = .outdoor
+        pendingTreadmillInclinePercent = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -320,6 +329,7 @@ final class IPhoneWorkoutStore:
             }
 
         showingWorkout = false
+        isUserMinimized = false
         message = active == nil ? nil : "Recovered workout paused at the last saved checkpoint. Resume when you are ready."
         lastActiveCheckpointWriteAt = nil
     }
@@ -328,6 +338,8 @@ final class IPhoneWorkoutStore:
         walking: Bool,
         route: TrainingRoute? = nil,
         title: String? = nil,
+        environment: RunEnvironment = .outdoor,
+        treadmillInclinePercent: Double? = nil,
         audioCoach:
             WatchAudioCoachConfiguration? = nil,
         structuredWorkout:
@@ -339,11 +351,31 @@ final class IPhoneWorkoutStore:
         autoPauseEnabled: Bool = false
     ) {
         guard accountID != nil, !saving else { return }
-        showingWorkout = true
-        guard active == nil else { return }
+
+        // If a workout is already active, treat this as a request to return
+        // to its live screen. For a brand-new workout, defer presentation
+        // until after the workout exists and the launch sheet has had time
+        // to dismiss. Presenting a full-screen cover while SwiftUI is still
+        // dismissing the quick-start sheet can otherwise be dropped.
+        if active != nil {
+            isUserMinimized = false
+            showingWorkout = true
+            return
+        }
 
         pendingWalking = walking
-        pendingRoute = route
+        pendingRunEnvironment = environment
+        pendingTreadmillInclinePercent =
+            environment == .treadmill
+                ? min(
+                    max(treadmillInclinePercent ?? 0, 0),
+                    20
+                )
+                : nil
+        pendingRoute =
+            environment == .outdoor
+                ? route
+                : nil
         pendingWorkoutTitle = title
         pendingAudioCoach = audioCoach
         pendingStructuredWorkout = structuredWorkout
@@ -352,7 +384,9 @@ final class IPhoneWorkoutStore:
         pendingAutoPauseEnabled =
             autoPauseEnabled
 
-        if manager.authorizationStatus == .notDetermined {
+        if environment == .treadmill {
+            beginIfAuthorized()
+        } else if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
         } else {
             beginIfAuthorized()
@@ -361,11 +395,21 @@ final class IPhoneWorkoutStore:
 
     private func beginIfAuthorized() {
         guard let walking = pendingWalking else { return }
-        guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
+        let environment = pendingRunEnvironment
+
+        if environment == .outdoor,
+           manager.authorizationStatus != .authorizedAlways,
+           manager.authorizationStatus != .authorizedWhenInUse {
             message = "Allow location access in iPhone Settings to record an outdoor workout."
             return
         }
-        let route = pendingRoute
+
+        let treadmillInclinePercent =
+            pendingTreadmillInclinePercent
+        let route =
+            environment == .outdoor
+                ? pendingRoute
+                : nil
         let workoutTitle = pendingWorkoutTitle
         let audioCoach = pendingAudioCoach
         let structuredWorkout =
@@ -375,9 +419,12 @@ final class IPhoneWorkoutStore:
         let ghostUpdates =
             pendingGhostAudio
         let autoPauseEnabled =
+            environment == .outdoor &&
             pendingAutoPauseEnabled
 
         pendingWalking = nil
+        pendingRunEnvironment = .outdoor
+        pendingTreadmillInclinePercent = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -406,6 +453,10 @@ final class IPhoneWorkoutStore:
             pauses: [],
             autoPauseEnabled:
                 autoPauseEnabled,
+            runEnvironment:
+                environment,
+            treadmillInclinePercent:
+                treadmillInclinePercent,
             plannedRouteID: route?.id,
             plannedComparisonRouteID:
                 route?.sharedSourceRouteID ??
@@ -432,16 +483,31 @@ final class IPhoneWorkoutStore:
             ghostAudioConfiguration:
                 ghostUpdates
         )
-        message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
+
+        requestLiveWorkoutPresentationAfterLaunch()
+
         lastLocation = nil
         automaticPauseActive = false
         autoPauseDetector.reset(
             enabled: autoPauseEnabled
         )
-        manager.distanceFilter =
-            autoPauseEnabled ? 1 : 5
-        manager.allowsBackgroundLocationUpdates = true
-        manager.startUpdatingLocation()
+
+        if environment == .outdoor {
+            message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
+            manager.distanceFilter =
+                autoPauseEnabled ? 1 : 5
+            manager.allowsBackgroundLocationUpdates = true
+            manager.startUpdatingLocation()
+        } else {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            manager.distanceFilter = 5
+            message = ATHLTHLocalization.format(
+                english: "Treadmill run · %.1f%% incline",
+                norwegian: "Tredemølle · %.1f%% stigning",
+                treadmillInclinePercent ?? 0
+            )
+        }
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -461,6 +527,75 @@ final class IPhoneWorkoutStore:
         announceStructuredStepIfNeeded(
             prefix: "Starting"
         )
+    }
+
+    private func requestLiveWorkoutPresentationAfterLaunch() {
+        livePresentationRetryTask?.cancel()
+        isUserMinimized = false
+
+        // The live workout is rendered as a root overlay rather than a second
+        // modal presentation. It can therefore become visible immediately
+        // even while the quick-start sheet is finishing its dismissal.
+        showingWorkout = true
+    }
+
+    func presentWorkout() {
+        guard active != nil else { return }
+        livePresentationRetryTask?.cancel()
+        isUserMinimized = false
+        showingWorkout = true
+    }
+
+    func minimizeWorkout() {
+        livePresentationRetryTask?.cancel()
+        isUserMinimized = true
+        showingWorkout = false
+    }
+
+    func setTreadmillInclinePercent(
+        _ percent: Double
+    ) {
+        guard var workout = active,
+              workout.runEnvironment ==
+                .treadmill
+        else {
+            return
+        }
+
+        let value =
+            min(
+                max(percent, 0),
+                20
+            )
+
+        workout.treadmillInclinePercent =
+            value
+        workout.lastCheckpoint = Date()
+        active = workout
+
+        message =
+            ATHLTHLocalization.format(
+                english:
+                    "Treadmill · %.1f%% incline",
+                norwegian:
+                    "Tredemølle · %.1f%% stigning",
+                value
+            )
+
+        persistActiveCheckpoint(
+            force: true
+        )
+        syncLiveActivity()
+    }
+
+    func liveViewDidAppear() {
+        liveViewIsVisible = true
+        isUserMinimized = false
+        livePresentationRetryTask?.cancel()
+    }
+
+    func liveViewDidDisappear() {
+        liveViewIsVisible = false
     }
 
     func pause() {
@@ -552,12 +687,12 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        guard
-            manager.authorizationStatus ==
-                .authorizedAlways ||
-            manager.authorizationStatus ==
-                .authorizedWhenInUse
-        else {
+        let environment =
+            workout.runEnvironment ?? .outdoor
+
+        if environment == .outdoor,
+           manager.authorizationStatus != .authorizedAlways,
+           manager.authorizationStatus != .authorizedWhenInUse {
             message =
                 "Allow location access in iPhone Settings before resuming."
             return
@@ -586,9 +721,20 @@ final class IPhoneWorkoutStore:
                 ? 1
                 : 5
         lastLocation = nil
-        manager.allowsBackgroundLocationUpdates = true
-        manager.startUpdatingLocation()
-        message = nil
+
+        if environment == .outdoor {
+            manager.allowsBackgroundLocationUpdates = true
+            manager.startUpdatingLocation()
+            message = nil
+        } else {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            message = ATHLTHLocalization.format(
+                english: "Treadmill run · %.1f%% incline",
+                norwegian: "Tredemølle · %.1f%% stigning",
+                workout.treadmillInclinePercent ?? 0
+            )
+        }
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -705,6 +851,10 @@ final class IPhoneWorkoutStore:
 
         history.insert(workout, at: 0)
         active = nil
+        showingWorkout = false
+        liveViewIsVisible = false
+        isUserMinimized = false
+        livePresentationRetryTask?.cancel()
         automaticPauseActive = false
         autoPauseDetector.reset(enabled: false)
         manager.distanceFilter = 5
@@ -888,7 +1038,10 @@ final class IPhoneWorkoutStore:
         let configuration = HKWorkoutConfiguration()
         configuration.activityType =
             workout.walking ? .walking : .running
-        configuration.locationType = .outdoor
+        let isIndoor =
+            workout.runEnvironment == .treadmill
+        configuration.locationType =
+            isIndoor ? .indoor : .outdoor
 
         let builder = HKWorkoutBuilder(
             healthStore: healthStore,
@@ -909,7 +1062,7 @@ final class IPhoneWorkoutStore:
                     HKMetadataKeySyncIdentifier:
                         "athlth-phone-" + workout.id.uuidString,
                     HKMetadataKeySyncVersion: 1,
-                    HKMetadataKeyIndoorWorkout: false
+                    HKMetadataKeyIndoorWorkout: isIndoor
                 ],
                 to: builder
             )
@@ -2433,20 +2586,12 @@ final class IPhoneWorkoutStore:
         }
 
         do {
-            let session =
-                AVAudioSession.sharedInstance()
-            let options:
-                AVAudioSession.CategoryOptions =
-                    configuration
-                        .shouldDuckOtherAudio
-                        ? [.duckOthers]
-                        : [.mixWithOthers]
-            try session.setCategory(
-                .playback,
-                mode: .spokenAudio,
-                options: options
-            )
-            try session.setActive(true)
+            try ATHLTHSpokenAudioSession
+                .activate(
+                    duckOtherAudio:
+                        configuration
+                            .shouldDuckOtherAudio
+                )
         } catch {
             // Speech remains best-effort and must never stop the workout.
         }
@@ -2497,13 +2642,8 @@ final class IPhoneWorkoutStore:
             at: .immediate
         )
 
-        try? AVAudioSession
-            .sharedInstance()
-            .setActive(
-                false,
-                options:
-                    .notifyOthersOnDeactivation
-            )
+        ATHLTHSpokenAudioSession
+            .deactivate()
     }
 
     nonisolated func speechSynthesizer(
@@ -2519,13 +2659,8 @@ final class IPhoneWorkoutStore:
 
             self.guidancePriorityGate.voiceDidFinish()
 
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession
+                .deactivate()
         }
     }
 
@@ -2542,13 +2677,8 @@ final class IPhoneWorkoutStore:
 
             self.guidancePriorityGate.voiceDidFinish()
 
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession
+                .deactivate()
         }
     }
 
