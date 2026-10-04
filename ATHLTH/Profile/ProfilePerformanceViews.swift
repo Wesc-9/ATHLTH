@@ -8258,7 +8258,7 @@ struct ProfileRecordShowcasePickerView:
         } label: {
             VStack(
                 alignment: .leading,
-                spacing: 9
+                spacing: 6
             ) {
                 HStack {
                     Image(
@@ -8267,7 +8267,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 16,
+                            size: 13,
                             weight:
                                 .semibold
                         )
@@ -8276,8 +8276,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 40,
-                        height: 40
+                        width: 34,
+                        height: 34
                     )
                     .background(
                         kind.tint
@@ -8305,8 +8305,8 @@ struct ProfileRecordShowcasePickerView:
                                     : 1.2
                             )
                             .frame(
-                                width: 26,
-                                height: 26
+                                width: 22,
+                                height: 22
                             )
 
                         if isSelected {
@@ -8316,8 +8316,8 @@ struct ProfileRecordShowcasePickerView:
                                         .accentDeep
                                 )
                                 .frame(
-                                    width: 26,
-                                    height: 26
+                                    width: 22,
+                                    height: 22
                                 )
 
                             Image(
@@ -8340,7 +8340,7 @@ struct ProfileRecordShowcasePickerView:
 
                 Text(kind.title)
                     .font(
-                        .subheadline
+                        .caption
                             .weight(
                                 .semibold
                             )
@@ -8360,7 +8360,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                 )
                 .font(
-                    .title3
+                    .headline
                         .weight(.bold)
                 )
                 .monospacedDigit()
@@ -8385,9 +8385,9 @@ struct ProfileRecordShowcasePickerView:
                         : ATHLTHLocalization
                             .choose(
                                 english:
-                                    "Available",
+                                    available ? "Available" : "Not recorded",
                                 norwegian:
-                                    "Tilgjengelig"
+                                    available ? "Tilgjengelig" : "Ikke registrert"
                             ),
                     systemImage:
                         isSelected
@@ -8408,10 +8408,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(12)
+            .padding(10)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 142,
+                minHeight: 116,
                 alignment: .topLeading
             )
             .background(
@@ -8436,14 +8436,14 @@ struct ProfileRecordShowcasePickerView:
                 ),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 20,
+                        cornerRadius: 17,
                         style:
                             .continuous
                     )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 20,
+                    cornerRadius: 17,
                     style:
                         .continuous
                 )
