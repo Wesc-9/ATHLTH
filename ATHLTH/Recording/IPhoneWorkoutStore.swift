@@ -2570,20 +2570,12 @@ final class IPhoneWorkoutStore:
         }
 
         do {
-            let session =
-                AVAudioSession.sharedInstance()
-            let options:
-                AVAudioSession.CategoryOptions =
-                    configuration
-                        .shouldDuckOtherAudio
-                        ? [.duckOthers]
-                        : [.mixWithOthers]
-            try session.setCategory(
-                .playback,
-                mode: .spokenAudio,
-                options: options
-            )
-            try session.setActive(true)
+            try ATHLTHSpokenAudioSession
+                .activate(
+                    duckOtherAudio:
+                        configuration
+                            .shouldDuckOtherAudio
+                )
         } catch {
             // Speech remains best-effort and must never stop the workout.
         }
@@ -2634,13 +2626,8 @@ final class IPhoneWorkoutStore:
             at: .immediate
         )
 
-        try? AVAudioSession
-            .sharedInstance()
-            .setActive(
-                false,
-                options:
-                    .notifyOthersOnDeactivation
-            )
+        ATHLTHSpokenAudioSession
+            .deactivate()
     }
 
     nonisolated func speechSynthesizer(
@@ -2656,13 +2643,8 @@ final class IPhoneWorkoutStore:
 
             self.guidancePriorityGate.voiceDidFinish()
 
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession
+                .deactivate()
         }
     }
 
@@ -2679,13 +2661,8 @@ final class IPhoneWorkoutStore:
 
             self.guidancePriorityGate.voiceDidFinish()
 
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession
+                .deactivate()
         }
     }
 
