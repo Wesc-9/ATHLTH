@@ -334,6 +334,37 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
         return completedDistanceMeters
     }
 
+    func completedReps(
+        atOrAboveWeightKilograms target: Double
+    ) -> Int {
+        if let effortSegments,
+           !effortSegments.isEmpty {
+            return effortSegments.reduce(0) {
+                partial,
+                segment in
+
+                guard let reps = segment.reps,
+                      let weight =
+                        segment.weightKilograms,
+                      weight + 0.01 >= target
+                else {
+                    return partial
+                }
+
+                return partial + reps
+            }
+        }
+
+        guard let weight =
+                completedWeightKilograms,
+              weight + 0.01 >= target
+        else {
+            return 0
+        }
+
+        return completedReps ?? 0
+    }
+
     var volumeKilograms: Double {
         guard countsTowardTrainingLoad else {
             return 0
