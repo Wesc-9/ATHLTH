@@ -1551,10 +1551,21 @@ struct FriendProfileView: View {
                         // order and visual rhythm as the owner's profile.
                         trophyCard(profile.trophies)
 
-                        if let performance =
-                                profile.performance {
+                        let sharedStrengthRecords =
+                            profile.recentActivities.filter {
+                                $0.activity.kind ==
+                                    "personal_record" &&
+                                $0.activity.metadata?[
+                                    "pr_type"
+                                ] == "strength"
+                            }
+
+                        if profile.performance != nil ||
+                            !sharedStrengthRecords.isEmpty {
                             performanceCard(
-                                performance
+                                profile.performance,
+                                activities:
+                                    profile.recentActivities
                             )
                         } else {
                             remoteEmptySection(
@@ -3068,9 +3079,23 @@ struct FriendProfileView: View {
 
     private func performanceCard(
         _ performance:
-            SocialPerformanceStats
+            SocialPerformanceStats?,
+        activities: [SocialFeedItem]
     ) -> some View {
-        VStack(
+        let strengthRecords =
+            Array(
+                activities
+                    .filter {
+                        $0.activity.kind ==
+                            "personal_record" &&
+                        $0.activity.metadata?[
+                            "pr_type"
+                        ] == "strength"
+                    }
+                    .prefix(4)
+            )
+
+        return VStack(
             alignment: .leading,
             spacing: 12
         ) {
@@ -3130,7 +3155,7 @@ struct FriendProfileView: View {
                         ),
                     value:
                         formatTime(
-                            performance
+                            performance?
                                 .fastest1KSeconds
                         ),
                     icon: "1.circle.fill",
@@ -3145,7 +3170,7 @@ struct FriendProfileView: View {
                         ),
                     value:
                         formatTime(
-                            performance
+                            performance?
                                 .fastest5KSeconds
                         ),
                     icon: "5.circle.fill",
@@ -3160,7 +3185,7 @@ struct FriendProfileView: View {
                         ),
                     value:
                         formatTime(
-                            performance
+                            performance?
                                 .fastestMarathonSeconds
                         ),
                     icon:
@@ -3178,7 +3203,7 @@ struct FriendProfileView: View {
                         ),
                     value:
                         formatDistance(
-                            performance
+                            performance?
                                 .longestRunMeters
                         ),
                     icon:
@@ -3222,19 +3247,45 @@ struct FriendProfileView: View {
                 )
             }
 
-            Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Strength PRs appear here when this athlete shares them.",
-                    norwegian:
-                        "Styrke-PR-er vises her når utøveren deler dem."
+            if strengthRecords.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No shared strength records yet.",
+                        norwegian:
+                            "Ingen delte styrkerekorder ennå."
+                    )
                 )
-            )
-            .font(.caption2)
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
-            .padding(.vertical, 4)
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .padding(.vertical, 4)
+            } else {
+                HStack(spacing: 6) {
+                    ForEach(
+                        strengthRecords
+                    ) { record in
+                        remoteRecordTile(
+                            title:
+                                record.activity
+                                    .metadata?[
+                                        "exercise"
+                                    ] ??
+                                record.activity.title,
+                            value:
+                                record.activity
+                                    .subtitle ??
+                                "—",
+                            icon:
+                                "dumbbell.fill",
+                            tint:
+                                ATHLTHTheme
+                                    .accentDeep
+                        )
+                    }
+                }
+            }
         }
         .padding(14)
         .background(
