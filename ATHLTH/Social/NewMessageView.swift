@@ -45,20 +45,34 @@ struct NewMessageView: View {
         NavigationStack {
             ZStack {
                 ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.recoveryBlue.opacity(0.34)
+                    accent:
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.16)
                 )
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
-                        introCard
+                    LazyVStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+                        newMessageHeader
+                        premiumSearchField
 
                         if cleanQuery.isEmpty {
                             friendsSection
                         } else {
                             if !filteredFriends.isEmpty {
                                 peopleSection(
-                                    title: "MUTUAL FOLLOWS",
-                                    people: filteredFriends
+                                    title:
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "MUTUAL FOLLOWS",
+                                            norwegian:
+                                                "FØLGER HVERANDRE"
+                                        ),
+                                    people:
+                                        filteredFriends
                                 )
                             }
 
@@ -66,35 +80,65 @@ struct NewMessageView: View {
                                 if searchedPeople.isEmpty &&
                                     filteredFriends.isEmpty {
                                     ContentUnavailableView.search(
-                                        text: cleanQuery
+                                        text:
+                                            cleanQuery
                                     )
-                                    .padding(.vertical, 56)
+                                    .padding(
+                                        .vertical,
+                                        56
+                                    )
                                 } else if !searchedPeople.isEmpty {
                                     peopleSection(
-                                        title: "PEOPLE",
-                                        people: searchedPeople
+                                        title:
+                                            ATHLTHLocalization.choose(
+                                                english:
+                                                    "PEOPLE",
+                                                norwegian:
+                                                    "PERSONER"
+                                            ),
+                                        people:
+                                            searchedPeople
                                     )
                                 }
                             }
                         }
                     }
-                    .padding()
+                    .padding(16)
+                    .padding(
+                        .bottom,
+                        28
+                    )
                     .frame(maxWidth: 680)
-                    .frame(maxWidth: .infinity)
+                    .frame(
+                        maxWidth: .infinity
+                    )
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(
+                    .interactively
+                )
+                .scrollIndicators(
+                    .hidden
+                )
             }
-            .navigationTitle("New Message")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(
-                text: $query,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search name or @username"
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(
+                .inline
             )
-            .focused($searchFocused)
+            .toolbarBackground(
+                .hidden,
+                for: .navigationBar
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
@@ -122,15 +166,120 @@ struct NewMessageView: View {
         }
     }
 
+    private var newMessageHeader: some View {
+        ATHLTHPremiumScreenHeader(
+            eyebrow:
+                ATHLTHLocalization.choose(
+                    english: "Messages",
+                    norwegian: "Meldinger"
+                ),
+            title:
+                ATHLTHLocalization.choose(
+                    english: "New message",
+                    norwegian: "Ny melding"
+                ),
+            subtitle:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Find an athlete and start a conversation or send one message request.",
+                    norwegian:
+                        "Finn en utøver og start en samtale eller send én meldingsforespørsel."
+                ),
+            icon:
+                "square.and.pencil",
+            tint:
+                ATHLTHTheme
+                    .vitality
+        ) {
+            EmptyView()
+        }
+    }
+
+    private var premiumSearchField: some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .vitality
+            )
+
+            TextField(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Search name or @username",
+                    norwegian:
+                        "Søk navn eller @brukernavn"
+                ),
+                text: $query
+            )
+            .focused(
+                $searchFocused
+            )
+            .textInputAutocapitalization(
+                .never
+            )
+            .autocorrectionDisabled()
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(
+                        systemName:
+                            "xmark.circle.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(
+            .horizontal,
+            14
+        )
+        .frame(height: 50)
+        .background(
+            Color.white
+                .opacity(0.82),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .border,
+                lineWidth: 0.8
+            )
+        }
+    }
+
     private var introCard: some View {
         ATHLTHCard {
             HStack(spacing: 13) {
                 Image(systemName: "message.badge.filled.fill")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(ATHLTHTheme.vitality)
                     .frame(width: 46, height: 46)
                     .background(
-                        ATHLTHTheme.recoveryBlueSoft,
+                        ATHLTHTheme.vitalitySoft,
                         in: RoundedRectangle(
                             cornerRadius: 14,
                             style: .continuous
@@ -327,11 +476,11 @@ private struct NewMessagePersonRow: View {
 
             Label(actionTitle, systemImage: actionIcon)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(ATHLTHTheme.vitality)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
                 .background(
-                    ATHLTHTheme.accentSoft.opacity(0.72),
+                    ATHLTHTheme.vitalitySoft.opacity(0.72),
                     in: Capsule()
                 )
         }
