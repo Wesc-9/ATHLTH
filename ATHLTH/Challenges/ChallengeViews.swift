@@ -1387,21 +1387,8 @@ struct ChallengeCreationView: View {
 
             creationDivider
 
-            Menu {
-                ForEach(
-                    ATHLTHChallengeSport
-                        .allCases
-                ) { option in
-                    Button {
-                        sport = option
-                    } label: {
-                        Label(
-                            option.title,
-                            systemImage:
-                                option.systemImage
-                        )
-                    }
-                }
+            Button {
+                activeSelectionSheet = .sport
             } label: {
                 creationSelectionRow(
                     title:
@@ -1417,22 +1404,8 @@ struct ChallengeCreationView: View {
 
             creationDivider
 
-            Menu {
-                ForEach(
-                    scoringOptions
-                ) { option in
-                    Button {
-                        scoring = option
-                    } label: {
-                        Label(
-                            option.title,
-                            systemImage:
-                                scoringIcon(
-                                    option
-                                )
-                        )
-                    }
-                }
+            Button {
+                activeSelectionSheet = .scoring
             } label: {
                 creationSelectionRow(
                     title:
@@ -1703,34 +1676,8 @@ struct ChallengeCreationView: View {
         some View {
         if scoring ==
             .fastestDistance {
-            Menu {
-                Button {
-                    usesSpecificRoute =
-                        false
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Run anywhere",
-                            norwegian: "Løp hvor som helst"
-                        ),
-                        systemImage:
-                            "figure.run"
-                    )
-                }
-
-                Button {
-                    usesSpecificRoute =
-                        true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Specific route",
-                            norwegian: "Bestemt rute"
-                        ),
-                        systemImage:
-                            "point.topleft.down.to.point.bottomright.curvepath"
-                    )
-                }
+            Button {
+                activeSelectionSheet = .course
             } label: {
                 creationSelectionRow(
                     title:
@@ -1952,18 +1899,8 @@ struct ChallengeCreationView: View {
             creationDivider
         }
 
-        Menu {
-            ForEach(
-                ChallengeVerificationPolicy
-                    .allCases
-            ) { policy in
-                Button {
-                    verificationPolicy =
-                        policy
-                } label: {
-                    Text(policy.title)
-                }
-            }
+        Button {
+            activeSelectionSheet = .verification
         } label: {
             creationSelectionRow(
                 title:
@@ -2665,47 +2602,8 @@ struct ChallengeCreationView: View {
 
             creationDivider
 
-            Menu {
-                Button {
-                    visibility =
-                        .publicProfile
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Public",
-                            norwegian: "Offentlig"
-                        ),
-                        systemImage: "globe"
-                    )
-                }
-
-                Button {
-                    visibility =
-                        .friends
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Followers",
-                            norwegian: "Følgere"
-                        ),
-                        systemImage:
-                            "person.2.fill"
-                    )
-                }
-
-                Button {
-                    visibility =
-                        .privateOnly
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Private",
-                            norwegian: "Privat"
-                        ),
-                        systemImage:
-                            "lock.fill"
-                    )
-                }
+            Button {
+                activeSelectionSheet = .visibility
             } label: {
                 creationSelectionRow(
                     title:
