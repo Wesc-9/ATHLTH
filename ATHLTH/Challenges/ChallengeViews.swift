@@ -7555,44 +7555,162 @@ struct ChallengeDetailView: View {
         .challengeCard()
     }
 
-    private func participantsCard(_ challenge: ATHLTHChallenge) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Participants")
-                .font(.headline)
+    private func participantsCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Participants",
+                            norwegian: "Deltakere"
+                        ),
+                    trailing:
+                        "\(challenge.participants.count)"
+                )
 
-            ForEach(challenge.participants) { participant in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(participant.displayName)
-                            .font(.subheadline.weight(.semibold))
-                        if let username = participant.username {
-                            Text("@\(username)")
+                ForEach(
+                    challenge.participants
+                ) { participant in
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(
+                                ATHLTHTheme
+                                    .cardWarm
+                            )
+                            .frame(
+                                width: 40,
+                                height: 40
+                            )
+                            .overlay {
+                                Text(
+                                    challengeInitials(
+                                        participant
+                                            .displayName
+                                    )
+                                )
+                                .font(
+                                    .caption
+                                        .weight(.semibold)
+                                )
+                            }
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                participant
+                                    .displayName
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+
+                            if let username =
+                                    participant
+                                        .username {
+                                Text(
+                                    "@\(username)"
+                                )
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
                         }
-                    }
 
-                    Spacer()
+                        Spacer()
 
-                    Text(participantState(participant.state))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(
-                            participant.state == .accepted ||
-                            participant.state == .creator
-                                ? ATHLTHTheme.accent
-                                : .secondary
+                        Text(
+                            participantState(
+                                participant.state
+                            )
                         )
+                        .font(
+                            .caption2
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            participant.state ==
+                                .accepted ||
+                            participant.state ==
+                                .creator
+                                ? ATHLTHTheme
+                                    .vitality
+                                : ATHLTHTheme
+                                    .mutedText
+                        )
+                        .padding(
+                            .horizontal,
+                            8
+                        )
+                        .padding(
+                            .vertical,
+                            5
+                        )
+                        .background(
+                            (
+                                participant.state ==
+                                    .accepted ||
+                                participant.state ==
+                                    .creator
+                                    ? ATHLTHTheme
+                                        .vitality
+                                    : Color.secondary
+                            )
+                            .opacity(0.08),
+                            in: Capsule()
+                        )
+                    }
+                    .padding(
+                        .horizontal,
+                        12
+                    )
+                    .padding(
+                        .vertical,
+                        10
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.55),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 17,
+                                style:
+                                    .continuous
+                            )
+                    )
                 }
             }
         }
-        .padding()
-        .challengeCard()
     }
 
-    private func attemptsCard(_ challenge: ATHLTHChallenge) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Attempts")
-                .font(.headline)
+    private func attemptsCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Attempts",
+                            norwegian: "Forsøk"
+                        ),
+                    trailing:
+                        challenge.attempts.isEmpty
+                            ? nil
+                            : "\(challenge.attempts.count)"
+                )
 
             if challenge.attempts.isEmpty {
                 Text("No attempts yet.")
@@ -7654,9 +7772,8 @@ struct ChallengeDetailView: View {
                     Divider().opacity(0.45)
                 }
             }
+            }
         }
-        .padding()
-        .challengeCard()
     }
 
     private func leaderboardValue(
