@@ -405,6 +405,11 @@ enum WorkoutLaunchCoordinator {
                     ghostUpdates:
                         configuration
                             .ghostUpdates,
+                    runEnvironment:
+                        configuration.environment,
+                    treadmillInclinePercent:
+                        configuration
+                            .treadmillInclinePercent,
                     spotifyPlaylist:
                         configuration
                             .spotifyPlaylist,
