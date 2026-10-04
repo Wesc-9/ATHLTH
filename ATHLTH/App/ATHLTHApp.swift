@@ -300,6 +300,11 @@ struct AppRootView: View {
     @State private var showingNotificationPermissionPrimer = false
     @State private var showingRelayedStrengthWorkout = false
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
+    @State private var lastHomeAssistantLiveWorkoutSyncAt = Date.distantPast
+    @State private var lastHomeAssistantStrengthSyncAt = Date.distantPast
+    @State private var homeAssistantReportedStrengthSetIDs: Set<String> = []
+    @State private var homeAssistantReportedImpactIDs: Set<String> = []
+    @State private var homeAssistantReportedPersonalRecordIDs: Set<String> = []
 
     @AppStorage("athlth.notifications.permissionPrimerShown")
     private var notificationPermissionPrimerShown = false
@@ -978,14 +983,70 @@ struct AppRootView: View {
         ) { notification in
             guard let command =
                     notification.object
-                        as? HomeAssistantInboundCommand,
-                  command.type == "sync_now"
+                        as? HomeAssistantInboundCommand
             else {
                 return
             }
 
             Task {
-                await syncHomeAssistantSnapshot()
+                await handleHomeAssistantCommand(
+                    command
+                )
+            }
+        }
+        .onReceive(phoneWorkout.$active) { workout in
+            guard ATHLTHDeviceRole.isIPhone else {
+                return
+            }
+
+            Task {
+                await syncHomeAssistantPhoneWorkoutLiveState(
+                    workout
+                )
+            }
+        }
+        .onReceive(strengthWorkout.$activeWorkout) { workout in
+            guard ATHLTHDeviceRole.isIPhone else {
+                return
+            }
+
+            Task {
+                await syncHomeAssistantStrengthLiveState(
+                    workout
+                )
+                await emitNewHomeAssistantStrengthSetEvents(
+                    workout
+                )
+            }
+        }
+        .onChange(
+            of: strengthWorkout.currentExerciseIndex
+        ) { _, _ in
+            Task {
+                await syncHomeAssistantStrengthLiveState(
+                    strengthWorkout.activeWorkout,
+                    force: true
+                )
+            }
+        }
+        .onChange(
+            of: strengthWorkout.currentSetIndex
+        ) { _, _ in
+            Task {
+                await syncHomeAssistantStrengthLiveState(
+                    strengthWorkout.activeWorkout,
+                    force: true
+                )
+            }
+        }
+        .onChange(
+            of: strengthWorkout.restEndsAt
+        ) { _, _ in
+            Task {
+                await syncHomeAssistantStrengthLiveState(
+                    strengthWorkout.activeWorkout,
+                    force: true
+                )
             }
         }
         .onReceive(
@@ -2606,6 +2667,542 @@ struct AppRootView: View {
             }
 
             showingNotificationPermissionPrimer = true
+        }
+    }
+
+    @MainActor
+    private func handleHomeAssistantCommand(
+        _ command: HomeAssistantInboundCommand
+    ) async {
+        guard ATHLTHDeviceRole.isIPhone,
+              appSession.signedIn
+        else {
+            return
+        }
+
+        switch command.type {
+        case "sync_now":
+            await syncHomeAssistantSnapshot()
+
+        case "schedule_extra_workout":
+            guard let data = command.data,
+                  let title =
+                    data["title"]?.stringValue,
+                  let scheduledRaw =
+                    data["scheduled_at"]?
+                        .stringValue,
+                  let scheduledAt =
+                    ISO8601DateFormatter()
+                        .date(
+                            from: scheduledRaw
+                        )
+            else {
+                return
+            }
+
+            let workoutID =
+                data["workout_id"]?
+                    .stringValue
+                    .flatMap(UUID.init(uuidString:))
+                    ?? UUID()
+
+            let kind: WorkoutKind
+            switch data["workout_type"]?
+                .stringValue {
+            case "running":
+                kind = .running
+            case "strength":
+                kind = .strength
+            case "mobility":
+                kind = .mobility
+            default:
+                kind = .custom
+            }
+
+            let session =
+                PlannedSession(
+                    id: workoutID,
+                    title: title,
+                    kind: kind,
+                    scheduledStart:
+                        scheduledAt,
+                    durationMinutes:
+                        data[
+                            "duration_minutes"
+                        ]?.intValue,
+                    targetDistanceKilometers:
+                        nil,
+                    targetPaceSecondsPerKilometer:
+                        nil,
+                    routeID: nil,
+                    exercises: [],
+                    notes:
+                        data["notes"]?
+                            .stringValue
+                )
+
+            // Home Assistant always creates a standalone extra session.
+            // It never mutates the active training plan.
+            appSession
+                .addStandalonePlannedSession(
+                    session
+                )
+            await syncHomeAssistantSnapshot()
+
+        case "move_planned_workout":
+            guard let data = command.data,
+                  let workoutIDRaw =
+                    data["workout_id"]?
+                        .stringValue,
+                  let workoutID =
+                    UUID(
+                        uuidString:
+                            workoutIDRaw
+                    ),
+                  let scheduledRaw =
+                    data["scheduled_at"]?
+                        .stringValue,
+                  let scheduledAt =
+                    ISO8601DateFormatter()
+                        .date(
+                            from: scheduledRaw
+                        ),
+                  var session =
+                    appSession
+                        .standalonePlannedSessions
+                        .first(
+                            where: {
+                                $0.id ==
+                                    workoutID
+                            }
+                        )
+            else {
+                return
+            }
+
+            session.scheduledStart =
+                scheduledAt
+            appSession
+                .updateStandalonePlannedSession(
+                    session
+                )
+            await syncHomeAssistantSnapshot()
+
+        case "open_planned_workout":
+            // HomeAssistantConnectionStore also schedules a local
+            // notification for this command. Refreshing here guarantees
+            // the surfaced workout uses the latest calendar state.
+            await syncHomeAssistantSnapshot()
+
+        default:
+            break
+        }
+    }
+
+    @MainActor
+    private func syncHomeAssistantPhoneWorkoutLiveState(
+        _ workout: PhoneWorkout?,
+        force: Bool = false
+    ) async {
+        guard homeAssistant.isConnected,
+              homeAssistant
+                .shareLiveWorkoutDetails,
+              let workout
+        else {
+            return
+        }
+
+        let now = Date()
+        guard force ||
+                now.timeIntervalSince(
+                    lastHomeAssistantLiveWorkoutSyncAt
+                ) >= 5
+        else {
+            return
+        }
+        lastHomeAssistantLiveWorkoutSyncAt =
+            now
+
+        let pace =
+            workout
+                .currentPaceSecondsPerKilometer
+        let speed =
+            pace.flatMap { value in
+                guard value > 0 else {
+                    return nil
+                }
+                return 3_600 / value
+            }
+        let environment =
+            String(
+                describing:
+                    workout.runEnvironment ??
+                    .outdoor
+            )
+            .lowercased()
+
+        await homeAssistant
+            .sendWorkoutLiveUpdate(
+                phase:
+                    phoneWorkout
+                        .automaticPauseActive
+                        ? "paused"
+                        : "active",
+                name: workout.title,
+                type:
+                    workout.walking
+                        ? "walking"
+                        : "running",
+                elapsedSeconds:
+                    workout.elapsed(
+                        at: now
+                    ),
+                distanceMeters:
+                    workout.distanceMeters,
+                paceSecondsPerKilometer:
+                    pace,
+                speedKilometersPerHour:
+                    speed,
+                environment:
+                    environment,
+                treadmillInclinePercent:
+                    workout
+                        .treadmillInclinePercent
+            )
+    }
+
+    @MainActor
+    private func syncHomeAssistantStrengthLiveState(
+        _ workout: StrengthWorkoutLog?,
+        force: Bool = false
+    ) async {
+        guard homeAssistant.isConnected,
+              homeAssistant
+                .shareStrengthDetails,
+              let workout,
+              workout.exercises.indices
+                .contains(
+                    strengthWorkout
+                        .currentExerciseIndex
+                )
+        else {
+            return
+        }
+
+        let now = Date()
+        guard force ||
+                now.timeIntervalSince(
+                    lastHomeAssistantStrengthSyncAt
+                ) >= 1
+        else {
+            return
+        }
+        lastHomeAssistantStrengthSyncAt =
+            now
+
+        let exerciseIndex =
+            strengthWorkout
+                .currentExerciseIndex
+        let exercise =
+            workout.exercises[
+                exerciseIndex
+            ]
+        let setIndex =
+            min(
+                max(
+                    strengthWorkout
+                        .currentSetIndex,
+                    0
+                ),
+                max(
+                    exercise.sets.count - 1,
+                    0
+                )
+            )
+        guard exercise.sets.indices
+                .contains(setIndex)
+        else {
+            return
+        }
+
+        let set =
+            exercise.sets[setIndex]
+        let remainingRest =
+            strengthWorkout
+                .restEndsAt
+                .map {
+                    max(
+                        Int(
+                            $0.timeIntervalSince(
+                                now
+                            )
+                            .rounded(.up)
+                        ),
+                        0
+                    )
+                }
+
+        await homeAssistant
+            .sendStrengthSetUpdate(
+                exercise:
+                    exercise.exercise.name,
+                exerciseIndex:
+                    exerciseIndex,
+                setNumber:
+                    set.setNumber,
+                setIndex:
+                    setIndex,
+                setTotal:
+                    exercise.sets.count,
+                reps:
+                    set.resolvedCompletedReps ??
+                    strengthWorkout
+                        .draftReps,
+                weightKilograms:
+                    set.completedWeightKilograms ??
+                    strengthWorkout
+                        .draftWeightKilograms,
+                resistanceLevel:
+                    set.completedResistanceLevel ??
+                    strengthWorkout
+                        .draftResistanceLevel,
+                restSeconds:
+                    remainingRest,
+                rowDistanceMeters:
+                    set
+                        .resolvedCompletedDistanceMeters,
+                completed: false
+            )
+    }
+
+    @MainActor
+    private func emitNewHomeAssistantStrengthSetEvents(
+        _ workout: StrengthWorkoutLog?
+    ) async {
+        guard homeAssistant
+                .shareStrengthDetails,
+              let workout
+        else {
+            return
+        }
+
+        for (
+            exerciseIndex,
+            exercise
+        ) in workout.exercises
+            .enumerated() {
+            for (
+                setIndex,
+                set
+            ) in exercise.sets
+                .enumerated()
+            where set.isCompleted {
+                let key =
+                    workout.id.uuidString +
+                    "|" +
+                    set.id.uuidString
+
+                guard !homeAssistantReportedStrengthSetIDs
+                    .contains(key)
+                else {
+                    continue
+                }
+
+                homeAssistantReportedStrengthSetIDs
+                    .insert(key)
+
+                await homeAssistant
+                    .sendStrengthSetUpdate(
+                        exercise:
+                            exercise
+                                .exercise
+                                .name,
+                        exerciseIndex:
+                            exerciseIndex,
+                        setNumber:
+                            set.setNumber,
+                        setIndex:
+                            setIndex,
+                        setTotal:
+                            exercise
+                                .sets
+                                .count,
+                        reps:
+                            set.resolvedCompletedReps,
+                        weightKilograms:
+                            set.completedWeightKilograms,
+                        resistanceLevel:
+                            set.completedResistanceLevel,
+                        restSeconds:
+                            set.restSeconds,
+                        rowDistanceMeters:
+                            set
+                                .resolvedCompletedDistanceMeters,
+                        completed: true
+                    )
+            }
+        }
+    }
+
+    @MainActor
+    private func emitHomeAssistantImpactEvents(
+        for workoutID: UUID
+    ) {
+        guard homeAssistant
+                .shareMilestoneEvents,
+              let impact =
+                workoutCompletion
+                    .impact(
+                        for: workoutID
+                    )
+        else {
+            return
+        }
+
+        for item in impact.items {
+            let key =
+                workoutID.uuidString +
+                "|" +
+                item.id
+
+            guard !homeAssistantReportedImpactIDs
+                .contains(key)
+            else {
+                continue
+            }
+
+            let event: String?
+            switch item.kind {
+            case .achievement:
+                event =
+                    "achievement_unlocked"
+            case .goal:
+                event =
+                    item.detail
+                        .localizedCaseInsensitiveContains(
+                            "goal completed"
+                        )
+                        ? "goal_completed"
+                        : nil
+            case .challenge:
+                event =
+                    item.detail
+                        .localizedCaseInsensitiveContains(
+                            "completed"
+                        )
+                        ? "challenge_completed"
+                        : nil
+            case .gear:
+                event = nil
+            }
+
+            guard let event else {
+                continue
+            }
+
+            homeAssistantReportedImpactIDs
+                .insert(key)
+
+            Task {
+                await homeAssistant
+                    .sendMilestoneEvent(
+                        event: event,
+                        title: item.title,
+                        detail: item.detail
+                    )
+            }
+        }
+    }
+
+    @MainActor
+    private func emitHomeAssistantPersonalRecords(
+        for workout:
+            SocialPublishableWorkout
+    ) async {
+        guard homeAssistant
+                .shareMilestoneEvents
+        else {
+            return
+        }
+
+        if workout.activity == .strength {
+            for record in
+                strengthWorkout
+                    .repPersonalRecords
+            where record.sourceWorkoutID ==
+                    workout.id {
+                let key =
+                    workout.id.uuidString +
+                    "|strength-pr|" +
+                    record.id
+
+                guard !homeAssistantReportedPersonalRecordIDs
+                    .contains(key)
+                else {
+                    continue
+                }
+
+                homeAssistantReportedPersonalRecordIDs
+                    .insert(key)
+
+                await homeAssistant
+                    .sendMilestoneEvent(
+                        event:
+                            "personal_record",
+                        title:
+                            record.title,
+                        value:
+                            record.value
+                    )
+            }
+        }
+
+        guard let records =
+                try? await health
+                    .personalRecords(
+                        forceRefresh: true
+                    )
+        else {
+            return
+        }
+
+        for record in records {
+            guard record.date >=
+                    workout.startDate
+                        .addingTimeInterval(
+                            -2
+                        ),
+                  record.date <=
+                    workout.endDate
+                        .addingTimeInterval(
+                            2
+                        )
+            else {
+                continue
+            }
+
+            let key =
+                workout.id.uuidString +
+                "|health-pr|" +
+                record.id
+
+            guard !homeAssistantReportedPersonalRecordIDs
+                .contains(key)
+            else {
+                continue
+            }
+
+            homeAssistantReportedPersonalRecordIDs
+                .insert(key)
+
+            await homeAssistant
+                .sendMilestoneEvent(
+                    event: "personal_record",
+                    title:
+                        record.kind.title,
+                    value:
+                        record.formattedValue
+                )
         }
     }
 
