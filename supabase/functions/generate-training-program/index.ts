@@ -1,3 +1,4 @@
+import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type GoalInput = {
@@ -499,6 +500,11 @@ Hard rules:
 - Use the user's goal deadlines and milestones as context, but do not exceed the explicit timeline.
 - The output is a draft the user will review before applying.
 `.trim();
+
+  const budgetResponse = await enforceAIRequestBudget(() => admin.rpc("consume_ai_request_budget", {
+    p_user_id: user.id, p_feature: "generate-training-program",
+  }));
+  if (budgetResponse) return budgetResponse;
 
   const aiResponse = await fetch("https://api.groq.com/openai/v1/responses", {
     method: "POST",

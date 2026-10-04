@@ -1290,11 +1290,13 @@ private final class ATHLTHRemoteArtworkCache {
 }
 
 private struct ATHLTHRemoteArtworkImage: View {
+    @Environment(\.athlthImageAccountID) private var accountID
     let url: URL
     let fallbackAssetName: String
     let maxPixelSize: Int
 
     @State private var image: UIImage?
+    @State private var loadedAccountID: UUID?
 
     private var cacheKey: String {
         "\(maxPixelSize)|\(url.absoluteString)"
@@ -1302,7 +1304,7 @@ private struct ATHLTHRemoteArtworkImage: View {
 
     var body: some View {
         Group {
-            if let image {
+            if loadedAccountID == accountID, let image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -1312,19 +1314,27 @@ private struct ATHLTHRemoteArtworkImage: View {
                     .scaledToFill()
             }
         }
-        .task(id: cacheKey) {
-            if let cached =
+        .task(id: ATHLTHImageRequestID(url: url, accountID: accountID)) {
+            image = nil
+            let isPrivate = ATHLTHStorageImageURL.privateWorkoutPath(url) != nil
+            if !isPrivate, let cached =
                     ATHLTHRemoteArtworkCache
                         .shared
                         .image(for: cacheKey) {
                 image = cached
+                loadedAccountID = accountID
                 return
             }
 
             do {
+                let resolvedURL = try await ATHLTHStorageImageURL.resolve(url)
+                var request = URLRequest(url: resolvedURL)
+                if isPrivate {
+                    request.cachePolicy = .reloadIgnoringLocalCacheData
+                }
                 let (data, _) =
                     try await URLSession.shared.data(
-                        from: url
+                        for: request
                     )
 
                 let prepared =
@@ -1344,12 +1354,15 @@ private struct ATHLTHRemoteArtworkImage: View {
                     return
                 }
 
-                ATHLTHRemoteArtworkCache
+                if !isPrivate {
+                    ATHLTHRemoteArtworkCache
                     .shared
                     .store(
                         prepared.image,
                         for: cacheKey
                     )
+                }
+                loadedAccountID = accountID
                 image = prepared.image
             } catch {
                 return
@@ -1365,6 +1378,7 @@ struct ATHLTHArtworkImage: View {
 
     @MainActor
     static func clearRemoteCache() {
+        URLCache.shared.removeAllCachedResponses()
         ATHLTHRemoteArtworkCache
             .shared
             .removeAll()

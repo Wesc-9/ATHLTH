@@ -2225,7 +2225,7 @@ struct AroundYouExploreView: View {
             route: route,
             profile: profile
         ) {
-            AsyncImage(url: url) { phase in
+            ATHLTHStorageImage(url: url) { phase in
                 if case .success(let image) = phase {
                     image
                         .resizable()

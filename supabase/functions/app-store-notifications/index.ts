@@ -8,8 +8,8 @@ import {
 
 const BUNDLE_ID = "com.wesc9.athlth";
 const PRODUCT_IDS = new Set([
-  "com.wesc9.athlth.paid.monthly",
-  "com.wesc9.athlth.paid.yearly",
+  "com.wesc9.athlth.plus.monthly",
+  "com.wesc9.athlth.plus.yearly",
 ]);
 
 const APPLE_ROOTS = [

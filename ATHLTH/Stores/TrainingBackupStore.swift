@@ -1,6 +1,20 @@
 import Foundation
 import Supabase
 
+struct TrainingBackupChangeTracker {
+    private(set) var revision: UInt64 = 0
+    var isDirty = false
+
+    mutating func markDirty() {
+        revision &+= 1
+        isDirty = true
+    }
+
+    mutating func didUpload(revision capturedRevision: UInt64) {
+        isDirty = revision != capturedRevision
+    }
+}
+
 struct TrainingBackupPayload: Codable, Equatable {
     let version: Int
     let ownerID: UUID
@@ -83,7 +97,11 @@ final class TrainingBackupStore: ObservableObject {
     @Published private(set) var available: [TrainingBackupRow] = []
     private var lastPayload: TrainingBackupPayload?
     private var accountID: UUID?
-    private var isDirty = false
+    private var changes = TrainingBackupChangeTracker()
+    private var isDirty: Bool {
+        get { changes.isDirty }
+        set { changes.isDirty = newValue }
+    }
     private var scheduledBackupTask: Task<Void, Never>?
     private var lastSuccessfulBackupAt: Date?
     private let automaticBackupDelay: Duration = .seconds(20)
@@ -206,7 +224,7 @@ final class TrainingBackupStore: ObservableObject {
     func markDirty(userID: UUID) {
         guard accountID == userID else { return }
 
-        isDirty = true
+        changes.markDirty()
         guard enabled else { return }
         scheduleAutomaticBackup(userID: userID)
     }
@@ -284,6 +302,7 @@ final class TrainingBackupStore: ObservableObject {
 
         do {
             try checkAccount(userID)
+            let capturedRevision = changes.revision
             let payload = try TrainingBackupPayload.capture(
                 userID: userID
             )
@@ -303,7 +322,9 @@ final class TrainingBackupStore: ObservableObject {
 
             let completedAt = Date()
             lastPayload = payload
-            isDirty = false
+            // An edit may arrive while the previous snapshot is uploading.
+            // Leave it pending so the scheduler uploads the newer snapshot.
+            changes.didUpload(revision: capturedRevision)
             lastSuccessfulBackupAt = completedAt
             AccountLocalStorage.write(
                 completedAt,

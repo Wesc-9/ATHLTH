@@ -885,7 +885,7 @@ struct ATHLTHHomeView: View {
     @ViewBuilder
     private var homeProfileShortcut: some View {
         if let avatarURL = session.profile.avatarURL {
-            AsyncImage(url: avatarURL) { phase in
+            ATHLTHStorageImage(url: avatarURL) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -10819,7 +10819,7 @@ struct ATHLTHProfileView: View {
                     item.imageURL,
                    let url =
                     URL(string: imageURL) {
-                    AsyncImage(url: url) {
+                    ATHLTHStorageImage(url: url) {
                         phase in
                         switch phase {
                         case .success(
@@ -10913,7 +10913,7 @@ struct ATHLTHProfileView: View {
         _ media: WorkoutMediaRecord
     ) -> some View {
         ZStack(alignment: .bottomLeading) {
-            AsyncImage(
+            ATHLTHStorageImage(
                 url: URL(
                     string: media.imageURL
                 )
@@ -11324,7 +11324,7 @@ struct ATHLTHProfileView: View {
         some View {
         if let avatarURL =
             session.profile.avatarURL {
-            AsyncImage(
+            ATHLTHStorageImage(
                 url: avatarURL
             ) { phase in
                 switch phase {

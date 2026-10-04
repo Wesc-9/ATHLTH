@@ -549,7 +549,7 @@ struct ExerciseDetailView: View {
 
             if entry.imagePeakURL != nil &&
                entry.imagePeakURL != entry.imageStartURL {
-                AsyncImage(url: entry.imagePeakURL) { phase in
+                ATHLTHStorageImage(url: entry.imagePeakURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -944,7 +944,7 @@ struct ExerciseArtwork: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    AsyncImage(url: url) { phase in
+                    ATHLTHStorageImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
                             image

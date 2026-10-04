@@ -1,3 +1,4 @@
+import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type GoalInput = {
@@ -402,6 +403,11 @@ Rules:
 - Explain every change in plain language under reason.
 - The user must review and accept all changes before anything is applied.
 `.trim();
+
+  const budgetResponse = await enforceAIRequestBudget(() => admin.rpc("consume_ai_request_budget", {
+    p_user_id: user.id, p_feature: "generate-plan-adaptation",
+  }));
+  if (budgetResponse) return budgetResponse;
 
   const aiResponse = await fetch("https://api.groq.com/openai/v1/responses", {
     method: "POST",

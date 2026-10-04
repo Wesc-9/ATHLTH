@@ -537,6 +537,8 @@ final class AppSessionStore: ObservableObject {
     }
 
     func clearAfterSignOut() {
+        ATHLTHSurfaceCoordinator.clearAccountSurfaces()
+        ATHLTHArtworkImage.clearRemoteCache()
         resetAuthenticationState()
         profile = Self.makeSignedOutProfile()
         previewModeEnabled = false

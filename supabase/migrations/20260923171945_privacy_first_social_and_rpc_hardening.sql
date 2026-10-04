@@ -1,5 +1,4 @@
--- Privacy-first social defaults and RPC hardening.
-
+-- Privacy-first defaults for social/Health-derived sharing.
 alter table public.profile_social_settings
   alter column share_training_presence set default false,
   alter column share_performance_stats set default false,
@@ -22,6 +21,7 @@ set
   share_workout_totals = false,
   updated_at = now();
 
+-- Move privileged messaging/username logic behind non-exposed private helpers.
 create or replace function private.get_or_create_direct_conversation_impl(other_user uuid)
 returns uuid
 language plpgsql
@@ -63,9 +63,20 @@ begin
   friend_state := private.are_friends(other_user);
 
   if friend_state then
-    insert into public.direct_conversations(user_a, user_b, request_status, requested_by)
-    values (actor, other_user, 'accepted', null)
+    insert into public.direct_conversations(
+      user_a,
+      user_b,
+      request_status,
+      requested_by
+    )
+    values (
+      actor,
+      other_user,
+      'accepted',
+      null
+    )
     returning id into existing.id;
+
     return existing.id;
   end if;
 
@@ -79,8 +90,18 @@ begin
   end if;
 
   begin
-    insert into public.direct_conversations(user_a, user_b, request_status, requested_by)
-    values (actor, other_user, 'pending', actor)
+    insert into public.direct_conversations(
+      user_a,
+      user_b,
+      request_status,
+      requested_by
+    )
+    values (
+      actor,
+      other_user,
+      'pending',
+      actor
+    )
     returning id into existing.id;
   exception
     when unique_violation then
@@ -196,7 +217,12 @@ begin
     where p.id = actor;
 
     insert into public.social_inbox_events(
-      recipient_id, kind, title, message, entity_type, entity_id
+      recipient_id,
+      kind,
+      title,
+      message,
+      entity_type,
+      entity_id
     )
     values (
       c.requested_by,

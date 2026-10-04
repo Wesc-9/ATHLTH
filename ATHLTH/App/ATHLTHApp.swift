@@ -739,7 +739,10 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
+        .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
+            ATHLTHSurfaceCoordinator.clearAccountSurfaces()
+            ATHLTHArtworkImage.clearRemoteCache()
             phoneWorkout.switchAccount(userID)
             trainingBackups.switchAccount(userID)
             goals.switchAccount(userID)
