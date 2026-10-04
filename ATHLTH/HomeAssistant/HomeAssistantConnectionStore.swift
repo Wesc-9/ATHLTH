@@ -620,6 +620,24 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func sendWorkoutStopped() async {
+        guard isConnected,
+              shareWorkoutState
+        else {
+            return
+        }
+
+        try? await send(
+            event: "sync_snapshot",
+            payload: [
+                "state": .object([
+                    "workout_active": .bool(false),
+                    "active_workout": .null
+                ])
+            ]
+        )
+    }
+
     func sendWorkoutCancelled() async {
         guard isConnected,
               shareWorkoutState
