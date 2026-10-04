@@ -224,6 +224,34 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func refreshChallenges(
+        challengeStore: ChallengeStore
+    ) async {
+        guard service.currentUserID != nil else {
+            return
+        }
+
+        do {
+            let remoteChallenges =
+                try await service
+                    .loadRemoteChallenges()
+
+            challengeStore
+                .mergeRemoteChallenges(
+                    remoteChallenges
+                )
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else {
+                return
+            }
+
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     func refreshIfStale(
         maxAge: TimeInterval = 120,
         challengeStore: ChallengeStore? = nil,
