@@ -436,9 +436,10 @@ struct AppRootView: View {
 
         deviceRelay.startListening {
             command in
-            try await processWorkoutDeviceRelayCommand(
-                command
-            )
+            try await self
+                .processWorkoutDeviceRelayCommand(
+                    command
+                )
         }
     }
 
@@ -704,9 +705,10 @@ struct AppRootView: View {
                     await deviceRelay
                         .refreshPending {
                             command in
-                            try await processWorkoutDeviceRelayCommand(
-                                command
-                            )
+                            try await self
+                                .processWorkoutDeviceRelayCommand(
+                                    command
+                                )
                         }
                 }
                 await allowWatchMirroringToAttachIfNeeded()
