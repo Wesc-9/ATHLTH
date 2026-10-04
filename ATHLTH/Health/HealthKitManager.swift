@@ -2811,21 +2811,25 @@ final class HealthKitManager: ObservableObject {
             _ kind: HealthPersonalRecordKind,
             activities: Set<HKWorkoutActivityType>
         ) {
+            let matchingWorkouts =
+                workouts.filter {
+                    activities.contains(
+                        $0.workoutActivityType
+                    )
+                }
+
             guard let workout =
-                    workouts
-                        .filter {
-                            activities.contains(
-                                $0.workoutActivityType
-                            )
+                    matchingWorkouts.max(
+                        by: {
+                            $0.duration <
+                            $1.duration
                         }
-                        .max(
-                            by: {
-                                $0.duration <
-                                $1.duration
-                            }
-                        ),
-                  workout.duration > 0
+                    )
             else {
+                return
+            }
+
+            guard workout.duration > 0 else {
                 return
             }
 
