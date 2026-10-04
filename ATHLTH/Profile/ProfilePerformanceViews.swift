@@ -7494,8 +7494,11 @@ private struct PerformanceMilestonesDetailView:
                     )
                 )
                 .font(
-                    .headline
-                        .weight(.bold)
+                    .system(
+                        size: 15,
+                        weight: .bold,
+                        design: .rounded
+                    )
                 )
 
                 Text(
@@ -8251,7 +8254,7 @@ struct ProfileRecordShowcasePickerView:
                 .padding(12)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 82,
+                    minHeight: 70,
                     alignment: .leading
                 )
                 .background(
@@ -8382,7 +8385,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 14,
+                        size: 15,
                         weight: .bold
                     )
                 )
@@ -8393,63 +8396,45 @@ struct ProfileRecordShowcasePickerView:
 
                 Text(group.title)
                     .font(
-                        .subheadline
+                        .headline
                             .weight(.bold)
                     )
 
                 Spacer()
 
-                if group ==
-                    .strength {
-                    Text(
-                        ATHLTHLocalization.choose(
+                Text(
+                    group == .strength
+                        ? ATHLTHLocalization.choose(
                             english:
-                                "Apple Health + ATHLTH",
+                                "ATHLTH + Apple Health",
                             norwegian:
-                                "Apple Health + ATHLTH"
+                                "ATHLTH + Apple Health"
                         )
+                        : "Apple Health"
+                )
+                .font(
+                    .system(
+                        size: 8,
+                        weight: .bold
                     )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                } else {
-                    Text("Apple Health")
-                        .font(
-                            .system(
-                                size: 8,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                }
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
             }
 
             LazyVGrid(
                 columns: [
                     GridItem(
-                        .flexible(),
-                        spacing: 7
-                    ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 7
-                    ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 7
+                        .adaptive(
+                            minimum: 92,
+                            maximum: 118
+                        ),
+                        spacing: 6
                     )
                 ],
-                spacing: 7
+                spacing: 6
             ) {
                 ForEach(
                     candidates(
@@ -8460,7 +8445,7 @@ struct ProfileRecordShowcasePickerView:
                 }
             }
         }
-        .padding(12)
+        .padding(10)
         .background(
             Color.white.opacity(0.88),
             in: RoundedRectangle(
@@ -8508,7 +8493,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 13,
+                            size: 11,
                             weight:
                                 .semibold
                         )
@@ -8517,8 +8502,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 28,
-                        height: 28
+                        width: 24,
+                        height: 24
                     )
                     .background(
                         kind.tint
@@ -8546,8 +8531,8 @@ struct ProfileRecordShowcasePickerView:
                                     : 1.2
                             )
                             .frame(
-                                width: 22,
-                                height: 22
+                                width: 18,
+                                height: 18
                             )
 
                         if isSelected {
@@ -8582,7 +8567,7 @@ struct ProfileRecordShowcasePickerView:
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 9,
+                            size: 8.3,
                             weight: .semibold
                         )
                     )
@@ -8637,7 +8622,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 9,
+                        size: 7.8,
                         weight: .medium
                     )
                 )
@@ -8649,10 +8634,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(8)
+            .padding(7)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 98,
+                minHeight: 82,
                 alignment: .topLeading
             )
             .background(
