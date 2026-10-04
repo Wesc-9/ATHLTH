@@ -605,11 +605,9 @@ struct PlannedWorkoutDetailView: View {
     ) -> String {
         var parts: [String] = []
 
-        if let reps = exercise.reps {
-            parts.append("\(exercise.sets) × \(reps)")
-        } else {
-            parts.append("\(exercise.sets) sets")
-        }
+        parts.append(
+            exercise.compactTargetSummary
+        )
 
         if let weight = exercise.targetWeightKilograms {
             parts.append(String(format: "%.1f kg", weight))
