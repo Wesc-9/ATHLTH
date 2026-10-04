@@ -453,22 +453,54 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            NavigationLink {
-                                ATHLTHTrainingDeviceSettingsView()
-                            } label: {
+                            if ATHLTHDeviceRole.isIPad {
                                 PremiumSettingsRow(
                                     icon: "applewatch",
-                                    iconTint: ATHLTHTheme.primaryText,
-                                    title: "Watch",
-                                    subtitle: trainingDeviceSubtitle
+                                    iconTint:
+                                        ATHLTHTheme.primaryText,
+                                    title: "Apple Watch",
+                                    subtitle:
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Managed by your paired iPhone · workout starts can be sent from iPad",
+                                            norwegian:
+                                                "Styres av den parede iPhonen · økter kan startes fra iPad"
+                                        )
                                 ) {
-                                    connectionTrailing(
-                                        watchDeviceTrailingTitle,
-                                        showChevron: true
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Via iPhone",
+                                            norwegian: "Via iPhone"
+                                        )
+                                    )
+                                    .font(
+                                        .caption.weight(
+                                            .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
                                     )
                                 }
+                            } else {
+                                NavigationLink {
+                                    ATHLTHTrainingDeviceSettingsView()
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "applewatch",
+                                        iconTint: ATHLTHTheme.primaryText,
+                                        title: "Watch",
+                                        subtitle: trainingDeviceSubtitle
+                                    ) {
+                                        connectionTrailing(
+                                            watchDeviceTrailingTitle,
+                                            showChevron: true
+                                        )
+                                    }
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
 
                             SettingsDivider()
 

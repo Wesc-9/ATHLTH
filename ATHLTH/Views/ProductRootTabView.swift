@@ -2803,6 +2803,10 @@ struct ATHLTHHomeView: View {
     private func homeRequiresAppleWatch(
         _ workout: PlannedSession
     ) -> Bool {
+        guard !ATHLTHDeviceRole.isIPad else {
+            return false
+        }
+
         guard workout.kind == .running ||
                 workout.kind == .walking
         else {

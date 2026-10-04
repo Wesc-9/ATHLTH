@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import Network
 import Security
+import UserNotifications
 import UIKit
 
 struct HomeAssistantDiscoveredInstance: Identifiable, Hashable, Sendable {
@@ -120,6 +121,38 @@ private struct HomeAssistantWebhookEnvelope: Encodable {
     let payload: [String: HomeAssistantJSONValue]
 }
 
+
+struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
+    let id: String
+    let type: String
+    let title: String?
+    let message: String?
+}
+
+private struct HomeAssistantWebhookResponse: Decodable {
+    let commands: [HomeAssistantInboundCommand]?
+}
+
+private struct HomeAssistantWebhookHTTPResult {
+    let statusCode: Int
+    let data: Data
+}
+
+extension Notification.Name {
+    static let athlthHomeAssistantCommandReceived =
+        Notification.Name(
+            "athlth.homeAssistant.commandReceived"
+        )
+}
+
+struct HomeAssistantCalendarEventPayload: Hashable {
+    let id: String
+    let title: String
+    let start: Date
+    let end: Date
+    let type: String
+}
+
 private struct HomeAssistantPendingDelivery: Codable, Identifiable {
     let id: UUID
     let pairingWebhookID: String
@@ -178,6 +211,23 @@ enum HomeAssistantJSONValue: Codable, Hashable, Sendable {
         case .null:
             try container.encodeNil()
         }
+    }
+}
+
+func homeAssistantRecoveryStateValue(
+    _ state: RecoveryReadinessState
+) -> String {
+    switch state {
+    case .buildingBaseline:
+        return "building_baseline"
+    case .ready:
+        return "ready"
+    case .balanced:
+        return "balanced"
+    case .takeItEasy:
+        return "take_it_easy"
+    case .recover:
+        return "recover"
     }
 }
 
@@ -281,6 +331,25 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareTrainingCalendar: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareTrainingCalendar,
+                forKey:
+                    Self.shareTrainingCalendarKey
+            )
+        }
+    }
+
+    @Published var shareGoals: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareGoals,
+                forKey: Self.shareGoalsKey
+            )
+        }
+    }
+
     private static let shareWorkoutStateKey =
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
@@ -301,6 +370,12 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareWeeklyProgress"
     private static let shareNextWorkoutKey =
         "athlth.homeAssistant.shareNextWorkout"
+    private static let shareTrainingCalendarKey =
+        "athlth.homeAssistant.shareTrainingCalendar"
+    private static let shareGoalsKey =
+        "athlth.homeAssistant.shareGoals"
+    private static let processedCommandIDsKey =
+        "athlth.homeAssistant.processedCommandIDs"
 
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
@@ -441,6 +516,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             defaults,
             key: Self.shareNextWorkoutKey,
             defaultValue: true
+        )
+        shareTrainingCalendar = Self.storedBool(
+            defaults,
+            key: Self.shareTrainingCalendarKey,
+            defaultValue: false
+        )
+        shareGoals = Self.storedBool(
+            defaults,
+            key: Self.shareGoalsKey,
+            defaultValue: false
         )
 
         storedPairing = restored
@@ -622,7 +707,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         do {
-            let status = try await Self.sendWebhookRequest(
+            let result = try await Self.sendWebhookRequest(
                 to: pairing.webhookURL,
                 body: body,
                 timestamp: timestamp,
@@ -631,16 +716,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 clientID: pairing.clientID
             )
 
-            guard (200..<300).contains(status) else {
+            guard (200..<300).contains(result.statusCode) else {
                 if Self.shouldTryWebhookFallback(
-                    after: status
+                    after: result.statusCode
                 ),
                    let fallback =
                     Self.fallbackWebhookURL(
                         for: pairing
                     ),
                    fallback != pairing.webhookURL {
-                    let fallbackStatus =
+                    let fallbackResult =
                         try await Self.sendWebhookRequest(
                             to: fallback,
                             body: body,
@@ -652,21 +737,30 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
                     guard (200..<300)
                         .contains(
-                            fallbackStatus
+                            fallbackResult.statusCode
                         ) ||
-                        fallbackStatus == 409
+                        fallbackResult.statusCode == 409
                     else {
                         throw Self.webhookError(
-                            for: fallbackStatus
+                            for: fallbackResult.statusCode
                         )
                     }
+                    await handleWebhookResponse(
+                        fallbackResult.data,
+                        sourceEvent: event
+                    )
                     return
                 }
 
                 throw Self.webhookError(
-                    for: status
+                    for: result.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                result.data,
+                sourceEvent: event
+            )
         } catch let error as HomeAssistantConnectionError {
             throw error
         } catch {
@@ -679,7 +773,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 throw error
             }
 
-            let fallbackStatus =
+            let fallbackResult =
                 try await Self.sendWebhookRequest(
                     to: fallback,
                     body: body,
@@ -689,14 +783,124 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     clientID: pairing.clientID
                 )
 
-            guard (200..<300).contains(fallbackStatus) ||
-                    fallbackStatus == 409
+            guard (200..<300).contains(fallbackResult.statusCode) ||
+                    fallbackResult.statusCode == 409
             else {
                 throw Self.webhookError(
-                    for: fallbackStatus
+                    for: fallbackResult.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                fallbackResult.data,
+                sourceEvent: event
+            )
         }
+    }
+
+    private func handleWebhookResponse(
+        _ data: Data,
+        sourceEvent: String
+    ) async {
+        guard sourceEvent != "command_ack",
+              let response =
+                try? JSONDecoder().decode(
+                    HomeAssistantWebhookResponse.self,
+                    from: data
+                ),
+              let commands = response.commands,
+              !commands.isEmpty
+        else {
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        var processed = Set(
+            defaults.stringArray(
+                forKey:
+                    Self.processedCommandIDsKey
+            ) ?? []
+        )
+
+        let fresh = commands.filter {
+            !processed.contains($0.id)
+        }
+
+        for command in fresh {
+            processed.insert(command.id)
+
+            switch command.type {
+            case "notification",
+                 "training_reminder",
+                 "show_next_workout":
+                await scheduleLocalNotification(
+                    for: command
+                )
+            case "sync_now":
+                NotificationCenter.default.post(
+                    name:
+                        .athlthHomeAssistantCommandReceived,
+                    object: command
+                )
+            default:
+                break
+            }
+        }
+
+        let trimmed =
+            Array(processed.suffix(64))
+        defaults.set(
+            trimmed,
+            forKey:
+                Self.processedCommandIDsKey
+        )
+
+        let ids = commands.map {
+            HomeAssistantJSONValue.string(
+                $0.id
+            )
+        }
+
+        try? await send(
+            event: "command_ack",
+            payload: [
+                "ids": .array(ids)
+            ]
+        )
+    }
+
+    private func scheduleLocalNotification(
+        for command: HomeAssistantInboundCommand
+    ) async {
+        let content =
+            UNMutableNotificationContent()
+        content.title =
+            command.title ??
+            ATHLTHLocalization.choose(
+                english: "ATHLTH",
+                norwegian: "ATHLTH"
+            )
+        content.body =
+            command.message ??
+            ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant sent an ATHLTH update.",
+                norwegian:
+                    "Home Assistant sendte en ATHLTH-oppdatering."
+            )
+        content.sound = .default
+
+        let request =
+            UNNotificationRequest(
+                identifier:
+                    "athlth-home-assistant-\(command.id)",
+                content: content,
+                trigger: nil
+            )
+
+        try? await UNUserNotificationCenter
+            .current()
+            .add(request)
     }
 
     private func sendReliably(
@@ -924,7 +1128,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         sleep: SleepSummary,
         heart: HeartSummary,
         training: TrainingHealthSummary,
-        recoveryScore: Int?
+        recoveryScore: Int?,
+        recoveryState: String?,
+        trainingLoad: Double?
     ) async {
         guard isConnected else {
             return
@@ -994,6 +1200,37 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     )
                 )
                 : .null
+
+        state["recovery_state"] =
+            shareRecovery
+                ? (
+                    Self.sanitizedText(
+                        recoveryState
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
+        state["training_load"] =
+            shareTrainingLoad &&
+                trainingLoad?.isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            trainingLoad ?? 0,
+                            0
+                        ),
+                        10
+                    )
+                )
+                : .null
+
+        state["pending_delivery_count"] =
+            .int(pendingDeliveryCount)
 
         state["sleep_duration_minutes"] =
             shareSleep &&
@@ -1342,11 +1579,19 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         hrvMilliseconds: Double?,
         restingHeartRate: Double?,
         respiratoryRate: Double?,
+        recoveryState: String?,
         weeklyProgress: Double?,
         weeklyTrainingMinutes: Double?,
         weeklyDistanceKilometers: Double?,
+        weeklyWorkoutCount: Int?,
+        trainingStreak: Int?,
         nextWorkout: String?,
-        nextWorkoutTime: Date?
+        nextWorkoutTime: Date?,
+        activeGoal: String?,
+        goalProgress: Double?,
+        goalDaysRemaining: Int?,
+        calendarEvents:
+            [HomeAssistantCalendarEventPayload]
     ) async {
         guard isConnected else {
             return
@@ -1451,6 +1696,20 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .null
 
+        state["recovery_state"] =
+            shareRecovery
+                ? (
+                    Self.sanitizedText(
+                        recoveryState
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
         state["weekly_progress"] =
             shareWeeklyProgress &&
                 weeklyProgress?.isFinite == true
@@ -1484,6 +1743,26 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .null
 
+        state["weekly_workout_count"] =
+            shareWeeklyProgress
+                ? .int(
+                    max(
+                        weeklyWorkoutCount ?? 0,
+                        0
+                    )
+                )
+                : .null
+
+        state["training_streak"] =
+            shareWeeklyProgress
+                ? .int(
+                    max(
+                        trainingStreak ?? 0,
+                        0
+                    )
+                )
+                : .null
+
         state["next_workout"] =
             shareNextWorkout
                 ? (
@@ -1505,6 +1784,86 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     ?? .null
                 )
                 : .null
+
+        state["active_goal"] =
+            shareGoals
+                ? (
+                    Self.sanitizedText(
+                        activeGoal
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
+        state["goal_progress"] =
+            shareGoals &&
+                goalProgress?.isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            goalProgress ?? 0,
+                            0
+                        ),
+                        100
+                    )
+                )
+                : .null
+
+        state["goal_days_remaining"] =
+            shareGoals
+                ? goalDaysRemaining
+                    .map {
+                        .int(max($0, 0))
+                    }
+                ?? .null
+                : .null
+
+        state["calendar_events"] =
+            shareTrainingCalendar
+                ? .array(
+                    calendarEvents
+                        .prefix(64)
+                        .map { event in
+                            .object([
+                                "id":
+                                    .string(event.id),
+                                "title":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.title
+                                        ) ??
+                                        "Workout"
+                                    ),
+                                "start":
+                                    .string(
+                                        Self.iso8601(
+                                            event.start
+                                        )
+                                    ),
+                                "end":
+                                    .string(
+                                        Self.iso8601(
+                                            event.end
+                                        )
+                                    ),
+                                "type":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.type
+                                        ) ??
+                                        "workout"
+                                    )
+                            ])
+                        }
+                )
+                : .array([])
+
+        state["pending_delivery_count"] =
+            .int(pendingDeliveryCount)
 
         await sendReliably(
             event: "sync_snapshot",
@@ -1530,6 +1889,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
         if !shareRecovery {
             state["recovery_score"] = .null
+            state["recovery_state"] = .null
         }
         if !shareTrainingLoad {
             state["training_load"] = .null
@@ -1554,6 +1914,14 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         if !shareNextWorkout {
             state["next_workout"] = .null
             state["next_workout_time"] = .null
+        }
+        if !shareGoals {
+            state["active_goal"] = .null
+            state["goal_progress"] = .null
+            state["goal_days_remaining"] = .null
+        }
+        if !shareTrainingCalendar {
+            state["calendar_events"] = .array([])
         }
 
         guard !state.isEmpty else {
@@ -2370,7 +2738,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         nonce: String,
         signature: String,
         clientID: String
-    ) async throws -> Int {
+    ) async throws -> HomeAssistantWebhookHTTPResult {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.httpMethod = "POST"
@@ -2396,7 +2764,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             forHTTPHeaderField: "X-ATHLTH-Signature"
         )
 
-        let (_, response) =
+        let (data, response) =
             try await URLSession.shared.data(
                 for: request
             )
@@ -2408,7 +2776,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 .invalidResponse
         }
 
-        return httpResponse.statusCode
+        return HomeAssistantWebhookHTTPResult(
+            statusCode:
+                httpResponse.statusCode,
+            data: data
+        )
     }
 
     private static func webhookError(

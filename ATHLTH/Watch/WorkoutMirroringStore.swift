@@ -25,6 +25,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     override init() {
         super.init()
 
+        guard ATHLTHDeviceRole
+            .supportsDirectAppleWatch
+        else {
+            return
+        }
+
         healthStore.workoutSessionMirroringStartHandler = { [weak self] session in
             Task { @MainActor [weak self] in
                 self?.attach(session)

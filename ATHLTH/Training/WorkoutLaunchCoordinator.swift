@@ -381,6 +381,48 @@ enum WorkoutLaunchCoordinator {
         spotify: SpotifyPlaybackStore,
         ghostRace: GhostRaceStore? = nil
     ) async throws {
+        if ATHLTHDeviceRole.isIPad {
+            let envelope =
+                WorkoutDeviceRelayEnvelope(
+                    kind: .run,
+                    target:
+                        WorkoutDeviceRelayTarget(
+                            captureDevice:
+                                configuration
+                                    .captureDevice
+                        ),
+                    workoutPayload:
+                        configuration
+                            .trainTogetherInvitePayload(
+                                savedRoutes:
+                                    session.savedRoutes
+                            ),
+                    watchAudioCoach:
+                        configuration.audioCoach,
+                    ghostTargetDurationSeconds:
+                        configuration
+                            .ghostTargetDurationSeconds,
+                    ghostUpdates:
+                        configuration
+                            .ghostUpdates,
+                    spotifyPlaylist:
+                        configuration
+                            .spotifyPlaylist,
+                    spotifyAutoplay:
+                        configuration
+                            .spotifyAutoplay,
+                    gearIDs:
+                        Array(
+                            configuration.gearIDs
+                        )
+                )
+
+            try await WorkoutDeviceRelayStore
+                .shared
+                .enqueue(envelope)
+            return
+        }
+
         let selectedRoute: TrainingRoute? = {
             if let route = configuration.route {
                 return route
@@ -597,6 +639,42 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws {
+        if ATHLTHDeviceRole.isIPad {
+            let envelope =
+                WorkoutDeviceRelayEnvelope(
+                    kind: .walk,
+                    target:
+                        WorkoutDeviceRelayTarget(
+                            captureDevice:
+                                configuration
+                                    .captureDevice
+                        ),
+                    workoutPayload:
+                        configuration
+                            .trainTogetherInvitePayload,
+                    watchAudioCoach:
+                        configuration.audioCoach,
+                    ghostTargetDurationSeconds:
+                        nil,
+                    ghostUpdates: nil,
+                    spotifyPlaylist:
+                        configuration
+                            .spotifyPlaylist,
+                    spotifyAutoplay:
+                        configuration
+                            .spotifyAutoplay,
+                    gearIDs:
+                        Array(
+                            configuration.gearIDs
+                        )
+                )
+
+            try await WorkoutDeviceRelayStore
+                .shared
+                .enqueue(envelope)
+            return
+        }
+
         if configuration.captureDevice == .iPhone {
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
@@ -726,6 +804,64 @@ enum WorkoutLaunchCoordinator {
             ) else {
                 return false
             }
+        }
+
+        if ATHLTHDeviceRole.isIPad {
+            let relayPayload =
+                SocialWorkoutInvitePayload(
+                    workout: workout,
+                    strengthTrackingMode:
+                        trackingMode,
+                    strengthAdvancedConfiguration:
+                        trackingMode == .advanced
+                            ? advancedConfiguration
+                            : nil
+                )
+
+            let envelope =
+                WorkoutDeviceRelayEnvelope(
+                    kind: .strength,
+                    target:
+                        WorkoutDeviceRelayTarget(
+                            captureDevice:
+                                captureDevice
+                        ),
+                    workoutPayload:
+                        relayPayload,
+                    watchAudioCoach:
+                        audioCoach,
+                    ghostTargetDurationSeconds:
+                        nil,
+                    ghostUpdates: nil,
+                    spotifyPlaylist:
+                        trackingMode == .advanced
+                            ? advancedConfiguration
+                                .spotifyPlaylist
+                            : resolvedSpotifyPlaylist(
+                                workout: workout,
+                                session: session
+                            ),
+                    spotifyAutoplay:
+                        trackingMode == .advanced
+                            ? advancedConfiguration
+                                .spotifyAutoplay
+                            : (
+                                resolvedSpotifyPlaylist(
+                                    workout: workout,
+                                    session: session
+                                ) != nil
+                            ),
+                    gearIDs:
+                        workout.gearIDs ?? []
+                )
+
+            try await WorkoutDeviceRelayStore
+                .shared
+                .enqueue(envelope)
+
+            // A relayed workout must not open a second local strength session
+            // on iPad. The iPhone becomes the authoritative workout device.
+            return false
         }
 
         let watchSessionID: UUID?

@@ -39,6 +39,7 @@ struct ATHLTHApp: App {
     @StateObject private var subscriptionStore = SubscriptionStore()
     @StateObject private var subscriptionBackend = SubscriptionBackendService()
     @StateObject private var accountService = SupabaseAccountService()
+    @StateObject private var deviceRelay = WorkoutDeviceRelayStore.shared
 
     init() {
         let homeAssistantStore =
@@ -62,10 +63,27 @@ struct ATHLTHApp: App {
                 [weak homeAssistantStore,
                  weak healthStore] in
 
-                guard let homeAssistantStore,
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistantStore,
                       let healthStore
                 else {
                     return
+                }
+
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistantStore
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await healthStore
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
                 }
 
                 await homeAssistantStore
@@ -81,11 +99,73 @@ struct ATHLTHApp: App {
                         recoveryScore:
                             healthStore
                                 .recovery
-                                .score
+                                .score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                healthStore
+                                    .recovery
+                                    .state
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
                     )
             }
 
-        ATHLTHKeyboardCoordinator.shared.install()
+        ATHLTHHomeAssistantBackgroundRefresh
+            .refreshHandler = {
+                [weak homeAssistantStore,
+                 weak healthStore] in
+
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistantStore,
+                      let healthStore,
+                      homeAssistantStore.isConnected
+                else {
+                    return false
+                }
+
+                await healthStore.refreshIfStale(
+                    maxAge: 5 * 60
+                )
+
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistantStore
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await healthStore
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
+                }
+
+                await homeAssistantStore
+                    .syncBackgroundHealthSnapshot(
+                        workouts: healthStore.workouts,
+                        sleep: healthStore.sleep,
+                        heart: healthStore.heart,
+                        training: healthStore.training,
+                        recoveryScore:
+                            healthStore.recovery.score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                healthStore
+                                    .recovery
+                                    .state
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
+                    )
+
+                return true
+            }
+
+                ATHLTHKeyboardCoordinator.shared.install()
     }
 
     var body: some Scene {
@@ -125,6 +205,7 @@ struct ATHLTHApp: App {
                 .environmentObject(subscriptionStore)
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
+                .environmentObject(deviceRelay)
                 .environment(
                     \.locale,
                     settings.interfaceLocale
@@ -206,6 +287,7 @@ struct AppRootView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var deviceRelay: WorkoutDeviceRelayStore
 
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
@@ -216,6 +298,8 @@ struct AppRootView: View {
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var lastFullLifecycleRefreshAt: Date?
     @State private var showingNotificationPermissionPrimer = false
+    @State private var showingRelayedStrengthWorkout = false
+    @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
 
     @AppStorage("athlth.notifications.permissionPrimerShown")
     private var notificationPermissionPrimerShown = false
@@ -245,6 +329,224 @@ struct AppRootView: View {
         appSession.signedIn
             ? appSession.profile.userID
             : nil
+    }
+
+    @MainActor
+    private func processWorkoutDeviceRelayCommand(
+        _ command: WorkoutDeviceRelayCommand
+    ) async throws {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        guard Date() >= relayedWorkoutLaunchGuardUntil,
+              phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !workoutMirroring.hasActiveMirroredWorkout
+        else {
+            throw NSError(
+                domain:
+                    "ATHLTH.DeviceRelay",
+                code: 409,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Another workout is already active or starting on this iPhone.",
+                            norwegian:
+                                "En annen økt er allerede aktiv eller i ferd med å starte på denne iPhonen."
+                        )
+                ]
+            )
+        }
+
+        // Protect the small launch window before HealthKit mirroring or a local
+        // workout store has had time to publish its active state.
+        relayedWorkoutLaunchGuardUntil =
+            Date().addingTimeInterval(20)
+
+        let envelope = command.envelope
+        let payload = envelope.workoutPayload
+        let captureDevice =
+            envelope.target.captureDevice
+
+        switch envelope.kind {
+        case .run:
+            let runningWorkout =
+                payload.workout
+                    .resolvedRunningWorkouts
+                    .first
+
+            let mode: RunQuickStartMode
+            if runningWorkout != nil {
+                mode = .structured
+            } else if payload.route != nil {
+                mode = .route
+            } else {
+                mode = .free
+            }
+
+            let configuration =
+                RunQuickStartConfiguration(
+                    mode: mode,
+                    route: payload.route,
+                    workout: runningWorkout,
+                    captureDevice: captureDevice,
+                    audioCoach:
+                        envelope.watchAudioCoach ??
+                        payload.workout
+                            .audioCoachConfiguration ??
+                        .disabled,
+                    routeAlerts:
+                        payload.routeAlerts ??
+                        settings
+                            .routeAlertConfiguration,
+                    ghostTargetDurationSeconds:
+                        envelope
+                            .ghostTargetDurationSeconds,
+                    ghostUpdates:
+                        envelope.ghostUpdates,
+                    autoPauseEnabled:
+                        payload.workout
+                            .autoPauseEnabled ??
+                        settings
+                            .autoPauseOutdoorWorkouts,
+                    spotifyPlaylist:
+                        envelope.spotifyPlaylist,
+                    spotifyAutoplay:
+                        envelope.spotifyAutoplay,
+                    friends: [],
+                    gearIDs:
+                        Set(envelope.gearIDs)
+                )
+
+            try await WorkoutLaunchCoordinator
+                .startRunQuick(
+                    configuration:
+                        configuration,
+                    session: appSession,
+                    settings: settings,
+                    gear: gear,
+                    phoneWorkout:
+                        phoneWorkout,
+                    watchConnection:
+                        watchConnection,
+                    spotify:
+                        spotifyPlayback,
+                    ghostRace:
+                        ghostRace
+                )
+
+        case .walk:
+            let configuration =
+                WalkQuickStartConfiguration(
+                    captureDevice:
+                        captureDevice,
+                    audioCoach:
+                        envelope.watchAudioCoach ??
+                        payload.workout
+                            .audioCoachConfiguration ??
+                        .disabled,
+                    autoPauseEnabled:
+                        payload.workout
+                            .autoPauseEnabled ??
+                        settings
+                            .autoPauseOutdoorWorkouts,
+                    spotifyPlaylist:
+                        envelope.spotifyPlaylist,
+                    spotifyAutoplay:
+                        envelope.spotifyAutoplay,
+                    friends: [],
+                    gearIDs:
+                        Set(envelope.gearIDs)
+                )
+
+            try await WorkoutLaunchCoordinator
+                .startWalkQuick(
+                    configuration:
+                        configuration,
+                    settings: settings,
+                    gear: gear,
+                    phoneWorkout:
+                        phoneWorkout,
+                    watchConnection:
+                        watchConnection,
+                    spotify:
+                        spotifyPlayback
+                )
+
+        case .strength:
+            let trackingMode =
+                payload.strengthTrackingMode ??
+                .simple
+            var advanced =
+                payload
+                    .strengthAdvancedConfiguration ??
+                StrengthAdvancedConfiguration
+                    .savedDefaults()
+
+            if envelope.spotifyPlaylist != nil {
+                advanced.spotifyPlaylist =
+                    envelope.spotifyPlaylist
+                advanced.spotifyAutoplay =
+                    envelope.spotifyAutoplay
+            }
+
+            let didStart =
+                try await WorkoutLaunchCoordinator
+                    .startStrength(
+                        workout:
+                            payload
+                                .recipientCopy(),
+                        captureDevice:
+                            captureDevice,
+                        trackingMode:
+                            trackingMode,
+                        selectedFriends: [],
+                        audioCoach:
+                            envelope.watchAudioCoach ??
+                            advanced
+                                .audioCoach
+                                .watchConfiguration,
+                        advancedConfiguration:
+                            advanced,
+                        session:
+                            appSession,
+                        settings:
+                            settings,
+                        social:
+                            social,
+                        strengthWorkout:
+                            strengthWorkout,
+                        watchConnection:
+                            watchConnection,
+                        spotify:
+                            spotifyPlayback
+                    )
+
+            if didStart {
+                showingRelayedStrengthWorkout =
+                    true
+            }
+        }
+    }
+
+    private func startDeviceRelayIfNeeded() {
+        guard
+            appSession.signedIn,
+            ATHLTHDeviceRole.isIPhone
+        else {
+            deviceRelay.stopListening()
+            return
+        }
+
+        deviceRelay.startListening {
+            command in
+            try await self
+                .processWorkoutDeviceRelayCommand(
+                    command
+                )
+        }
     }
 
     private var lifecycleContent: some View {
@@ -279,10 +581,14 @@ struct AppRootView: View {
             // before secondary account/network work begins.
             await Task.yield()
 
-            // Watch availability is discovered independently of workout capture.
-            // The user chooses iPhone vs Apple Watch for each workout.
-            watchConnection.connect()
-            syncSpotifyPlaybackToWatch()
+            // Only the paired iPhone owns Apple Watch connectivity. iPad is a
+            // controller/secondary screen and never activates WatchConnectivity.
+            if ATHLTHDeviceRole.supportsDirectAppleWatch {
+                watchConnection.connect()
+                syncSpotifyPlaybackToWatch()
+            }
+
+            startDeviceRelayIfNeeded()
 
             // If Apple Watch already owns a workout, HealthKit may deliver the
             // mirroring callback just after app activation. Give that callback
@@ -318,14 +624,16 @@ struct AppRootView: View {
                     calendarRefresh
                 )
 
-                await realtimeSocial
-                    .configureOnlinePresence(
-                        appIsActive: true,
-                        enabled:
-                            social.privacy?
-                                .showOnlineStatus ??
-                            true
-                    )
+                if ATHLTHDeviceRole.isIPhone {
+                    await realtimeSocial
+                        .configureOnlinePresence(
+                            appIsActive: true,
+                            enabled:
+                                social.privacy?
+                                    .showOnlineStatus ??
+                                true
+                        )
+                }
                 await realtimeSocial
                     .refreshVisibleLiveSessions()
             }
@@ -404,7 +712,21 @@ struct AppRootView: View {
 
             lastFullLifecycleRefreshAt = Date()
         }
-        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
+        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) {
+            IPhoneWorkoutView()
+        }
+        .fullScreenCover(
+            isPresented:
+                $showingRelayedStrengthWorkout
+        ) {
+            ActiveStrengthWorkoutView()
+                .environmentObject(
+                    strengthWorkout
+                )
+                .environmentObject(
+                    appSession
+                )
+        }
         .onChange(of: watchConnection.lastSpotifyCommand) { _, command in
             guard let command else { return }
             handleWatchSpotifyCommand(command)
@@ -427,6 +749,46 @@ struct AppRootView: View {
                 }.padding(.top, 4)
             }
         }
+        .overlay(alignment: .top) {
+            if ATHLTHDeviceRole.isIPad,
+               let status =
+                    deviceRelay.lastStatusText {
+                Label(
+                    status,
+                    systemImage:
+                        "iphone.and.arrow.forward"
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    .regularMaterial,
+                    in: Capsule()
+                )
+                .shadow(
+                    radius: 10,
+                    y: 4
+                )
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+                .transition(
+                    .move(edge: .top)
+                        .combined(
+                            with: .opacity
+                        )
+                )
+            }
+        }
+        .animation(
+            .easeInOut(duration: 0.2),
+            value:
+                deviceRelay.lastStatusText
+        )
         .onReceive(
             NotificationCenter.default.publisher(
                 for:
@@ -441,9 +803,11 @@ struct AppRootView: View {
             if phase == .active {
                 spotifyPlayback
                     .applicationDidBecomeActive()
+                startDeviceRelayIfNeeded()
             } else {
                 spotifyPlayback
                     .applicationWillResignActive()
+                deviceRelay.stopListening()
             }
 
             phoneWorkout.checkpoint()
@@ -452,7 +816,8 @@ struct AppRootView: View {
                 appSession.checkpointTrainingContent()
             }
 
-            if appSession.signedIn {
+            if appSession.signedIn,
+               ATHLTHDeviceRole.isIPhone {
                 Task {
                     await realtimeSocial
                         .configureOnlinePresence(
@@ -467,7 +832,8 @@ struct AppRootView: View {
             }
 
             if phase != .active,
-               appSession.signedIn {
+               appSession.signedIn,
+               ATHLTHDeviceRole.isIPhone {
                 let userID = appSession.profile.userID
                 Task {
                     await trainingBackups.backUp(
@@ -478,11 +844,29 @@ struct AppRootView: View {
 
             guard phase == .active else { return }
 
-            // Refresh Watch availability whenever the app becomes active.
-            // This is connection state, not a global workout-device choice.
-            watchConnection.connect()
+            // Apple Watch belongs to the paired iPhone. iPad does not query,
+            // activate or present WatchConnectivity state.
+            if ATHLTHDeviceRole.supportsDirectAppleWatch {
+                watchConnection.connect()
+            }
+
+            if homeAssistant.isConnected,
+               ATHLTHDeviceRole.isIPhone {
+                ATHLTHHomeAssistantBackgroundRefresh
+                    .schedule()
+            }
 
             Task {
+                if ATHLTHDeviceRole.isIPhone {
+                    await deviceRelay
+                        .refreshPending {
+                            command in
+                            try await self
+                                .processWorkoutDeviceRelayCommand(
+                                    command
+                                )
+                        }
+                }
                 await allowWatchMirroringToAttachIfNeeded()
 
                 if !workoutMirroring.hasActiveMirroredWorkout,
@@ -492,6 +876,31 @@ struct AppRootView: View {
                 }
 
                 syncHomeAssistantWatchConfiguration()
+                await syncHomeAssistantSnapshot()
+            }
+        }
+        .onChange(of: appSession.signedIn) { _, signedIn in
+            if signedIn {
+                startDeviceRelayIfNeeded()
+            } else {
+                deviceRelay.stopListening()
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for:
+                    .athlthHomeAssistantCommandReceived
+            )
+        ) { notification in
+            guard let command =
+                    notification.object
+                        as? HomeAssistantInboundCommand,
+                  command.type == "sync_now"
+            else {
+                return
+            }
+
+            Task {
                 await syncHomeAssistantSnapshot()
             }
         }
@@ -540,11 +949,16 @@ struct AppRootView: View {
         }
         .onChange(of: health.recovery.score) { _, score in
             Task {
-                await homeAssistant.sendRecovery(
-                    score: score
-                )
+                if ATHLTHDeviceRole.isIPhone {
+                    await homeAssistant.sendRecovery(
+                        score: score
+                    )
+                }
                 await syncHomeAssistantSnapshot()
             }
+        }
+        .onChange(of: health.recovery.state) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: health.sleep) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
@@ -706,6 +1120,7 @@ struct AppRootView: View {
                 }
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
+                await syncHomeAssistantSnapshot()
             }
         }
         .onChange(of: appSession.activePlan) { _, plan in
@@ -733,6 +1148,10 @@ struct AppRootView: View {
             }
 
             Task {
+                guard ATHLTHDeviceRole.isIPhone else {
+                    return
+                }
+
                 if presence.state == .training,
                    previous.state != .training {
                     await homeAssistant.sendWorkoutStarted(
@@ -804,7 +1223,8 @@ struct AppRootView: View {
             runningWorkoutLibrary.switchAccount(userID)
         }
         .task(id: signedInUserID) {
-            guard let userID =
+            guard ATHLTHDeviceRole.isIPhone,
+                  let userID =
                     signedInUserID
             else {
                 return
@@ -844,6 +1264,16 @@ struct AppRootView: View {
         }
         .onChange(of: homeAssistant.connectionState) { _, state in
             syncHomeAssistantWatchConfiguration()
+
+            if ATHLTHDeviceRole.isIPhone {
+                if state == .connected {
+                    ATHLTHHomeAssistantBackgroundRefresh
+                        .schedule()
+                } else if !homeAssistant.isConnected {
+                    ATHLTHHomeAssistantBackgroundRefresh
+                        .cancel()
+                }
+            }
 
             guard state == .connected else {
                 return
@@ -888,6 +1318,12 @@ struct AppRootView: View {
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: homeAssistant.shareNextWorkout) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareTrainingCalendar) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareGoals) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: appSession.onboardingCompleted) { _, completed in
@@ -1937,7 +2373,8 @@ struct AppRootView: View {
             settings.shareTrainingPresence = privacy.shareTrainingPresence
         }
 
-        if social.privacy?.shareTrainingPresence == true {
+        if ATHLTHDeviceRole.isIPhone,
+           social.privacy?.shareTrainingPresence == true {
             await social.syncPresence(appSession.profile.presence)
         }
     }
@@ -1949,34 +2386,53 @@ struct AppRootView: View {
             return
         }
 
-        if privacy.sharePerformanceStats,
-           let stats = try? await health.profilePerformanceStats() {
-            await social.syncOwnPerformance(stats)
-        }
+        if ATHLTHDeviceRole.isIPhone {
+            if privacy.sharePerformanceStats,
+               let stats =
+                    try? await health
+                        .profilePerformanceStats() {
+                await social
+                    .syncOwnPerformance(stats)
+            }
 
-        if privacy.shareRunningPRs,
-           let runningRecords = try? await health.personalRecords() {
-            await social.publishRunningPersonalRecords(
-                runningRecords,
-                visibility: settings.defaultActivityVisibility
-            )
-        }
+            if privacy.shareRunningPRs,
+               let runningRecords =
+                    try? await health
+                        .personalRecords() {
+                await social
+                    .publishRunningPersonalRecords(
+                        runningRecords,
+                        visibility:
+                            settings
+                                .defaultActivityVisibility
+                    )
+            }
 
-        if privacy.shareStrengthPRs {
-            await social.publishStrengthRepPersonalRecords(
-                strengthWorkout.repPersonalRecords,
-                visibility: settings.defaultActivityVisibility
-            )
-        }
+            if privacy.shareStrengthPRs {
+                await social
+                    .publishStrengthRepPersonalRecords(
+                        strengthWorkout
+                            .repPersonalRecords,
+                        visibility:
+                            settings
+                                .defaultActivityVisibility
+                    )
+            }
 
-        if privacy.shareTrophyCabinet {
-            await social.syncOwnTrophies(trophies.showcaseTrophies)
-
-            if privacy.shareRecentActivity {
-                await social.publishTrophyUnlocks(
-                    trophies.unlocks,
-                    visibility: settings.defaultActivityVisibility
+            if privacy.shareTrophyCabinet {
+                await social.syncOwnTrophies(
+                    trophies.showcaseTrophies
                 )
+
+                if privacy.shareRecentActivity {
+                    await social
+                        .publishTrophyUnlocks(
+                            trophies.unlocks,
+                            visibility:
+                                settings
+                                    .defaultActivityVisibility
+                        )
+                }
             }
         }
 
@@ -2044,7 +2500,8 @@ struct AppRootView: View {
 
     @MainActor
     private func syncHomeAssistantSnapshot() async {
-        guard appSession.signedIn,
+        guard ATHLTHDeviceRole.isIPhone,
+              appSession.signedIn,
               homeAssistant.isConnected
         else {
             return
@@ -2074,6 +2531,13 @@ struct AppRootView: View {
             homeAssistantNextWorkoutOccurrence()
         let weeklyMetrics =
             homeAssistantWeeklyTrainingMetrics()
+        let primaryGoal =
+            goals.primaryGoal ??
+            goals.activeGoals.first
+        let goalDaysRemaining =
+            homeAssistantGoalDaysRemaining(
+                primaryGoal
+            )
 
         await homeAssistant.syncSnapshot(
             workoutActive:
@@ -2104,16 +2568,34 @@ struct AppRootView: View {
                 health.heart.restingHeartRate,
             respiratoryRate:
                 health.training.respiratoryRate,
+            recoveryState:
+                homeAssistantRecoveryStateValue(
+                    health.recovery.state
+                ),
             weeklyProgress:
                 homeAssistantWeeklyProgress(),
             weeklyTrainingMinutes:
                 weeklyMetrics.minutes,
             weeklyDistanceKilometers:
                 weeklyMetrics.distanceKilometers,
+            weeklyWorkoutCount:
+                weeklyMetrics.workoutCount,
+            trainingStreak:
+                homeAssistantTrainingStreak(),
             nextWorkout:
                 nextWorkout?.title,
             nextWorkoutTime:
-                nextWorkout?.time
+                nextWorkout?.time,
+            activeGoal:
+                primaryGoal?.title,
+            goalProgress:
+                primaryGoal.map {
+                    $0.progress * 100
+                },
+            goalDaysRemaining:
+                goalDaysRemaining,
+            calendarEvents:
+                homeAssistantCalendarEvents()
         )
     }
 
@@ -2177,74 +2659,81 @@ struct AppRootView: View {
         -> (title: String, time: Date)? {
         let now = Date()
 
-        guard let occurrence =
-                homeAssistantPlannedOccurrences()
-                    .filter { occurrence in
-                        guard let start =
-                                occurrence
-                                    .session
-                                    .scheduledStart,
-                              start >= now
-                        else {
+        let candidates =
+            homeAssistantPlannedOccurrences()
+                .filter { occurrence in
+                    guard let start =
+                            occurrence.session
+                                .scheduledStart,
+                          start >= now
+                    else {
+                        return false
+                    }
+
+                    if let planID =
+                            occurrence.planID {
+                        if appSession
+                            .isPlanSessionSkipped(
+                                planID: planID,
+                                sessionID:
+                                    occurrence
+                                        .session
+                                        .id
+                            ) {
                             return false
                         }
 
-                        if let planID =
-                                occurrence.planID {
-                            if appSession
-                                .isPlanSessionSkipped(
-                                    planID: planID,
-                                    sessionID:
-                                        occurrence
-                                            .session
-                                            .id
-                                ) {
-                                return false
-                            }
-
-                            if appSession
-                                .isPlanSessionManuallyCompleted(
-                                    planID: planID,
-                                    sessionID:
-                                        occurrence
-                                            .session
-                                            .id
-                                ) {
-                                return false
-                            }
+                        if appSession
+                            .isPlanSessionManuallyCompleted(
+                                planID: planID,
+                                sessionID:
+                                    occurrence
+                                        .session
+                                        .id
+                            ) {
+                            return false
                         }
+                    }
 
-                        return true
-                    }
-                    .sorted {
-                        (
-                            $0.session
-                                .scheduledStart ??
-                            .distantFuture
-                        ) <
-                        (
-                            $1.session
-                                .scheduledStart ??
-                            .distantFuture
-                        )
-                    }
-                    .first,
-              let start =
-                    occurrence
-                        .session
-                        .scheduledStart
+                    return true
+                }
+                .sorted { lhs, rhs in
+                    let lhsStart =
+                        lhs.session
+                            .scheduledStart ??
+                        .distantFuture
+                    let rhsStart =
+                        rhs.session
+                            .scheduledStart ??
+                        .distantFuture
+                    return lhsStart < rhsStart
+                }
+
+        guard let occurrence =
+                candidates.first
+        else {
+            return nil
+        }
+
+        guard let start =
+                occurrence.session
+                    .scheduledStart
         else {
             return nil
         }
 
         return (
-            title: occurrence.session.title,
-            time: start
+            occurrence.session.title,
+            start
         )
     }
 
     private func homeAssistantWeeklyTrainingMetrics()
-        -> (minutes: Double, distanceKilometers: Double) {
+        -> (
+            minutes: Double,
+            distanceKilometers: Double,
+            workoutCount: Int
+        ) {
         var calendar = Calendar.current
         calendar.firstWeekday = 2
 
@@ -2254,7 +2743,7 @@ struct AppRootView: View {
                     for: Date()
                 )
         else {
-            return (0, 0)
+            return (0, 0, 0)
         }
 
         let workouts =
@@ -2273,8 +2762,179 @@ struct AppRootView: View {
 
         return (
             minutes: totalSeconds / 60,
-            distanceKilometers: totalMeters / 1_000
+            distanceKilometers: totalMeters / 1_000,
+            workoutCount: workouts.count
         )
+    }
+
+    private func homeAssistantTrainingStreak() -> Int {
+        let calendar = Calendar.current
+        let workoutDays =
+            Set(
+                health.workouts.map {
+                    calendar.startOfDay(
+                        for: $0.startDate
+                    )
+                }
+            )
+
+        guard !workoutDays.isEmpty else {
+            return 0
+        }
+
+        let today =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let yesterday =
+            calendar.date(
+                byAdding: .day,
+                value: -1,
+                to: today
+            ) ?? today
+
+        var cursor: Date
+        if workoutDays.contains(today) {
+            cursor = today
+        } else if workoutDays.contains(
+                    yesterday
+                  ) {
+            cursor = yesterday
+        } else {
+            return 0
+        }
+
+        var streak = 0
+        while workoutDays.contains(cursor) {
+            streak += 1
+            guard let previous =
+                    calendar.date(
+                        byAdding: .day,
+                        value: -1,
+                        to: cursor
+                    )
+            else {
+                break
+            }
+            cursor = previous
+        }
+
+        return streak
+    }
+
+    private func homeAssistantGoalDaysRemaining(
+        _ goal: ATHLTHGoal?
+    ) -> Int? {
+        guard let deadline =
+                goal?.deadline
+        else {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        let today =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let end =
+            calendar.startOfDay(
+                for: deadline
+            )
+
+        return max(
+            calendar.dateComponents(
+                [.day],
+                from: today,
+                to: end
+            ).day ?? 0,
+            0
+        )
+    }
+
+    private func homeAssistantCalendarEvents()
+        -> [HomeAssistantCalendarEventPayload] {
+        let now = Date()
+        let lowerBound =
+            Calendar.current.date(
+                byAdding: .day,
+                value: -7,
+                to: now
+            ) ?? now
+        let upperBound =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 90,
+                to: now
+            ) ?? now
+
+        return homeAssistantPlannedOccurrences()
+            .compactMap { occurrence in
+                guard let start =
+                        occurrence
+                            .session
+                            .scheduledStart,
+                      start >= lowerBound,
+                      start <= upperBound
+                else {
+                    return nil
+                }
+
+                if let planID =
+                        occurrence.planID {
+                    if appSession
+                        .isPlanSessionSkipped(
+                            planID: planID,
+                            sessionID:
+                                occurrence
+                                    .session
+                                    .id
+                        ) {
+                        return nil
+                    }
+                }
+
+                let duration =
+                    max(
+                        occurrence
+                            .session
+                            .durationMinutes ??
+                            60,
+                        1
+                    )
+                let end =
+                    Calendar.current.date(
+                        byAdding: .minute,
+                        value: duration,
+                        to: start
+                    ) ??
+                    start.addingTimeInterval(
+                        Double(duration) * 60
+                    )
+
+                return HomeAssistantCalendarEventPayload(
+                    id:
+                        occurrence
+                            .session
+                            .id
+                            .uuidString,
+                    title:
+                        occurrence
+                            .session
+                            .title,
+                    start: start,
+                    end: end,
+                    type:
+                        occurrence
+                            .session
+                            .kind
+                            .rawValue
+                )
+            }
+            .sorted {
+                $0.start < $1.start
+            }
+            .prefix(64)
+            .map { $0 }
     }
 
     private func homeAssistantWeeklyProgress()
