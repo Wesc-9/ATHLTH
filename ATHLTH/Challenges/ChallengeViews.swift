@@ -6562,38 +6562,74 @@ struct ChallengeDetailView: View {
         .challengeCard()
     }
 
-    private func invitationResponseCard(_ challenge: ATHLTHChallenge) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("You’ve been challenged")
-                .font(.headline)
+    private func invitationResponseCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "You’ve been challenged",
+                            norwegian: "Du har blitt utfordret"
+                        ),
+                    trailing: nil
+                )
 
-            Text("Accept to join the leaderboard. Declining removes you from active competition.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 10) {
-                Button("Decline") {
-                    respondToInvitation(
-                        challenge,
-                        accept: false
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Accept to join the leaderboard. If you decline, you are removed from this challenge.",
+                        norwegian:
+                            "Godta for å bli med på leaderboardet. Hvis du avslår, fjernes du fra denne challengen."
                     )
-                }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
 
-                Button("Accept Challenge") {
-                    respondToInvitation(
-                        challenge,
-                        accept: true
-                    )
+                HStack(spacing: 10) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Decline",
+                            norwegian: "Avslå"
+                        )
+                    ) {
+                        respondToInvitation(
+                            challenge,
+                            accept: false
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Accept Challenge",
+                            norwegian: "Godta challenge"
+                        )
+                    ) {
+                        respondToInvitation(
+                            challenge,
+                            accept: true
+                        )
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.vitality)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
-                .frame(maxWidth: .infinity)
             }
         }
-        .padding()
-        .challengeCard()
     }
 
     private func respondToInvitation(
