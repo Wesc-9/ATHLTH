@@ -720,6 +720,46 @@ struct AppRootView: View {
                 }.padding(.top, 4)
             }
         }
+        .overlay(alignment: .top) {
+            if ATHLTHDeviceRole.isIPad,
+               let status =
+                    deviceRelay.lastStatusText {
+                Label(
+                    status,
+                    systemImage:
+                        "iphone.and.arrow.forward"
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    .regularMaterial,
+                    in: Capsule()
+                )
+                .shadow(
+                    radius: 10,
+                    y: 4
+                )
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+                .transition(
+                    .move(edge: .top)
+                        .combined(
+                            with: .opacity
+                        )
+                )
+            }
+        }
+        .animation(
+            .easeInOut(duration: 0.2),
+            value:
+                deviceRelay.lastStatusText
+        )
         .onReceive(
             NotificationCenter.default.publisher(
                 for:
