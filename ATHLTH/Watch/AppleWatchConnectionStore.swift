@@ -302,7 +302,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     @MainActor
-    func startWorkoutOnWatch(_ kind: WatchWorkoutKind) async throws {
+    func startWorkoutOnWatch(
+        _ kind: WatchWorkoutKind,
+        indoor: Bool? = nil
+    ) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
         }
@@ -341,9 +344,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             configuration.activityType = .other
         }
 
-        configuration.locationType = kind.usesOutdoorLocation
-            ? .outdoor
-            : .indoor
+        configuration.locationType =
+            indoor.map {
+                $0 ? .indoor : .outdoor
+            } ??
+            (
+                kind.usesOutdoorLocation
+                    ? .outdoor
+                    : .indoor
+            )
 
         // Queue the current display preferences before the Watch workout
         // starts. Delivery is independent of the workout launch itself.
