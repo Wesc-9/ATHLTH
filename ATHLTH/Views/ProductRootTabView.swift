@@ -1349,7 +1349,7 @@ struct ATHLTHHomeView: View {
                             height: 90
                         )
                         .scaleEffect(
-                            1.18,
+                            1.34,
                             anchor: .center
                         )
                         .clipped()
@@ -1388,20 +1388,6 @@ struct ATHLTHHomeView: View {
                             in: Capsule()
                         )
                         .padding(5)
-                    }
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
-                        .stroke(
-                            Color.white
-                                .opacity(
-                                    0.62
-                                ),
-                            lineWidth: 0.8
-                        )
                     }
 
                     VStack(
