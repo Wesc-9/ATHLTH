@@ -4185,7 +4185,10 @@ private struct FreestyleExercisePrescriptionView: View {
 }
 
 struct StrengthSetResultEditTarget: Identifiable {
-    var id: UUID { set.id }
+    var id: UUID {
+        return self.set.id
+    }
+
     let exerciseID: UUID
     let exerciseName: String
     let exercise: ExerciseSnapshot
