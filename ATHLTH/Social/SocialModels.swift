@@ -552,6 +552,9 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         case "train_together_request_declined":
             return "Train Together-forespørsel avslått"
 
+        case "train_together_cancelled":
+            return "Train Together-økt avlyst"
+
         case "message_request":
             let prefix = "Message request from "
             if title.hasPrefix(prefix) {
@@ -727,6 +730,13 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                 .replacingOccurrences(
                     of: " declined your request for ",
                     with: " avslo forespørselen din til "
+                )
+
+        case "train_together_cancelled":
+            return message
+                .replacingOccurrences(
+                    of: " cancelled ",
+                    with: " avlyste "
                 )
 
         case "message",
