@@ -807,6 +807,9 @@ struct WatchTodayWorkoutTransfer: Codable, Hashable {
     var routeID: UUID?
     var runningWorkout: WatchRunningWorkoutTransfer?
     var audioCoach: WatchAudioCoachConfiguration?
+    // Optional so older iPhone/Watch pairs still decode. When present, the
+    // Watch has the entire strength prescription before it leaves the phone.
+    var strengthWorkout: WatchStrengthSessionSnapshot? = nil
     var updatedAt: Date
 }
 
