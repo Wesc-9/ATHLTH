@@ -1595,6 +1595,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                             : .running,
                     force: true
                 )
+                WatchHomeAssistantBridge.shared
+                    .workoutStarted(
+                        kind: recovered.kind,
+                        startedAt: recovered.startedAt
+                    )
             }
         } catch {
             fail(
@@ -2099,6 +2104,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
             publishState(.running)
+            WatchHomeAssistantBridge.shared
+                .workoutStarted(
+                    kind: kind,
+                    startedAt: startedAt
+                )
             startTimer()
 
             if kind == .strength {
@@ -3959,6 +3969,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.automaticPauseActive =
                 false
         }
+        WatchHomeAssistantBridge.shared
+            .workoutStopped()
         clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
@@ -4559,6 +4571,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.allowsBackgroundLocationUpdates = false
         errorMessage = message
         state = .failed(message)
+        WatchHomeAssistantBridge.shared
+            .workoutStopped()
         clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
@@ -4577,6 +4591,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.errorMessage = error.localizedDescription
             self.state = .failed(error.localizedDescription)
         }
+        WatchHomeAssistantBridge.shared
+            .workoutStopped()
         clearPersistedWorkoutState()
 
         Task { @MainActor [weak self] in
