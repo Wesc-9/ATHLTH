@@ -1054,18 +1054,7 @@ struct AppRootView: View {
                 for: .athlthRemoteNotificationReceived
             )
         ) { _ in
-            guard appSession.signedIn else { return }
-
-            _ = Task<Void, Never> { @MainActor in
-                // The backend already delivered this event through APNs.
-                // Pull the authoritative inbox immediately so the Home bell
-                // updates while ATHLTH is open, without scheduling a duplicate
-                // local system notification for the same event.
-                await refreshSocialHomeCore(
-                    deliverSystemAlertsForImportedInbox: false,
-                    force: true
-                )
-            }
+            handleRemoteNotificationReceived()
         }
         .onChange(of: health.workouts.map(\.id)) { _, _ in
             guard appSession.signedIn else { return }
@@ -2525,6 +2514,21 @@ struct AppRootView: View {
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
         pendingWorkoutReview = workout
+    }
+
+    private func handleRemoteNotificationReceived() {
+        guard appSession.signedIn else { return }
+
+        Task { @MainActor in
+            // The backend already delivered this event through APNs.
+            // Pull the authoritative inbox immediately so the Home bell
+            // updates while ATHLTH is open, without scheduling a duplicate
+            // local system notification for the same event.
+            await refreshSocialHomeCore(
+                deliverSystemAlertsForImportedInbox: false,
+                force: true
+            )
+        }
     }
 
     private func refreshSocialHomeCore(
