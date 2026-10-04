@@ -7,31 +7,31 @@ final class ProfileRecordRegressionTests:
         XCTAssertEqual(
             HealthPersonalRecordKind
                 .fastest400M
-                .targetDistanceMeters,
+                .targetDistanceMeters ?? 0,
             400
         )
         XCTAssertEqual(
             HealthPersonalRecordKind
                 .fastest800M
-                .targetDistanceMeters,
+                .targetDistanceMeters ?? 0,
             800
         )
         XCTAssertEqual(
             HealthPersonalRecordKind
                 .fastest3K
-                .targetDistanceMeters,
+                .targetDistanceMeters ?? 0,
             3_000
         )
         XCTAssertEqual(
             HealthPersonalRecordKind
                 .fastest15K
-                .targetDistanceMeters,
+                .targetDistanceMeters ?? 0,
             15_000
         )
         XCTAssertEqual(
             HealthPersonalRecordKind
                 .fastest10Mile
-                .targetDistanceMeters,
+                .targetDistanceMeters ?? 0,
             16_093.44,
             accuracy: 0.01
         )
