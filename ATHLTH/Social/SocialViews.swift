@@ -4112,6 +4112,11 @@ private struct WorkoutInviteLaunchSheet: View {
     @State private var launchError: String?
     @State private var showingStrengthWorkout = false
 
+    private var appleWatchSelectable: Bool {
+        ATHLTHDeviceRole.isIPad ||
+            watchConnection.isReady
+    }
+
     private var payload:
         SocialWorkoutInvitePayload? {
         invite.session.invitePayload
@@ -4187,8 +4192,7 @@ private struct WorkoutInviteLaunchSheet: View {
                             (
                                 captureDevice ==
                                     .appleWatch &&
-                                !watchConnection
-                                    .isReady
+                                !appleWatchSelectable
                             )
                         )
                     } else {
@@ -4476,11 +4480,22 @@ private struct WorkoutInviteLaunchSheet: View {
                         title: "Apple Watch",
                         icon: "applewatch",
                         enabled:
-                            watchConnection.isReady
+                            appleWatchSelectable
                     )
                 }
 
-                if !watchConnection.isReady {
+                if ATHLTHDeviceRole.isIPad {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "iPad sends your choice to iPhone. Apple Watch starts through the paired iPhone.",
+                            norwegian:
+                                "iPad sender valget ditt til iPhone. Apple Watch startes via den parede iPhonen."
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                } else if !watchConnection.isReady {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
@@ -4549,6 +4564,16 @@ private struct WorkoutInviteLaunchSheet: View {
             return ATHLTHLocalization.choose(
                 english: "Waiting for shared start…",
                 norwegian: "Venter på felles start…"
+            )
+        }
+
+        if ATHLTHDeviceRole.isIPad &&
+            captureDevice == .appleWatch {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Ready · Watch via iPhone",
+                norwegian:
+                    "Klar · Watch via iPhone"
             )
         }
 
@@ -4811,6 +4836,11 @@ private struct WorkoutInviteLaunchSheet: View {
                         )
 
                     guard didStart else {
+                        if ATHLTHDeviceRole.isIPad {
+                            _ = await social
+                                .confirmCurrentJoinedWorkoutStarted()
+                            dismiss()
+                        }
                         isStarting = false
                         return
                     }

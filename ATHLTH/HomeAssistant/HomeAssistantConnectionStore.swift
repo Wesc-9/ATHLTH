@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import Network
 import Security
+import UserNotifications
 import UIKit
 
 struct HomeAssistantDiscoveredInstance: Identifiable, Hashable, Sendable {
@@ -120,6 +121,38 @@ private struct HomeAssistantWebhookEnvelope: Encodable {
     let payload: [String: HomeAssistantJSONValue]
 }
 
+
+struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
+    let id: String
+    let type: String
+    let title: String?
+    let message: String?
+}
+
+private struct HomeAssistantWebhookResponse: Decodable {
+    let commands: [HomeAssistantInboundCommand]?
+}
+
+private struct HomeAssistantWebhookHTTPResult {
+    let statusCode: Int
+    let data: Data
+}
+
+extension Notification.Name {
+    static let athlthHomeAssistantCommandReceived =
+        Notification.Name(
+            "athlth.homeAssistant.commandReceived"
+        )
+}
+
+struct HomeAssistantCalendarEventPayload: Hashable {
+    let id: String
+    let title: String
+    let start: Date
+    let end: Date
+    let type: String
+}
+
 private struct HomeAssistantPendingDelivery: Codable, Identifiable {
     let id: UUID
     let pairingWebhookID: String
@@ -181,6 +214,23 @@ enum HomeAssistantJSONValue: Codable, Hashable, Sendable {
     }
 }
 
+func homeAssistantRecoveryStateValue(
+    _ state: RecoveryReadinessState
+) -> String {
+    switch state {
+    case .buildingBaseline:
+        return "building_baseline"
+    case .ready:
+        return "ready"
+    case .balanced:
+        return "balanced"
+    case .takeItEasy:
+        return "take_it_easy"
+    case .recover:
+        return "recover"
+    }
+}
+
 @MainActor
 final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectionState: HomeAssistantConnectionState
@@ -227,6 +277,42 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareSleep: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareSleep,
+                forKey: Self.shareSleepKey
+            )
+        }
+    }
+
+    @Published var shareHRV: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareHRV,
+                forKey: Self.shareHRVKey
+            )
+        }
+    }
+
+    @Published var shareRestingHeartRate: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareRestingHeartRate,
+                forKey: Self.shareRestingHeartRateKey
+            )
+        }
+    }
+
+    @Published var shareRespiratoryRate: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareRespiratoryRate,
+                forKey: Self.shareRespiratoryRateKey
+            )
+        }
+    }
+
     @Published var shareWeeklyProgress: Bool {
         didSet {
             UserDefaults.standard.set(
@@ -245,6 +331,25 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareTrainingCalendar: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareTrainingCalendar,
+                forKey:
+                    Self.shareTrainingCalendarKey
+            )
+        }
+    }
+
+    @Published var shareGoals: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareGoals,
+                forKey: Self.shareGoalsKey
+            )
+        }
+    }
+
     private static let shareWorkoutStateKey =
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
@@ -253,10 +358,24 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareRecovery"
     private static let shareTrainingLoadKey =
         "athlth.homeAssistant.shareTrainingLoad"
+    private static let shareSleepKey =
+        "athlth.homeAssistant.shareSleep"
+    private static let shareHRVKey =
+        "athlth.homeAssistant.shareHRV"
+    private static let shareRestingHeartRateKey =
+        "athlth.homeAssistant.shareRestingHeartRate"
+    private static let shareRespiratoryRateKey =
+        "athlth.homeAssistant.shareRespiratoryRate"
     private static let shareWeeklyProgressKey =
         "athlth.homeAssistant.shareWeeklyProgress"
     private static let shareNextWorkoutKey =
         "athlth.homeAssistant.shareNextWorkout"
+    private static let shareTrainingCalendarKey =
+        "athlth.homeAssistant.shareTrainingCalendar"
+    private static let shareGoalsKey =
+        "athlth.homeAssistant.shareGoals"
+    private static let processedCommandIDsKey =
+        "athlth.homeAssistant.processedCommandIDs"
 
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
@@ -368,6 +487,26 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             key: Self.shareTrainingLoadKey,
             defaultValue: false
         )
+        shareSleep = Self.storedBool(
+            defaults,
+            key: Self.shareSleepKey,
+            defaultValue: false
+        )
+        shareHRV = Self.storedBool(
+            defaults,
+            key: Self.shareHRVKey,
+            defaultValue: false
+        )
+        shareRestingHeartRate = Self.storedBool(
+            defaults,
+            key: Self.shareRestingHeartRateKey,
+            defaultValue: false
+        )
+        shareRespiratoryRate = Self.storedBool(
+            defaults,
+            key: Self.shareRespiratoryRateKey,
+            defaultValue: false
+        )
         shareWeeklyProgress = Self.storedBool(
             defaults,
             key: Self.shareWeeklyProgressKey,
@@ -377,6 +516,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             defaults,
             key: Self.shareNextWorkoutKey,
             defaultValue: true
+        )
+        shareTrainingCalendar = Self.storedBool(
+            defaults,
+            key: Self.shareTrainingCalendarKey,
+            defaultValue: false
+        )
+        shareGoals = Self.storedBool(
+            defaults,
+            key: Self.shareGoalsKey,
+            defaultValue: false
         )
 
         storedPairing = restored
@@ -558,7 +707,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         do {
-            let status = try await Self.sendWebhookRequest(
+            let result = try await Self.sendWebhookRequest(
                 to: pairing.webhookURL,
                 body: body,
                 timestamp: timestamp,
@@ -567,16 +716,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 clientID: pairing.clientID
             )
 
-            guard (200..<300).contains(status) else {
+            guard (200..<300).contains(result.statusCode) else {
                 if Self.shouldTryWebhookFallback(
-                    after: status
+                    after: result.statusCode
                 ),
                    let fallback =
                     Self.fallbackWebhookURL(
                         for: pairing
                     ),
                    fallback != pairing.webhookURL {
-                    let fallbackStatus =
+                    let fallbackResult =
                         try await Self.sendWebhookRequest(
                             to: fallback,
                             body: body,
@@ -588,21 +737,30 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
                     guard (200..<300)
                         .contains(
-                            fallbackStatus
+                            fallbackResult.statusCode
                         ) ||
-                        fallbackStatus == 409
+                        fallbackResult.statusCode == 409
                     else {
                         throw Self.webhookError(
-                            for: fallbackStatus
+                            for: fallbackResult.statusCode
                         )
                     }
+                    await handleWebhookResponse(
+                        fallbackResult.data,
+                        sourceEvent: event
+                    )
                     return
                 }
 
                 throw Self.webhookError(
-                    for: status
+                    for: result.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                result.data,
+                sourceEvent: event
+            )
         } catch let error as HomeAssistantConnectionError {
             throw error
         } catch {
@@ -615,7 +773,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 throw error
             }
 
-            let fallbackStatus =
+            let fallbackResult =
                 try await Self.sendWebhookRequest(
                     to: fallback,
                     body: body,
@@ -625,14 +783,124 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     clientID: pairing.clientID
                 )
 
-            guard (200..<300).contains(fallbackStatus) ||
-                    fallbackStatus == 409
+            guard (200..<300).contains(fallbackResult.statusCode) ||
+                    fallbackResult.statusCode == 409
             else {
                 throw Self.webhookError(
-                    for: fallbackStatus
+                    for: fallbackResult.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                fallbackResult.data,
+                sourceEvent: event
+            )
         }
+    }
+
+    private func handleWebhookResponse(
+        _ data: Data,
+        sourceEvent: String
+    ) async {
+        guard sourceEvent != "command_ack",
+              let response =
+                try? JSONDecoder().decode(
+                    HomeAssistantWebhookResponse.self,
+                    from: data
+                ),
+              let commands = response.commands,
+              !commands.isEmpty
+        else {
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        var processed = Set(
+            defaults.stringArray(
+                forKey:
+                    Self.processedCommandIDsKey
+            ) ?? []
+        )
+
+        let fresh = commands.filter {
+            !processed.contains($0.id)
+        }
+
+        for command in fresh {
+            processed.insert(command.id)
+
+            switch command.type {
+            case "notification",
+                 "training_reminder",
+                 "show_next_workout":
+                await scheduleLocalNotification(
+                    for: command
+                )
+            case "sync_now":
+                NotificationCenter.default.post(
+                    name:
+                        .athlthHomeAssistantCommandReceived,
+                    object: command
+                )
+            default:
+                break
+            }
+        }
+
+        let trimmed =
+            Array(processed.suffix(64))
+        defaults.set(
+            trimmed,
+            forKey:
+                Self.processedCommandIDsKey
+        )
+
+        let ids = commands.map {
+            HomeAssistantJSONValue.string(
+                $0.id
+            )
+        }
+
+        try? await send(
+            event: "command_ack",
+            payload: [
+                "ids": .array(ids)
+            ]
+        )
+    }
+
+    private func scheduleLocalNotification(
+        for command: HomeAssistantInboundCommand
+    ) async {
+        let content =
+            UNMutableNotificationContent()
+        content.title =
+            command.title ??
+            ATHLTHLocalization.choose(
+                english: "ATHLTH",
+                norwegian: "ATHLTH"
+            )
+        content.body =
+            command.message ??
+            ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant sent an ATHLTH update.",
+                norwegian:
+                    "Home Assistant sendte en ATHLTH-oppdatering."
+            )
+        content.sound = .default
+
+        let request =
+            UNNotificationRequest(
+                identifier:
+                    "athlth-home-assistant-\(command.id)",
+                content: content,
+                trigger: nil
+            )
+
+        try? await UNUserNotificationCenter
+            .current()
+            .add(request)
     }
 
     private func sendReliably(
@@ -855,6 +1123,231 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func syncBackgroundHealthSnapshot(
+        workouts: [WorkoutSummary],
+        sleep: SleepSummary,
+        heart: HeartSummary,
+        training: TrainingHealthSummary,
+        recoveryScore: Int?,
+        recoveryState: String?,
+        trainingLoad: Double?
+    ) async {
+        guard isConnected else {
+            return
+        }
+
+        await flushPendingDeliveries()
+
+        var state:
+            [String: HomeAssistantJSONValue] = [:]
+
+        if shareCompletedWorkouts {
+            let latestWorkout =
+                workouts.max {
+                    $0.startDate <
+                        $1.startDate
+                }
+
+            state["last_workout"] =
+                latestWorkout
+                    .map {
+                        .string(
+                            $0.activity.rawValue
+                        )
+                    }
+                ?? .null
+
+            if let latestWorkout {
+                state["last_workout_type"] =
+                    .string(
+                        latestWorkout.activity.rawValue
+                    )
+                state[
+                    "last_workout_duration_seconds"
+                ] = .double(
+                    max(
+                        latestWorkout.duration,
+                        0
+                    )
+                )
+                state[
+                    "last_workout_distance_meters"
+                ] =
+                    latestWorkout.distanceMeters
+                        .map {
+                            .double(max($0, 0))
+                        }
+                    ?? .null
+                state["last_workout_ended_at"] =
+                    .string(
+                        Self.iso8601(
+                            latestWorkout.endDate
+                        )
+                    )
+            }
+        }
+
+        state["recovery_score"] =
+            shareRecovery &&
+                recoveryScore != nil
+                ? .int(
+                    min(
+                        max(
+                            recoveryScore ?? 0,
+                            0
+                        ),
+                        100
+                    )
+                )
+                : .null
+
+        state["recovery_state"] =
+            shareRecovery
+                ? (
+                    Self.sanitizedText(
+                        recoveryState
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
+        state["training_load"] =
+            shareTrainingLoad &&
+                trainingLoad?.isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            trainingLoad ?? 0,
+                            0
+                        ),
+                        10
+                    )
+                )
+                : .null
+
+        state["pending_delivery_count"] =
+            .int(pendingDeliveryCount)
+
+        state["sleep_duration_minutes"] =
+            shareSleep &&
+                sleep.totalAsleep > 0
+                ? .double(
+                    min(
+                        sleep.totalAsleep / 60,
+                        1_440
+                    )
+                )
+                : .null
+
+        state["hrv_milliseconds"] =
+            shareHRV &&
+                heart.hrvMilliseconds?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            heart.hrvMilliseconds ?? 0,
+                            0
+                        ),
+                        2_000
+                    )
+                )
+                : .null
+
+        state["resting_heart_rate"] =
+            shareRestingHeartRate &&
+                heart.restingHeartRate?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            heart.restingHeartRate ?? 20,
+                            20
+                        ),
+                        250
+                    )
+                )
+                : .null
+
+        state["respiratory_rate"] =
+            shareRespiratoryRate &&
+                training.respiratoryRate?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            training.respiratoryRate ?? 1,
+                            1
+                        ),
+                        80
+                    )
+                )
+                : .null
+
+        if shareWeeklyProgress {
+            var calendar = Calendar.current
+            calendar.firstWeekday = 2
+
+            if let week =
+                    calendar.dateInterval(
+                        of: .weekOfYear,
+                        for: Date()
+                    ) {
+                let current =
+                    workouts.filter {
+                        week.contains(
+                            $0.startDate
+                        )
+                    }
+                let seconds =
+                    current.reduce(0.0) {
+                        $0 +
+                            max(
+                                $1.duration,
+                                0
+                            )
+                    }
+                let meters =
+                    current.reduce(0.0) {
+                        $0 +
+                            max(
+                                $1.distanceMeters ??
+                                    0,
+                                0
+                            )
+                    }
+
+                state[
+                    "weekly_training_minutes"
+                ] = .double(
+                    min(
+                        seconds / 60,
+                        10_080
+                    )
+                )
+                state[
+                    "weekly_distance_km"
+                ] = .double(
+                    min(
+                        meters / 1_000,
+                        5_000
+                    )
+                )
+            }
+        }
+
+        await sendReliably(
+            event: "sync_snapshot",
+            payload: [
+                "state": .object(state)
+            ]
+        )
+    }
+
     func sendConnectionTest() async {
         guard isConnected else {
             return
@@ -877,7 +1370,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     func sendWorkoutStarted(
         name: String?,
-        startedAt: Date?
+        startedAt: Date?,
+        type: String? = nil,
+        device: String = "iPhone"
     ) async {
         guard isConnected,
               shareWorkoutState
@@ -894,6 +1389,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 Self.iso8601(startedAt)
             )
         }
+        if let type = Self.sanitizedText(type) {
+            payload["type"] = .string(type)
+        }
+        payload["device"] = .string(device)
 
         try? await send(
             event: "workout_started",
@@ -937,7 +1436,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         startedAt: Date,
         endedAt: Date,
         duration: TimeInterval,
-        distanceMeters: Double?
+        distanceMeters: Double?,
+        device: String = "iPhone"
     ) async {
         guard isConnected else {
             return
@@ -960,7 +1460,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 ),
                 "duration_seconds": .double(
                     max(duration, 0)
-                )
+                ),
+                "device": .string(device)
             ]
 
             if let distanceMeters,
@@ -1070,11 +1571,27 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     func syncSnapshot(
         workoutActive: Bool,
         activeWorkout: String?,
+        activeWorkoutStartedAt: Date?,
         lastWorkout: String?,
         recoveryScore: Int?,
         trainingLoad: Double?,
+        sleepDurationMinutes: Double?,
+        hrvMilliseconds: Double?,
+        restingHeartRate: Double?,
+        respiratoryRate: Double?,
+        recoveryState: String?,
         weeklyProgress: Double?,
-        nextWorkout: String?
+        weeklyTrainingMinutes: Double?,
+        weeklyDistanceKilometers: Double?,
+        weeklyWorkoutCount: Int?,
+        trainingStreak: Int?,
+        nextWorkout: String?,
+        nextWorkoutTime: Date?,
+        activeGoal: String?,
+        goalProgress: Double?,
+        goalDaysRemaining: Int?,
+        calendarEvents:
+            [HomeAssistantCalendarEventPayload]
     ) async {
         guard isConnected else {
             return
@@ -1088,9 +1605,21 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 Self.sanitizedText(activeWorkout)
                     .map(HomeAssistantJSONValue.string)
                 ?? .null
+            state["active_workout_started_at"] =
+                activeWorkoutStartedAt
+                    .map {
+                        .string(
+                            Self.iso8601($0)
+                        )
+                    }
+                ?? .null
+            state["active_workout_device"] =
+                .string("iPhone")
         } else {
             state["workout_active"] = .bool(false)
             state["active_workout"] = .null
+            state["active_workout_started_at"] = .null
+            state["active_workout_device"] = .null
         }
 
         state["last_workout"] =
@@ -1123,6 +1652,64 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .null
 
+        state["sleep_duration_minutes"] =
+            shareSleep &&
+                sleepDurationMinutes?.isFinite == true
+                ? .double(
+                    min(
+                        max(sleepDurationMinutes ?? 0, 0),
+                        1_440
+                    )
+                )
+                : .null
+
+        state["hrv_milliseconds"] =
+            shareHRV &&
+                hrvMilliseconds?.isFinite == true
+                ? .double(
+                    min(
+                        max(hrvMilliseconds ?? 0, 0),
+                        2_000
+                    )
+                )
+                : .null
+
+        state["resting_heart_rate"] =
+            shareRestingHeartRate &&
+                restingHeartRate?.isFinite == true
+                ? .double(
+                    min(
+                        max(restingHeartRate ?? 20, 20),
+                        250
+                    )
+                )
+                : .null
+
+        state["respiratory_rate"] =
+            shareRespiratoryRate &&
+                respiratoryRate?.isFinite == true
+                ? .double(
+                    min(
+                        max(respiratoryRate ?? 1, 1),
+                        80
+                    )
+                )
+                : .null
+
+        state["recovery_state"] =
+            shareRecovery
+                ? (
+                    Self.sanitizedText(
+                        recoveryState
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
         state["weekly_progress"] =
             shareWeeklyProgress &&
                 weeklyProgress?.isFinite == true
@@ -1130,6 +1717,48 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     min(
                         max(weeklyProgress ?? 0, 0),
                         100
+                    )
+                )
+                : .null
+
+        state["weekly_training_minutes"] =
+            shareWeeklyProgress &&
+                weeklyTrainingMinutes?.isFinite == true
+                ? .double(
+                    min(
+                        max(weeklyTrainingMinutes ?? 0, 0),
+                        10_080
+                    )
+                )
+                : .null
+
+        state["weekly_distance_km"] =
+            shareWeeklyProgress &&
+                weeklyDistanceKilometers?.isFinite == true
+                ? .double(
+                    min(
+                        max(weeklyDistanceKilometers ?? 0, 0),
+                        5_000
+                    )
+                )
+                : .null
+
+        state["weekly_workout_count"] =
+            shareWeeklyProgress
+                ? .int(
+                    max(
+                        weeklyWorkoutCount ?? 0,
+                        0
+                    )
+                )
+                : .null
+
+        state["training_streak"] =
+            shareWeeklyProgress
+                ? .int(
+                    max(
+                        trainingStreak ?? 0,
+                        0
                     )
                 )
                 : .null
@@ -1142,6 +1771,99 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     ?? .null
                 )
                 : .null
+
+        state["next_workout_time"] =
+            shareNextWorkout
+                ? (
+                    nextWorkoutTime
+                        .map {
+                            .string(
+                                Self.iso8601($0)
+                            )
+                        }
+                    ?? .null
+                )
+                : .null
+
+        state["active_goal"] =
+            shareGoals
+                ? (
+                    Self.sanitizedText(
+                        activeGoal
+                    )
+                        .map(
+                            HomeAssistantJSONValue
+                                .string
+                        )
+                    ?? .null
+                )
+                : .null
+
+        state["goal_progress"] =
+            shareGoals &&
+                goalProgress?.isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            goalProgress ?? 0,
+                            0
+                        ),
+                        100
+                    )
+                )
+                : .null
+
+        state["goal_days_remaining"] =
+            shareGoals
+                ? goalDaysRemaining
+                    .map {
+                        .int(max($0, 0))
+                    }
+                ?? .null
+                : .null
+
+        state["calendar_events"] =
+            shareTrainingCalendar
+                ? .array(
+                    calendarEvents
+                        .prefix(64)
+                        .map { event in
+                            .object([
+                                "id":
+                                    .string(event.id),
+                                "title":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.title
+                                        ) ??
+                                        "Workout"
+                                    ),
+                                "start":
+                                    .string(
+                                        Self.iso8601(
+                                            event.start
+                                        )
+                                    ),
+                                "end":
+                                    .string(
+                                        Self.iso8601(
+                                            event.end
+                                        )
+                                    ),
+                                "type":
+                                    .string(
+                                        Self.sanitizedText(
+                                            event.type
+                                        ) ??
+                                        "workout"
+                                    )
+                            ])
+                        }
+                )
+                : .array([])
+
+        state["pending_delivery_count"] =
+            .int(pendingDeliveryCount)
 
         await sendReliably(
             event: "sync_snapshot",
@@ -1167,15 +1889,39 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
         if !shareRecovery {
             state["recovery_score"] = .null
+            state["recovery_state"] = .null
         }
         if !shareTrainingLoad {
             state["training_load"] = .null
         }
+        if !shareSleep {
+            state["sleep_duration_minutes"] = .null
+        }
+        if !shareHRV {
+            state["hrv_milliseconds"] = .null
+        }
+        if !shareRestingHeartRate {
+            state["resting_heart_rate"] = .null
+        }
+        if !shareRespiratoryRate {
+            state["respiratory_rate"] = .null
+        }
         if !shareWeeklyProgress {
             state["weekly_progress"] = .null
+            state["weekly_training_minutes"] = .null
+            state["weekly_distance_km"] = .null
         }
         if !shareNextWorkout {
             state["next_workout"] = .null
+            state["next_workout_time"] = .null
+        }
+        if !shareGoals {
+            state["active_goal"] = .null
+            state["goal_progress"] = .null
+            state["goal_days_remaining"] = .null
+        }
+        if !shareTrainingCalendar {
+            state["calendar_events"] = .array([])
         }
 
         guard !state.isEmpty else {
@@ -1992,7 +2738,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         nonce: String,
         signature: String,
         clientID: String
-    ) async throws -> Int {
+    ) async throws -> HomeAssistantWebhookHTTPResult {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.httpMethod = "POST"
@@ -2018,7 +2764,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             forHTTPHeaderField: "X-ATHLTH-Signature"
         )
 
-        let (_, response) =
+        let (data, response) =
             try await URLSession.shared.data(
                 for: request
             )
@@ -2030,7 +2776,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 .invalidResponse
         }
 
-        return httpResponse.statusCode
+        return HomeAssistantWebhookHTTPResult(
+            statusCode:
+                httpResponse.statusCode,
+            data: data
+        )
     }
 
     private static func webhookError(

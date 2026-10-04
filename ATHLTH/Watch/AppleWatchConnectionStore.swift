@@ -124,7 +124,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         )
 
     var session: WCSession? {
-        WCSession.isSupported() ? WCSession.default : nil
+        guard ATHLTHDeviceRole.supportsDirectAppleWatch else {
+            return nil
+        }
+
+        return WCSession.isSupported()
+            ? WCSession.default
+            : nil
     }
 
     override init() {

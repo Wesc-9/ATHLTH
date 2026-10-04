@@ -46,7 +46,9 @@ targets:
           - _home-assistant._tcp
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        UIBackgroundModes: [location, audio]
+        UIBackgroundModes: [location, audio, fetch]
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.wesc9.athlth.home-assistant-refresh
         NSCalendarsFullAccessUsageDescription: "ATHLTH creates a dedicated training calendar and keeps your planned workouts synchronized with Calendar."
         NSCalendarsUsageDescription: "ATHLTH uses calendar access to show your planned workouts in a dedicated ATHLTH calendar."
         ITSAppUsesNonExemptEncryption: false

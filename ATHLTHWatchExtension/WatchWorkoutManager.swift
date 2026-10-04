@@ -1597,8 +1597,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
                 WatchHomeAssistantBridge.shared
                     .workoutStarted(
-                        kind: recovered.kind,
-                        startedAt: recovered.startedAt
+                        kind: kind,
+                        startedAt: startedAt
                     )
             }
         } catch {

@@ -90,7 +90,14 @@ final class HealthKitManager: ObservableObject {
         hasTrainingHealthData || personalDetails.hasAnyValue
     }
 
-    private let healthStore = HKHealthStore()
+    /// Called after a HealthKit background observer has refreshed ATHLTH's
+    /// in-memory health snapshot, before the HealthKit completion handler is
+    /// released. This lets integrations finish a small background network
+    /// update while iOS still grants execution time.
+    var backgroundRefreshDidComplete:
+        (@MainActor @Sendable () async -> Void)?
+
+        private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
     private var backgroundRefreshTask: Task<Void, Never>?
@@ -654,17 +661,21 @@ final class HealthKitManager: ObservableObject {
         ]
 
         if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
-            registrations.append((sleepType, .hourly))
+            // Sleep updates are comparatively sparse, so immediate delivery
+            // keeps Home Assistant current without creating a high-rate wake loop.
+            registrations.append((sleepType, .immediate))
         }
 
         let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
-            // ATHLTH does not show continuous background heart rate outside
-            // an active Watch workout, so hourly delivery avoids waking the
-            // iPhone for every sensor sample.
+            // Continuous raw heart rate can be very high frequency, so keep it
+            // hourly outside an active Watch workout. Recovery signals arrive
+            // much less often and can safely wake ATHLTH as soon as HealthKit
+            // publishes a new sample.
             (.heartRate, .hourly),
-            (.restingHeartRate, .hourly),
+            (.restingHeartRate, .immediate),
             (.walkingHeartRateAverage, .hourly),
-            (.heartRateVariabilitySDNN, .hourly),
+            (.heartRateVariabilitySDNN, .immediate),
+            (.respiratoryRate, .immediate),
             (.activeEnergyBurned, .hourly),
             (.basalEnergyBurned, .hourly),
             (.distanceWalkingRunning, .hourly),
@@ -814,6 +825,11 @@ final class HealthKitManager: ObservableObject {
                 await self.refreshAll()
             } else {
                 await self.refreshHealthSignals()
+            }
+
+            if let handler =
+                    self.backgroundRefreshDidComplete {
+                await handler()
             }
         }
 

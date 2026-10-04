@@ -58,7 +58,8 @@ final class WatchHomeAssistantBridge {
 
         var payload: [String: Any] = [
             "name": kind.title,
-            "type": kind.rawValue
+            "type": kind.rawValue,
+            "device": "Apple Watch"
         ]
 
         if let startedAt {
