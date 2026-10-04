@@ -2289,13 +2289,59 @@ private enum HomeFollowingWorkoutPresentation {
         if let groups =
                 metadata?["muscle_groups"],
            !groups.isEmpty {
-            return groups
-                .split(separator: "|")
-                .prefix(4)
-                .map(String.init)
-                .joined(
-                    separator: " · "
-                )
+            var titles: [String] = []
+
+            for raw in
+                groups
+                    .split(
+                        separator: "|"
+                    )
+                    .map(String.init) {
+                let regions =
+                    StrengthMuscleResolver
+                        .regions(
+                            for: raw
+                        )
+
+                if regions.isEmpty {
+                    let clean =
+                        raw.trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                    if !clean.isEmpty,
+                       !titles.contains(clean) {
+                        titles.append(clean)
+                    }
+                } else {
+                    for region in regions {
+                        let title =
+                            region
+                                .activityDisplayTitle
+
+                        if !titles.contains(
+                            title
+                        ) {
+                            titles.append(
+                                title
+                            )
+                        }
+                    }
+                }
+
+                if titles.count >= 4 {
+                    break
+                }
+            }
+
+            if !titles.isEmpty {
+                return titles
+                    .prefix(4)
+                    .joined(
+                        separator: " · "
+                    )
+            }
         }
 
         if let raw =
