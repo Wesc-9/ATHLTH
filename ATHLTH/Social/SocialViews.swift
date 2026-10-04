@@ -1966,16 +1966,16 @@ struct FriendProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 8.8,
+                            size: 10.5,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 11)
+                    .frame(width: 13)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 10.2,
+                            size: 12,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1988,7 +1988,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 6.3,
+                        size: 7.4,
                         weight: .medium
                     )
                 )
@@ -1998,17 +1998,17 @@ struct FriendProfileView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 1)
         .frame(maxWidth: .infinity)
-        .frame(height: 30)
+        .frame(height: 36)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 11,
+                cornerRadius: 13,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 11,
+                cornerRadius: 13,
                 style: .continuous
             )
             .stroke(
@@ -3432,19 +3432,19 @@ struct FriendProfileView: View {
                                 ATHLTHMarkShape()
                                     .fill(.white)
                                     .frame(
-                                        width: 8,
-                                        height: 6
+                                        width: 10,
+                                        height: 8
                                     )
                             }
                             .frame(
-                                width: 12,
-                                height: 14
+                                width: 28,
+                                height: 32
                             )
 
                             Text(item.title)
                                 .font(
                                     .system(
-                                        size: 6.1,
+                                        size: 8.0,
                                         weight: .bold
                                     )
                                 )
@@ -3471,8 +3471,8 @@ struct FriendProfileView: View {
                                         )
                                 )
                                 .frame(
-                                    width: 13,
-                                    height: 15
+                                    width: 28,
+                                    height: 32
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
@@ -3498,7 +3498,7 @@ struct FriendProfileView: View {
                             Text("—")
                                 .font(
                                     .system(
-                                        size: 6.8,
+                                        size: 8.5,
                                         weight:
                                             .semibold
                                     )
