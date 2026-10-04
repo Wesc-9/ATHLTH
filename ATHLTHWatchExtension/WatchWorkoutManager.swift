@@ -1163,6 +1163,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let shouldAdvanceExercise =
+            snapshot.currentExerciseComplete &&
+            snapshot.hasNextExercise
+
         let sent =
             sendStrengthCommand(
                 WatchStrengthCommand(
@@ -1186,6 +1190,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.strengthSession = updated
             }
             persistWorkoutRecoveryState()
+
+            if shouldAdvanceExercise {
+                moveToNextStrengthExercise()
+            }
         }
     }
 
