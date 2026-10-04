@@ -610,6 +610,7 @@ struct ChallengeCreationView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
 
     let preselectedFriends: [SocialProfileCard]
     let preselectedRouteID: UUID?
@@ -859,10 +860,33 @@ struct ChallengeCreationView: View {
 
                 if invitees.isEmpty &&
                     !preselectedFriends.isEmpty {
+                    let mutualIDs =
+                        Set(
+                            social.mutualFollows
+                                .map(\.userID)
+                        )
+                    let eligibleFriends =
+                        preselectedFriends.filter {
+                            mutualIDs.contains(
+                                $0.userID
+                            )
+                        }
+
                     invitees =
-                        preselectedFriends.map(
+                        eligibleFriends.map(
                             challengeParticipant
                         )
+
+                    if eligibleFriends.count !=
+                        preselectedFriends.count {
+                        createError =
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Follow each other before sending a challenge.",
+                                norwegian:
+                                    "Dere må følge hverandre før du kan sende en utfordring."
+                            )
+                    }
                 }
             }
             .onChange(of: sport) { _, newSport in
@@ -5426,6 +5450,10 @@ struct ChallengeCreationView: View {
             return
         }
 
+        await shareChallengeInMessages(
+            challenge
+        )
+
         if shareToCommunity {
             _ = await social
                 .shareChallengeToCommunity(
@@ -5434,6 +5462,71 @@ struct ChallengeCreationView: View {
         }
 
         dismiss()
+    }
+
+    @MainActor
+    private func shareChallengeInMessages(
+        _ challenge: ATHLTHChallenge
+    ) async {
+        guard
+            let draft = try? MessageShareDraft(
+                kind: .challenge,
+                title: challenge.title,
+                subtitle:
+                    "\(challenge.sport.title) · \(challenge.rules.scoring.title)",
+                snapshot: challenge,
+                sourceObjectID: challenge.id,
+                sourceOwnerID: challenge.creatorID
+            )
+        else {
+            return
+        }
+
+        let mutualIDs =
+            Set(
+                social.mutualFollows
+                    .map(\.userID)
+            )
+
+        for participant in challenge.participants {
+            guard
+                participant.state == .invited,
+                let recipientID = participant.userID,
+                mutualIDs.contains(recipientID)
+            else {
+                continue
+            }
+
+            do {
+                let conversationID =
+                    try await messaging
+                        .openConversation(
+                            with: recipientID
+                        )
+
+                guard
+                    let conversation =
+                        messaging.conversation(
+                            with: recipientID
+                        ),
+                    conversation.id == conversationID,
+                    conversation.requestStatus == .accepted
+                else {
+                    continue
+                }
+
+                _ = await messaging.send(
+                    to: recipientID,
+                    conversationID: conversationID,
+                    body: nil,
+                    attachment: draft
+                )
+            } catch {
+                // The backend challenge invite remains authoritative.
+                // Messaging is an additional presentation channel only.
+                continue
+            }
+        }
     }
 
     private var runningAttemptSummary: String {
