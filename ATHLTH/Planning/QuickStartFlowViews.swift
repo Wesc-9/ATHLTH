@@ -730,6 +730,37 @@ struct QuickStartWorkoutDeviceCard: View {
     let iPhoneEnabled: Bool
     let iPhoneSubtitle: String
 
+    private var watchSelectable: Bool {
+        ATHLTHDeviceRole.isIPad ||
+            watchConnected
+    }
+
+    private var resolvedIPhoneSubtitle: String {
+        ATHLTHDeviceRole.isIPad
+            ? ATHLTHLocalization.choose(
+                english:
+                    "Send this workout to your signed-in iPhone.",
+                norwegian:
+                    "Send denne økten til iPhonen du er logget inn på."
+            )
+            : iPhoneSubtitle
+    }
+
+    private var watchSubtitle: String {
+        if ATHLTHDeviceRole.isIPad {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Start Apple Watch through the paired iPhone.",
+                norwegian:
+                    "Start Apple Watch via den parede iPhonen."
+            )
+        }
+
+        return watchConnected
+            ? "Record with Apple Watch, including live workout metrics."
+            : "Finish Apple Watch setup in Settings to use this option."
+    }
+
     var body: some View {
         ATHLTHCard {
             ATHLTHSectionHeader(title: "Workout device")
@@ -737,7 +768,7 @@ struct QuickStartWorkoutDeviceCard: View {
             VStack(spacing: 10) {
                 deviceRow(
                     title: "iPhone",
-                    subtitle: iPhoneSubtitle,
+                    subtitle: resolvedIPhoneSubtitle,
                     icon: "iphone",
                     selected: selection == .iPhone,
                     disabled: !iPhoneEnabled
@@ -747,12 +778,10 @@ struct QuickStartWorkoutDeviceCard: View {
 
                 deviceRow(
                     title: "Apple Watch",
-                    subtitle: watchConnected
-                        ? "Record with Apple Watch, including live workout metrics."
-                        : "Finish Apple Watch setup in Settings to use this option.",
+                    subtitle: watchSubtitle,
                     icon: "applewatch",
                     selected: selection == .appleWatch,
-                    disabled: !watchConnected
+                    disabled: !watchSelectable
                 ) {
                     selection = .appleWatch
                 }
@@ -914,7 +943,8 @@ struct RunQuickStartSheet: View {
 
     private var canStart: Bool {
         if captureDevice == .appleWatch,
-           !watchConnected {
+           !watchConnected,
+           !ATHLTHDeviceRole.isIPad {
             return false
         }
 
@@ -1359,7 +1389,8 @@ struct RunQuickStartSheet: View {
                         captureDevice ==
                             .appleWatch,
                     disabled:
-                        !watchConnected
+                        !watchConnected &&
+                        !ATHLTHDeviceRole.isIPad
                 ) {
                     captureDevice =
                         .appleWatch
@@ -1368,12 +1399,19 @@ struct RunQuickStartSheet: View {
             .padding(.top, 10)
 
             Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "This choice applies only to this workout.",
-                    norwegian:
-                        "Valget gjelder bare denne økten."
-                )
+                ATHLTHDeviceRole.isIPad
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "iPad sends the start request through your iPhone. Apple Watch is never paired directly with iPad.",
+                        norwegian:
+                            "iPad sender startforespørselen via iPhone. Apple Watch pares aldri direkte med iPad."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "This choice applies only to this workout.",
+                        norwegian:
+                            "Valget gjelder bare denne økten."
+                    )
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -1873,10 +1911,21 @@ struct RunQuickStartSheet: View {
             }
         }
 
-        guard watchConnected else {
+        guard watchConnected ||
+                ATHLTHDeviceRole.isIPad
+        else {
             return ATHLTHLocalization.choose(
                 english: "Apple Watch Required",
                 norwegian: "Apple Watch kreves"
+            )
+        }
+
+        if ATHLTHDeviceRole.isIPad {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Start Apple Watch via iPhone",
+                norwegian:
+                    "Start Apple Watch via iPhone"
             )
         }
 
@@ -2276,9 +2325,13 @@ struct WalkQuickStartSheet: View {
                     } label: {
                         Label(
                             captureDevice == .appleWatch
-                                ? (watchConnected
-                                    ? "Start Walk on Watch"
-                                    : "Apple Watch Required")
+                                ? (
+                                    ATHLTHDeviceRole.isIPad
+                                        ? "Start Apple Watch via iPhone"
+                                        : watchConnected
+                                            ? "Start Walk on Watch"
+                                            : "Apple Watch Required"
+                                )
                                 : "Start on iPhone",
                             systemImage:
                                 captureDevice == .appleWatch
@@ -2292,7 +2345,9 @@ struct WalkQuickStartSheet: View {
                     .controlSize(.large)
                     .tint(ATHLTHTheme.accent)
                     .disabled(
-                        captureDevice == .appleWatch && !watchConnected
+                        captureDevice == .appleWatch &&
+                        !watchConnected &&
+                        !ATHLTHDeviceRole.isIPad
                     )
                 }
                 .padding()
