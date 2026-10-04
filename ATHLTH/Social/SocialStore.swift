@@ -1716,6 +1716,30 @@ final class SocialStore: ObservableObject {
     }
 
     @discardableResult
+    func deleteChallenge(
+        challengeID: UUID
+    ) async -> Bool {
+        guard service.currentUserID != nil else {
+            errorMessage =
+                "Sign in to use ATHLTH social features."
+            return false
+        }
+
+        do {
+            try await service.deleteChallenge(
+                challengeID:
+                    challengeID
+            )
+            await refresh()
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
     func withdrawChallengeInvite(
         participantID: UUID
     ) async -> Bool {
