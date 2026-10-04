@@ -8361,10 +8361,10 @@ struct ProfileRecordShowcasePickerView:
                         )
                         .lineLimit(1)
                 }
-                .padding(12)
+                .padding(10)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 70,
+                    minHeight: 62,
                     alignment: .leading
                 )
                 .background(
@@ -8444,7 +8444,7 @@ struct ProfileRecordShowcasePickerView:
                 }
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 82
+                    minHeight: 62
                 )
                 .background(
                     Color.black
@@ -8538,13 +8538,13 @@ struct ProfileRecordShowcasePickerView:
                 columns: [
                     GridItem(
                         .adaptive(
-                            minimum: 70,
-                            maximum: 86
+                            minimum: 64,
+                            maximum: 78
                         ),
-                        spacing: 5
+                        spacing: 4
                     )
                 ],
-                spacing: 5
+                spacing: 4
             ) {
                 ForEach(
                     candidates(
@@ -8555,7 +8555,7 @@ struct ProfileRecordShowcasePickerView:
                 }
             }
         }
-        .padding(9)
+        .padding(8)
         .background(
             Color.white.opacity(0.88),
             in: RoundedRectangle(
@@ -8594,7 +8594,7 @@ struct ProfileRecordShowcasePickerView:
         } label: {
             VStack(
                 alignment: .leading,
-                spacing: 6
+                spacing: 4
             ) {
                 HStack {
                     Image(
@@ -8603,7 +8603,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 9,
+                            size: 8,
                             weight:
                                 .semibold
                         )
@@ -8612,8 +8612,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 19,
-                        height: 19
+                        width: 17,
+                        height: 17
                     )
                     .background(
                         kind.tint
@@ -8677,7 +8677,7 @@ struct ProfileRecordShowcasePickerView:
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 7.1,
+                            size: 6.7,
                             weight: .semibold
                         )
                     )
@@ -8697,7 +8697,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 12,
+                        size: 11,
                         weight: .bold,
                         design: .rounded
                     )
@@ -8735,7 +8735,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 6.5,
+                        size: 6.1,
                         weight: .medium
                     )
                 )
@@ -8747,10 +8747,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(5)
+            .padding(4)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 62,
+                minHeight: 54,
                 alignment: .topLeading
             )
             .background(
@@ -8775,7 +8775,7 @@ struct ProfileRecordShowcasePickerView:
                 ),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 13,
+                        cornerRadius: 12,
                         style:
                             .continuous
                     )
