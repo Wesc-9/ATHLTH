@@ -1526,7 +1526,8 @@ struct FriendProfileView: View {
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
-            accent: ATHLTHTheme.premiumGold.opacity(0.62)
+            accent: ATHLTHTheme.premiumGold.opacity(0.34),
+            immersiveTransition: true
         ) {
             if let profile {
                 remoteProfileHero(profile)
@@ -1591,7 +1592,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 34)
+            .padding(.top, 64)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1864,7 +1865,7 @@ struct FriendProfileView: View {
                     )
                 }
                 .padding(.horizontal, 18)
-                .padding(.bottom, 24)
+                .padding(.bottom, 18)
                 .shadow(
                     color:
                         Color.black.opacity(0.24),
@@ -1873,7 +1874,7 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .frame(height: 306)
+        .frame(height: 282)
         .clipped()
     }
 
@@ -1993,17 +1994,17 @@ struct FriendProfileView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity)
-        .frame(height: 52)
+        .frame(height: 46)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 18,
+                cornerRadius: 16,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 18,
+                cornerRadius: 16,
                 style: .continuous
             )
             .stroke(
@@ -2308,10 +2309,10 @@ struct FriendProfileView: View {
                 profileActionLabel(
                     title:
                         ATHLTHLocalization.choose(
-                            english: "Following",
-                            norwegian: "Følger"
+                            english: "Remove",
+                            norwegian: "Fjern"
                         ),
-                    icon: "person.fill.checkmark",
+                    icon: "person.fill.xmark",
                     tint: ATHLTHTheme.accentDeep,
                     emphasized: true
                 )
@@ -3245,19 +3246,19 @@ struct FriendProfileView: View {
                             ATHLTHMarkShape()
                                 .fill(.white)
                                 .frame(
-                                    width: 19,
-                                    height: 14
+                                    width: 15,
+                                    height: 11
                                 )
                         }
                         .frame(
-                            width: 46,
-                            height: 52
+                            width: 36,
+                            height: 41
                         )
 
                         Text(item.title)
                             .font(
                                 .system(
-                                    size: 8.5,
+                                    size: 8,
                                     weight: .bold
                                 )
                             )
