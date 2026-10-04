@@ -1007,7 +1007,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         startedAt: Date,
         endedAt: Date,
         duration: TimeInterval,
-        distanceMeters: Double?
+        distanceMeters: Double?,
+        device: String = "iPhone"
     ) async {
         guard isConnected else {
             return
@@ -1030,7 +1031,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 ),
                 "duration_seconds": .double(
                     max(duration, 0)
-                )
+                ),
+                "device": .string(device)
             ]
 
             if let distanceMeters,
