@@ -843,6 +843,7 @@ struct SocialFriendProfile: Hashable {
     let trophies: [SocialTrophyShowcaseItem]
     let goals: [SocialProfileGoalRecord]
     let gear: [ProfileGearItem]
+    let workoutMedia: [WorkoutMediaRecord]
     let recentActivities: [SocialFeedItem]
 }
 
