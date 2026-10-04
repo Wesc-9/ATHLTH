@@ -19,6 +19,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published var isPresentationRequested = false
     @Published private(set) var isUserMinimized = false
+    @Published private(set) var liveViewIsVisible = false
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
@@ -121,6 +122,14 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    func liveViewDidAppear() {
+        liveViewIsVisible = true
+    }
+
+    func liveViewDidDisappear() {
+        liveViewIsVisible = false
+    }
+
     func presentWorkout() {
         guard snapshot != nil else {
             return
@@ -137,6 +146,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         isUserMinimized = true
         isPresentationRequested = false
+        liveViewIsVisible = false
     }
 
     func dismissSummary() {
@@ -148,6 +158,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         publish {
             self.isPresentationRequested = false
             self.isUserMinimized = false
+            self.liveViewIsVisible = false
             self.snapshot = nil
             self.errorMessage = nil
             self.connectionText =
