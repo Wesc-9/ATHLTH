@@ -2776,82 +2776,294 @@ struct DirectMessageThreadView: View {
     }
 
     private var incomingRequestBar: some View {
-        VStack(spacing: 10) {
-            Text("Accept this request before replying or sharing training.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "envelope.badge.fill"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    width: 36,
+                    height: 36
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Message request",
+                            norwegian:
+                                "Meldingsforespørsel"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Accept before replying or sharing training.",
+                            norwegian:
+                                "Godta før du svarer eller deler trening."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+            }
 
             HStack(spacing: 10) {
-                Button("Decline") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Decline",
+                        norwegian: "Avslå"
+                    )
+                ) {
                     Task {
-                        guard let conversationID else { return }
-                        if await messaging.respondToMessageRequest(
-                            conversationID,
-                            accept: false
-                        ) {
+                        guard
+                            let conversationID
+                        else {
+                            return
+                        }
+
+                        if await messaging
+                            .respondToMessageRequest(
+                                conversationID,
+                                accept: false
+                            ) {
                             dismiss()
                         }
                     }
                 }
                 .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
+                .frame(
+                    maxWidth: .infinity
+                )
 
-                Button("Accept") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Accept",
+                        norwegian: "Godta"
+                    )
+                ) {
                     Task {
-                        guard let conversationID else { return }
-                        _ = await messaging.respondToMessageRequest(
-                            conversationID,
-                            accept: true
-                        )
+                        guard
+                            let conversationID
+                        else {
+                            return
+                        }
+
+                        _ = await messaging
+                            .respondToMessageRequest(
+                                conversationID,
+                                accept: true
+                            )
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.vitality)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
 
                 Menu {
-                    Button("Block", role: .destructive) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Block",
+                            norwegian: "Blokker"
+                        ),
+                        role: .destructive
+                    ) {
                         Task {
-                            guard let conversationID else { return }
-                            _ = await messaging.respondToMessageRequest(
-                                conversationID,
-                                accept: false
+                            guard
+                                let conversationID
+                            else {
+                                return
+                            }
+
+                            _ = await messaging
+                                .respondToMessageRequest(
+                                    conversationID,
+                                    accept: false
+                                )
+                            await social.block(
+                                friend.userID
                             )
-                            await social.block(friend.userID)
-                            await messaging.refresh()
+                            await messaging
+                                .refresh()
                             dismiss()
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .frame(width: 38, height: 38)
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .frame(
+                        width: 38,
+                        height: 38
+                    )
                 }
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme.cardWarm
+                        .opacity(0.82)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .vitality
+                    .opacity(0.13),
+                lineWidth: 0.8
+            )
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            8
+        )
+        .background(
+            ATHLTHTheme
+                .canvasBottom
+                .opacity(0.92)
+        )
     }
 
     private var outgoingRequestBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "clock.fill")
-                .foregroundStyle(ATHLTHTheme.vitality)
+        HStack(spacing: 11) {
+            Image(
+                systemName:
+                    "paperplane.fill"
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .vitality
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                ATHLTHTheme
+                    .vitalitySoft,
+                in: RoundedRectangle(
+                    cornerRadius: 12,
+                    style: .continuous
+                )
+            )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Message request sent")
-                    .font(.subheadline.weight(.semibold))
-                Text("You can send more messages and training items after it is accepted.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Message request sent",
+                        norwegian:
+                            "Meldingsforespørsel sendt"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "More messages and training items unlock after acceptance.",
+                        norwegian:
+                            "Flere meldinger og treningsdeling åpnes etter godkjenning."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
             }
 
             Spacer()
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .padding(14)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 0.8
+            )
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            8
+        )
+        .background(
+            ATHLTHTheme
+                .canvasBottom
+                .opacity(0.92)
+        )
     }
 
     private var composer: some View {
@@ -2924,7 +3136,23 @@ struct DirectMessageThreadView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18))
+                    .background(
+                        Color.white.opacity(0.84),
+                        in: RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                        .stroke(
+                            ATHLTHTheme.border,
+                            lineWidth: 0.8
+                        )
+                    }
 
                 Button {
                     Task { await send() }
@@ -2949,7 +3177,12 @@ struct DirectMessageThreadView: View {
             .padding(.bottom, 8)
         }
         .padding(.top, 8)
-        .background(.ultraThinMaterial)
+        .padding(.bottom, 4)
+        .background(
+            ATHLTHTheme
+                .canvasBottom
+                .opacity(0.94)
+        )
     }
 
     private var mentionSuggestions: [ATHLTHMentionSuggestion] {
