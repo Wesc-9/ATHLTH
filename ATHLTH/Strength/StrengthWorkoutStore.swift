@@ -14,6 +14,7 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftDurationSeconds = 60 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var draftResistanceLevel = 5 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRestSeconds = 90 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRPE = 8.0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftRIR = 2.0 { didSet { scheduleCheckpointPersist() } }
@@ -36,6 +37,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var reps: Int
         var durationSeconds: Int? = nil
         var weight: Double
+        var resistanceLevel: Int? = nil
         var rest: Int
         var rpe: Double
         var rir: Double? = nil
@@ -63,6 +65,14 @@ final class StrengthWorkoutStore: ObservableObject {
         draftDurationSeconds =
             checkpoint?.durationSeconds ?? 60
         draftWeightKilograms = checkpoint?.weight ?? 20
+        draftResistanceLevel =
+            min(
+                max(
+                    checkpoint?.resistanceLevel ?? 5,
+                    1
+                ),
+                10
+            )
         draftRestSeconds = checkpoint?.rest ?? 90
         draftRPE = checkpoint?.rpe ?? 8
         draftRIR = checkpoint?.rir ?? 2
@@ -106,6 +116,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 reps: draftReps,
                 durationSeconds: draftDurationSeconds,
                 weight: draftWeightKilograms,
+                resistanceLevel: draftResistanceLevel,
                 rest: draftRestSeconds,
                 rpe: draftRPE,
                 rir: draftRIR,
@@ -226,7 +237,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 for set in exercise.sets
                 where set.countsTowardTrainingLoad {
                     guard let reps =
-                            set.completedReps,
+                            set.resolvedCompletedReps,
                           reps > 0
                     else {
                         continue
@@ -525,6 +536,7 @@ final class StrengthWorkoutStore: ObservableObject {
         reps: Int? = nil,
         durationSeconds: Int? = nil,
         weightKilograms: Double? = nil,
+        resistanceLevel: Int? = nil,
         restSeconds: Int? = nil,
         rpe: Double? = nil,
         rir: Double? = nil,
@@ -547,6 +559,14 @@ final class StrengthWorkoutStore: ObservableObject {
 
         if let weightKilograms {
             draftWeightKilograms = max(weightKilograms, 0)
+        }
+
+        if let resistanceLevel {
+            draftResistanceLevel =
+                min(
+                    max(resistanceLevel, 1),
+                    10
+                )
         }
 
         if let restSeconds {
@@ -585,6 +605,7 @@ final class StrengthWorkoutStore: ObservableObject {
             draftReps = 8
             draftDurationSeconds = 60
             draftWeightKilograms = 20
+            draftResistanceLevel = 5
             draftRestSeconds = 90
             draftRPE = 8
             draftRIR = 2
@@ -604,6 +625,16 @@ final class StrengthWorkoutStore: ObservableObject {
             set.completedWeightKilograms ??
             set.plannedWeightKilograms ??
             max(draftWeightKilograms, 20)
+        draftResistanceLevel =
+            min(
+                max(
+                    set.completedResistanceLevel ??
+                        set.plannedResistanceLevel ??
+                        draftResistanceLevel,
+                    1
+                ),
+                10
+            )
         draftRestSeconds =
             max(set.restSeconds ?? 90, 0)
         draftRPE = set.rpe ?? 8
@@ -726,7 +757,9 @@ final class StrengthWorkoutStore: ObservableObject {
         reps: Int? = 8,
         targetKind: StrengthExerciseTargetKind? = nil,
         targetDurationSeconds: Int? = nil,
+        loadKind: StrengthExerciseLoadKind? = nil,
         targetWeightKilograms: Double? = nil,
+        targetResistanceLevel: Int? = nil,
         restSeconds: Int? = 90,
         warmUpSets: Int = 0
     ) {
@@ -737,6 +770,11 @@ final class StrengthWorkoutStore: ObservableObject {
             exercise
                 .snapshot
                 .defaultStrengthTargetKind
+        let resolvedLoadKind =
+            loadKind ??
+            exercise
+                .snapshot
+                .defaultStrengthLoadKind
         let setCount = max(sets, 1)
         let log = StrengthExerciseLog(
             id: UUID(),
@@ -750,7 +788,10 @@ final class StrengthWorkoutStore: ObservableObject {
                         resolvedTargetKind == .reps
                             ? reps
                             : nil,
-                    plannedWeightKilograms: targetWeightKilograms,
+                    plannedWeightKilograms:
+                        resolvedLoadKind == .weightKilograms
+                            ? targetWeightKilograms
+                            : nil,
                     completedReps: nil,
                     completedWeightKilograms: nil,
                     rpe: nil,
@@ -775,6 +816,17 @@ final class StrengthWorkoutStore: ObservableObject {
                                         .snapshot
                                         .defaultStrengthTargetDurationSeconds,
                                 15
+                            )
+                            : nil,
+                    loadKind: resolvedLoadKind,
+                    plannedResistanceLevel:
+                        resolvedLoadKind == .resistanceLevel
+                            ? min(
+                                max(
+                                    targetResistanceLevel ?? 5,
+                                    1
+                                ),
+                                10
                             )
                             : nil
                 )
@@ -815,7 +867,10 @@ final class StrengthWorkoutStore: ObservableObject {
                         setNumber: setNumber,
                         plannedReps:
                             planned.resolvedTargetReps,
-                        plannedWeightKilograms: planned.targetWeightKilograms,
+                        plannedWeightKilograms:
+                            planned.resolvedLoadKind == .weightKilograms
+                                ? planned.targetWeightKilograms
+                                : nil,
                         completedReps: nil,
                         completedWeightKilograms: nil,
                         rpe: nil,
@@ -824,7 +879,11 @@ final class StrengthWorkoutStore: ObservableObject {
                         targetKind:
                             planned.resolvedTargetKind,
                         plannedDurationSeconds:
-                            planned.resolvedTargetDurationSeconds
+                            planned.resolvedTargetDurationSeconds,
+                        loadKind:
+                            planned.resolvedLoadKind,
+                        plannedResistanceLevel:
+                            planned.resolvedTargetResistanceLevel
                     )
                 },
                 completedAt: nil
@@ -865,6 +924,8 @@ final class StrengthWorkoutStore: ObservableObject {
         reps: Int?,
         durationSeconds: Int? = nil,
         weightKilograms: Double?,
+        resistanceLevel: Int? = nil,
+        distanceMeters: Double? = nil,
         rpe: Double?,
         rir: Double? = nil,
         isWarmUp: Bool? = nil,
@@ -889,7 +950,40 @@ final class StrengthWorkoutStore: ObservableObject {
                     min(max($0, 0), 7_200)
                 }
                 : nil
-        set.completedWeightKilograms = weightKilograms.map { max($0, 0) }
+        set.completedWeightKilograms =
+            set.resolvedLoadKind == .weightKilograms
+                ? weightKilograms.map {
+                    max($0, 0)
+                }
+                : nil
+        set.completedResistanceLevel =
+            set.resolvedLoadKind == .resistanceLevel
+                ? resistanceLevel.map {
+                    min(max($0, 1), 10)
+                }
+                : nil
+        set.completedDistanceMeters =
+            distanceMeters.map {
+                max($0, 0)
+            }
+        set.effortSegments = [
+            StrengthSetEffortSegment(
+                reps:
+                    set.resolvedTargetKind == .reps
+                        ? set.completedReps
+                        : nil,
+                weightKilograms:
+                    set.completedWeightKilograms,
+                durationSeconds:
+                    set.resolvedTargetKind == .time
+                        ? set.completedDurationSeconds
+                        : nil,
+                distanceMeters:
+                    set.completedDistanceMeters,
+                resistanceLevel:
+                    set.completedResistanceLevel
+            )
+        ]
         set.rpe = rpe
         set.rir = rir
         if let isWarmUp {
@@ -1013,6 +1107,9 @@ final class StrengthWorkoutStore: ObservableObject {
         let targetKind =
             currentSet?.resolvedTargetKind ??
             .reps
+        let loadKind =
+            currentSet?.resolvedLoadKind ??
+            .weightKilograms
 
         completeCurrentSet(
             reps:
@@ -1024,7 +1121,13 @@ final class StrengthWorkoutStore: ObservableObject {
                     ? draftDurationSeconds
                     : nil,
             weightKilograms:
-                draftWeightKilograms,
+                loadKind == .weightKilograms
+                    ? draftWeightKilograms
+                    : nil,
+            resistanceLevel:
+                loadKind == .resistanceLevel
+                    ? draftResistanceLevel
+                    : nil,
             rpe:
                 effortMetric == .rpe
                     ? draftRPE
@@ -1037,6 +1140,317 @@ final class StrengthWorkoutStore: ObservableObject {
             restSeconds:
                 draftRestSeconds
         )
+    }
+
+    func updateActiveSetResult(
+        exerciseID: UUID,
+        setID: UUID,
+        segments: [StrengthSetEffortSegment],
+        distanceMeters: Double? = nil,
+        resistanceLevel: Int? = nil
+    ) {
+        guard var workout = activeWorkout,
+              let exerciseIndex =
+                workout.exercises.firstIndex(
+                    where: { $0.id == exerciseID }
+                ),
+              let setIndex =
+                workout.exercises[exerciseIndex]
+                    .sets
+                    .firstIndex(
+                        where: { $0.id == setID }
+                    )
+        else {
+            return
+        }
+
+        var set =
+            workout.exercises[
+                exerciseIndex
+            ].sets[setIndex]
+
+        let cleaned =
+            segments
+                .map {
+                    StrengthSetEffortSegment(
+                        id: $0.id,
+                        reps:
+                            $0.reps.map {
+                                max($0, 0)
+                            },
+                        weightKilograms:
+                            $0.weightKilograms.map {
+                                max($0, 0)
+                            },
+                        durationSeconds:
+                            $0.durationSeconds.map {
+                                min(
+                                    max($0, 0),
+                                    7_200
+                                )
+                            },
+                        distanceMeters:
+                            $0.distanceMeters.map {
+                                max($0, 0)
+                            },
+                        resistanceLevel:
+                            $0.resistanceLevel.map {
+                                min(max($0, 1), 10)
+                            }
+                    )
+                }
+                .filter {
+                    ($0.reps ?? 0) > 0 ||
+                    ($0.weightKilograms ?? 0) > 0 ||
+                    ($0.durationSeconds ?? 0) > 0 ||
+                    ($0.distanceMeters ?? 0) > 0 ||
+                    $0.resistanceLevel != nil
+                }
+
+        set.effortSegments =
+            cleaned.isEmpty
+                ? nil
+                : cleaned
+
+        let totalReps =
+            cleaned
+                .compactMap(\.reps)
+                .reduce(0, +)
+        let totalDuration =
+            cleaned
+                .compactMap(\.durationSeconds)
+                .reduce(0, +)
+
+        set.completedReps =
+            totalReps > 0
+                ? totalReps
+                : set.completedReps
+        set.completedDurationSeconds =
+            totalDuration > 0
+                ? totalDuration
+                : set.completedDurationSeconds
+
+        let segmentWeights =
+            cleaned
+                .compactMap(\.weightKilograms)
+                .filter { $0 > 0 }
+        if !segmentWeights.isEmpty {
+            set.completedWeightKilograms =
+                segmentWeights.max()
+        }
+
+        let segmentResistance =
+            cleaned
+                .compactMap(\.resistanceLevel)
+                .last
+        set.completedResistanceLevel =
+            resistanceLevel.map {
+                min(max($0, 1), 10)
+            } ??
+            segmentResistance ??
+            set.completedResistanceLevel
+
+        let segmentDistance =
+            cleaned
+                .compactMap(\.distanceMeters)
+                .reduce(0, +)
+        set.completedDistanceMeters =
+            distanceMeters.map {
+                max($0, 0)
+            } ??
+            (segmentDistance > 0
+                ? segmentDistance
+                : set.completedDistanceMeters)
+
+        workout.exercises[
+            exerciseIndex
+        ].sets[setIndex] = set
+
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
+    func updateActiveSetDistance(
+        exerciseID: UUID,
+        setID: UUID,
+        distanceMeters: Double
+    ) {
+        guard let workout = activeWorkout,
+              let exercise =
+                workout.exercises.first(
+                    where: { $0.id == exerciseID }
+                ),
+              let set =
+                exercise.sets.first(
+                    where: { $0.id == setID }
+                )
+        else {
+            return
+        }
+
+        var segments =
+            set.effortSegments ?? []
+
+        if segments.isEmpty {
+            segments = [
+                StrengthSetEffortSegment(
+                    reps:
+                        set.completedReps,
+                    weightKilograms:
+                        set.completedWeightKilograms,
+                    durationSeconds:
+                        set.completedDurationSeconds,
+                    resistanceLevel:
+                        set.completedResistanceLevel
+                )
+            ]
+        }
+
+        if segments.indices.contains(
+            segments.count - 1
+        ) {
+            segments[
+                segments.count - 1
+            ].distanceMeters =
+                max(distanceMeters, 0)
+        }
+
+        updateActiveSetResult(
+            exerciseID: exerciseID,
+            setID: setID,
+            segments: segments,
+            distanceMeters:
+                max(distanceMeters, 0),
+            resistanceLevel:
+                set.completedResistanceLevel
+        )
+    }
+
+    func updateCompletedSetResult(
+        workoutID: UUID,
+        exerciseID: UUID,
+        setID: UUID,
+        segments: [StrengthSetEffortSegment],
+        distanceMeters: Double? = nil,
+        resistanceLevel: Int? = nil
+    ) {
+        guard let workoutIndex =
+                workoutHistory.firstIndex(
+                    where: {
+                        $0.id == workoutID
+                    }
+                ),
+              let exerciseIndex =
+                workoutHistory[
+                    workoutIndex
+                ].exercises
+                .firstIndex(
+                    where: {
+                        $0.id == exerciseID
+                    }
+                ),
+              let setIndex =
+                workoutHistory[
+                    workoutIndex
+                ].exercises[
+                    exerciseIndex
+                ].sets
+                .firstIndex(
+                    where: {
+                        $0.id == setID
+                    }
+                )
+        else {
+            return
+        }
+
+        var workout =
+            workoutHistory[workoutIndex]
+        var set =
+            workout.exercises[
+                exerciseIndex
+            ].sets[setIndex]
+
+        let cleaned =
+            segments
+                .map {
+                    StrengthSetEffortSegment(
+                        id: $0.id,
+                        reps:
+                            $0.reps.map {
+                                max($0, 0)
+                            },
+                        weightKilograms:
+                            $0.weightKilograms.map {
+                                max($0, 0)
+                            },
+                        durationSeconds:
+                            $0.durationSeconds.map {
+                                min(max($0, 0), 7_200)
+                            },
+                        distanceMeters:
+                            $0.distanceMeters.map {
+                                max($0, 0)
+                            },
+                        resistanceLevel:
+                            $0.resistanceLevel.map {
+                                min(max($0, 1), 10)
+                            }
+                    )
+                }
+
+        set.effortSegments = cleaned
+        let reps =
+            cleaned
+                .compactMap(\.reps)
+                .reduce(0, +)
+        let duration =
+            cleaned
+                .compactMap(\.durationSeconds)
+                .reduce(0, +)
+        set.completedReps =
+            reps > 0 ? reps : nil
+        set.completedDurationSeconds =
+            duration > 0
+                ? duration
+                : set.completedDurationSeconds
+        set.completedWeightKilograms =
+            cleaned
+                .compactMap(\.weightKilograms)
+                .max() ??
+            set.completedWeightKilograms
+        set.completedResistanceLevel =
+            resistanceLevel.map {
+                min(max($0, 1), 10)
+            } ??
+            cleaned
+                .compactMap(\.resistanceLevel)
+                .last ??
+            set.completedResistanceLevel
+        let segmentDistance =
+            cleaned
+                .compactMap(\.distanceMeters)
+                .reduce(0, +)
+        set.completedDistanceMeters =
+            distanceMeters.map {
+                max($0, 0)
+            } ??
+            (segmentDistance > 0
+                ? segmentDistance
+                : set.completedDistanceMeters)
+
+        workout.exercises[
+            exerciseIndex
+        ].sets[setIndex] = set
+        workoutHistory[workoutIndex] =
+            workout
+
+        if completedWorkout?.id ==
+            workoutID {
+            completedWorkout = workout
+        }
+
+        persistWorkoutHistory()
     }
 
     func setCurrentExerciseRestSeconds(
@@ -1214,7 +1628,11 @@ final class StrengthWorkoutStore: ObservableObject {
                         targetKind:
                             set.targetKind,
                         plannedDurationSeconds:
-                            set.plannedDurationSeconds
+                            set.plannedDurationSeconds,
+                        loadKind:
+                            set.loadKind,
+                        plannedResistanceLevel:
+                            set.plannedResistanceLevel
                     )
                 }
 
@@ -1562,6 +1980,7 @@ final class StrengthWorkoutStore: ObservableObject {
         draftReps = 8
         draftDurationSeconds = 60
         draftWeightKilograms = 20
+        draftResistanceLevel = 5
         draftRestSeconds = 90
         draftRPE = 8
         draftRIR = 2
