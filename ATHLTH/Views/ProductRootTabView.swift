@@ -3578,7 +3578,7 @@ private struct HomeCurrentStreakCard: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 ForEach(currentWeekDays, id: \.self) { day in
                     streakDay(day)
                 }
@@ -9891,7 +9891,7 @@ struct ATHLTHProfileView: View {
     }
 
     private var heroStatRow: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             NavigationLink {
                 ProfileFollowListView(
                     mode: .followers
