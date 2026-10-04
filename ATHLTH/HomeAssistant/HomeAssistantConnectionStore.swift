@@ -261,6 +261,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
     private let pendingDeliveryAccount = "pending-deliveries-v1"
+    private let clientInstallationAccount = "client-installation-v1"
     private static let maxPendingDeliveries = 16
     private static let pendingDeliveryMaxAge: TimeInterval =
         7 * 24 * 60 * 60
@@ -542,7 +543,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 body: body,
                 timestamp: timestamp,
                 nonce: nonce,
-                signature: signature
+                signature: signature,
+                clientID: pairing.clientID
             )
 
             guard (200..<300).contains(status) else {
@@ -560,7 +562,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                             body: body,
                             timestamp: timestamp,
                             nonce: nonce,
-                            signature: signature
+                            signature: signature,
+                            clientID: pairing.clientID
                         )
 
                     guard (200..<300)
@@ -598,7 +601,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     body: body,
                     timestamp: timestamp,
                     nonce: nonce,
-                    signature: signature
+                    signature: signature,
+                    clientID: pairing.clientID
                 )
 
             guard (200..<300).contains(fallbackStatus) ||
@@ -1465,8 +1469,18 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             forHTTPHeaderField: "Accept"
         )
         request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.setValue(
             "no-store",
             forHTTPHeaderField: "Cache-Control"
+        )
+        request.httpBody = try? JSONSerialization.data(
+            withJSONObject: [
+                "client_id": clientInstallationID(),
+                "client_name": "ATHLTH iPhone"
+            ]
         )
 
         let (data, response) = try await URLSession.shared.data(
@@ -1532,6 +1546,37 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             throw HomeAssistantConnectionError
                 .secureStorageFailed
         }
+    }
+
+    private func clientInstallationID() -> String {
+        if let data = Self.readSecureData(
+            service: keychainService,
+            account: clientInstallationAccount
+        ),
+           let value = String(
+                data: data,
+                encoding: .utf8
+           ),
+           !value.isEmpty {
+            return value
+        }
+
+        let value =
+            UUID()
+                .uuidString
+                .lowercased()
+
+        if let data = value.data(
+            using: .utf8
+        ) {
+            _ = Self.writeSecureData(
+                data,
+                service: keychainService,
+                account: clientInstallationAccount
+            )
+        }
+
+        return value
     }
 
     private func configuredInfoValue(_ key: String) -> String {
@@ -1925,7 +1970,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         body: Data,
         timestamp: String,
         nonce: String,
-        signature: String
+        signature: String,
+        clientID: String
     ) async throws -> Int {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -1934,6 +1980,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         request.setValue(
             "application/json",
             forHTTPHeaderField: "Content-Type"
+        )
+        request.setValue(
+            clientID,
+            forHTTPHeaderField: "X-ATHLTH-Client-ID"
         )
         request.setValue(
             timestamp,
