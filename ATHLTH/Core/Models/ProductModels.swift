@@ -321,6 +321,28 @@ struct Exercise: Identifiable, Codable, Hashable {
     }
 }
 
+enum StrengthExerciseLoadKind: String, CaseIterable, Identifiable, Codable, Hashable {
+    case weightKilograms
+    case resistanceLevel
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weightKilograms:
+            return ATHLTHLocalization.choose(
+                english: "Weight",
+                norwegian: "Vekt"
+            )
+        case .resistanceLevel:
+            return ATHLTHLocalization.choose(
+                english: "Resistance",
+                norwegian: "Motstand"
+            )
+        }
+    }
+}
+
 enum StrengthExerciseTargetKind: String, CaseIterable, Identifiable, Codable, Hashable {
     case reps
     case time
@@ -344,6 +366,50 @@ enum StrengthExerciseTargetKind: String, CaseIterable, Identifiable, Codable, Ha
 }
 
 extension ExerciseSnapshot {
+    private var normalizedStrengthEquipmentText: String {
+        ([name] + equipment)
+            .joined(separator: " ")
+            .folding(
+                options: [.diacriticInsensitive, .caseInsensitive],
+                locale: .current
+            )
+            .lowercased()
+    }
+
+    var defaultStrengthLoadKind: StrengthExerciseLoadKind {
+        let resistanceKeywords = [
+            "rowing",
+            "rowerg",
+            "rower",
+            "rowing machine",
+            "concept2 row",
+            "ski erg",
+            "skierg"
+        ]
+
+        return resistanceKeywords.contains {
+            normalizedStrengthEquipmentText.contains($0)
+        }
+            ? .resistanceLevel
+            : .weightKilograms
+    }
+
+    var supportsStrengthDistanceResult: Bool {
+        let distanceKeywords = [
+            "rowing",
+            "rowerg",
+            "rower",
+            "rowing machine",
+            "concept2 row",
+            "ski erg",
+            "skierg"
+        ]
+
+        return distanceKeywords.contains {
+            normalizedStrengthEquipmentText.contains($0)
+        }
+    }
+
     var defaultStrengthTargetKind: StrengthExerciseTargetKind {
         let normalized =
             ([name] + equipment)
@@ -437,6 +503,27 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     var targetKind: StrengthExerciseTargetKind? = nil
     var targetDurationSeconds: Int? = nil
 
+    // Optional load metadata keeps older plans compatible while allowing
+    // machine settings such as a RowErg damper/resistance level.
+    var loadKind: StrengthExerciseLoadKind? = nil
+    var targetResistanceLevel: Int? = nil
+
+    var resolvedLoadKind: StrengthExerciseLoadKind {
+        loadKind ??
+            embeddedExercise.defaultStrengthLoadKind
+    }
+
+    var resolvedTargetResistanceLevel: Int? {
+        guard resolvedLoadKind == .resistanceLevel else {
+            return nil
+        }
+
+        return min(
+            max(targetResistanceLevel ?? 5, 1),
+            10
+        )
+    }
+
     var resolvedTargetKind: StrengthExerciseTargetKind {
         targetKind ??
             embeddedExercise.defaultStrengthTargetKind
@@ -459,6 +546,30 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
         resolvedTargetKind == .reps
             ? reps
             : nil
+    }
+
+    var compactLoadSummary: String? {
+        switch resolvedLoadKind {
+        case .weightKilograms:
+            guard let targetWeightKilograms else {
+                return nil
+            }
+            return String(
+                format: "%.1f kg",
+                targetWeightKilograms
+            )
+
+        case .resistanceLevel:
+            guard let level =
+                    resolvedTargetResistanceLevel
+            else {
+                return nil
+            }
+            return ATHLTHLocalization.choose(
+                english: "Resistance \(level)",
+                norwegian: "Motstand \(level)"
+            )
+        }
     }
 
     var compactTargetSummary: String {
