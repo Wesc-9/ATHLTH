@@ -574,7 +574,9 @@ struct ATHLTHHomeView: View {
                                         spotify:
                                             spotifyPlayback,
                                         ghostRace:
-                                            ghostRace
+                                            ghostRace,
+                                        workoutMirroring:
+                                            workoutMirroring
                                     )
                                 _ = await social
                                     .confirmCurrentJoinedWorkoutStarted()
@@ -4047,6 +4049,7 @@ struct ATHLTHTrainView: View {
         ATHLTHTrainNavigationRequest?
 
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
@@ -4312,7 +4315,9 @@ struct ATHLTHTrainView: View {
                                     watchConnection:
                                         watchConnection,
                                     spotify:
-                                        spotifyPlayback
+                                        spotifyPlayback,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
