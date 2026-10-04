@@ -286,19 +286,37 @@ enum StrengthMuscleProfileBuilder {
                 }
             }
 
-            if !mappedAny,
-               let bodyPart =
-                    catalog?.bodyPart {
-                let fallback =
-                    StrengthMuscleResolver
-                        .fallbackRegions(
-                            forBodyPart:
-                                bodyPart
-                        )
+            if !mappedAny {
+                var fallback:
+                    [StrengthMuscleRegion] =
+                        []
+
+                if let bodyPart =
+                        catalog?.bodyPart {
+                    fallback =
+                        StrengthMuscleResolver
+                            .fallbackRegions(
+                                forBodyPart:
+                                    bodyPart
+                            )
+                }
+
+                if fallback.isEmpty {
+                    fallback =
+                        StrengthMuscleResolver
+                            .fallbackRegions(
+                                forExerciseName:
+                                    log.exercise
+                                        .name
+                            )
+                }
 
                 for region in fallback {
-                    scores[region, default: 0] +=
-                        0.35 *
+                    scores[
+                        region,
+                        default: 0
+                    ] +=
+                        0.45 *
                         workload
                 }
             }
@@ -717,6 +735,207 @@ enum StrengthMuscleResolver {
                 .quads,
                 .hamstrings,
                 .glutes
+            ]
+        }
+
+        return []
+    }
+
+    static func fallbackRegions(
+        forExerciseName raw: String
+    ) -> [StrengthMuscleRegion] {
+        let value = normalize(raw)
+
+        if contains(
+            value,
+            "rowing machine",
+            "row erg",
+            "rower",
+            "ergometer"
+        ) {
+            return [
+                .lats,
+                .upperBack,
+                .biceps,
+                .rearDelts,
+                .quads,
+                .hamstrings,
+                .glutes
+            ]
+        }
+
+        if contains(
+            value,
+            "bench press",
+            "chest press",
+            "push up",
+            "pushup",
+            "dip"
+        ) {
+            return [
+                .chest,
+                .frontDelts,
+                .triceps
+            ]
+        }
+
+        if contains(
+            value,
+            "shoulder press",
+            "overhead press",
+            "military press"
+        ) {
+            return [
+                .frontDelts,
+                .sideDelts,
+                .triceps
+            ]
+        }
+
+        if contains(
+            value,
+            "lateral raise",
+            "side raise"
+        ) {
+            return [.sideDelts]
+        }
+
+        if contains(
+            value,
+            "rear delt",
+            "reverse fly",
+            "reverse pec",
+            "face pull"
+        ) {
+            return [
+                .rearDelts,
+                .upperBack
+            ]
+        }
+
+        if contains(
+            value,
+            "lat pulldown",
+            "pull down",
+            "pulldown",
+            "pull up",
+            "pullup",
+            "chin up",
+            "chinup"
+        ) {
+            return [
+                .lats,
+                .upperBack,
+                .biceps
+            ]
+        }
+
+        if contains(
+            value,
+            "row"
+        ) {
+            return [
+                .lats,
+                .upperBack,
+                .biceps,
+                .rearDelts
+            ]
+        }
+
+        if contains(
+            value,
+            "biceps",
+            "curl"
+        ) {
+            return [
+                .biceps,
+                .forearms
+            ]
+        }
+
+        if contains(
+            value,
+            "triceps",
+            "pushdown",
+            "push down",
+            "skull crusher"
+        ) {
+            return [.triceps]
+        }
+
+        if contains(
+            value,
+            "deadlift",
+            "romanian deadlift",
+            "rdl",
+            "good morning"
+        ) {
+            return [
+                .hamstrings,
+                .glutes,
+                .lowerBack
+            ]
+        }
+
+        if contains(
+            value,
+            "squat",
+            "leg press",
+            "lunge",
+            "split squat",
+            "step up"
+        ) {
+            return [
+                .quads,
+                .glutes,
+                .hamstrings
+            ]
+        }
+
+        if contains(
+            value,
+            "leg extension"
+        ) {
+            return [.quads]
+        }
+
+        if contains(
+            value,
+            "leg curl",
+            "hamstring curl"
+        ) {
+            return [.hamstrings]
+        }
+
+        if contains(
+            value,
+            "hip thrust",
+            "glute bridge"
+        ) {
+            return [
+                .glutes,
+                .hamstrings
+            ]
+        }
+
+        if contains(
+            value,
+            "calf raise"
+        ) {
+            return [.calves]
+        }
+
+        if contains(
+            value,
+            "plank",
+            "crunch",
+            "sit up",
+            "situp",
+            "ab wheel"
+        ) {
+            return [
+                .abs,
+                .obliques
             ]
         }
 
