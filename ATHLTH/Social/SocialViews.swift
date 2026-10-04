@@ -3186,6 +3186,55 @@ struct FriendProfileView: View {
                     tint: .purple
                 )
             }
+
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Strength",
+                        norwegian: "Styrke"
+                    ),
+                    systemImage:
+                        "dumbbell.fill"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Spacer()
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "ATHLTH records",
+                        norwegian:
+                            "ATHLTH-rekorder"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 7.2,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Strength PRs appear here when this athlete shares them.",
+                    norwegian:
+                        "Styrke-PR-er vises her når utøveren deler dem."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(.vertical, 4)
         }
         .padding(14)
         .background(
