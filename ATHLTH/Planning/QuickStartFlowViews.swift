@@ -917,6 +917,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
@@ -1285,6 +1286,22 @@ struct RunQuickStartSheet: View {
                 }
 
                 routeLocationProbe.refresh()
+            }
+            .onDisappear {
+                guard captureDevice == .iPhone,
+                      phoneWorkout.active != nil,
+                      !phoneWorkout.isUserMinimized
+                else {
+                    return
+                }
+
+                Task { @MainActor in
+                    await Task.yield()
+                    try? await Task.sleep(
+                        for: .milliseconds(120)
+                    )
+                    phoneWorkout.presentWorkout()
+                }
             }
             .onChange(
                 of: selectedRoute?.id
