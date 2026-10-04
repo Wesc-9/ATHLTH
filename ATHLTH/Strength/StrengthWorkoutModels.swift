@@ -317,6 +317,10 @@ struct StrengthRepPersonalRecord: Identifiable, Hashable {
     }
 
     var value: String {
+        guard weightKilograms > 0 else {
+            return "\(reps) reps"
+        }
+
         let weight: String
         if weightKilograms.rounded() == weightKilograms {
             weight = String(Int(weightKilograms))
