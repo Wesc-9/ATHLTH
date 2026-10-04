@@ -6253,7 +6253,11 @@ struct SessionEditorView: View {
                 targetKind:
                     exercise.targetKind,
                 targetDurationSeconds:
-                    exercise.targetDurationSeconds
+                    exercise.targetDurationSeconds,
+                loadKind:
+                    exercise.loadKind,
+                targetResistanceLevel:
+                    exercise.targetResistanceLevel
             )
         }
     }
@@ -6612,8 +6616,9 @@ struct SessionEditorView: View {
             planned.compactTargetSummary
         ]
 
-        if let weight = planned.targetWeightKilograms {
-            parts.append(String(format: "%.1f kg", weight))
+        if let load =
+                planned.compactLoadSummary {
+            parts.append(load)
         }
 
         if let rpe = planned.targetRPE {
@@ -6980,8 +6985,11 @@ struct PlannedExerciseEditorView: View {
         StrengthExerciseTargetKind
     @State private var reps: Int
     @State private var durationSeconds: Int
+    @State private var loadKind:
+        StrengthExerciseLoadKind
     @State private var weight: Double
-    @State private var useWeight: Bool
+    @State private var resistanceLevel: Int
+    @State private var useLoadTarget: Bool
 
     @State private var useRPE: Bool
     @State private var rpe: Double
@@ -7020,11 +7028,24 @@ struct PlannedExerciseEditorView: View {
                     .embeddedExercise
                     .defaultStrengthTargetDurationSeconds
         )
+        _loadKind = State(
+            initialValue:
+                exercise.resolvedLoadKind
+        )
         _weight = State(
             initialValue: exercise.targetWeightKilograms ?? 20
         )
-        _useWeight = State(
-            initialValue: exercise.targetWeightKilograms != nil
+        _resistanceLevel = State(
+            initialValue:
+                exercise
+                    .resolvedTargetResistanceLevel ??
+                5
+        )
+        _useLoadTarget = State(
+            initialValue:
+                exercise.targetWeightKilograms != nil ||
+                exercise.targetResistanceLevel != nil ||
+                exercise.resolvedLoadKind == .resistanceLevel
         )
 
         _useRPE = State(
@@ -7073,33 +7094,20 @@ struct PlannedExerciseEditorView: View {
                     targetRow
 
                     Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Target weight",
-                            norwegian: "Målvekt"
-                        ),
-                        isOn: $useWeight
+                        loadKind == .resistanceLevel
+                            ? ATHLTHLocalization.choose(
+                                english: "Resistance target",
+                                norwegian: "Motstandsmål"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Target weight",
+                                norwegian: "Målvekt"
+                            ),
+                        isOn: $useLoadTarget
                     )
 
-                    if useWeight {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Weight",
-                                    norwegian: "Vekt"
-                                )
-                            )
-                            Spacer()
-                            TextField(
-                                "kg",
-                                value: $weight,
-                                format: .number.precision(.fractionLength(0...2))
-                            )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 100)
-                            Text("kg")
-                                .foregroundStyle(.secondary)
-                        }
+                    if useLoadTarget {
+                        loadTargetRow
                     }
 
                     Stepper(
@@ -7149,7 +7157,8 @@ struct PlannedExerciseEditorView: View {
                     }
                 }
 
-                if targetKind == .reps {
+                if targetKind == .reps &&
+                    loadKind == .weightKilograms {
                     Section("Progression") {
                         Picker(
                             "Rule",
@@ -7247,8 +7256,18 @@ struct PlannedExerciseEditorView: View {
                             targetKind == .time
                                 ? durationSeconds
                                 : nil
+                        updated.loadKind =
+                            loadKind
                         updated.targetWeightKilograms =
-                            useWeight ? weight : nil
+                            useLoadTarget &&
+                            loadKind == .weightKilograms
+                                ? weight
+                                : nil
+                        updated.targetResistanceLevel =
+                            useLoadTarget &&
+                            loadKind == .resistanceLevel
+                                ? resistanceLevel
+                                : nil
                         updated.targetRPE =
                             useRPE ? rpe : nil
                         updated.targetRIR =
@@ -7260,7 +7279,8 @@ struct PlannedExerciseEditorView: View {
                             )
                             .nilIfEmpty
                         updated.progression =
-                            targetKind == .reps
+                            targetKind == .reps &&
+                            loadKind == .weightKilograms
                                 ? StrengthProgressionRule(
                                     kind: progressionKind,
                                     amount: max(progressionAmount, 0),
@@ -7280,6 +7300,103 @@ struct PlannedExerciseEditorView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+    }
+
+    private var loadTargetRow:
+        some View {
+        Group {
+            if loadKind == .resistanceLevel {
+                Stepper(
+                    value: $resistanceLevel,
+                    in: 1...10
+                ) {
+                    loadMenu(
+                        value:
+                            ATHLTHLocalization.choose(
+                                english: "Level \(resistanceLevel)",
+                                norwegian: "Steg \(resistanceLevel)"
+                            )
+                    )
+                }
+            } else {
+                HStack(spacing: 12) {
+                    loadMenu(
+                        value:
+                            String(
+                                format:
+                                    "%.1f kg",
+                                weight
+                            )
+                    )
+
+                    Spacer()
+
+                    TextField(
+                        "kg",
+                        value: $weight,
+                        format:
+                            .number
+                            .precision(
+                                .fractionLength(0...2)
+                            )
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 84)
+
+                    Text("kg")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func loadMenu(
+        value: String
+    ) -> some View {
+        Menu {
+            Button {
+                loadKind = .weightKilograms
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Weight",
+                        norwegian: "Vekt"
+                    ),
+                    systemImage:
+                        loadKind == .weightKilograms
+                            ? "checkmark"
+                            : "scalemass"
+                )
+            }
+
+            Button {
+                loadKind = .resistanceLevel
+                useLoadTarget = true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Resistance",
+                        norwegian: "Motstand"
+                    ),
+                    systemImage:
+                        loadKind == .resistanceLevel
+                            ? "checkmark"
+                            : "dial.medium"
+                )
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(
+                    "\(loadKind.title): \(value)"
+                )
+                .foregroundStyle(.primary)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
