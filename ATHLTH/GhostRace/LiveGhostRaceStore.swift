@@ -679,8 +679,23 @@ final class LiveGhostRaceStore:
                 }
 
                 while !Task.isCancelled {
+                    let interval:
+                        Duration
+
+                    switch self.room?.status {
+                    case .lobby,
+                         .countdown,
+                         .none:
+                        interval = .seconds(2)
+
+                    case .racing,
+                         .finished,
+                         .cancelled:
+                        interval = .seconds(12)
+                    }
+
                     try? await Task.sleep(
-                        for: .seconds(12)
+                        for: interval
                     )
 
                     guard
