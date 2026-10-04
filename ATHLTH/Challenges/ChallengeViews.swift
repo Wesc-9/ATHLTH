@@ -6305,6 +6305,145 @@ private struct ChallengeRouteSelectionView: View {
     }
 }
 
+private struct MeetupLocationSearchResult:
+    Identifiable {
+    let id = UUID()
+    let name: String
+    let address: String
+    let coordinate:
+        CLLocationCoordinate2D
+}
+
+@MainActor
+private final class MeetupLocationSearchStore:
+    ObservableObject {
+    @Published var query = ""
+    @Published private(set) var results:
+        [MeetupLocationSearchResult] = []
+    @Published private(set) var isSearching =
+        false
+
+    private var searchTask:
+        Task<Void, Never>?
+
+    deinit {
+        searchTask?.cancel()
+    }
+
+    func scheduleSearch(
+        _ text: String
+    ) {
+        searchTask?.cancel()
+
+        let trimmed =
+            text.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        guard trimmed.count >= 2 else {
+            results = []
+            isSearching = false
+            return
+        }
+
+        searchTask = Task {
+            try? await Task.sleep(
+                nanoseconds:
+                    320_000_000
+            )
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            await search(trimmed)
+        }
+    }
+
+    func clear() {
+        searchTask?.cancel()
+        query = ""
+        results = []
+        isSearching = false
+    }
+
+    private func search(
+        _ query: String
+    ) async {
+        isSearching = true
+        defer {
+            isSearching = false
+        }
+
+        let request =
+            MKLocalSearch.Request()
+        request.naturalLanguageQuery =
+            query
+
+        do {
+            let response =
+                try await MKLocalSearch(
+                    request: request
+                )
+                .start()
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            results =
+                response.mapItems
+                    .prefix(6)
+                    .map { item in
+                        let placemark =
+                            item.placemark
+                        let name =
+                            item.name?
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                        let address =
+                            placemark.title?
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+
+                        return MeetupLocationSearchResult(
+                            name:
+                                (name?.isEmpty ==
+                                    false)
+                                    ? name!
+                                    : (
+                                        address?
+                                            .isEmpty ==
+                                            false
+                                            ? address!
+                                            : ATHLTHLocalization.choose(
+                                                english:
+                                                    "Meetup point",
+                                                norwegian:
+                                                    "Møtested"
+                                            )
+                                    ),
+                            address:
+                                address ?? "",
+                            coordinate:
+                                placemark.coordinate
+                        )
+                    }
+        } catch {
+            guard !Task.isCancelled else {
+                return
+            }
+
+            results = []
+        }
+    }
+}
+
 struct MeetupLocationPicker: View {
     @Binding var coordinate: CLLocationCoordinate2D?
     @Binding var position: MapCameraPosition
