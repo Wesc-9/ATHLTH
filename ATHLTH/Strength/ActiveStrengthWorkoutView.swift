@@ -177,9 +177,11 @@ struct ActiveStrengthWorkoutView: View {
                         entry.exercise,
                         sets: $0,
                         reps: $1,
-                        targetWeightKilograms: $2,
-                        restSeconds: $3,
-                        warmUpSets: $4
+                        targetKind: $2,
+                        targetDurationSeconds: $3,
+                        targetWeightKilograms: $4,
+                        restSeconds: $5,
+                        warmUpSets: $6
                     )
                     pendingExercise = nil
                     loadDefaultsFromCurrentSet()
@@ -1069,13 +1071,27 @@ struct ActiveStrengthWorkoutView: View {
 
                 focusedHeroMetric(
                     value:
-                        "\(strength.draftReps)",
+                        currentStrengthTargetKind == .time
+                            ? TimeInterval(
+                                strength
+                                    .draftDurationSeconds
+                            )
+                            .clockDuration
+                            : "\(strength.draftReps)",
                     label:
-                        ATHLTHLocalization.choose(
-                            english: "REPS",
-                            norwegian: "REPS"
-                        ),
-                    icon: "repeat"
+                        currentStrengthTargetKind == .time
+                            ? ATHLTHLocalization.choose(
+                                english: "TIME",
+                                norwegian: "TID"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "REPS",
+                                norwegian: "REPS"
+                            ),
+                    icon:
+                        currentStrengthTargetKind == .time
+                            ? "timer"
+                            : "repeat"
                 )
 
                 focusedHeroDivider
@@ -1373,16 +1389,20 @@ struct ActiveStrengthWorkoutView: View {
                         suffix: "kg"
                     )
 
-                    focusedIntegerField(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Reps",
-                                norwegian:
-                                    "Repetisjoner"
-                            ),
-                        value:
-                            draftRepsBinding
-                    )
+                    if currentStrengthTargetKind == .time {
+                        focusedDurationField
+                    } else {
+                        focusedIntegerField(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Reps",
+                                    norwegian:
+                                        "Repetisjoner"
+                                ),
+                            value:
+                                draftRepsBinding
+                        )
+                    }
                 }
 
                 HStack(spacing: 10) {
@@ -1805,6 +1825,73 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         )
+    }
+
+    private var draftDurationBinding:
+        Binding<Int> {
+        Binding(
+            get: {
+                strength
+                    .draftDurationSeconds
+            },
+            set: { value in
+                strength.setDraft(
+                    durationSeconds:
+                        min(
+                            max(value, 15),
+                            7_200
+                        )
+                )
+            }
+        )
+    }
+
+    private var focusedDurationField:
+        some View {
+        premiumSetInputField(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Duration",
+                    norwegian: "Varighet"
+                ),
+            suffix: nil,
+            decrement: {
+                draftDurationBinding
+                    .wrappedValue =
+                    max(
+                        15,
+                        draftDurationBinding
+                            .wrappedValue -
+                            15
+                    )
+            },
+            increment: {
+                draftDurationBinding
+                    .wrappedValue =
+                    min(
+                        7_200,
+                        draftDurationBinding
+                            .wrappedValue +
+                            15
+                    )
+            }
+        ) {
+            Text(
+                TimeInterval(
+                    strength
+                        .draftDurationSeconds
+                )
+                .clockDuration
+            )
+            .font(
+                .system(
+                    size: 28,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+        }
     }
 
     private func focusedSetRest(
@@ -2760,8 +2847,34 @@ struct ActiveStrengthWorkoutView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 if set.isCompleted {
-                    if let reps = set.completedReps, let weight = set.completedWeightKilograms {
+                    if set.resolvedTargetKind == .time,
+                       let duration =
+                            set.completedDurationSeconds {
+                        HStack(spacing: 4) {
+                            Text(
+                                TimeInterval(duration)
+                                    .clockDuration
+                            )
+
+                            if let weight =
+                                    set.completedWeightKilograms {
+                                Text("·")
+                                Text(
+                                    "\(weight, specifier: "%.1f") kg"
+                                )
+                            }
+                        }
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    } else if let reps = set.completedReps,
+                              let weight = set.completedWeightKilograms {
                         Text("\(reps) reps × \(weight, specifier: "%.1f") kg")
+                            .font(.subheadline.weight(.semibold))
+                    } else if let reps =
+                                set.completedReps {
+                        Text("\(reps) reps")
                             .font(.subheadline.weight(.semibold))
                     } else {
                         Text("Set completed")
@@ -2794,7 +2907,19 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
                 } else {
-                    if let plannedReps = set.plannedReps {
+                    if set.resolvedTargetKind == .time,
+                       let duration =
+                            set.plannedDurationSeconds {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Target: \(TimeInterval(duration).clockDuration)",
+                                norwegian:
+                                    "Mål: \(TimeInterval(duration).clockDuration)"
+                            )
+                        )
+                        .font(.subheadline.weight(.medium))
+                    } else if let plannedReps = set.plannedReps {
                         Text(ATHLTHLocalization.format(
                             english: "Target: %d reps",
                             norwegian: "Mål: %d repetisjoner",
@@ -2802,8 +2927,13 @@ struct ActiveStrengthWorkoutView: View {
                         ))
                             .font(.subheadline.weight(.medium))
                     } else {
-                        Text("No rep target")
-                            .font(.subheadline.weight(.medium))
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "No target",
+                                norwegian: "Ingen mål"
+                            )
+                        )
+                        .font(.subheadline.weight(.medium))
                     }
 
                     Text(set.plannedWeightKilograms.map { String(format: "%.1f kg", $0) } ?? "No weight target")
@@ -2836,12 +2966,50 @@ struct ActiveStrengthWorkoutView: View {
                     plus: { strength.setDraft(weightKilograms: strength.draftWeightKilograms + 2.5) }
                 )
 
-                valueStepper(
-                    title: "Reps",
-                    value: "\(strength.draftReps)",
-                    minus: { strength.setDraft(reps: max(0, strength.draftReps - 1)) },
-                    plus: { strength.setDraft(reps: strength.draftReps + 1) }
-                )
+                if currentStrengthTargetKind == .time {
+                    valueStepper(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Duration",
+                                norwegian: "Varighet"
+                            ),
+                        value:
+                            TimeInterval(
+                                strength
+                                    .draftDurationSeconds
+                            )
+                            .clockDuration,
+                        minus: {
+                            strength.setDraft(
+                                durationSeconds:
+                                    max(
+                                        15,
+                                        strength
+                                            .draftDurationSeconds -
+                                            15
+                                    )
+                            )
+                        },
+                        plus: {
+                            strength.setDraft(
+                                durationSeconds:
+                                    min(
+                                        7_200,
+                                        strength
+                                            .draftDurationSeconds +
+                                            15
+                                    )
+                            )
+                        }
+                    )
+                } else {
+                    valueStepper(
+                        title: "Reps",
+                        value: "\(strength.draftReps)",
+                        minus: { strength.setDraft(reps: max(0, strength.draftReps - 1)) },
+                        plus: { strength.setDraft(reps: strength.draftReps + 1) }
+                    )
+                }
             }
             .padding(.top, 12)
 
@@ -3116,6 +3284,14 @@ struct ActiveStrengthWorkoutView: View {
         .off
     }
 
+    private var currentStrengthTargetKind:
+        StrengthExerciseTargetKind {
+        strength
+            .currentSet?
+            .resolvedTargetKind ??
+        .reps
+    }
+
     private var restDurationText: String {
         let restSeconds = strength.draftRestSeconds
 
@@ -3137,42 +3313,113 @@ private struct FreestyleExercisePrescriptionView: View {
 
     let entry: ExerciseLibraryEntry
     let onAdd:
-        (Int, Int?, Double?, Int?, Int) -> Void
+        (
+            Int,
+            Int?,
+            StrengthExerciseTargetKind,
+            Int?,
+            Double?,
+            Int?,
+            Int
+        ) -> Void
 
     @State private var sets = 3
+    @State private var targetKind:
+        StrengthExerciseTargetKind
     @State private var reps = 8
+    @State private var durationSeconds: Int
     @State private var restSeconds = 90
     @State private var warmUpSets = 0
     @State private var useWeightTarget = false
     @State private var weightKilograms = 20.0
+
+    init(
+        entry: ExerciseLibraryEntry,
+        onAdd: @escaping (
+            Int,
+            Int?,
+            StrengthExerciseTargetKind,
+            Int?,
+            Double?,
+            Int?,
+            Int
+        ) -> Void
+    ) {
+        self.entry = entry
+        self.onAdd = onAdd
+
+        let snapshot =
+            entry.exercise.snapshot
+        let initialKind =
+            snapshot.defaultStrengthTargetKind
+
+        _targetKind = State(
+            initialValue: initialKind
+        )
+        _durationSeconds = State(
+            initialValue:
+                snapshot
+                    .defaultStrengthTargetDurationSeconds
+        )
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        ExerciseArtwork(entry: entry, size: 62)
+                        ExerciseArtwork(
+                            entry: entry,
+                            size: 62
+                        )
 
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
                             Text(entry.name)
                                 .font(.headline)
 
                             Text(
-                                entry.exercise.primaryMuscles
+                                entry.exercise
+                                    .primaryMuscles
                                     .prefix(3)
-                                    .joined(separator: " · ")
+                                    .joined(
+                                        separator: " · "
+                                    )
                             )
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(
+                                .secondary
+                            )
                         }
                     }
                 }
 
-                Section("Prescription") {
-                    Stepper("Sets: \(sets)", value: $sets, in: 1...20)
-                    Stepper("Target reps: \(reps)", value: $reps, in: 1...100)
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Planned setup",
+                        norwegian: "Planlagt oppsett"
+                    )
+                ) {
                     Stepper(
-                        "Rest: \(restSeconds) sec",
+                        ATHLTHLocalization.format(
+                            english: "Sets: %d",
+                            norwegian: "Sett: %d",
+                            sets
+                        ),
+                        value: $sets,
+                        in: 1...20
+                    )
+
+                    targetRow
+
+                    Stepper(
+                        ATHLTHLocalization.format(
+                            english: "Rest: %d sec",
+                            norwegian: "Hvile: %d sek",
+                            restSeconds
+                        ),
                         value: $restSeconds,
                         in: 0...600,
                         step: 15
@@ -3187,7 +3434,10 @@ private struct FreestyleExercisePrescriptionView: View {
                         value: $warmUpSets,
                         in: 0...sets
                     )
-                    .onChange(of: sets) { _, newValue in
+                    .onChange(of: sets) {
+                        _,
+                        newValue in
+
                         warmUpSets =
                             min(
                                 warmUpSets,
@@ -3195,47 +3445,120 @@ private struct FreestyleExercisePrescriptionView: View {
                             )
                     }
 
-                    Toggle("Target weight", isOn: $useWeightTarget)
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Target weight",
+                            norwegian: "Målvekt"
+                        ),
+                        isOn:
+                            $useWeightTarget
+                    )
 
                     if useWeightTarget {
                         HStack {
-                            Text("Weight")
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Weight",
+                                    norwegian: "Vekt"
+                                )
+                            )
+
                             Spacer()
+
                             TextField(
                                 "kg",
-                                value: $weightKilograms,
-                                format: .number.precision(.fractionLength(0...2))
+                                value:
+                                    $weightKilograms,
+                                format:
+                                    .number
+                                    .precision(
+                                        .fractionLength(
+                                            0...2
+                                        )
+                                    )
                             )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
+                            .keyboardType(
+                                .decimalPad
+                            )
+                            .multilineTextAlignment(
+                                .trailing
+                            )
                             .frame(width: 95)
+
                             Text("kg")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(
+                                    .secondary
+                                )
                         }
                     }
                 }
 
                 Section {
-                    Text("You can log actual reps, weight and RPE set by set. The exercise is added immediately to the running workout.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        targetKind == .time
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "You can log the actual duration, weight and effort set by set. This choice applies only to this exercise in this workout.",
+                                norwegian:
+                                    "Du kan registrere faktisk varighet, vekt og anstrengelse sett for sett. Valget gjelder bare denne øvelsen i denne økten."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "You can log actual reps, weight and effort set by set. This choice applies only to this exercise in this workout.",
+                                norwegian:
+                                    "Du kan registrere faktiske repetisjoner, vekt og anstrengelse sett for sett. Valget gjelder bare denne øvelsen i denne økten."
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Add Exercise")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Add Exercise",
+                    norwegian: "Legg til øvelse"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Add",
+                            norwegian: "Legg til"
+                        )
+                    ) {
                         onAdd(
                             sets,
-                            reps,
-                            useWeightTarget ? weightKilograms : nil,
+                            targetKind == .reps
+                                ? reps
+                                : nil,
+                            targetKind,
+                            targetKind == .time
+                                ? durationSeconds
+                                : nil,
+                            useWeightTarget
+                                ? weightKilograms
+                                : nil,
                             restSeconds,
                             warmUpSets
                         )
@@ -3245,8 +3568,140 @@ private struct FreestyleExercisePrescriptionView: View {
             }
         }
     }
-}
 
+    private var targetRow:
+        some View {
+        HStack(spacing: 12) {
+            Menu {
+                Button {
+                    targetKind = .reps
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Target reps",
+                            norwegian: "Målreps"
+                        ),
+                        systemImage:
+                            targetKind == .reps
+                                ? "checkmark"
+                                : "repeat"
+                    )
+                }
+
+                Button {
+                    targetKind = .time
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ),
+                        systemImage:
+                            targetKind == .time
+                                ? "checkmark"
+                                : "timer"
+                    )
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(targetKind.title)
+                        .foregroundStyle(
+                            .primary
+                        )
+
+                    Image(
+                        systemName:
+                            "chevron.up.chevron.down"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+            }
+
+            Spacer()
+
+            Button {
+                adjustTarget(by: -1)
+            } label: {
+                Image(systemName: "minus")
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(
+                targetKind == .reps
+                    ? reps <= 1
+                    : durationSeconds <= 15
+            )
+
+            Text(targetValue)
+                .font(
+                    .body
+                        .monospacedDigit()
+                )
+                .frame(
+                    minWidth: 52
+                )
+
+            Button {
+                adjustTarget(by: 1)
+            } label: {
+                Image(systemName: "plus")
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var targetValue: String {
+        switch targetKind {
+        case .reps:
+            return "\(reps)"
+        case .time:
+            return
+                TimeInterval(
+                    durationSeconds
+                )
+                .clockDuration
+        }
+    }
+
+    private func adjustTarget(
+        by direction: Int
+    ) {
+        switch targetKind {
+        case .reps:
+            reps =
+                min(
+                    max(
+                        reps + direction,
+                        1
+                    ),
+                    100
+                )
+
+        case .time:
+            durationSeconds =
+                min(
+                    max(
+                        durationSeconds +
+                            direction * 15,
+                        15
+                    ),
+                    7_200
+                )
+        }
+    }
+}
 
 private struct StrengthExerciseSwapView: View {
     @Environment(\.dismiss) private var dismiss
