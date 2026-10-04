@@ -45,7 +45,7 @@ struct RecoveryTrendDay: Identifiable, Equatable {
     let trainingMinutes: Double
 }
 
-struct RecoveryTrainingLoadSummary: Equatable {
+struct RecoveryTrainingLoadSummary: Equatable, Hashable, Sendable {
     let acuteMinutes: Double
     let chronicWeeklyAverageMinutes: Double?
     let strengthMinutes: Double
@@ -304,7 +304,6 @@ final class RecoverySorenessStore: ObservableObject {
         }
 
         trimAndPersistIfNeeded()
-        objectWillChange.send()
     }
 
     private static func normalizedCheckInValue(
@@ -633,6 +632,18 @@ enum MuscleRecoveryEngine {
         soreness: RecoverySorenessStore,
         activityLoad: RecoveryTrainingLoadSummary = RecoveryTrendSnapshot.empty.trainingLoad
     ) -> [MuscleRecoveryStatus] {
+        statuses(
+            history: history,
+            sorenessRatings: soreness.todayRatings,
+            activityLoad: activityLoad
+        )
+    }
+
+    static func statuses(
+        history: [StrengthWorkoutLog],
+        sorenessRatings: [String: RecoverySorenessLevel],
+        activityLoad: RecoveryTrainingLoadSummary = RecoveryTrendSnapshot.empty.trainingLoad
+    ) -> [MuscleRecoveryStatus] {
         let now = Date()
         let cutoff = now.addingTimeInterval(-7 * 86_400)
         let baselineStart =
@@ -893,7 +904,7 @@ enum MuscleRecoveryEngine {
         let allGroups =
             Set(values.keys)
                 .union(
-                    soreness.todayRatings.keys
+                    sorenessRatings.keys
                 )
 
         return allGroups
@@ -902,7 +913,7 @@ enum MuscleRecoveryEngine {
                     values[group] ??
                     Accumulator()
                 let sorenessLevel =
-                    soreness.level(for: group)
+                    sorenessRatings[group] ?? .none
 
                 let strengthDoseMinutes =
                     max(
@@ -1527,12 +1538,6 @@ struct RecoveryTrendsCard: View {
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(ATHLTHTheme.accent)
 
-                    PointMark(
-                        x: .value(recoveryText("Day", "Dag"), day.date),
-                        y: .value(recoveryText("Value", "Verdi"), value)
-                    )
-                    .symbolSize(10)
-                    .foregroundStyle(ATHLTHTheme.accent)
                 }
             }
             .chartXAxis(.hidden)
@@ -2795,26 +2800,6 @@ struct MuscleRecoveryCard: View {
                         )
                     )
 
-                    PointMark(
-                        x: .value(
-                            recoveryText(
-                                "Day",
-                                "Dag"
-                            ),
-                            day.date
-                        ),
-                        y: .value(
-                            recoveryText(
-                                "Minutes",
-                                "Minutter"
-                            ),
-                            day.trainingMinutes
-                        )
-                    )
-                    .symbolSize(18)
-                    .foregroundStyle(
-                        forest
-                    )
                 }
                 .chartXAxis {
                     AxisMarks(

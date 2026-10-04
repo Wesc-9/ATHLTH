@@ -38,7 +38,42 @@ enum ATHLTHTheme {
     static let divider = Color.black.opacity(0.065)
 }
 
+private struct ATHLTHLightweightCardChromeKey:
+    EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var athlthLightweightCardChrome: Bool {
+        get {
+            self[
+                ATHLTHLightweightCardChromeKey.self
+            ]
+        }
+        set {
+            self[
+                ATHLTHLightweightCardChromeKey.self
+            ] = newValue
+        }
+    }
+}
+
+extension View {
+    func athlthLightweightCardChrome(
+        _ enabled: Bool = true
+    ) -> some View {
+        environment(
+            \.athlthLightweightCardChrome,
+            enabled
+        )
+    }
+}
+
 struct ATHLTHCard<Content: View>: View {
+    @Environment(
+        \.athlthLightweightCardChrome
+    ) private var lightweightChrome
+
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -78,10 +113,22 @@ struct ATHLTHCard<Content: View>: View {
             )
         }
         .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.075),
-            radius: 16,
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(
+                        lightweightChrome
+                            ? 0.045
+                            : 0.075
+                    ),
+            radius:
+                lightweightChrome
+                    ? 9
+                    : 16,
             x: 0,
-            y: 7
+            y:
+                lightweightChrome
+                    ? 4
+                    : 7
         )
     }
 }

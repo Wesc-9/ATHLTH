@@ -6761,6 +6761,9 @@ struct ATHLTHRecoveryView: View {
     @State private var showingRecoveryInfo = false
     @State private var showingRecoveryCoach = false
     @State private var selectedRecoveryTool: RecoveryTool?
+    @State private var recoveryDerivedSnapshot =
+        RecoveryDerivedSnapshot.empty
+    @State private var recoveryDerivedGeneration = 0
 
     private struct RecoveryChangeItem: Identifiable {
         let id: String
@@ -6974,17 +6977,67 @@ struct ATHLTHRecoveryView: View {
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
+                .athlthLightweightCardChrome()
             }
             .refreshable {
+                let performanceID =
+                    ATHLTHPerformance.begin(
+                        "InsightRefresh"
+                    )
+                defer {
+                    ATHLTHPerformance.end(
+                        "InsightRefresh",
+                        id: performanceID
+                    )
+                }
+
                 await health.refreshAll()
                 recoverySnapshot =
                     await health.recoveryTrendSnapshot()
-                await loadRecoveryAIIfNeeded(force: true)
+                await refreshRecoveryDerivedSnapshot()
+                await loadRecoveryAIIfNeeded(
+                    force: true
+                )
             }
             .task {
+                let performanceID =
+                    ATHLTHPerformance.begin(
+                        "InsightInitialLoad"
+                    )
+                defer {
+                    ATHLTHPerformance.end(
+                        "InsightInitialLoad",
+                        id: performanceID
+                    )
+                }
+
                 recoverySnapshot =
                     await health.recoveryTrendSnapshot()
+                await refreshRecoveryDerivedSnapshot()
                 await loadRecoveryAIIfNeeded()
+            }
+            .onReceive(
+                strengthWorkout
+                    .$workoutHistory
+                    .dropFirst()
+            ) { _ in
+                Task { @MainActor in
+                    await refreshRecoveryDerivedSnapshot()
+                }
+            }
+            .onReceive(
+                sorenessStore
+                    .$entries
+                    .dropFirst()
+            ) { _ in
+                Task { @MainActor in
+                    await refreshRecoveryDerivedSnapshot()
+                }
+            }
+            .onAppear {
+                ATHLTHPerformance.event(
+                    "InsightAppear"
+                )
             }
             .sheet(isPresented: $showingSorenessLog) {
                 RecoverySorenessLogView(
@@ -9050,19 +9103,12 @@ struct ATHLTHRecoveryView: View {
     }
 
     private var muscleRecoveryStatuses: [MuscleRecoveryStatus] {
-        MuscleRecoveryEngine.statuses(
-            history: strengthWorkout.workoutHistory,
-            soreness: sorenessStore,
-            activityLoad: recoverySnapshot.trainingLoad
-        )
+        recoveryDerivedSnapshot.statuses
     }
 
     private var unmappedMuscleExercises: [String] {
-        MuscleRecoveryEngine
-            .unmappedExerciseNames(
-                history:
-                    strengthWorkout.workoutHistory
-            )
+        recoveryDerivedSnapshot
+            .unmappedExerciseNames
     }
 
     private var recoveryAIContext: RecoveryAIContext {
@@ -9213,6 +9259,38 @@ struct ATHLTHRecoveryView: View {
     }
 
     @MainActor
+    private func refreshRecoveryDerivedSnapshot()
+        async {
+        recoveryDerivedGeneration &+= 1
+        let generation =
+            recoveryDerivedGeneration
+        let history =
+            strengthWorkout.workoutHistory
+        let sorenessRatings =
+            sorenessStore.todayRatings
+        let activityLoad =
+            recoverySnapshot.trainingLoad
+
+        let snapshot =
+            await RecoveryDerivedSnapshotBuilder
+                .build(
+                    history: history,
+                    sorenessRatings:
+                        sorenessRatings,
+                    activityLoad:
+                        activityLoad
+                )
+
+        guard generation ==
+                recoveryDerivedGeneration
+        else {
+            return
+        }
+
+        recoveryDerivedSnapshot = snapshot
+    }
+
+    @MainActor
     private func loadRecoveryAIIfNeeded(
         force: Bool = false
     ) async {
@@ -9230,7 +9308,17 @@ struct ATHLTHRecoveryView: View {
 
         isLoadingRecoveryAI = true
         recoveryAIError = nil
-        defer { isLoadingRecoveryAI = false }
+        let performanceID =
+            ATHLTHPerformance.begin(
+                "RecoveryAILoad"
+            )
+        defer {
+            isLoadingRecoveryAI = false
+            ATHLTHPerformance.end(
+                "RecoveryAILoad",
+                id: performanceID
+            )
+        }
 
         do {
             recoveryAIInsight = try await RecoveryAIService()

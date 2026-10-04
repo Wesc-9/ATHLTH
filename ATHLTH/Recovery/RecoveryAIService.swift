@@ -68,6 +68,27 @@ private struct RecoveryAIInsightCacheEntry: Codable {
     let insight: RecoveryAIInsight
 }
 
+private struct RecoveryAICacheMuscle: Codable {
+    let name: String
+    let completedSets: Int
+}
+
+private struct RecoveryAICacheSignature: Codable {
+    let recoveryScore: Int?
+    let recoveryState: String
+    let sleepSeconds: Double?
+    let baselineSleepSeconds: Double?
+    let hrvMilliseconds: Double?
+    let baselineHRVMilliseconds: Double?
+    let restingHeartRate: Double?
+    let baselineRestingHeartRate: Double?
+    let yesterdayTrainingMinutes: Double
+    let acuteTrainingMinutes: Double
+    let chronicWeeklyAverageMinutes: Double?
+    let muscles: [RecoveryAICacheMuscle]
+    let checkIn: RecoveryAICheckIn
+}
+
 private struct RecoveryAIAnswer: Decodable {
     let answer: String
 }
@@ -86,7 +107,10 @@ final class RecoveryAIService {
         _ context: RecoveryAIContext,
         bypassCache: Bool = false
     ) async throws -> RecoveryAIInsight {
-        let signature = try contextSignature(context)
+        let signature =
+            try Self.cacheSignature(
+                for: context
+            )
         let userScope =
             client.auth.currentUser?.id.uuidString
             ?? "signed-out"
@@ -108,8 +132,15 @@ final class RecoveryAIService {
            cached.signature == signature,
            Date().timeIntervalSince(cached.createdAt) <
                 6 * 60 * 60 {
+            ATHLTHPerformance.event(
+                "RecoveryAICacheHit"
+            )
             return cached.insight
         }
+
+        ATHLTHPerformance.event(
+            "RecoveryAICacheMiss"
+        )
 
         let insight: RecoveryAIInsight =
             try await client.functions.invoke(
@@ -143,14 +174,62 @@ final class RecoveryAIService {
         return insight
     }
 
-    private func contextSignature(
-        _ context: RecoveryAIContext
+    static func cacheSignature(
+        for context: RecoveryAIContext
     ) throws -> String {
+        // Passive time progression must not invalidate the six-hour cache.
+        // Muscle recovery percentage/status are time-derived, so the cache
+        // key keeps only muscle identity + completed load. New Health data,
+        // new workouts and new check-ins still change the signature.
+        let stableContext =
+            RecoveryAICacheSignature(
+                recoveryScore:
+                    context.recoveryScore,
+                recoveryState:
+                    context.recoveryState,
+                sleepSeconds:
+                    context.sleepSeconds,
+                baselineSleepSeconds:
+                    context.baselineSleepSeconds,
+                hrvMilliseconds:
+                    context.hrvMilliseconds,
+                baselineHRVMilliseconds:
+                    context.baselineHRVMilliseconds,
+                restingHeartRate:
+                    context.restingHeartRate,
+                baselineRestingHeartRate:
+                    context.baselineRestingHeartRate,
+                yesterdayTrainingMinutes:
+                    context.yesterdayTrainingMinutes,
+                acuteTrainingMinutes:
+                    context.acuteTrainingMinutes,
+                chronicWeeklyAverageMinutes:
+                    context.chronicWeeklyAverageMinutes,
+                muscles:
+                    context.muscles.map {
+                        RecoveryAICacheMuscle(
+                            name: $0.name,
+                            completedSets:
+                                $0.completedSets
+                        )
+                    },
+                checkIn:
+                    context.checkIn
+            )
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(context)
+        let data =
+            try encoder.encode(
+                stableContext
+            )
         return SHA256.hash(data: data)
-            .map { String(format: "%02x", $0) }
+            .map {
+                String(
+                    format: "%02x",
+                    $0
+                )
+            }
             .joined()
     }
 

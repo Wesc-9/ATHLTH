@@ -847,46 +847,94 @@ final class HealthKitManager: ObservableObject {
         }
 
         isRefreshing = true
-        recoveryTrendCache.removeAll()
         defer { isRefreshing = false }
 
-        let previousSleepDuration = sleep.totalAsleep
+        let previousSleepDuration =
+            sleep.totalAsleep
+        let previousHRV =
+            heart.hrvMilliseconds
+        let previousRestingHeartRate =
+            heart.restingHeartRate
+        let previousRespiratoryRate =
+            training.respiratoryRate
 
         async let sleepTask = fetchLatestSleep()
         async let heartTask = fetchHeartSummary()
         async let trainingTask = fetchTrainingSummary()
+        async let profileTask =
+            fetchPersonalDetailsSnapshot()
 
-        var sleepReadSucceeded = false
-        var heartReadSucceeded = false
+        let fetchedSleep =
+            try? await sleepTask
+        let fetchedHeart =
+            try? await heartTask
+        let fetchedTraining =
+            try? await trainingTask
+        let fetchedProfile =
+            await profileTask
 
-        if let fetchedSleep = try? await sleepTask {
-            sleep = fetchedSleep
-            sleepReadSucceeded = true
+        let refreshedRecovery:
+            RecoveryReadinessSummary?
+        if let fetchedSleep,
+           let fetchedHeart {
+            refreshedRecovery =
+                try? await fetchRecoveryReadiness(
+                    currentSleep:
+                        fetchedSleep,
+                    currentHeart:
+                        fetchedHeart
+                )
+        } else {
+            refreshedRecovery = nil
+        }
 
-            if fetchedSleep.totalAsleep != previousSleepDuration {
+        let recoveryTrendInputsChanged =
+            (
+                fetchedSleep.map {
+                    $0.totalAsleep !=
+                        previousSleepDuration
+                } ?? false
+            ) ||
+            (
+                fetchedHeart.map {
+                    $0.hrvMilliseconds !=
+                        previousHRV ||
+                    $0.restingHeartRate !=
+                        previousRestingHeartRate
+                } ?? false
+            ) ||
+            (
+                fetchedTraining.map {
+                    $0.respiratoryRate !=
+                        previousRespiratoryRate
+                } ?? false
+            )
+
+        if recoveryTrendInputsChanged {
+            recoveryTrendCache.removeAll()
+        }
+
+        if let fetchedSleep {
+            if fetchedSleep.totalAsleep !=
+                previousSleepDuration {
                 invalidateTrophySnapshotCache()
             }
+            sleep = fetchedSleep
         }
 
-        if let fetchedHeart = try? await heartTask {
+        if let fetchedHeart {
             heart = fetchedHeart
-            heartReadSucceeded = true
         }
 
-        if let fetchedTraining = try? await trainingTask {
+        if let fetchedTraining {
             training = fetchedTraining
         }
 
-        if sleepReadSucceeded,
-           heartReadSucceeded,
-           let refreshedRecovery = try? await fetchRecoveryReadiness(
-                currentSleep: sleep,
-                currentHeart: heart
-           ) {
+        if let refreshedRecovery {
             recovery = refreshedRecovery
         }
 
-        await refreshPersonalDetails()
+        personalDetails = fetchedProfile
     }
 
     func refreshAll() async {
@@ -914,7 +962,6 @@ final class HealthKitManager: ObservableObject {
 
         isRefreshing = true
         authorizationError = nil
-        recoveryTrendCache.removeAll()
         defer {
             isRefreshing = false
             defaults.set(
@@ -925,15 +972,27 @@ final class HealthKitManager: ObservableObject {
         }
 
         let end = Date()
-        let start = Calendar.current.date(byAdding: .month, value: -3, to: end)
-            ?? end.addingTimeInterval(-7_776_000)
+        let start =
+            Calendar.current.date(
+                byAdding: .month,
+                value: -3,
+                to: end
+            ) ??
+            end.addingTimeInterval(
+                -7_776_000
+            )
 
-        let previousWorkoutIDs = Set(workouts.map(\.id))
-        let previousSleepDuration = sleep.totalAsleep
+        let previousWorkoutIDs =
+            Set(workouts.map(\.id))
+        let previousSleepDuration =
+            sleep.totalAsleep
+        let previousHRV =
+            heart.hrvMilliseconds
+        let previousRestingHeartRate =
+            heart.restingHeartRate
+        let previousRespiratoryRate =
+            training.respiratoryRate
 
-        // These HealthKit reads are independent. Starting them together keeps
-        // launch/tab refresh latency close to the slowest query instead of
-        // adding every query's latency together.
         async let workoutsTask = fetchWorkouts(
             startDate: start,
             endDate: end,
@@ -942,25 +1001,88 @@ final class HealthKitManager: ObservableObject {
         async let sleepTask = fetchLatestSleep()
         async let heartTask = fetchHeartSummary()
         async let trainingTask = fetchTrainingSummary()
+        async let profileTask =
+            fetchPersonalDetailsSnapshot()
 
-        var completedRead = false
-        var sleepReadSucceeded = false
-        var heartReadSucceeded = false
+        var fetchedWorkouts: [HKWorkout]?
+        var fetchedSleep: SleepSummary?
+        var fetchedHeart: HeartSummary?
+        var fetchedTraining:
+            TrainingHealthSummary?
         var failures: [String] = []
 
         do {
-            let fetched = try await workoutsTask
-            let summaries = fetched.map(WorkoutSummary.init)
-            workouts = summaries
-            workoutObjects = fetched.reduce(into: [:]) { result, workout in
-                result[workout.uuid] = workout
-            }
+            fetchedWorkouts =
+                try await workoutsTask
+        } catch {
+            failures.append(
+                "Workouts: \(error.localizedDescription)"
+            )
+        }
 
-            let latestFetchedWorkout = fetched.max {
-                $0.endDate < $1.endDate
-            }
+        do {
+            fetchedSleep =
+                try await sleepTask
+        } catch {
+            failures.append(
+                "Sleep: \(error.localizedDescription)"
+            )
+        }
 
-            let recentWorkoutsChanged: Bool
+        do {
+            fetchedHeart =
+                try await heartTask
+        } catch {
+            failures.append(
+                "Heart: \(error.localizedDescription)"
+            )
+        }
+
+        do {
+            fetchedTraining =
+                try await trainingTask
+        } catch {
+            failures.append(
+                "Activity: \(error.localizedDescription)"
+            )
+        }
+
+        let fetchedProfile =
+            await profileTask
+
+        var fetchedRecovery:
+            RecoveryReadinessSummary?
+        if let fetchedSleep,
+           let fetchedHeart {
+            do {
+                fetchedRecovery =
+                    try await fetchRecoveryReadiness(
+                        currentSleep:
+                            fetchedSleep,
+                        currentHeart:
+                            fetchedHeart
+                    )
+            } catch {
+                failures.append(
+                    "Recovery: \(error.localizedDescription)"
+                )
+            }
+        }
+
+        var completedRead = false
+        var recentWorkoutsChanged = false
+
+        if let fetchedWorkouts {
+            let summaries =
+                fetchedWorkouts.map(
+                    WorkoutSummary.init
+                )
+            let latestFetchedWorkout =
+                fetchedWorkouts.max {
+                    $0.endDate <
+                        $1.endDate
+                }
+
             if previousWorkoutIDs.isEmpty,
                trophySnapshotCache != nil {
                 recentWorkoutsChanged =
@@ -978,79 +1100,89 @@ final class HealthKitManager: ObservableObject {
                 invalidateWorkoutDerivedCaches()
             }
 
+            workouts = summaries
+            workoutObjects =
+                fetchedWorkouts.reduce(
+                    into: [:]
+                ) {
+                    result,
+                    workout in
+                    result[workout.uuid] =
+                        workout
+                }
             completedRead = true
-        } catch {
-            failures.append("Workouts: \(error.localizedDescription)")
         }
 
-        do {
-            let fetchedSleep = try await sleepTask
-            sleep = fetchedSleep
+        let signalInputsChanged =
+            (
+                fetchedSleep.map {
+                    $0.totalAsleep !=
+                        previousSleepDuration
+                } ?? false
+            ) ||
+            (
+                fetchedHeart.map {
+                    $0.hrvMilliseconds !=
+                        previousHRV ||
+                    $0.restingHeartRate !=
+                        previousRestingHeartRate
+                } ?? false
+            ) ||
+            (
+                fetchedTraining.map {
+                    $0.respiratoryRate !=
+                        previousRespiratoryRate
+                } ?? false
+            )
 
-            let sleepChanged: Bool
-            if previousSleepDuration == 0,
-               let cachedDuration =
-                    trophyCacheLatestSleepDuration {
-                sleepChanged =
-                    fetchedSleep.totalAsleep !=
-                    cachedDuration
-            } else {
-                sleepChanged =
-                    fetchedSleep.totalAsleep !=
-                    previousSleepDuration
-            }
+        if signalInputsChanged {
+            recoveryTrendCache.removeAll()
+        }
 
-            if sleepChanged {
+        if let fetchedSleep {
+            if fetchedSleep.totalAsleep !=
+                previousSleepDuration {
                 invalidateTrophySnapshotCache()
             }
-            sleepReadSucceeded = true
+            sleep = fetchedSleep
             completedRead = true
-        } catch {
-            failures.append("Sleep: \(error.localizedDescription)")
         }
 
-        do {
-            heart = try await heartTask
-            heartReadSucceeded = true
+        if let fetchedHeart {
+            heart = fetchedHeart
             completedRead = true
-        } catch {
-            failures.append("Heart: \(error.localizedDescription)")
         }
 
-        do {
-            training = try await trainingTask
+        if let fetchedTraining {
+            training = fetchedTraining
             completedRead = true
-        } catch {
-            failures.append("Activity: \(error.localizedDescription)")
         }
 
-        if sleepReadSucceeded &&
-            heartReadSucceeded {
-            do {
-                recovery = try await fetchRecoveryReadiness(
-                    currentSleep: sleep,
-                    currentHeart: heart
-                )
-                completedRead = true
-            } catch {
-                failures.append(
-                    "Recovery: \(error.localizedDescription)"
-                )
-            }
+        if let fetchedRecovery {
+            recovery = fetchedRecovery
+            completedRead = true
         }
 
-        await refreshPersonalDetails()
+        personalDetails = fetchedProfile
 
-        if completedRead || personalDetails.hasAnyValue {
+        if completedRead ||
+            fetchedProfile.hasAnyValue {
             let refreshedAt = Date()
-            lastSuccessfulRefreshAt = refreshedAt
-            defaults.set(refreshedAt, forKey: lastSuccessfulRefreshKey)
+            lastSuccessfulRefreshAt =
+                refreshedAt
+            defaults.set(
+                refreshedAt,
+                forKey:
+                    lastSuccessfulRefreshKey
+            )
         }
 
-        if let firstFailure = failures.first {
-            authorizationError = failures.count == 1
-                ? firstFailure
-                : "\(firstFailure) (+\(failures.count - 1) more)"
+        if let firstFailure =
+                failures.first {
+            authorizationError =
+                failures.count == 1
+                    ? firstFailure
+                    : "\(firstFailure) (+\(failures.count - 1) more)"
         }
     }
 
@@ -1179,16 +1311,26 @@ final class HealthKitManager: ObservableObject {
         previousEndDate: Date,
         grouping: HealthProgressGrouping
     ) async throws -> HealthProgressSnapshot {
-        let current = try await progressMetrics(
-            startDate: startDate,
-            endDate: endDate,
-            grouping: grouping
-        )
-        let previous = try await progressMetrics(
-            startDate: previousStartDate,
-            endDate: previousEndDate,
-            grouping: grouping
-        )
+        async let currentTask =
+            progressMetrics(
+                startDate: startDate,
+                endDate: endDate,
+                grouping: grouping
+            )
+        async let previousTask =
+            progressMetrics(
+                startDate:
+                    previousStartDate,
+                endDate:
+                    previousEndDate,
+                grouping: grouping
+            )
+
+        let (current, previous) =
+            try await (
+                currentTask,
+                previousTask
+            )
 
         return HealthProgressSnapshot(
             startDate: startDate,
@@ -1218,7 +1360,21 @@ final class HealthKitManager: ObservableObject {
 
         if let cached = recoveryTrendCache[resolvedDays],
            Date().timeIntervalSince(cached.generatedAt) < 120 {
+            ATHLTHPerformance.event(
+                "RecoveryTrendCacheHit"
+            )
             return cached.snapshot
+        }
+
+        let performanceID =
+            ATHLTHPerformance.begin(
+                "RecoveryTrendLoad"
+            )
+        defer {
+            ATHLTHPerformance.end(
+                "RecoveryTrendLoad",
+                id: performanceID
+            )
         }
 
         let calendar = Calendar.current
@@ -3095,18 +3251,32 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshPersonalDetails() async {
+        personalDetails =
+            await fetchPersonalDetailsSnapshot()
+    }
+
+    private func fetchPersonalDetailsSnapshot()
+        async -> HealthProfileBasics {
         guard healthDataAvailable else {
-            personalDetails = .empty
-            return
+            return .empty
         }
 
-        var details = HealthProfileBasics.empty
+        var details =
+            HealthProfileBasics.empty
 
-        if let components = try? healthStore.dateOfBirthComponents() {
-            details.dateOfBirth = Calendar.current.date(from: components)
+        if let components =
+                try? healthStore
+                    .dateOfBirthComponents() {
+            details.dateOfBirth =
+                Calendar.current.date(
+                    from: components
+                )
         }
 
-        if let biologicalSex = try? healthStore.biologicalSex().biologicalSex {
+        if let biologicalSex =
+                try? healthStore
+                    .biologicalSex()
+                    .biologicalSex {
             switch biologicalSex {
             case .female:
                 details.healthSex = .female
@@ -3121,17 +3291,25 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
-        details.heightCentimeters = try? await latestQuantity(
-            identifier: .height,
-            unit: HKUnit.meterUnit(with: .centi)
-        )?.0
+        details.heightCentimeters =
+            try? await latestQuantity(
+                identifier: .height,
+                unit:
+                    HKUnit.meterUnit(
+                        with: .centi
+                    )
+            )?.0
 
-        details.weightKilograms = try? await latestQuantity(
-            identifier: .bodyMass,
-            unit: HKUnit.gramUnit(with: .kilo)
-        )?.0
+        details.weightKilograms =
+            try? await latestQuantity(
+                identifier: .bodyMass,
+                unit:
+                    HKUnit.gramUnit(
+                        with: .kilo
+                    )
+            )?.0
 
-        personalDetails = details
+        return details
     }
 
     func authorizationRequestStatusDescription() async -> String {
@@ -4014,6 +4192,7 @@ final class HealthKitManager: ObservableObject {
         workoutRouteCache.removeAll(keepingCapacity: true)
         profilePerformanceCache = nil
         personalRecordsCache = nil
+        recoveryTrendCache.removeAll()
         invalidateTrophySnapshotCache()
     }
 
