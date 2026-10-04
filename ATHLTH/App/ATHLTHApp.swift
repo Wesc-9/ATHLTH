@@ -392,6 +392,12 @@ struct AppRootView: View {
                     route: payload.route,
                     workout: runningWorkout,
                     captureDevice: captureDevice,
+                    environment:
+                        envelope.runEnvironment ??
+                        .outdoor,
+                    treadmillInclinePercent:
+                        envelope
+                            .treadmillInclinePercent,
                     audioCoach:
                         envelope.watchAudioCoach ??
                         payload.workout
