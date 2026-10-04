@@ -1546,23 +1546,40 @@ struct FriendProfileView: View {
                     if profile.card.isPrivateProfile &&
                         !social.isFollowing(userID) {
                         privateProfileNotice
-                    }
-
-                    // Keep the same visual order as the owner's profile.
-                    // Privacy/RLS still controls which remote data exists.
-                    if !profile.trophies.isEmpty {
+                    } else {
+                        // Other profiles deliberately use the same section
+                        // order and visual rhythm as the owner's profile.
                         trophyCard(profile.trophies)
-                    }
 
-                    if let performance = profile.performance {
-                        performanceCard(performance)
-                    }
+                        if let performance =
+                                profile.performance {
+                            performanceCard(
+                                performance
+                            )
+                        } else {
+                            remoteEmptySection(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Personal records",
+                                        norwegian:
+                                            "Personlige rekorder"
+                                    ),
+                                icon:
+                                    "chart.bar.fill",
+                                message:
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "No shared records yet.",
+                                        norwegian:
+                                            "Ingen delte rekorder ennå."
+                                    )
+                            )
+                        }
 
-                    if !profile.gear.isEmpty {
-                        remoteGearCard(profile.gear)
-                    }
-
-                    if !profile.workoutMedia.isEmpty {
+                        remoteGearCard(
+                            profile.gear
+                        )
                         remoteHighlightsCard(
                             profile.workoutMedia
                         )
@@ -1579,7 +1596,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 142)
+            .padding(.top, 168)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1884,7 +1901,7 @@ struct FriendProfileView: View {
     private func remoteProfileStats(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             remoteHeroStat(
                 value:
                     followOverview
@@ -1949,16 +1966,16 @@ struct FriendProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 9.5,
+                            size: 8.8,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 12)
+                    .frame(width: 11)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 11,
+                            size: 10.2,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1971,7 +1988,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 6.8,
+                        size: 6.3,
                         weight: .medium
                     )
                 )
@@ -1979,19 +1996,19 @@ struct FriendProfileView: View {
                 .minimumScaleFactor(0.58)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 1)
         .frame(maxWidth: .infinity)
-        .frame(height: 34)
+        .frame(height: 30)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 12,
+                cornerRadius: 11,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 13,
+                cornerRadius: 11,
                 style: .continuous
             )
             .stroke(
@@ -2441,6 +2458,74 @@ struct FriendProfileView: View {
         }
     }
 
+    private func remoteEmptySection(
+        title: String,
+        icon: String,
+        message: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Label(
+                title,
+                systemImage: icon
+            )
+            .font(.title3.weight(.bold))
+
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "minus.circle"
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                Spacer()
+            }
+            .padding(10)
+            .background(
+                Color.black.opacity(0.022),
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.91),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.88),
+                lineWidth: 0.9
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 14,
+            y: 6
+        )
+    }
+
     private func remoteGearCard(
         _ items: [ProfileGearItem]
     ) -> some View {
@@ -2474,10 +2559,25 @@ struct FriendProfileView: View {
                 )
             }
 
-            HStack(spacing: 8) {
-                ForEach(
-                    Array(items.prefix(3))
-                ) { item in
+            if items.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No shared gear yet.",
+                        norwegian:
+                            "Ingen delt utstyr ennå."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .padding(.vertical, 6)
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(
+                        Array(items.prefix(3))
+                    ) { item in
                     HStack(spacing: 7) {
                         Image(
                             systemName:
@@ -2563,6 +2663,7 @@ struct FriendProfileView: View {
                                     .continuous
                             )
                     )
+                    }
                 }
             }
         }
@@ -2630,10 +2731,25 @@ struct FriendProfileView: View {
                 )
             }
 
-            HStack(spacing: 8) {
-                ForEach(
-                    Array(media.prefix(4))
-                ) { item in
+            if media.isEmpty {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No shared photos or highlights yet.",
+                        norwegian:
+                            "Ingen delte bilder eller høydepunkter ennå."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .padding(.vertical, 6)
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(
+                        Array(media.prefix(4))
+                    ) { item in
                     AsyncImage(
                         url:
                             URL(
@@ -2675,6 +2791,7 @@ struct FriendProfileView: View {
                             style: .continuous
                         )
                     )
+                    }
                 }
             }
         }
@@ -3243,7 +3360,7 @@ struct FriendProfileView: View {
                         let item =
                             items[index]
 
-                        VStack(spacing: 5) {
+                        VStack(spacing: 3) {
                             ZStack {
                                 ATHLTHTrophyPlateShape()
                                     .fill(
@@ -3271,14 +3388,14 @@ struct FriendProfileView: View {
                                     )
                             }
                             .frame(
-                                width: 16,
-                                height: 18
+                                width: 12,
+                                height: 14
                             )
 
                             Text(item.title)
                                 .font(
                                     .system(
-                                        size: 6.6,
+                                        size: 6.1,
                                         weight: .bold
                                     )
                                 )
@@ -3305,8 +3422,8 @@ struct FriendProfileView: View {
                                         )
                                 )
                                 .frame(
-                                    width: 17,
-                                    height: 19
+                                    width: 13,
+                                    height: 15
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
