@@ -18,6 +18,8 @@ struct ActiveStrengthWorkoutView: View {
     @State private var watchFinishError: String?
     @State private var showingExerciseLibrary = false
     @State private var pendingExercise: ExerciseLibraryEntry?
+    @State private var editingSetResult:
+        StrengthSetResultEditTarget?
     @State private var showingExerciseSwap = false
     @State private var showingExerciseGroupBuilder = false
     @State private var showingExerciseRestEditor = false
@@ -179,11 +181,39 @@ struct ActiveStrengthWorkoutView: View {
                         reps: $1,
                         targetKind: $2,
                         targetDurationSeconds: $3,
-                        targetWeightKilograms: $4,
-                        restSeconds: $5,
-                        warmUpSets: $6
+                        loadKind: $4,
+                        targetWeightKilograms: $5,
+                        targetResistanceLevel: $6,
+                        restSeconds: $7,
+                        warmUpSets: $8
                     )
                     pendingExercise = nil
+                    loadDefaultsFromCurrentSet()
+                }
+            }
+            .sheet(
+                item: $editingSetResult
+            ) { target in
+                StrengthSetResultEditorView(
+                    target: target
+                ) {
+                    segments,
+                    distanceMeters,
+                    resistanceLevel in
+
+                    strength.updateActiveSetResult(
+                        exerciseID:
+                            target.exerciseID,
+                        setID:
+                            target.set.id,
+                        segments:
+                            segments,
+                        distanceMeters:
+                            distanceMeters,
+                        resistanceLevel:
+                            resistanceLevel
+                    )
+                    editingSetResult = nil
                     loadDefaultsFromCurrentSet()
                 }
             }
@@ -889,9 +919,23 @@ struct ActiveStrengthWorkoutView: View {
                     exercise: exercise
                 )
             } else if strength.isResting {
-                focusedSetRest(
-                    exercise: exercise
-                )
+                VStack(spacing: 12) {
+                    focusedSetRest(
+                        exercise: exercise
+                    )
+
+                    if exercise.exercise
+                        .supportsStrengthDistanceResult,
+                       let latest =
+                            latestCompletedSet(
+                                in: exercise
+                            ) {
+                        postSetResultButton(
+                            exercise: exercise,
+                            set: latest
+                        )
+                    }
+                }
             } else {
                 focusedSetEntry(
                     exercise: exercise
@@ -1098,17 +1142,29 @@ struct ActiveStrengthWorkoutView: View {
 
                 focusedHeroMetric(
                     value:
-                        formatWeight(
-                            strength
-                                .draftWeightKilograms
-                        ) + " kg",
+                        currentStrengthLoadKind ==
+                            .resistanceLevel
+                            ? "\(strength.draftResistanceLevel)"
+                            : formatWeight(
+                                strength
+                                    .draftWeightKilograms
+                            ) + " kg",
                     label:
-                        ATHLTHLocalization.choose(
-                            english: "WEIGHT",
-                            norwegian: "VEKT"
-                        ),
+                        currentStrengthLoadKind ==
+                            .resistanceLevel
+                            ? ATHLTHLocalization.choose(
+                                english: "RESIST.",
+                                norwegian: "MOTST."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "WEIGHT",
+                                norwegian: "VEKT"
+                            ),
                     icon:
-                        "scalemass"
+                        currentStrengthLoadKind ==
+                            .resistanceLevel
+                            ? "dial.medium"
+                            : "scalemass"
                 )
 
                 focusedHeroDivider
@@ -1378,16 +1434,29 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 HStack(spacing: 10) {
-                    focusedNumberField(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Weight",
-                                norwegian: "Vekt"
-                            ),
-                        value:
-                            draftWeightBinding,
-                        suffix: "kg"
-                    )
+                    if currentStrengthLoadKind ==
+                        .resistanceLevel {
+                        focusedIntegerField(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Resistance",
+                                    norwegian: "Motstand"
+                                ),
+                            value:
+                                draftResistanceBinding
+                        )
+                    } else {
+                        focusedNumberField(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Weight",
+                                    norwegian: "Vekt"
+                                ),
+                            value:
+                                draftWeightBinding,
+                            suffix: "kg"
+                        )
+                    }
 
                     if currentStrengthTargetKind == .time {
                         focusedDurationField
@@ -1807,6 +1876,21 @@ struct ActiveStrengthWorkoutView: View {
                 strength.setDraft(
                     weightKilograms:
                         max(value, 0)
+                )
+            }
+        )
+    }
+
+    private var draftResistanceBinding:
+        Binding<Int> {
+        Binding(
+            get: {
+                strength.draftResistanceLevel
+            },
+            set: { value in
+                strength.setDraft(
+                    resistanceLevel:
+                        min(max(value, 1), 10)
                 )
             }
         )
@@ -2536,7 +2620,10 @@ struct ActiveStrengthWorkoutView: View {
 
             VStack(spacing: 10) {
                 ForEach(exercise.sets) { set in
-                    setRow(set)
+                    setRow(
+                        set,
+                        exercise: exercise
+                    )
                 }
             }
             .padding(.top, 10)
@@ -2835,120 +2922,303 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @ViewBuilder
-    private func setRow(_ set: StrengthSetLog) -> some View {
-        HStack(spacing: 12) {
-            Text("\(set.setNumber)")
-                .font(.subheadline.weight(.bold))
-                .frame(width: 28, height: 28)
-                .background(
-                    set.isCompleted ? ATHLTHTheme.accent.opacity(0.18) : Color.secondary.opacity(0.10),
-                    in: Circle()
-                )
+    private func setRow(
+        _ set: StrengthSetLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        let row =
+            HStack(spacing: 12) {
+                Text("\(set.setNumber)")
+                    .font(.subheadline.weight(.bold))
+                    .frame(width: 28, height: 28)
+                    .background(
+                        set.isCompleted
+                            ? ATHLTHTheme.accent.opacity(0.18)
+                            : Color.secondary.opacity(0.10),
+                        in: Circle()
+                    )
 
-            VStack(alignment: .leading, spacing: 2) {
-                if set.isCompleted {
-                    if set.resolvedTargetKind == .time,
-                       let duration =
-                            set.completedDurationSeconds {
-                        HStack(spacing: 4) {
-                            Text(
-                                TimeInterval(duration)
-                                    .clockDuration
-                            )
-
-                            if let weight =
-                                    set.completedWeightKilograms {
-                                Text("·")
-                                Text(
-                                    "\(weight, specifier: "%.1f") kg"
-                                )
-                            }
-                        }
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    if set.isCompleted {
+                        Text(
+                            completedSetSummary(set)
+                        )
                         .font(
                             .subheadline
                                 .weight(.semibold)
                         )
-                    } else if let reps = set.completedReps,
-                              let weight = set.completedWeightKilograms {
-                        Text("\(reps) reps × \(weight, specifier: "%.1f") kg")
-                            .font(.subheadline.weight(.semibold))
-                    } else if let reps =
-                                set.completedReps {
-                        Text("\(reps) reps")
-                            .font(.subheadline.weight(.semibold))
-                    } else {
-                        Text("Set completed")
-                            .font(.subheadline.weight(.semibold))
-                    }
 
-                    HStack(spacing: 7) {
-                        if set.isWarmUp == true {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Warm-up",
-                                    norwegian: "Oppvarming"
-                                ),
-                                systemImage: "flame"
-                            )
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.orange)
-                        }
-
-                        if let rpe = set.rpe {
-                            Text("RPE \(rpe, specifier: "%.1f")")
+                        HStack(spacing: 7) {
+                            if let distance =
+                                    set.resolvedCompletedDistanceMeters,
+                               distance > 0 {
+                                Text(
+                                    String(
+                                        format:
+                                            "%.0f m",
+                                        distance
+                                    )
+                                )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
+                            }
 
-                        if let rir = set.rir {
-                            Text("RIR \(rir, specifier: "%.1f")")
+                            if set.isWarmUp == true {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Warm-up",
+                                        norwegian: "Oppvarming"
+                                    ),
+                                    systemImage: "flame"
+                                )
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.orange)
+                            }
+
+                            if let rpe = set.rpe {
+                                Text(
+                                    "RPE \(rpe, specifier: "%.1f")"
+                                )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            }
+
+                            if let rir = set.rir {
+                                Text(
+                                    "RIR \(rir, specifier: "%.1f")"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
                         }
-                    }
-                } else {
-                    if set.resolvedTargetKind == .time,
-                       let duration =
-                            set.plannedDurationSeconds {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Target: \(TimeInterval(duration).clockDuration)",
-                                norwegian:
-                                    "Mål: \(TimeInterval(duration).clockDuration)"
-                            )
-                        )
-                        .font(.subheadline.weight(.medium))
-                    } else if let plannedReps = set.plannedReps {
-                        Text(ATHLTHLocalization.format(
-                            english: "Target: %d reps",
-                            norwegian: "Mål: %d repetisjoner",
-                            plannedReps
-                        ))
-                            .font(.subheadline.weight(.medium))
                     } else {
                         Text(
-                            ATHLTHLocalization.choose(
-                                english: "No target",
-                                norwegian: "Ingen mål"
-                            )
+                            plannedSetSummary(set)
                         )
                         .font(.subheadline.weight(.medium))
-                    }
 
-                    Text(set.plannedWeightKilograms.map { String(format: "%.1f kg", $0) } ?? "No weight target")
+                        Text(
+                            plannedLoadSummary(set)
+                        )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    }
                 }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        set.isCompleted
+                            ? "pencil.circle.fill"
+                            : "circle"
+                )
+                .foregroundStyle(
+                    set.isCompleted
+                        ? ATHLTHTheme.accent
+                        : .secondary
+                )
+            }
+            .padding(10)
+            .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14
+                    )
+            )
+
+        if set.isCompleted {
+            Button {
+                editingSetResult =
+                    StrengthSetResultEditTarget(
+                        exerciseID:
+                            exercise.id,
+                        exerciseName:
+                            exercise.exercise.name,
+                        exercise:
+                            exercise.exercise,
+                        set: set
+                    )
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+        } else {
+            row
+        }
+    }
+
+    private func completedSetSummary(
+        _ set: StrengthSetLog
+    ) -> String {
+        if let segments = set.effortSegments,
+           segments.count > 1 {
+            let values =
+                segments.compactMap {
+                    segment -> String? in
+
+                    if let reps = segment.reps,
+                       let weight =
+                            segment.weightKilograms {
+                        return
+                            "\(reps) × \(formatWeight(weight)) kg"
+                    }
+
+                    if let reps = segment.reps,
+                       let resistance =
+                            segment.resistanceLevel {
+                        return
+                            "\(reps) × " +
+                            ATHLTHLocalization.choose(
+                                english: "level \(resistance)",
+                                norwegian: "steg \(resistance)"
+                            )
+                    }
+
+                    if let duration =
+                            segment.durationSeconds {
+                        return
+                            TimeInterval(duration)
+                                .clockDuration
+                    }
+
+                    return nil
+                }
+
+            if !values.isEmpty {
+                return values.joined(
+                    separator: " + "
+                )
+            }
+        }
+
+        if set.resolvedTargetKind == .time,
+           let duration =
+                set.resolvedCompletedDurationSeconds {
+            var value =
+                TimeInterval(duration)
+                    .clockDuration
+
+            if set.resolvedLoadKind ==
+                .resistanceLevel,
+               let resistance =
+                    set.completedResistanceLevel {
+                value +=
+                    " · " +
+                    ATHLTHLocalization.choose(
+                        english:
+                            "level \(resistance)",
+                        norwegian:
+                            "steg \(resistance)"
+                    )
+            } else if let weight =
+                        set.completedWeightKilograms {
+                value +=
+                    " · \(formatWeight(weight)) kg"
             }
 
-            Spacer()
-
-            Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(set.isCompleted ? ATHLTHTheme.accent : .secondary)
+            return value
         }
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+
+        let reps =
+            set.resolvedCompletedReps
+
+        if set.resolvedLoadKind ==
+            .resistanceLevel,
+           let resistance =
+                set.completedResistanceLevel {
+            return
+                (reps.map {
+                    "\($0) reps · "
+                } ?? "") +
+                ATHLTHLocalization.choose(
+                    english: "level \(resistance)",
+                    norwegian: "steg \(resistance)"
+                )
+        }
+
+        if let reps,
+           let weight =
+                set.completedWeightKilograms {
+            return
+                "\(reps) reps × \(formatWeight(weight)) kg"
+        }
+
+        if let reps {
+            return "\(reps) reps"
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Set completed",
+            norwegian: "Sett fullført"
+        )
+    }
+
+    private func plannedSetSummary(
+        _ set: StrengthSetLog
+    ) -> String {
+        if set.resolvedTargetKind == .time,
+           let duration =
+                set.plannedDurationSeconds {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Target: \(TimeInterval(duration).clockDuration)",
+                norwegian:
+                    "Mål: \(TimeInterval(duration).clockDuration)"
+            )
+        }
+
+        if let reps =
+                set.plannedReps {
+            return ATHLTHLocalization.format(
+                english: "Target: %d reps",
+                norwegian: "Mål: %d repetisjoner",
+                reps
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "No target",
+            norwegian: "Ingen mål"
+        )
+    }
+
+    private func plannedLoadSummary(
+        _ set: StrengthSetLog
+    ) -> String {
+        if set.resolvedLoadKind ==
+            .resistanceLevel {
+            if let level =
+                    set.plannedResistanceLevel {
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Resistance level \(level)",
+                    norwegian:
+                        "Motstand steg \(level)"
+                )
+            }
+
+            return ATHLTHLocalization.choose(
+                english: "No resistance target",
+                norwegian: "Ingen motstandsmål"
+            )
+        }
+
+        return set.plannedWeightKilograms.map {
+            String(
+                format:
+                    "%.1f kg",
+                $0
+            )
+        } ??
+        ATHLTHLocalization.choose(
+            english: "No weight target",
+            norwegian: "Ingen vektmål"
+        )
     }
 
     private var setEntry: some View {
@@ -2959,12 +3229,47 @@ struct ActiveStrengthWorkoutView: View {
             )
 
             HStack(spacing: 12) {
-                valueStepper(
-                    title: "Weight",
-                    value: String(format: "%.1f kg", strength.draftWeightKilograms),
-                    minus: { strength.setDraft(weightKilograms: max(0, strength.draftWeightKilograms - 2.5)) },
-                    plus: { strength.setDraft(weightKilograms: strength.draftWeightKilograms + 2.5) }
-                )
+                if currentStrengthLoadKind ==
+                    .resistanceLevel {
+                    valueStepper(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Resistance",
+                                norwegian: "Motstand"
+                            ),
+                        value:
+                            "\(strength.draftResistanceLevel)",
+                        minus: {
+                            strength.setDraft(
+                                resistanceLevel:
+                                    max(
+                                        1,
+                                        strength
+                                            .draftResistanceLevel -
+                                            1
+                                    )
+                            )
+                        },
+                        plus: {
+                            strength.setDraft(
+                                resistanceLevel:
+                                    min(
+                                        10,
+                                        strength
+                                            .draftResistanceLevel +
+                                            1
+                                    )
+                            )
+                        }
+                    )
+                } else {
+                    valueStepper(
+                        title: "Weight",
+                        value: String(format: "%.1f kg", strength.draftWeightKilograms),
+                        minus: { strength.setDraft(weightKilograms: max(0, strength.draftWeightKilograms - 2.5)) },
+                        plus: { strength.setDraft(weightKilograms: strength.draftWeightKilograms + 2.5) }
+                    )
+                }
 
                 if currentStrengthTargetKind == .time {
                     valueStepper(
@@ -3292,6 +3597,110 @@ struct ActiveStrengthWorkoutView: View {
         .reps
     }
 
+    private var currentStrengthLoadKind:
+        StrengthExerciseLoadKind {
+        strength
+            .currentSet?
+            .resolvedLoadKind ??
+        strength
+            .currentExercise?
+            .exercise
+            .defaultStrengthLoadKind ??
+        .weightKilograms
+    }
+
+    private func latestCompletedSet(
+        in exercise: StrengthExerciseLog
+    ) -> StrengthSetLog? {
+        exercise.sets
+            .filter(\.isCompleted)
+            .max {
+                ($0.completedAt ?? .distantPast) <
+                ($1.completedAt ?? .distantPast)
+            }
+    }
+
+    private func postSetResultButton(
+        exercise: StrengthExerciseLog,
+        set: StrengthSetLog
+    ) -> some View {
+        Button {
+            editingSetResult =
+                StrengthSetResultEditTarget(
+                    exerciseID: exercise.id,
+                    exerciseName:
+                        exercise.exercise.name,
+                    exercise:
+                        exercise.exercise,
+                    set: set
+                )
+        } label: {
+            HStack {
+                Image(
+                    systemName:
+                        "ruler.fill"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Add rowed distance",
+                            norwegian:
+                                "Legg inn rodd distanse"
+                        )
+                    )
+                    .font(.subheadline.weight(.semibold))
+
+                    Text(
+                        set.resolvedCompletedDistanceMeters.map {
+                            String(
+                                format:
+                                    "%.0f m registered · tap to edit",
+                                $0
+                            )
+                        } ??
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Enter the meter result while you rest.",
+                            norwegian:
+                                "Registrer meterresultatet mens du hviler."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(
+                Color.white.opacity(0.88),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var restDurationText: String {
         let restSeconds = strength.draftRestSeconds
 
@@ -3318,7 +3727,9 @@ private struct FreestyleExercisePrescriptionView: View {
             Int?,
             StrengthExerciseTargetKind,
             Int?,
+            StrengthExerciseLoadKind,
             Double?,
+            Int?,
             Int?,
             Int
         ) -> Void
@@ -3328,10 +3739,13 @@ private struct FreestyleExercisePrescriptionView: View {
         StrengthExerciseTargetKind
     @State private var reps = 8
     @State private var durationSeconds: Int
+    @State private var loadKind:
+        StrengthExerciseLoadKind
     @State private var restSeconds = 90
     @State private var warmUpSets = 0
-    @State private var useWeightTarget = false
+    @State private var useLoadTarget: Bool
     @State private var weightKilograms = 20.0
+    @State private var resistanceLevel = 5
 
     init(
         entry: ExerciseLibraryEntry,
@@ -3340,7 +3754,9 @@ private struct FreestyleExercisePrescriptionView: View {
             Int?,
             StrengthExerciseTargetKind,
             Int?,
+            StrengthExerciseLoadKind,
             Double?,
+            Int?,
             Int?,
             Int
         ) -> Void
@@ -3350,16 +3766,25 @@ private struct FreestyleExercisePrescriptionView: View {
 
         let snapshot =
             entry.exercise.snapshot
-        let initialKind =
+        let initialTarget =
             snapshot.defaultStrengthTargetKind
+        let initialLoad =
+            snapshot.defaultStrengthLoadKind
 
         _targetKind = State(
-            initialValue: initialKind
+            initialValue: initialTarget
         )
         _durationSeconds = State(
             initialValue:
                 snapshot
                     .defaultStrengthTargetDurationSeconds
+        )
+        _loadKind = State(
+            initialValue: initialLoad
+        )
+        _useLoadTarget = State(
+            initialValue:
+                initialLoad == .resistanceLevel
         )
     }
 
@@ -3389,9 +3814,7 @@ private struct FreestyleExercisePrescriptionView: View {
                                     )
                             )
                             .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -3413,6 +3836,23 @@ private struct FreestyleExercisePrescriptionView: View {
                     )
 
                     targetRow
+
+                    Toggle(
+                        loadKind == .resistanceLevel
+                            ? ATHLTHLocalization.choose(
+                                english: "Resistance target",
+                                norwegian: "Motstandsmål"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Target weight",
+                                norwegian: "Målvekt"
+                            ),
+                        isOn: $useLoadTarget
+                    )
+
+                    if useLoadTarget {
+                        loadTargetRow
+                    }
 
                     Stepper(
                         ATHLTHLocalization.format(
@@ -3444,70 +3884,34 @@ private struct FreestyleExercisePrescriptionView: View {
                                 newValue
                             )
                     }
+                }
 
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Target weight",
-                            norwegian: "Målvekt"
-                        ),
-                        isOn:
-                            $useWeightTarget
-                    )
-
-                    if useWeightTarget {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Weight",
-                                    norwegian: "Vekt"
-                                )
-                            )
-
-                            Spacer()
-
-                            TextField(
-                                "kg",
-                                value:
-                                    $weightKilograms,
-                                format:
-                                    .number
-                                    .precision(
-                                        .fractionLength(
-                                            0...2
-                                        )
-                                    )
-                            )
-                            .keyboardType(
-                                .decimalPad
-                            )
-                            .multilineTextAlignment(
-                                .trailing
-                            )
-                            .frame(width: 95)
-
-                            Text("kg")
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                        }
+                if entry.exercise.snapshot
+                    .supportsStrengthDistanceResult {
+                    Section {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Rowed distance is entered immediately after the set or from the completed set row.",
+                                norwegian:
+                                    "Rodd distanse legges inn rett etter settet eller ved å trykke på det fullførte settet."
+                            ),
+                            systemImage:
+                                "ruler"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
 
                 Section {
                     Text(
-                        targetKind == .time
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "You can log the actual duration, weight and effort set by set. This choice applies only to this exercise in this workout.",
-                                norwegian:
-                                    "Du kan registrere faktisk varighet, vekt og anstrengelse sett for sett. Valget gjelder bare denne øvelsen i denne økten."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "You can log actual reps, weight and effort set by set. This choice applies only to this exercise in this workout.",
-                                norwegian:
-                                    "Du kan registrere faktiske repetisjoner, vekt og anstrengelse sett for sett. Valget gjelder bare denne øvelsen i denne økten."
-                            )
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Targets are only the plan. During the workout you can edit the actual result, including split loads such as 8 × 10 kg + 2 × 8 kg.",
+                            norwegian:
+                                "Målene er bare planen. Under økten kan du redigere faktisk resultat, også delt belastning som 8 × 10 kg + 2 × 8 kg."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -3519,13 +3923,10 @@ private struct FreestyleExercisePrescriptionView: View {
                     norwegian: "Legg til øvelse"
                 )
             )
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(
-                    placement:
-                        .cancellationAction
+                    placement: .cancellationAction
                 ) {
                     Button(
                         ATHLTHLocalization.choose(
@@ -3538,8 +3939,7 @@ private struct FreestyleExercisePrescriptionView: View {
                 }
 
                 ToolbarItem(
-                    placement:
-                        .confirmationAction
+                    placement: .confirmationAction
                 ) {
                     Button(
                         ATHLTHLocalization.choose(
@@ -3556,8 +3956,14 @@ private struct FreestyleExercisePrescriptionView: View {
                             targetKind == .time
                                 ? durationSeconds
                                 : nil,
-                            useWeightTarget
+                            loadKind,
+                            useLoadTarget &&
+                            loadKind == .weightKilograms
                                 ? weightKilograms
+                                : nil,
+                            useLoadTarget &&
+                            loadKind == .resistanceLevel
+                                ? resistanceLevel
                                 : nil,
                             restSeconds,
                             warmUpSets
@@ -3565,6 +3971,105 @@ private struct FreestyleExercisePrescriptionView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+    }
+
+    private var loadTargetRow:
+        some View {
+        Group {
+            if loadKind == .resistanceLevel {
+                Stepper(
+                    value: $resistanceLevel,
+                    in: 1...10
+                ) {
+                    loadMenu(
+                        value:
+                            ATHLTHLocalization.choose(
+                                english: "Level \(resistanceLevel)",
+                                norwegian: "Steg \(resistanceLevel)"
+                            )
+                    )
+                }
+            } else {
+                HStack {
+                    loadMenu(
+                        value:
+                            String(
+                                format:
+                                    "%.1f kg",
+                                weightKilograms
+                            )
+                    )
+
+                    Spacer()
+
+                    TextField(
+                        "kg",
+                        value: $weightKilograms,
+                        format:
+                            .number
+                            .precision(
+                                .fractionLength(0...2)
+                            )
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 90)
+
+                    Text("kg")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func loadMenu(
+        value: String
+    ) -> some View {
+        Menu {
+            Button {
+                loadKind =
+                    .weightKilograms
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Weight",
+                        norwegian: "Vekt"
+                    ),
+                    systemImage:
+                        loadKind == .weightKilograms
+                            ? "checkmark"
+                            : "scalemass"
+                )
+            }
+
+            Button {
+                loadKind =
+                    .resistanceLevel
+                useLoadTarget = true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Resistance",
+                        norwegian: "Motstand"
+                    ),
+                    systemImage:
+                        loadKind == .resistanceLevel
+                            ? "checkmark"
+                            : "dial.medium"
+                )
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(
+                    "\(loadKind.title): \(value)"
+                )
+                .foregroundStyle(.primary)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -3639,16 +4144,533 @@ private struct FreestyleExercisePrescriptionView: View {
                 )
                 .foregroundStyle(.primary)
 
-                Image(
-                    systemName:
-                        "chevron.down"
-                )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 }
+
+struct StrengthSetResultEditTarget: Identifiable {
+    var id: UUID { set.id }
+    let exerciseID: UUID
+    let exerciseName: String
+    let exercise: ExerciseSnapshot
+    let set: StrengthSetLog
+}
+
+struct StrengthSetResultEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let target: StrengthSetResultEditTarget
+    let onSave:
+        (
+            [StrengthSetEffortSegment],
+            Double?,
+            Int?
+        ) -> Void
+
+    @State private var segments:
+        [StrengthSetEffortSegment]
+    @State private var distanceMeters: Double
+    @State private var resistanceLevel: Int
+
+    init(
+        target: StrengthSetResultEditTarget,
+        onSave: @escaping (
+            [StrengthSetEffortSegment],
+            Double?,
+            Int?
+        ) -> Void
+    ) {
+        self.target = target
+        self.onSave = onSave
+
+        let set = target.set
+        let existing =
+            set.effortSegments?.isEmpty == false
+                ? set.effortSegments!
+                : [
+                    StrengthSetEffortSegment(
+                        reps:
+                            set.completedReps,
+                        weightKilograms:
+                            set.completedWeightKilograms,
+                        durationSeconds:
+                            set.completedDurationSeconds,
+                        distanceMeters:
+                            set.completedDistanceMeters,
+                        resistanceLevel:
+                            set.completedResistanceLevel
+                    )
+                ]
+
+        _segments = State(
+            initialValue: existing
+        )
+        _distanceMeters = State(
+            initialValue:
+                set.resolvedCompletedDistanceMeters ??
+                0
+        )
+        _resistanceLevel = State(
+            initialValue:
+                set.completedResistanceLevel ??
+                set.plannedResistanceLevel ??
+                5
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Actual result",
+                        norwegian: "Faktisk resultat"
+                    )
+                ) {
+                    ForEach(
+                        Array(
+                            segments
+                                .indices
+                        ),
+                        id: \.self
+                    ) { index in
+                        segmentEditor(index)
+
+                        if segments.count > 1 {
+                            Button(
+                                role: .destructive
+                            ) {
+                                segments.remove(
+                                    at: index
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Remove part",
+                                        norwegian:
+                                            "Fjern del"
+                                    ),
+                                    systemImage:
+                                        "minus.circle"
+                                )
+                            }
+                        }
+                    }
+
+                    Button {
+                        addSegment()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Add load change",
+                                norwegian:
+                                    "Legg til belastningsendring"
+                            ),
+                            systemImage:
+                                "plus.circle.fill"
+                        )
+                    }
+                    .disabled(
+                        target.set
+                            .resolvedTargetKind ==
+                            .time
+                    )
+                }
+
+                if target.exercise
+                    .supportsStrengthDistanceResult {
+                    Section(
+                        ATHLTHLocalization.choose(
+                            english: "Machine result",
+                            norwegian: "Maskinresultat"
+                        )
+                    ) {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Distance",
+                                    norwegian: "Distanse"
+                                ),
+                                systemImage: "ruler"
+                            )
+
+                            Spacer()
+
+                            TextField(
+                                "0",
+                                value: $distanceMeters,
+                                format:
+                                    .number
+                                    .precision(
+                                        .fractionLength(
+                                            0...0
+                                        )
+                                    )
+                            )
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(
+                                .trailing
+                            )
+                            .frame(width: 90)
+
+                            Text("m")
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
+
+                        Stepper(
+                            value:
+                                $resistanceLevel,
+                            in: 1...10
+                        ) {
+                            HStack {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Resistance",
+                                        norwegian: "Motstand"
+                                    )
+                                )
+
+                                Spacer()
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Level \(resistanceLevel)",
+                                        norwegian:
+                                            "Steg \(resistanceLevel)"
+                                    )
+                                )
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Example: if 10 reps were planned at 10 kg, record 8 × 10 kg and add a second part with 2 × 8 kg. ATHLTH will calculate volume from the actual parts.",
+                            norwegian:
+                                "Eksempel: Var målet 10 repetisjoner på 10 kg, kan du registrere 8 × 10 kg og legge til en ny del med 2 × 8 kg. ATHLTH beregner volum fra det du faktisk gjorde."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                "\(target.exerciseName) · " +
+                ATHLTHLocalization.format(
+                    english: "Set %d",
+                    norwegian: "Sett %d",
+                    target.set.setNumber
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        onSave(
+                            segments,
+                            target.exercise
+                                .supportsStrengthDistanceResult
+                                ? max(
+                                    distanceMeters,
+                                    0
+                                )
+                                : nil,
+                            target.set
+                                .resolvedLoadKind ==
+                                .resistanceLevel ||
+                            target.exercise
+                                .supportsStrengthDistanceResult
+                                ? resistanceLevel
+                                : nil
+                        )
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func segmentEditor(
+        _ index: Int
+    ) -> some View {
+        if segments.indices.contains(
+            index
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: 10
+            ) {
+                Text(
+                    segments.count > 1
+                        ? ATHLTHLocalization.format(
+                            english: "Part %d",
+                            norwegian: "Del %d",
+                            index + 1
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Set result",
+                            norwegian: "Settresultat"
+                        )
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(.secondary)
+
+                if target.set
+                    .resolvedTargetKind ==
+                    .time {
+                    Stepper(
+                        value:
+                            durationBinding(index),
+                        in: 0...7_200,
+                        step: 15
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Duration",
+                                    norwegian: "Varighet"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                TimeInterval(
+                                    durationBinding(index)
+                                        .wrappedValue
+                                )
+                                .clockDuration
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                } else {
+                    Stepper(
+                        value:
+                            repsBinding(index),
+                        in: 0...200
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Reps",
+                                    norwegian: "Repetisjoner"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                "\(repsBinding(index).wrappedValue)"
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                }
+
+                if target.set
+                    .resolvedLoadKind ==
+                    .resistanceLevel {
+                    Stepper(
+                        value:
+                            resistanceBinding(index),
+                        in: 1...10
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Resistance",
+                                    norwegian: "Motstand"
+                                )
+                            )
+                            Spacer()
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Level \(resistanceBinding(index).wrappedValue)",
+                                    norwegian:
+                                        "Steg \(resistanceBinding(index).wrappedValue)"
+                                )
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                } else {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Weight",
+                                norwegian: "Vekt"
+                            )
+                        )
+                        Spacer()
+                        TextField(
+                            "kg",
+                            value:
+                                weightBinding(index),
+                            format:
+                                .number
+                                .precision(
+                                    .fractionLength(
+                                        0...2
+                                    )
+                                )
+                        )
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(
+                            .trailing
+                        )
+                        .frame(width: 90)
+                        Text("kg")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func addSegment() {
+        let last =
+            segments.last
+
+        segments.append(
+            StrengthSetEffortSegment(
+                reps: 1,
+                weightKilograms:
+                    target.set
+                        .resolvedLoadKind ==
+                        .weightKilograms
+                        ? last?
+                            .weightKilograms ??
+                            target.set
+                                .completedWeightKilograms ??
+                            target.set
+                                .plannedWeightKilograms
+                        : nil,
+                resistanceLevel:
+                    target.set
+                        .resolvedLoadKind ==
+                        .resistanceLevel
+                        ? last?
+                            .resistanceLevel ??
+                            target.set
+                                .completedResistanceLevel ??
+                            target.set
+                                .plannedResistanceLevel ??
+                            5
+                        : nil
+            )
+        )
+    }
+
+    private func repsBinding(
+        _ index: Int
+    ) -> Binding<Int> {
+        Binding(
+            get: {
+                segments[index]
+                    .reps ?? 0
+            },
+            set: {
+                segments[index].reps =
+                    max($0, 0)
+            }
+        )
+    }
+
+    private func durationBinding(
+        _ index: Int
+    ) -> Binding<Int> {
+        Binding(
+            get: {
+                segments[index]
+                    .durationSeconds ?? 0
+            },
+            set: {
+                segments[index]
+                    .durationSeconds =
+                    min(
+                        max($0, 0),
+                        7_200
+                    )
+            }
+        )
+    }
+
+    private func weightBinding(
+        _ index: Int
+    ) -> Binding<Double> {
+        Binding(
+            get: {
+                segments[index]
+                    .weightKilograms ?? 0
+            },
+            set: {
+                segments[index]
+                    .weightKilograms =
+                    max($0, 0)
+            }
+        )
+    }
+
+    private func resistanceBinding(
+        _ index: Int
+    ) -> Binding<Int> {
+        Binding(
+            get: {
+                segments[index]
+                    .resistanceLevel ??
+                resistanceLevel
+            },
+            set: {
+                let value =
+                    min(max($0, 1), 10)
+                segments[index]
+                    .resistanceLevel =
+                    value
+                resistanceLevel =
+                    value
+            }
+        )
+    }
+}
+
 
 private struct StrengthExerciseSwapView: View {
     @Environment(\.dismiss) private var dismiss
