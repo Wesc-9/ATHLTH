@@ -2268,16 +2268,6 @@ struct DirectMessageThreadView: View {
                         }
                     }
 
-                    if !lifecycleEvents.isEmpty {
-                        ForEach(
-                            lifecycleEvents
-                        ) { event in
-                            ThreadChallengeLifecycleEventRow(
-                                event: event
-                            )
-                        }
-                    }
-
                     if messages.isEmpty &&
                         challenges.isEmpty &&
                         outgoingChallenges.isEmpty &&
@@ -2308,22 +2298,45 @@ struct DirectMessageThreadView: View {
                         )
                     }
 
-                    ForEach(messages) { message in
-                        MessageBubble(
-                            message: message,
-                            friend: friend,
-                            currentUserID:
-                                messaging
-                                    .currentUserID,
-                            currentUserProfile:
-                                currentUserProfileCard,
-                            onSaveAttachment: {
-                                saveAttachment(
-                                    message
+                    ForEach(
+                        threadTimelineItems(
+                            messages: messages,
+                            lifecycleEvents:
+                                lifecycleEvents
+                        )
+                    ) { item in
+                        switch item {
+                        case .message(let message):
+                            MessageBubble(
+                                message: message,
+                                friend: friend,
+                                currentUserID:
+                                    messaging
+                                        .currentUserID,
+                                currentUserProfile:
+                                    currentUserProfileCard,
+                                onSaveAttachment: {
+                                    saveAttachment(
+                                        message
+                                    )
+                                }
+                            )
+                            .id(item.id)
+
+                        case .challengeEvent(let event):
+                            NavigationLink {
+                                ChallengeDetailView(
+                                    challengeID:
+                                        event.challengeID
+                                )
+                            } label: {
+                                ThreadChallengeLifecycleEventRow(
+                                    event: event
                                 )
                             }
-                        )
-                        .id(message.id)
+                            .buttonStyle(.plain)
+                            .id(item.id)
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -2576,6 +2589,29 @@ struct DirectMessageThreadView: View {
                     norwegian:
                         "Utfordringen utløp før du svarte."
                 )
+        }
+    }
+
+    private func threadTimelineItems(
+        messages: [DirectMessageRecord],
+        lifecycleEvents: [ThreadChallengeLifecycleEvent]
+    ) -> [ThreadTimelineItem] {
+        (
+            messages.map {
+                ThreadTimelineItem.message(
+                    $0
+                )
+            } +
+            lifecycleEvents.map {
+                ThreadTimelineItem
+                    .challengeEvent(
+                        $0
+                    )
+            }
+        )
+        .sorted {
+            $0.createdAt <
+                $1.createdAt
         }
     }
 
@@ -3094,6 +3130,35 @@ struct DirectMessageThreadView: View {
 
         case .none:
             break
+        }
+    }
+}
+
+private enum ThreadTimelineItem: Identifiable {
+    case message(
+        DirectMessageRecord
+    )
+    case challengeEvent(
+        ThreadChallengeLifecycleEvent
+    )
+
+    var id: String {
+        switch self {
+        case .message(let message):
+            return "message:" +
+                message.id.uuidString
+        case .challengeEvent(let event):
+            return "challenge-event:" +
+                event.id
+        }
+    }
+
+    var createdAt: Date {
+        switch self {
+        case .message(let message):
+            return message.createdAt
+        case .challengeEvent(let event):
+            return event.createdAt
         }
     }
 }
