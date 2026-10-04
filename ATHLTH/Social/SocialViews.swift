@@ -1536,7 +1536,7 @@ struct FriendProfileView: View {
                     .frame(height: 236)
             }
         } content: {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: 18) {
                 if loading && profile == nil {
                     ProgressView("Loading profile…")
                         .padding(.top, 70)
@@ -1591,7 +1591,7 @@ struct FriendProfileView: View {
                     .padding(.top, 70)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.top, 96)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
@@ -2579,9 +2579,9 @@ struct FriendProfileView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         .background(
-            Color.white.opacity(0.94),
+            Color.white.opacity(0.91),
             in: RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
@@ -2593,16 +2593,15 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border
-                    .opacity(0.56),
-                lineWidth: 0.8
+                Color.white.opacity(0.88),
+                lineWidth: 0.9
             )
         }
         .shadow(
             color:
                 Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            radius: 14,
+            y: 6
         )
     }
 
@@ -2692,9 +2691,9 @@ struct FriendProfileView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         .background(
-            Color.white.opacity(0.94),
+            Color.white.opacity(0.91),
             in: RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
@@ -2706,16 +2705,15 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border
-                    .opacity(0.56),
-                lineWidth: 0.8
+                Color.white.opacity(0.88),
+                lineWidth: 0.9
             )
         }
         .shadow(
             color:
                 Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            radius: 14,
+            y: 6
         )
     }
 
@@ -3069,9 +3067,9 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .padding(16)
+        .padding(14)
         .background(
-            Color.white.opacity(0.94),
+            Color.white.opacity(0.91),
             in: RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
@@ -3083,16 +3081,15 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border
-                    .opacity(0.56),
-                lineWidth: 0.8
+                Color.white.opacity(0.88),
+                lineWidth: 0.9
             )
         }
         .shadow(
             color:
                 Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            radius: 14,
+            y: 6
         )
     }
 
@@ -3185,16 +3182,28 @@ struct FriendProfileView: View {
             alignment: .leading,
             spacing: 12
         ) {
-            HStack {
-                Label(
+            HStack(spacing: 9) {
+                Image(
+                    systemName:
+                        "trophy.fill"
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+
+                Text(
                     ATHLTHLocalization.choose(
                         english:
                             "Trophy cabinet",
                         norwegian:
                             "Troféskap"
-                    ),
-                    systemImage:
-                        "trophy.fill"
+                    )
                 )
                 .font(
                     .title3.weight(.bold)
@@ -3204,15 +3213,17 @@ struct FriendProfileView: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Showcase",
-                        norwegian: "Utstilling"
+                        english: "Shared",
+                        norwegian: "Delt"
                     )
                 )
                 .font(
-                    .caption.weight(.semibold)
+                    .caption.weight(
+                        .semibold
+                    )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.mutedText
+                    ATHLTHTheme.accentDeep
                 )
             }
 
@@ -3221,65 +3232,124 @@ struct FriendProfileView: View {
                 spacing: 8
             ) {
                 ForEach(
-                    Array(items.prefix(4))
-                ) { item in
-                    VStack(spacing: 5) {
-                        ZStack {
-                            ATHLTHTrophyPlateShape()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            .black,
-                                            ATHLTHTheme
-                                                .accent
-                                                .opacity(
-                                                    0.62
-                                                )
-                                        ],
-                                        startPoint:
-                                            .topLeading,
-                                        endPoint:
-                                            .bottomTrailing
+                    0..<4,
+                    id: \.self
+                ) { index in
+                    if items.indices
+                        .contains(index) {
+                        let item =
+                            items[index]
+
+                        VStack(spacing: 5) {
+                            ZStack {
+                                ATHLTHTrophyPlateShape()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                .black,
+                                                ATHLTHTheme
+                                                    .accent
+                                                    .opacity(
+                                                        0.62
+                                                    )
+                                            ],
+                                            startPoint:
+                                                .topLeading,
+                                            endPoint:
+                                                .bottomTrailing
+                                        )
+                                    )
+
+                                ATHLTHMarkShape()
+                                    .fill(.white)
+                                    .frame(
+                                        width: 10,
+                                        height: 8
+                                    )
+                            }
+                            .frame(
+                                width: 26,
+                                height: 30
+                            )
+
+                            Text(item.title)
+                                .font(
+                                    .system(
+                                        size: 8,
+                                        weight: .bold
                                     )
                                 )
-
-                            ATHLTHMarkShape()
-                                .fill(.white)
-                                .frame(
-                                    width: 12,
-                                    height: 9
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.58
                                 )
                         }
                         .frame(
-                            width: 28,
-                            height: 32
+                            maxWidth:
+                                .infinity
                         )
-
-                        Text(item.title)
-                            .font(
-                                .system(
-                                    size: 8,
-                                    weight: .bold
+                    } else {
+                        VStack(spacing: 5) {
+                            ATHLTHTrophyPlateShape()
+                                .fill(
+                                    Color.black
+                                        .opacity(
+                                            0.025
+                                        )
                                 )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
-                            )
-                            .lineLimit(1)
-                            .minimumScaleFactor(
-                                0.62
-                            )
+                                .frame(
+                                    width: 26,
+                                    height: 30
+                                )
+                                .overlay {
+                                    ATHLTHTrophyPlateShape()
+                                        .stroke(
+                                            ATHLTHTheme
+                                                .border
+                                                .opacity(
+                                                    0.45
+                                                ),
+                                            style:
+                                                StrokeStyle(
+                                                    lineWidth:
+                                                        0.8,
+                                                    dash:
+                                                        [
+                                                            3,
+                                                            3
+                                                        ]
+                                                )
+                                        )
+                                }
+
+                            Text("—")
+                                .font(
+                                    .system(
+                                        size: 8,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                        }
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
                     }
-                    .frame(
-                        maxWidth: .infinity
-                    )
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         .background(
-            Color.white.opacity(0.94),
+            Color.white.opacity(0.91),
             in: RoundedRectangle(
                 cornerRadius: 26,
                 style: .continuous
@@ -3291,16 +3361,15 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme.border
-                    .opacity(0.56),
-                lineWidth: 0.8
+                Color.white.opacity(0.88),
+                lineWidth: 0.9
             )
         }
         .shadow(
             color:
                 Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            radius: 14,
+            y: 6
         )
     }
 
