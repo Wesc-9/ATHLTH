@@ -701,6 +701,51 @@ struct LiveGhostRaceLobbyView: View {
                     )
                 }
 
+                HStack(spacing: 10) {
+                    resultMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Best lead",
+                                norwegian:
+                                    "Største ledelse"
+                            ),
+                        value:
+                            String(
+                                format:
+                                    "%.0f m",
+                                ownMaximumLead
+                            )
+                    )
+
+                    resultMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Largest deficit",
+                                norwegian:
+                                    "Største etterslep"
+                            ),
+                        value:
+                            String(
+                                format:
+                                    "%.0f m",
+                                opponentMaximumLead
+                            )
+                    )
+
+                    resultMetric(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Lead changes",
+                                norwegian:
+                                    "Lederskifter"
+                            ),
+                        value:
+                            "\(liveRace.room?.leadChangeCount ?? 0)"
+                    )
+                }
+
                 Button {
                     Task {
                         rematchSent =
@@ -1049,6 +1094,32 @@ struct LiveGhostRaceLobbyView: View {
              .cancelled:
             return nil
         }
+    }
+
+    private var ownMaximumLead: Double {
+        guard let room =
+                liveRace.room
+        else {
+            return 0
+        }
+
+        return currentUserID ==
+            challenge.senderID
+            ? room.senderMaxLeadMeters
+            : room.recipientMaxLeadMeters
+    }
+
+    private var opponentMaximumLead: Double {
+        guard let room =
+                liveRace.room
+        else {
+            return 0
+        }
+
+        return currentUserID ==
+            challenge.senderID
+            ? room.recipientMaxLeadMeters
+            : room.senderMaxLeadMeters
     }
 
     private var resultTitle: String {
