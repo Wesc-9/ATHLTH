@@ -543,6 +543,15 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                 ? "Økten starter"
                 : "Treningspartner ble med"
 
+        case "train_together_request":
+            return "Ny Train Together-forespørsel"
+
+        case "train_together_request_accepted":
+            return "Du skal være med"
+
+        case "train_together_request_declined":
+            return "Train Together-forespørsel avslått"
+
         case "message_request":
             let prefix = "Message request from "
             if title.hasPrefix(prefix) {
@@ -698,6 +707,27 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                 with:
                     " godtok invitasjonen din til "
             )
+
+        case "train_together_request":
+            return message
+                .replacingOccurrences(
+                    of: " wants to join ",
+                    with: " ønsker å bli med på "
+                )
+
+        case "train_together_request_accepted":
+            return message
+                .replacingOccurrences(
+                    of: " accepted your request for ",
+                    with: " godkjente forespørselen din til "
+                )
+
+        case "train_together_request_declined":
+            return message
+                .replacingOccurrences(
+                    of: " declined your request for ",
+                    with: " avslo forespørselen din til "
+                )
 
         case "message",
              "message_request":
