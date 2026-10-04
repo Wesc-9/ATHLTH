@@ -146,32 +146,41 @@ struct MessageInboxView: View {
     }
 
     private var messagesHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Messages")
-                    .font(
-                        .system(
-                            size: 34,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .lineLimit(1)
+        VStack(
+            alignment: .leading,
+            spacing: 16
+        ) {
+            HStack(spacing: 10) {
+                Label(
+                    "SOCIAL",
+                    systemImage:
+                        "bubble.left.and.bubble.right.fill"
+                )
+                .font(
+                    .caption2
+                        .weight(.bold)
+                )
+                .tracking(1.4)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .padding(
+                    .vertical,
+                    6
+                )
+                .background(
+                    Color.white
+                        .opacity(0.58),
+                    in: Capsule()
+                )
 
-                Text(inboxSummaryText)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .lineLimit(1)
-            }
+                Spacer()
 
-            Spacer(minLength: 8)
-
-            HStack(spacing: 8) {
                 headerAction(
                     systemImage:
                         showingSearch
@@ -183,9 +192,12 @@ struct MessageInboxView: View {
                             : "Search messages"
                 ) {
                     withAnimation(
-                        .easeInOut(duration: 0.20)
+                        .easeInOut(
+                            duration: 0.20
+                        )
                     ) {
-                        showingSearch.toggle()
+                        showingSearch
+                            .toggle()
                         if !showingSearch {
                             searchText = ""
                         }
@@ -193,35 +205,228 @@ struct MessageInboxView: View {
                 }
 
                 headerAction(
-                    systemImage: "square.and.pencil",
-                    accessibilityLabel: "New message",
-                    action: onNewMessage
+                    systemImage:
+                        "square.and.pencil",
+                    accessibilityLabel:
+                        "New message",
+                    action:
+                        onNewMessage
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                Text("Messages")
+                    .font(
+                        .system(
+                            size: 36,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Text(
+                    inboxSummaryText
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+
+            HStack(spacing: 8) {
+                inboxMetric(
+                    value:
+                        personInboxItems
+                            .count,
+                    label:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "People",
+                                norwegian:
+                                    "Personer"
+                            )
+                )
+
+                inboxMetric(
+                    value:
+                        messaging
+                            .unreadCount,
+                    label:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Unread",
+                                norwegian:
+                                    "Ulest"
+                            )
+                )
+
+                inboxMetric(
+                    value:
+                        totalRequestCount,
+                    label:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Needs reply",
+                                norwegian:
+                                    "Venter svar"
+                            )
                 )
             }
         }
-        .padding(.top, 0)
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.92),
+                    ATHLTHTheme
+                        .cardWarm
+                        .opacity(0.88)
+                ],
+                startPoint: .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 28,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.94),
+                lineWidth: 0.9
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.05),
+            radius: 18,
+            y: 7
+        )
+    }
+
+    private func inboxMetric(
+        value: Int,
+        label: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 2
+        ) {
+            Text("\(value)")
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            Text(label)
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            Color.white
+                .opacity(0.56),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
     }
 
     private var inboxSummaryText: String {
         if messaging.unreadCount > 0 {
-            return messaging.unreadCount == 1
-                ? "1 unread message"
-                : "\(messaging.unreadCount) unread messages"
+            return ATHLTHLocalization.choose(
+                english:
+                    messaging.unreadCount == 1
+                        ? "1 unread message"
+                        : "\(messaging.unreadCount) unread messages",
+                norwegian:
+                    messaging.unreadCount == 1
+                        ? "1 ulest melding"
+                        : "\(messaging.unreadCount) uleste meldinger"
+            )
         }
 
         if totalRequestCount > 0 {
-            return totalRequestCount == 1
-                ? "1 request"
-                : "\(totalRequestCount) requests"
+            return ATHLTHLocalization.choose(
+                english:
+                    totalRequestCount == 1
+                        ? "1 person needs your response"
+                        : "\(totalRequestCount) people need your response",
+                norwegian:
+                    totalRequestCount == 1
+                        ? "1 person venter på svar"
+                        : "\(totalRequestCount) personer venter på svar"
+            )
         }
 
-        if activeConversations.isEmpty {
-            return "Your conversations"
+        if personInboxItems.isEmpty {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Your conversations",
+                norwegian:
+                    "Dine samtaler"
+            )
         }
 
-        return activeConversations.count == 1
-            ? "1 conversation"
-            : "\(activeConversations.count) conversations"
+        return ATHLTHLocalization.choose(
+            english:
+                personInboxItems.count == 1
+                    ? "1 conversation"
+                    : "\(personInboxItems.count) conversations",
+            norwegian:
+                personInboxItems.count == 1
+                    ? "1 samtale"
+                    : "\(personInboxItems.count) samtaler"
+        )
     }
 
     private func headerAction(
