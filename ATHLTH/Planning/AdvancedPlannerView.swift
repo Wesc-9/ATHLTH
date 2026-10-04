@@ -4256,6 +4256,12 @@ struct SessionEditorView: View {
     @State private var audioCoachOverride:
         WatchAudioCoachConfiguration? = nil
     @State private var showingAudioCoachEditor = false
+    @State private var routeGuardianDraft =
+        RouteGuardianDraft()
+    @State private var ghostDraft =
+        GhostQuickStartDraft()
+    @State private var didLoadRunGuidanceDefaults =
+        false
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
 
@@ -4375,6 +4381,45 @@ struct SessionEditorView: View {
         _audioCoachOverride = State(
             initialValue: workout.audioCoachConfiguration
         )
+
+        var routeDraft =
+            RouteGuardianDraft()
+        if let routeConfiguration =
+                workout.routeAlertConfiguration {
+            routeDraft.load(
+                configuration:
+                    routeConfiguration
+            )
+        }
+        _routeGuardianDraft =
+            State(
+                initialValue: routeDraft
+            )
+
+        var plannedGhost =
+            GhostQuickStartDraft()
+        if let targetDuration =
+                workout
+                    .ghostTargetDurationSeconds,
+           targetDuration > 0 {
+            plannedGhost.enabled = true
+            plannedGhost.targetTimeText =
+                GhostTargetTimeFormatter
+                    .string(
+                        targetDuration
+                    )
+            plannedGhost.updatesEnabled =
+                workout
+                    .ghostUpdates?
+                    .enabled ??
+                true
+        }
+        _ghostDraft =
+            State(
+                initialValue:
+                    plannedGhost
+            )
+
         _autoPausePreference = State(
             initialValue:
                 WorkoutAutoPausePreference(
@@ -4828,6 +4873,7 @@ struct SessionEditorView: View {
                 if kind == .running {
                     runningBuilder
                     routeBuilder
+                    plannedRunGuidanceSection
                 }
 
                 if kind == .walking {
@@ -4953,8 +4999,33 @@ struct SessionEditorView: View {
                     previousRouteID: oldRouteID,
                     routeID: newRouteID
                 )
+
+                ghostDraft.load(
+                    route: selectedRoute,
+                    settings: settings
+                )
             }
             .task {
+                if !didLoadRunGuidanceDefaults {
+                    if existingWorkout?
+                        .routeAlertConfiguration == nil {
+                        routeGuardianDraft.load(
+                            from: settings
+                        )
+                    }
+
+                    if existingWorkout?
+                        .ghostTargetDurationSeconds == nil {
+                        ghostDraft.load(
+                            route: selectedRoute,
+                            settings: settings
+                        )
+                    }
+
+                    didLoadRunGuidanceDefaults =
+                        true
+                }
+
                 await gear.refresh()
 
                 if exerciseLibrary
@@ -5190,44 +5261,6 @@ struct SessionEditorView: View {
 
                 Text(
                     "These targets apply only to this workout. Route-deviation alerts use your global Training settings."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
-
-        if kind == .running || kind == .walking {
-            Section("Audio Coach") {
-                Button {
-                    showingAudioCoachEditor = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "waveform.and.person.filled")
-                            .foregroundStyle(ATHLTHTheme.accent)
-                            .frame(width: 28)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Audio Coach")
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-
-                            Text(audioCoachStatusText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.bold())
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Text(
-                    "Use the app default or customize cues for this workout only."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
