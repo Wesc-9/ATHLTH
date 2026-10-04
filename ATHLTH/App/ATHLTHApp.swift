@@ -564,6 +564,156 @@ struct AppRootView: View {
         }
     }
 
+    private func runLifecycleStartupTask() async {
+        // Compatibility preview is a CI-only rendering surface. Do not
+        // compete with the first frame by starting auth, StoreKit or
+        // backend work that the preview neither needs nor can use.
+        if appSession.previewModeEnabled {
+            startupAuthenticationResolved = true
+            await Task.yield()
+            return
+        }
+
+        await resolveStartupAuthentication()
+        scheduleNotificationPermissionPrimerIfNeeded()
+
+        // Give SwiftUI one render turn after authentication changes the
+        // root surface. This keeps cold launch responsive on small phones
+        // before secondary account/network work begins.
+        await Task.yield()
+
+        // Only the paired iPhone owns Apple Watch connectivity. iPad is a
+        // controller/secondary screen and never activates WatchConnectivity.
+        if ATHLTHDeviceRole.supportsDirectAppleWatch {
+            watchConnection.connect()
+            syncSpotifyPlaybackToWatch()
+        }
+
+        startDeviceRelayIfNeeded()
+
+        // If Apple Watch already owns a workout, HealthKit may deliver the
+        // mirroring callback just after app activation. Give that callback
+        // first priority before any later Health refresh decisions.
+        await allowWatchMirroringToAttachIfNeeded()
+
+        await subscriptionStore.start()
+        appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
+        await submitLatestStoreProofIfPossible()
+
+        if appSession.signedIn {
+            // Keep launch responsive: load only Home-critical account
+            // context first and let independent network work overlap.
+            async let pushToken: Void =
+                APNsPushManager.shared.syncCurrentToken()
+            async let pushPreferences: Void =
+                syncPushPreferences()
+            async let socialHome: Void =
+                refreshSocialHomeCore()
+            async let messages: Void =
+                messaging.refresh()
+            async let gearRefresh: Void =
+                gear.refresh()
+            async let calendarRefresh: Void =
+                syncCalendarIfAllowed()
+
+            _ = await (
+                pushToken,
+                pushPreferences,
+                socialHome,
+                messages,
+                gearRefresh,
+                calendarRefresh
+            )
+
+            if ATHLTHDeviceRole.isIPhone {
+                await realtimeSocial
+                    .configureOnlinePresence(
+                        appIsActive: true,
+                        enabled:
+                            social.privacy?
+                                .showOnlineStatus ??
+                            true
+                    )
+            }
+            await realtimeSocial
+                .refreshVisibleLiveSessions()
+        }
+
+        // Reconcile the app-local marker with HealthKit before deciding
+        // whether Health is connected. This keeps existing permissions
+        // intact across TestFlight/app updates and local defaults migrations
+        // without presenting the Health permission sheet.
+        _ = await health.restoreAuthorizationStateFromSystem()
+
+        if health.needsHealthRefreshRecovery {
+            // Give the UI a stable launch first. Clearing the recovery
+            // latch here only affects future launches because this
+            // process remains deferred until it exits.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            health.resumeAutomaticRefresh()
+        }
+
+        guard health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork
+        else {
+            return
+        }
+
+        await health.configureBackgroundSync(
+            allowed: settings.backgroundHealthSyncEnabled
+        )
+
+        // Opening ATHLTH while the Watch owns an active workout should
+        // prioritize the mirroring session. A full Health refresh can
+        // wait until the workout finishes; the completion path refreshes
+        // Health immediately afterwards.
+        guard !workoutMirroring.hasActiveMirroredWorkout,
+              !ATHLTHWatchWorkoutRuntime
+                .isMirroredWorkoutActive
+        else {
+            return
+        }
+
+        await health.refreshIfStale(maxAge: 90)
+        await officialWeeklyChallenges.syncCompletionState(
+            workouts: health.workouts
+        )
+        syncAppleHealthProfileDetailsIfNeeded()
+        await goals.refreshAutomaticMilestones(
+            health: health,
+            strength: strengthWorkout
+        )
+        notifications.syncGoalEvents(from: goals.goals)
+        challengeStore.refreshStatuses()
+        notifications.syncChallengeEvents(
+            from: challengeStore.challenges,
+            currentUserID: appSession.profile.userID
+        )
+        let startupUserID =
+            appSession.profile.userID
+
+        // Trophies and owned social snapshots are valuable but not needed
+        // to make Home interactive. Let the first frame and gestures win,
+        // then refresh these secondary surfaces shortly afterwards.
+        Task { @MainActor in
+            try? await Task.sleep(
+                for: .milliseconds(700)
+            )
+
+            guard appSession.signedIn,
+                  appSession.profile.userID ==
+                    startupUserID
+            else {
+                return
+            }
+
+            await refreshTrophiesAndNotifications()
+            await syncSocialOwnedData()
+        }
+
+        lastFullLifecycleRefreshAt = Date()
+    }
+
     private var lifecycleContent: some View {
         AnyView(
             AnyView(
@@ -579,153 +729,7 @@ struct AppRootView: View {
             }
         }
         .task {
-            // Compatibility preview is a CI-only rendering surface. Do not
-            // compete with the first frame by starting auth, StoreKit or
-            // backend work that the preview neither needs nor can use.
-            if appSession.previewModeEnabled {
-                startupAuthenticationResolved = true
-                await Task.yield()
-                return
-            }
-
-            await resolveStartupAuthentication()
-            scheduleNotificationPermissionPrimerIfNeeded()
-
-            // Give SwiftUI one render turn after authentication changes the
-            // root surface. This keeps cold launch responsive on small phones
-            // before secondary account/network work begins.
-            await Task.yield()
-
-            // Only the paired iPhone owns Apple Watch connectivity. iPad is a
-            // controller/secondary screen and never activates WatchConnectivity.
-            if ATHLTHDeviceRole.supportsDirectAppleWatch {
-                watchConnection.connect()
-                syncSpotifyPlaybackToWatch()
-            }
-
-            startDeviceRelayIfNeeded()
-
-            // If Apple Watch already owns a workout, HealthKit may deliver the
-            // mirroring callback just after app activation. Give that callback
-            // first priority before any later Health refresh decisions.
-            await allowWatchMirroringToAttachIfNeeded()
-
-            await subscriptionStore.start()
-            appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
-            await submitLatestStoreProofIfPossible()
-
-            if appSession.signedIn {
-                // Keep launch responsive: load only Home-critical account
-                // context first and let independent network work overlap.
-                async let pushToken: Void =
-                    APNsPushManager.shared.syncCurrentToken()
-                async let pushPreferences: Void =
-                    syncPushPreferences()
-                async let socialHome: Void =
-                    refreshSocialHomeCore()
-                async let messages: Void =
-                    messaging.refresh()
-                async let gearRefresh: Void =
-                    gear.refresh()
-                async let calendarRefresh: Void =
-                    syncCalendarIfAllowed()
-
-                _ = await (
-                    pushToken,
-                    pushPreferences,
-                    socialHome,
-                    messages,
-                    gearRefresh,
-                    calendarRefresh
-                )
-
-                if ATHLTHDeviceRole.isIPhone {
-                    await realtimeSocial
-                        .configureOnlinePresence(
-                            appIsActive: true,
-                            enabled:
-                                social.privacy?
-                                    .showOnlineStatus ??
-                                true
-                        )
-                }
-                await realtimeSocial
-                    .refreshVisibleLiveSessions()
-            }
-
-            // Reconcile the app-local marker with HealthKit before deciding
-            // whether Health is connected. This keeps existing permissions
-            // intact across TestFlight/app updates and local defaults migrations
-            // without presenting the Health permission sheet.
-            _ = await health.restoreAuthorizationStateFromSystem()
-
-            if health.needsHealthRefreshRecovery {
-                // Give the UI a stable launch first. Clearing the recovery
-                // latch here only affects future launches because this
-                // process remains deferred until it exits.
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                health.resumeAutomaticRefresh()
-            }
-
-            guard health.hasRequestedAuthorization,
-                  !health.shouldDeferAutomaticHealthWork
-            else {
-                return
-            }
-
-            await health.configureBackgroundSync(
-                allowed: settings.backgroundHealthSyncEnabled
-            )
-
-            // Opening ATHLTH while the Watch owns an active workout should
-            // prioritize the mirroring session. A full Health refresh can
-            // wait until the workout finishes; the completion path refreshes
-            // Health immediately afterwards.
-            guard !workoutMirroring.hasActiveMirroredWorkout,
-                  !ATHLTHWatchWorkoutRuntime
-                    .isMirroredWorkoutActive
-            else {
-                return
-            }
-
-            await health.refreshIfStale(maxAge: 90)
-            await officialWeeklyChallenges.syncCompletionState(
-                workouts: health.workouts
-            )
-            syncAppleHealthProfileDetailsIfNeeded()
-            await goals.refreshAutomaticMilestones(
-                health: health,
-                strength: strengthWorkout
-            )
-            notifications.syncGoalEvents(from: goals.goals)
-            challengeStore.refreshStatuses()
-            notifications.syncChallengeEvents(
-                from: challengeStore.challenges,
-                currentUserID: appSession.profile.userID
-            )
-            let startupUserID =
-                appSession.profile.userID
-
-            // Trophies and owned social snapshots are valuable but not needed
-            // to make Home interactive. Let the first frame and gestures win,
-            // then refresh these secondary surfaces shortly afterwards.
-            Task { @MainActor in
-                try? await Task.sleep(
-                    for: .milliseconds(700)
-                )
-
-                guard appSession.signedIn,
-                      appSession.profile.userID ==
-                        startupUserID
-                else {
-                    return
-                }
-
-                await refreshTrophiesAndNotifications()
-                await syncSocialOwnedData()
-            }
-
-            lastFullLifecycleRefreshAt = Date()
+            await runLifecycleStartupTask()
         }
         .overlay {
             if phoneWorkout.showingWorkout,
