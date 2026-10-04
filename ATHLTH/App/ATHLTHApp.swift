@@ -92,7 +92,42 @@ struct ATHLTHApp: App {
                     )
             }
 
-        ATHLTHKeyboardCoordinator.shared.install()
+        ATHLTHHomeAssistantBackgroundRefresh
+            .refreshHandler = {
+                [weak homeAssistantStore,
+                 weak healthStore] in
+
+                guard let homeAssistantStore,
+                      let healthStore,
+                      homeAssistantStore.isConnected
+                else {
+                    return false
+                }
+
+                await healthStore.refreshIfStale(
+                    maxAge: 5 * 60
+                )
+
+                await homeAssistantStore
+                    .syncBackgroundHealthSnapshot(
+                        workouts: healthStore.workouts,
+                        sleep: healthStore.sleep,
+                        heart: healthStore.heart,
+                        training: healthStore.training,
+                        recoveryScore:
+                            healthStore.recovery.score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                healthStore
+                                    .recovery
+                                    .state
+                            )
+                    )
+
+                return true
+            }
+
+                ATHLTHKeyboardCoordinator.shared.install()
     }
 
     var body: some Scene {
@@ -710,6 +745,12 @@ struct AppRootView: View {
                 watchConnection.connect()
             }
 
+            if homeAssistant.isConnected,
+               ATHLTHDeviceRole.isIPhone {
+                ATHLTHHomeAssistantBackgroundRefresh
+                    .schedule()
+            }
+
             Task {
                 if ATHLTHDeviceRole.isIPhone {
                     await deviceRelay
@@ -1117,6 +1158,16 @@ struct AppRootView: View {
         }
         .onChange(of: homeAssistant.connectionState) { _, state in
             syncHomeAssistantWatchConfiguration()
+
+            if ATHLTHDeviceRole.isIPhone {
+                if state == .connected {
+                    ATHLTHHomeAssistantBackgroundRefresh
+                        .schedule()
+                } else if !homeAssistant.isConnected {
+                    ATHLTHHomeAssistantBackgroundRefresh
+                        .cancel()
+                }
+            }
 
             guard state == .connected else {
                 return
