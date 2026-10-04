@@ -3423,51 +3423,23 @@ struct ChallengeCreationView: View {
         @ViewBuilder content:
             () -> Content
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 12
+        ATHLTHPremiumFormSection(
+            title: title,
+            icon: icon,
+            tint:
+                ATHLTHTheme
+                    .vitality
         ) {
-            Label(
-                title,
-                systemImage: icon
-            )
-            .font(.headline)
-            .foregroundStyle(
-                clubForest
-            )
-
             content()
         }
-        .padding(16)
-        .background(
-            Color.white.opacity(0.93),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.025),
-            radius: 9,
-            y: 3
-        )
     }
 
     private var creationDivider:
         some View {
         Divider()
-            .opacity(0.42)
+            .overlay(
+                ATHLTHTheme.divider
+            )
             .padding(.leading, 50)
     }
 
@@ -3541,78 +3513,15 @@ struct ChallengeCreationView: View {
         icon: String,
         subtitle: String? = nil
     ) -> some View {
-        HStack(spacing: 12) {
-            Image(
-                systemName: icon
-            )
-            .font(
-                .system(
-                    size: 17,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                clubForest
-            )
-            .frame(
-                width: 38,
-                height: 38
-            )
-            .background(
-                clubMint,
-                in: RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        .primary
-                    )
-
-                if let subtitle,
-                   !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                        .lineLimit(2)
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: 7) {
-                Text(value)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .lineLimit(1)
-
-                Image(
-                    systemName:
-                        "chevron.down"
-                )
-                .font(.caption.bold())
-            }
-            .foregroundStyle(
-                clubForest
-            )
-            .padding(.horizontal, 12)
-            .frame(height: 38)
-            .background(
-                clubMint,
-                in: Capsule()
-            )
-        }
+        ATHLTHPremiumSelectionRow(
+            title: title,
+            value: value,
+            icon: icon,
+            subtitle: subtitle,
+            tint:
+                ATHLTHTheme
+                    .vitality
+        )
     }
 
     private func creationNumberRow(
