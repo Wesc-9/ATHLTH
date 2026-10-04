@@ -56,8 +56,10 @@ struct HomeAssistantSettingsView: View {
                 ),
                 role: .destructive
             ) {
-                homeAssistant.disconnect()
-                homeAssistant.startDiscovery()
+                Task {
+                    await homeAssistant.disconnect()
+                    homeAssistant.startDiscovery()
+                }
             }
 
             Button(
