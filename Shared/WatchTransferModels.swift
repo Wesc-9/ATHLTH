@@ -851,11 +851,28 @@ enum WatchStrengthInputMode:
     }
 }
 
+struct WatchStrengthSetPlan: Codable, Hashable {
+    var setNumber: Int
+    var reps: Int? = nil
+    var durationSeconds: Int? = nil
+    var weightKilograms: Double? = nil
+    var resistanceLevel: Int? = nil
+    var restSeconds: Int? = nil
+    var isWarmUp: Bool? = nil
+}
+
 struct WatchStrengthExerciseSummary: Codable, Hashable {
     var index: Int
     var name: String
     var primaryMuscles: [String]
     var setCount: Int
+
+    // Optional details let Apple Watch carry the whole strength prescription
+    // without iPhone reachability. Defaults keep older snapshots decodable.
+    var instructions: [String]? = nil
+    var secondaryMuscles: [String]? = nil
+    var equipment: [String]? = nil
+    var setPlans: [WatchStrengthSetPlan]? = nil
 }
 
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
@@ -886,6 +903,12 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var effortMetricRaw: String? = nil
     var exerciseQueue:
         [WatchStrengthExerciseSummary]? = nil
+
+    // Offline ownership metadata. A Watch-started workout can be rebuilt on
+    // iPhone from this snapshot after hours without connectivity.
+    var startedAt: Date? = nil
+    var plannedSessionID: UUID? = nil
+    var allowsLiveExerciseBuilding: Bool? = nil
 }
 
 enum WatchStrengthCommandKind: String, Codable, Hashable {
@@ -915,6 +938,10 @@ struct WatchStrengthCommand: Codable, Hashable {
     // True only when the strength workout was initiated from the Watch UI.
     // Older queued commands remain decodable because this is optional.
     var initiatedOnWatch: Bool? = nil
+
+    // The first durable request from a standalone Watch carries enough state
+    // for iPhone to recreate the strength log before replaying queued actions.
+    var bootstrapSnapshot: WatchStrengthSessionSnapshot? = nil
 }
 
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
@@ -942,6 +969,12 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routeLeaderboardEligible: Bool? = nil
     var routeComparisonID: UUID? = nil
     var routeTitle: String? = nil
+
+    // Strength work performed while iPhone is unavailable is shipped together
+    // with the final HealthKit result. This makes offline completion atomic
+    // instead of depending on WatchConnectivity delivery order.
+    var strengthSnapshot: WatchStrengthSessionSnapshot? = nil
+    var strengthCommands: [WatchStrengthCommand]? = nil
 }
 
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
