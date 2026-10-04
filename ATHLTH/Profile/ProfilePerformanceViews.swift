@@ -61,7 +61,7 @@ enum ProfileFeaturedRecordKind:
     case strengthEstimatedOneRM
     case strengthWorkoutVolume
     case strengthBestRepPR
-    case strengthLongestHealthWorkout
+    case longestStrengthWorkout
 
     case longestRide
     case longestWalkOrHike
@@ -105,10 +105,21 @@ enum ProfileFeaturedRecordKind:
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
              .strengthBestRepPR,
-             .strengthLongestHealthWorkout:
+             .longestStrengthWorkout:
             return .strength
 
-        default:
+        case .longestRide,
+             .longestWalkOrHike,
+             .longestSwim,
+             .longestWorkout,
+             .longestHIITWorkout,
+             .longestRowingWorkout,
+             .longestEllipticalWorkout,
+             .longestStairClimbingWorkout,
+             .longestYogaWorkout,
+             .longestCoreWorkout,
+             .mostActiveCalories,
+             .mostStepsInWorkout:
             return .appleHealth
         }
     }
@@ -129,7 +140,7 @@ enum ProfileFeaturedRecordKind:
             return .fastestMarathon
         case .longestRun:
             return .longestRun
-        case .strengthLongestHealthWorkout:
+        case .longestStrengthWorkout:
             return .longestStrengthWorkout
         case .longestRide:
             return .longestRide
@@ -220,7 +231,7 @@ enum ProfileFeaturedRecordKind:
                 english: "Best rep PR",
                 norwegian: "Beste repetisjons-PR"
             )
-        case .strengthLongestHealthWorkout:
+        case .longestStrengthWorkout:
             return ATHLTHLocalization.choose(
                 english: "Longest strength workout",
                 norwegian: "Lengste styrkeøkt"
@@ -290,14 +301,14 @@ enum ProfileFeaturedRecordKind:
 
     var shortTitle: String {
         switch self {
-        case .fastest1K: return "1 km"
+        case .fastest1K:
+            return "1 km"
         case .fastestMile:
-            return ATHLTHLocalization.choose(
-                english: "Mile",
-                norwegian: "Mile"
-            )
-        case .fastest5K: return "5 km"
-        case .fastest10K: return "10 km"
+            return "Mile"
+        case .fastest5K:
+            return "5 km"
+        case .fastest10K:
+            return "10 km"
         case .fastestHalfMarathon:
             return ATHLTHLocalization.choose(
                 english: "Half",
@@ -318,21 +329,19 @@ enum ProfileFeaturedRecordKind:
                 english: "Heaviest",
                 norwegian: "Tyngst"
             )
-        case .strengthEstimatedOneRM: return "1RM"
+        case .strengthEstimatedOneRM:
+            return "1RM"
         case .strengthWorkoutVolume:
             return ATHLTHLocalization.choose(
                 english: "Volume",
                 norwegian: "Volum"
             )
         case .strengthBestRepPR:
+            return "Rep-PR"
+        case .longestStrengthWorkout:
             return ATHLTHLocalization.choose(
-                english: "Rep PR",
-                norwegian: "Rep-PR"
-            )
-        case .strengthLongestHealthWorkout:
-            return ATHLTHLocalization.choose(
-                english: "Duration",
-                norwegian: "Varighet"
+                english: "Strength",
+                norwegian: "Styrke"
             )
         case .longestRide:
             return ATHLTHLocalization.choose(
@@ -347,14 +356,15 @@ enum ProfileFeaturedRecordKind:
         case .longestSwim:
             return ATHLTHLocalization.choose(
                 english: "Swim",
-                norwegian: "Svømming"
+                norwegian: "Svøm"
             )
         case .longestWorkout:
             return ATHLTHLocalization.choose(
                 english: "Workout",
                 norwegian: "Økt"
             )
-        case .longestHIITWorkout: return "HIIT"
+        case .longestHIITWorkout:
+            return "HIIT"
         case .longestRowingWorkout:
             return ATHLTHLocalization.choose(
                 english: "Rowing",
@@ -370,7 +380,8 @@ enum ProfileFeaturedRecordKind:
                 english: "Stairs",
                 norwegian: "Trapp"
             )
-        case .longestYogaWorkout: return "Yoga"
+        case .longestYogaWorkout:
+            return "Yoga"
         case .longestCoreWorkout:
             return ATHLTHLocalization.choose(
                 english: "Core",
@@ -390,12 +401,23 @@ enum ProfileFeaturedRecordKind:
     }
 
     var icon: String {
-        if let healthKind {
-            return healthKind.systemImage
-        }
-
         switch self {
-        case .strengthHeaviestSet:
+        case .fastest1K:
+            return "1.circle.fill"
+        case .fastestMile:
+            return "m.circle.fill"
+        case .fastest5K:
+            return "5.circle.fill"
+        case .fastest10K:
+            return "10.circle.fill"
+        case .fastestHalfMarathon:
+            return "figure.run"
+        case .fastestMarathon:
+            return "flag.checkered"
+        case .longestRun:
+            return "point.topleft.down.to.point.bottomright.curvepath"
+        case .strengthHeaviestSet,
+             .longestStrengthWorkout:
             return "dumbbell.fill"
         case .strengthEstimatedOneRM:
             return "bolt.fill"
@@ -403,39 +425,83 @@ enum ProfileFeaturedRecordKind:
             return "chart.bar.fill"
         case .strengthBestRepPR:
             return "repeat"
-        default:
-            return "chart.bar.fill"
+        case .longestRide:
+            return "figure.outdoor.cycle"
+        case .longestWalkOrHike:
+            return "figure.hiking"
+        case .longestSwim:
+            return "figure.pool.swim"
+        case .longestWorkout:
+            return "clock.fill"
+        case .longestHIITWorkout:
+            return "figure.highintensity.intervaltraining"
+        case .longestRowingWorkout:
+            return "figure.rower"
+        case .longestEllipticalWorkout:
+            return "figure.elliptical"
+        case .longestStairClimbingWorkout:
+            return "figure.stair.stepper"
+        case .longestYogaWorkout:
+            return "figure.yoga"
+        case .longestCoreWorkout:
+            return "figure.core.training"
+        case .mostActiveCalories:
+            return "flame.fill"
+        case .mostStepsInWorkout:
+            return "shoeprints.fill"
         }
     }
 
     var tint: Color {
         switch self {
-        case .fastest1K: return .blue
-        case .fastestMile: return .cyan
-        case .fastest5K: return .green
-        case .fastest10K: return .orange
-        case .fastestHalfMarathon: return .pink
-        case .fastestMarathon: return .indigo
-        case .longestRun: return .purple
-
-        case .strengthHeaviestSet: return .blue
-        case .strengthEstimatedOneRM: return .green
-        case .strengthWorkoutVolume: return .indigo
-        case .strengthBestRepPR: return .orange
-        case .strengthLongestHealthWorkout: return .cyan
-
-        case .longestRide: return .green
-        case .longestWalkOrHike: return .brown
-        case .longestSwim: return .cyan
-        case .longestWorkout: return .indigo
-        case .longestHIITWorkout: return .orange
-        case .longestRowingWorkout: return .blue
-        case .longestEllipticalWorkout: return .purple
-        case .longestStairClimbingWorkout: return .mint
-        case .longestYogaWorkout: return .teal
-        case .longestCoreWorkout: return .pink
-        case .mostActiveCalories: return .orange
-        case .mostStepsInWorkout: return .green
+        case .fastest1K:
+            return .blue
+        case .fastestMile:
+            return .cyan
+        case .fastest5K:
+            return .green
+        case .fastest10K:
+            return .orange
+        case .fastestHalfMarathon:
+            return .pink
+        case .fastestMarathon:
+            return .indigo
+        case .longestRun:
+            return .purple
+        case .strengthHeaviestSet:
+            return .blue
+        case .strengthEstimatedOneRM:
+            return .green
+        case .strengthWorkoutVolume:
+            return .indigo
+        case .strengthBestRepPR:
+            return .orange
+        case .longestStrengthWorkout:
+            return .mint
+        case .longestRide:
+            return .green
+        case .longestWalkOrHike:
+            return .brown
+        case .longestSwim:
+            return .cyan
+        case .longestWorkout:
+            return .indigo
+        case .longestHIITWorkout:
+            return .red
+        case .longestRowingWorkout:
+            return .teal
+        case .longestEllipticalWorkout:
+            return .purple
+        case .longestStairClimbingWorkout:
+            return .orange
+        case .longestYogaWorkout:
+            return .mint
+        case .longestCoreWorkout:
+            return .blue
+        case .mostActiveCalories:
+            return .orange
+        case .mostStepsInWorkout:
+            return .green
         }
     }
 
@@ -447,7 +513,9 @@ enum ProfileFeaturedRecordKind:
     ) -> String {
         if let healthKind,
            let record = healthRecords.first(
-                where: { $0.kind == healthKind }
+                where: {
+                    $0.kind == healthKind
+                }
            ) {
             return record.formattedValue
         }
@@ -467,8 +535,7 @@ enum ProfileFeaturedRecordKind:
                 .formattedTime ?? "—"
         case .longestRun:
             guard let meters =
-                    stats?
-                        .longestRunMeters,
+                    stats?.longestRunMeters,
                   meters > 0
             else {
                 return "—"
@@ -530,7 +597,22 @@ enum ProfileFeaturedRecordKind:
                 }?
                 .value ?? "—"
 
-        default:
+        case .fastestMile,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .longestStrengthWorkout,
+             .longestRide,
+             .longestWalkOrHike,
+             .longestSwim,
+             .longestWorkout,
+             .longestHIITWorkout,
+             .longestRowingWorkout,
+             .longestEllipticalWorkout,
+             .longestStairClimbingWorkout,
+             .longestYogaWorkout,
+             .longestCoreWorkout,
+             .mostActiveCalories,
+             .mostStepsInWorkout:
             return "—"
         }
     }
@@ -553,10 +635,12 @@ enum ProfileFeaturedRecordKind:
 
         var seen:
             Set<ProfileFeaturedRecordKind> = []
+
         return Array(
             decoded
                 .filter {
-                    seen.insert($0).inserted
+                    seen.insert($0)
+                        .inserted
                 }
                 .prefix(showcaseLimit)
         )
@@ -576,6 +660,7 @@ enum ProfileFeaturedRecordKind:
             .joined(separator: ",")
     }
 }
+
 
 struct ProfilePerformanceSection: View {
     let stats: ProfilePerformanceStats?
