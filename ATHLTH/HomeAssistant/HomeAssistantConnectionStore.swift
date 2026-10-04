@@ -919,6 +919,198 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func syncBackgroundHealthSnapshot(
+        workouts: [WorkoutSummary],
+        sleep: SleepSummary,
+        heart: HeartSummary,
+        training: TrainingHealthSummary,
+        recoveryScore: Int?
+    ) async {
+        guard isConnected else {
+            return
+        }
+
+        await flushPendingDeliveries()
+
+        var state:
+            [String: HomeAssistantJSONValue] = [:]
+
+        if shareCompletedWorkouts {
+            let latestWorkout =
+                workouts.max {
+                    $0.startDate <
+                        $1.startDate
+                }
+
+            state["last_workout"] =
+                latestWorkout
+                    .map {
+                        .string(
+                            $0.activity.rawValue
+                        )
+                    }
+                ?? .null
+
+            if let latestWorkout {
+                state["last_workout_type"] =
+                    .string(
+                        latestWorkout.activity.rawValue
+                    )
+                state[
+                    "last_workout_duration_seconds"
+                ] = .double(
+                    max(
+                        latestWorkout.duration,
+                        0
+                    )
+                )
+                state[
+                    "last_workout_distance_meters"
+                ] =
+                    latestWorkout.distanceMeters
+                        .map {
+                            .double(max($0, 0))
+                        }
+                    ?? .null
+                state["last_workout_ended_at"] =
+                    .string(
+                        Self.iso8601(
+                            latestWorkout.endDate
+                        )
+                    )
+            }
+        }
+
+        state["recovery_score"] =
+            shareRecovery &&
+                recoveryScore != nil
+                ? .int(
+                    min(
+                        max(
+                            recoveryScore ?? 0,
+                            0
+                        ),
+                        100
+                    )
+                )
+                : .null
+
+        state["sleep_duration_minutes"] =
+            shareSleep &&
+                sleep.totalAsleep > 0
+                ? .double(
+                    min(
+                        sleep.totalAsleep / 60,
+                        1_440
+                    )
+                )
+                : .null
+
+        state["hrv_milliseconds"] =
+            shareHRV &&
+                heart.hrvMilliseconds?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            heart.hrvMilliseconds ?? 0,
+                            0
+                        ),
+                        2_000
+                    )
+                )
+                : .null
+
+        state["resting_heart_rate"] =
+            shareRestingHeartRate &&
+                heart.restingHeartRate?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            heart.restingHeartRate ?? 20,
+                            20
+                        ),
+                        250
+                    )
+                )
+                : .null
+
+        state["respiratory_rate"] =
+            shareRespiratoryRate &&
+                training.respiratoryRate?
+                    .isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            training.respiratoryRate ?? 1,
+                            1
+                        ),
+                        80
+                    )
+                )
+                : .null
+
+        if shareWeeklyProgress {
+            var calendar = Calendar.current
+            calendar.firstWeekday = 2
+
+            if let week =
+                    calendar.dateInterval(
+                        of: .weekOfYear,
+                        for: Date()
+                    ) {
+                let current =
+                    workouts.filter {
+                        week.contains(
+                            $0.startDate
+                        )
+                    }
+                let seconds =
+                    current.reduce(0.0) {
+                        $0 +
+                            max(
+                                $1.duration,
+                                0
+                            )
+                    }
+                let meters =
+                    current.reduce(0.0) {
+                        $0 +
+                            max(
+                                $1.distanceMeters ??
+                                    0,
+                                0
+                            )
+                    }
+
+                state[
+                    "weekly_training_minutes"
+                ] = .double(
+                    min(
+                        seconds / 60,
+                        10_080
+                    )
+                )
+                state[
+                    "weekly_distance_km"
+                ] = .double(
+                    min(
+                        meters / 1_000,
+                        5_000
+                    )
+                )
+            }
+        }
+
+        await sendReliably(
+            event: "sync_snapshot",
+            payload: [
+                "state": .object(state)
+            ]
+        )
+    }
+
     func sendConnectionTest() async {
         guard isConnected else {
             return
