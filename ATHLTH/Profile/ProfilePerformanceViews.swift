@@ -8995,10 +8995,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(7)
+            .padding(6)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 74,
+                minHeight: 64,
                 alignment: .topLeading
             )
             .background(
