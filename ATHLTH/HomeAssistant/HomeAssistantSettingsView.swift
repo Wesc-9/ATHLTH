@@ -79,6 +79,21 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareGoals) { _, _ in
             clearDisabledValues()
         }
+        .onChange(
+            of: homeAssistant.shareLiveWorkoutDetails
+        ) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(
+            of: homeAssistant.shareStrengthDetails
+        ) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(
+            of: homeAssistant.shareMilestoneEvents
+        ) { _, _ in
+            clearDisabledValues()
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Disconnect Home Assistant?",
@@ -472,6 +487,57 @@ struct HomeAssistantSettingsView: View {
                 ),
                 icon: "target",
                 isOn: $homeAssistant.shareGoals
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Live workout details",
+                    norwegian: "Live treningsdata"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares phase, elapsed time, distance, pace/speed, heart-rate zone and treadmill incline while training. GPS coordinates are never shared. Off by default.",
+                    norwegian:
+                        "Deler fase, tid, distanse, tempo/fart, pulssone og møllestigning under trening. GPS-koordinater deles aldri. Av som standard."
+                ),
+                icon: "waveform.path.ecg.rectangle",
+                isOn:
+                    $homeAssistant
+                        .shareLiveWorkoutDetails
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Live strength details",
+                    norwegian: "Live styrkedata"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares current exercise, set, actual reps, weight, resistance, rest and rowing distance. Off by default.",
+                    norwegian:
+                        "Deler øvelse, sett, faktiske reps, vekt, motstand, pause og rodd distanse. Av som standard."
+                ),
+                icon: "dumbbell.fill",
+                isOn:
+                    $homeAssistant
+                        .shareStrengthDetails
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "PRs and milestones",
+                    norwegian: "PR-er og milepæler"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Lets Home Assistant react to personal records, achievements, completed goals and challenges. Off by default.",
+                    norwegian:
+                        "Lar Home Assistant reagere på personlige rekorder, achievements, fullførte mål og challenges. Av som standard."
+                ),
+                icon: "trophy.fill",
+                isOn:
+                    $homeAssistant
+                        .shareMilestoneEvents
             )
 
             Text(
