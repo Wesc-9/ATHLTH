@@ -4020,8 +4020,8 @@ private struct HomeStrengthMuscleArtwork:
     private let activationTint =
         Color(
             red: 0.94,
-            green: 0.55,
-            blue: 0.22
+            green: 0.34,
+            blue: 0.23
         )
 
     var body: some View {
@@ -4030,14 +4030,14 @@ private struct HomeStrengthMuscleArtwork:
                 LinearGradient(
                     colors: [
                         Color(
-                            red: 0.997,
-                            green: 0.989,
-                            blue: 0.970
+                            red: 1.0,
+                            green: 0.986,
+                            blue: 0.968
                         ),
                         Color(
-                            red: 0.980,
-                            green: 0.964,
-                            blue: 0.930
+                            red: 0.988,
+                            green: 0.944,
+                            blue: 0.904
                         )
                     ],
                     startPoint:
@@ -4049,20 +4049,39 @@ private struct HomeStrengthMuscleArtwork:
                 RadialGradient(
                     colors: [
                         activationTint
-                            .opacity(0.12),
+                            .opacity(0.18),
                         activationTint
-                            .opacity(0.035),
+                            .opacity(0.06),
                         Color.clear
                     ],
-                    center: .center,
-                    startRadius: 4,
+                    center:
+                        UnitPoint(
+                            x: 0.52,
+                            y: 0.52
+                        ),
+                    startRadius: 2,
                     endRadius:
                         max(
                             proxy.size.width *
-                                0.62,
-                            110
+                                0.60,
+                            108
                         )
                 )
+
+                Circle()
+                    .fill(
+                        Color.white
+                            .opacity(0.30)
+                    )
+                    .frame(
+                        width:
+                            min(
+                                proxy.size.width *
+                                    0.82,
+                                178
+                            )
+                    )
+                    .blur(radius: 1)
 
                 StrengthMuscleMapView(
                     profile: profile,
@@ -4076,20 +4095,20 @@ private struct HomeStrengthMuscleArtwork:
                     width:
                         min(
                             max(
-                                height * 1.62,
-                                154
+                                height * 1.74,
+                                166
                             ),
                             proxy.size.width -
-                                12
+                                8
                         ),
                     height:
                         max(
-                            height + 18,
-                            124
+                            height + 26,
+                            132
                         )
                 )
-                .offset(y: 9)
-                .opacity(0.99)
+                .offset(y: 11)
+                .opacity(0.995)
 
                 LinearGradient(
                     colors: [
@@ -4156,21 +4175,57 @@ private struct HomePersonalWorkoutVisual:
 
     private var muscleProfile:
         StrengthMuscleProfile {
-        guard let strengthWorkout else {
-            return StrengthMuscleProfile(
-                activations: []
-            )
+        if let strengthWorkout {
+            let built =
+                StrengthMuscleProfileBuilder
+                    .make(
+                        workout:
+                            strengthWorkout,
+                        library:
+                            exerciseLibrary
+                                .allExercises
+                    )
+                    .profile
+
+            if !built.activations.isEmpty {
+                return built
+            }
         }
 
-        return StrengthMuscleProfileBuilder
-            .make(
-                workout:
-                    strengthWorkout,
-                library:
-                    exerciseLibrary
-                        .allExercises
-            )
-            .profile
+        guard let groups =
+                workout
+                    .strengthMuscleGroups,
+              !groups.isEmpty
+        else {
+            return .empty
+        }
+
+        var scores:
+            [StrengthMuscleRegion: Double] =
+                [:]
+
+        for raw in groups {
+            for region in
+                StrengthMuscleResolver
+                    .regions(
+                        for: raw
+                    ) {
+                scores[
+                    region,
+                    default: 0
+                ] += 1
+            }
+        }
+
+        return StrengthMuscleProfile(
+            activations:
+                scores.map {
+                    StrengthMuscleActivation(
+                        region: $0.key,
+                        score: $0.value
+                    )
+                }
+        )
     }
 
     private var strengthFigureStyle:
