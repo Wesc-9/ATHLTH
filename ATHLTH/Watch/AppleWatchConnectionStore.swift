@@ -754,24 +754,31 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 Date().timeIntervalSince1970
         ]
 
+        // Ending a workout must be durable. sendMessage is the fast path,
+        // while transferUserInfo guarantees delivery if the Watch app or
+        // connection changes state during HealthKit finalization. Duplicate
+        // .end commands are harmless because WatchWorkoutManager.end() only
+        // acts while the workout is running or paused.
+        if command == .end {
+            session.transferUserInfo(
+                payload
+            )
+        }
+
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
                 errorHandler:
                     command == .end
-                        ? Self.makeDurableMessageErrorHandler(
-                            session: session,
-                            payload: payload,
+                        ? Self.makeMessageErrorHandler(
                             store: self
                         )
                         : Self.makeMessageErrorHandler(
                             store: self
                         )
             )
-        } else if command == .end {
-            session.transferUserInfo(payload)
-        } else {
+        } else if command != .end {
             workoutLaunchError =
                 ATHLTHLocalization.choose(
                     english:
