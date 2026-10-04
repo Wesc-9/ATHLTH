@@ -1006,18 +1006,9 @@ struct AppRootView: View {
             }
         }
         .onReceive(strengthWorkout.$activeWorkout) { workout in
-            guard ATHLTHDeviceRole.isIPhone else {
-                return
-            }
-
-            Task {
-                await syncHomeAssistantStrengthLiveState(
-                    workout
-                )
-                await emitNewHomeAssistantStrengthSetEvents(
-                    workout
-                )
-            }
+            handleStrengthWorkoutLiveUpdate(
+                workout
+            )
         }
         .onChange(
             of: strengthWorkout.currentExerciseIndex
@@ -2514,6 +2505,23 @@ struct AppRootView: View {
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
         pendingWorkoutReview = workout
+    }
+
+    private func handleStrengthWorkoutLiveUpdate(
+        _ workout: StrengthWorkoutSession?
+    ) {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        Task { @MainActor in
+            await syncHomeAssistantStrengthLiveState(
+                workout
+            )
+            await emitNewHomeAssistantStrengthSetEvents(
+                workout
+            )
+        }
     }
 
     private func handleRemoteNotificationReceived() {
