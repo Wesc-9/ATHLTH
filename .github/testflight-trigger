@@ -62,3 +62,5 @@ ATHLTH 1.5.8 build 63 TestFlight upload 2026-10-03
 Retry build 63 after Watch strength compile fix 2026-10-03
 ATHLTH 1.5.8 build 63 retry after Watch always-on compile fix 2026-10-03
 Trigger ATHLTH 1.5.9 build 64 to TestFlight
+
+ATHLTH 1.6.0 build 65 TestFlight upload after main merge 7469aa9
