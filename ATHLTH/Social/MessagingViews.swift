@@ -10,6 +10,7 @@ struct MessageInboxDestinationView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingNewMessage) {
             NewMessageView()
