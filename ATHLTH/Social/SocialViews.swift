@@ -3135,22 +3135,9 @@ struct FriendProfileView: View {
     private func performanceCard(
         _ performance:
             SocialPerformanceStats?,
-        activities: [SocialFeedItem]
+        activities _: [SocialFeedItem]
     ) -> some View {
-        let strengthRecords =
-            Array(
-                activities
-                    .filter {
-                        $0.activity.kind ==
-                            "personal_record" &&
-                        $0.activity.metadata?[
-                            "pr_type"
-                        ] == "strength"
-                    }
-                    .prefix(4)
-            )
-
-        return VStack(
+        VStack(
             alignment: .leading,
             spacing: 12
         ) {
@@ -3188,22 +3175,6 @@ struct FriendProfileView: View {
                 )
             }
 
-            HStack {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Running",
-                        norwegian: "Løping"
-                    ),
-                    systemImage: "figure.run"
-                )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-                Spacer()
-            }
-
             HStack(spacing: 6) {
                 remoteRecordTile(
                     title:
@@ -3216,7 +3187,7 @@ struct FriendProfileView: View {
                             performance?
                                 .fastest1KSeconds
                         ),
-                    icon: "1.circle.fill",
+                    icon: "figure.run",
                     tint: .blue
                 )
 
@@ -3268,81 +3239,6 @@ struct FriendProfileView: View {
                         "point.topleft.down.to.point.bottomright.curvepath",
                     tint: .purple
                 )
-            }
-
-            HStack {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Strength",
-                        norwegian: "Styrke"
-                    ),
-                    systemImage:
-                        "dumbbell.fill"
-                )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-                Spacer()
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "ATHLTH records",
-                        norwegian:
-                            "ATHLTH-rekorder"
-                    )
-                )
-                .font(
-                    .system(
-                        size: 7.2,
-                        weight: .bold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-            }
-
-            if strengthRecords.isEmpty {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "No shared strength records yet.",
-                        norwegian:
-                            "Ingen delte styrkerekorder ennå."
-                    )
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .padding(.vertical, 4)
-            } else {
-                HStack(spacing: 6) {
-                    ForEach(
-                        strengthRecords
-                    ) { record in
-                        remoteRecordTile(
-                            title:
-                                record.activity
-                                    .metadata?[
-                                        "exercise"
-                                    ] ??
-                                record.activity.title,
-                            value:
-                                record.activity
-                                    .subtitle ??
-                                "—",
-                            icon:
-                                "dumbbell.fill",
-                            tint:
-                                ATHLTHTheme
-                                    .accentDeep
-                        )
-                    }
-                }
             }
         }
         .padding(14)
