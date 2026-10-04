@@ -722,9 +722,29 @@ struct AppRootView: View {
 
             lastFullLifecycleRefreshAt = Date()
         }
-        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) {
-            IPhoneWorkoutView()
+        .overlay {
+            if phoneWorkout.showingWorkout,
+               phoneWorkout.active != nil {
+                IPhoneWorkoutView()
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                    .background(
+                        Color(.systemGroupedBackground)
+                            .ignoresSafeArea()
+                    )
+                    .transition(
+                        .move(edge: .bottom)
+                            .combined(with: .opacity)
+                    )
+                    .zIndex(100)
+            }
         }
+        .animation(
+            .easeInOut(duration: 0.20),
+            value: phoneWorkout.showingWorkout
+        )
         .fullScreenCover(
             isPresented:
                 $showingRelayedStrengthWorkout
