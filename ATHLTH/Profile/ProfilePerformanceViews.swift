@@ -8403,8 +8403,10 @@ struct ProfileRecordShowcasePickerView:
                     .strength {
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "ATHLTH",
-                            norwegian: "ATHLTH"
+                            english:
+                                "Apple Health + ATHLTH",
+                            norwegian:
+                                "Apple Health + ATHLTH"
                         )
                     )
                     .font(
