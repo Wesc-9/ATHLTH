@@ -22,6 +22,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
+    private let iPhoneAudioCoach =
+        MirroredWorkoutAudioCoach()
+    private var iPhoneAudioCoachPreparedAt:
+        Date?
+    private var iPhoneAudioCoachAttached =
+        false
 
     override init() {
         super.init()
@@ -37,6 +43,32 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 self?.attach(session)
             }
         }
+    }
+
+    func prepareIPhoneAudioCoach(
+        _ configuration:
+            WatchAudioCoachConfiguration
+    ) {
+        guard configuration.enabled else {
+            iPhoneAudioCoach.stop()
+            iPhoneAudioCoachPreparedAt = nil
+            iPhoneAudioCoachAttached = false
+            return
+        }
+
+        iPhoneAudioCoach.prepare(
+            configuration
+        )
+        iPhoneAudioCoachPreparedAt =
+            Date()
+        iPhoneAudioCoachAttached =
+            false
+    }
+
+    func clearIPhoneAudioCoach() {
+        iPhoneAudioCoach.stop()
+        iPhoneAudioCoachPreparedAt = nil
+        iPhoneAudioCoachAttached = false
     }
 
     var hasActiveMirroredWorkout: Bool {
@@ -111,6 +143,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard !hasActiveMirroredWorkout else { return }
 
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
+        clearIPhoneAudioCoach()
 
         publish {
             self.isPresentationRequested = false
@@ -145,6 +178,21 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             routePointCount: snapshot?.routePointCount ?? 0
         )
 
+        if let preparedAt =
+                iPhoneAudioCoachPreparedAt,
+           Date()
+                .timeIntervalSince(
+                    preparedAt
+                ) <= 90 {
+            iPhoneAudioCoachAttached =
+                true
+            iPhoneAudioCoach.handle(
+                initialSnapshot
+            )
+        } else {
+            clearIPhoneAudioCoach()
+        }
+
         publish {
             self.snapshot = initialSnapshot
             self.isUserMinimized = false
@@ -171,6 +219,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         guard let latestSnapshot else { return }
+
+        if iPhoneAudioCoachAttached {
+            iPhoneAudioCoach.handle(
+                latestSnapshot
+            )
+        }
 
         publish {
             self.snapshot = latestSnapshot
@@ -257,6 +311,16 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 result.routePointCount,
                 snapshot.routePointCount
             )
+
+        if iPhoneAudioCoachAttached {
+            iPhoneAudioCoach.handle(
+                snapshot
+            )
+            iPhoneAudioCoachAttached =
+                false
+            iPhoneAudioCoachPreparedAt =
+                nil
+        }
 
         self.snapshot = snapshot
         mirroredSession = nil
@@ -362,6 +426,13 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             }
 
             self.snapshot = snapshot
+
+            if self.iPhoneAudioCoachAttached {
+                self.iPhoneAudioCoach.handle(
+                    snapshot
+                )
+            }
+
             self.connectionText =
                 newState == .completed
                     ? ATHLTHLocalization.choose(
@@ -407,6 +478,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             if !self.isUserMinimized {
                 self.isPresentationRequested = true
             }
+            self.clearIPhoneAudioCoach()
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
         }
     }
