@@ -39,6 +39,7 @@ struct ATHLTHApp: App {
     @StateObject private var subscriptionStore = SubscriptionStore()
     @StateObject private var subscriptionBackend = SubscriptionBackendService()
     @StateObject private var accountService = SupabaseAccountService()
+    @StateObject private var deviceRelay = WorkoutDeviceRelayStore.shared
 
     init() {
         let homeAssistantStore =
@@ -125,6 +126,7 @@ struct ATHLTHApp: App {
                 .environmentObject(subscriptionStore)
                 .environmentObject(subscriptionBackend)
                 .environmentObject(accountService)
+                .environmentObject(deviceRelay)
                 .environment(
                     \.locale,
                     settings.interfaceLocale
@@ -206,6 +208,7 @@ struct AppRootView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var deviceRelay: WorkoutDeviceRelayStore
 
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
@@ -216,6 +219,7 @@ struct AppRootView: View {
     @State private var lastQueuedWorkoutReview: SocialPublishableWorkout?
     @State private var lastFullLifecycleRefreshAt: Date?
     @State private var showingNotificationPermissionPrimer = false
+    @State private var showingRelayedStrengthWorkout = false
 
     @AppStorage("athlth.notifications.permissionPrimerShown")
     private var notificationPermissionPrimerShown = false
@@ -245,6 +249,197 @@ struct AppRootView: View {
         appSession.signedIn
             ? appSession.profile.userID
             : nil
+    }
+
+    @MainActor
+    private func processWorkoutDeviceRelayCommand(
+        _ command: WorkoutDeviceRelayCommand
+    ) async throws {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        let envelope = command.envelope
+        let payload = envelope.workoutPayload
+        let captureDevice =
+            envelope.target.captureDevice
+
+        switch envelope.kind {
+        case .run:
+            let runningWorkout =
+                payload.workout
+                    .resolvedRunningWorkouts
+                    .first
+
+            let mode: RunQuickStartMode
+            if runningWorkout != nil {
+                mode = .structured
+            } else if payload.route != nil {
+                mode = .route
+            } else {
+                mode = .free
+            }
+
+            let configuration =
+                RunQuickStartConfiguration(
+                    mode: mode,
+                    route: payload.route,
+                    workout: runningWorkout,
+                    captureDevice: captureDevice,
+                    audioCoach:
+                        envelope.watchAudioCoach ??
+                        payload.workout
+                            .audioCoachConfiguration ??
+                        .disabled,
+                    routeAlerts:
+                        payload.routeAlerts ??
+                        settings
+                            .routeAlertConfiguration,
+                    ghostTargetDurationSeconds:
+                        envelope
+                            .ghostTargetDurationSeconds,
+                    ghostUpdates:
+                        envelope.ghostUpdates,
+                    autoPauseEnabled:
+                        payload.workout
+                            .autoPauseEnabled ??
+                        settings
+                            .autoPauseOutdoorWorkouts,
+                    spotifyPlaylist:
+                        envelope.spotifyPlaylist,
+                    spotifyAutoplay:
+                        envelope.spotifyAutoplay,
+                    friends: [],
+                    gearIDs:
+                        Set(envelope.gearIDs)
+                )
+
+            try await WorkoutLaunchCoordinator
+                .startRunQuick(
+                    configuration:
+                        configuration,
+                    session: appSession,
+                    settings: settings,
+                    gear: gear,
+                    phoneWorkout:
+                        phoneWorkout,
+                    watchConnection:
+                        watchConnection,
+                    spotify:
+                        spotifyPlayback,
+                    ghostRace:
+                        ghostRace
+                )
+
+        case .walk:
+            let configuration =
+                WalkQuickStartConfiguration(
+                    captureDevice:
+                        captureDevice,
+                    audioCoach:
+                        envelope.watchAudioCoach ??
+                        payload.workout
+                            .audioCoachConfiguration ??
+                        .disabled,
+                    autoPauseEnabled:
+                        payload.workout
+                            .autoPauseEnabled ??
+                        settings
+                            .autoPauseOutdoorWorkouts,
+                    spotifyPlaylist:
+                        envelope.spotifyPlaylist,
+                    spotifyAutoplay:
+                        envelope.spotifyAutoplay,
+                    friends: [],
+                    gearIDs:
+                        Set(envelope.gearIDs)
+                )
+
+            try await WorkoutLaunchCoordinator
+                .startWalkQuick(
+                    configuration:
+                        configuration,
+                    settings: settings,
+                    gear: gear,
+                    phoneWorkout:
+                        phoneWorkout,
+                    watchConnection:
+                        watchConnection,
+                    spotify:
+                        spotifyPlayback
+                )
+
+        case .strength:
+            let trackingMode =
+                payload.strengthTrackingMode ??
+                .simple
+            var advanced =
+                payload
+                    .strengthAdvancedConfiguration ??
+                StrengthAdvancedConfiguration
+                    .savedDefaults()
+
+            if envelope.spotifyPlaylist != nil {
+                advanced.spotifyPlaylist =
+                    envelope.spotifyPlaylist
+                advanced.spotifyAutoplay =
+                    envelope.spotifyAutoplay
+            }
+
+            let didStart =
+                try await WorkoutLaunchCoordinator
+                    .startStrength(
+                        workout:
+                            payload
+                                .recipientCopy(),
+                        captureDevice:
+                            captureDevice,
+                        trackingMode:
+                            trackingMode,
+                        selectedFriends: [],
+                        audioCoach:
+                            envelope.watchAudioCoach ??
+                            advanced
+                                .audioCoach
+                                .watchConfiguration,
+                        advancedConfiguration:
+                            advanced,
+                        session:
+                            appSession,
+                        settings:
+                            settings,
+                        social:
+                            social,
+                        strengthWorkout:
+                            strengthWorkout,
+                        watchConnection:
+                            watchConnection,
+                        spotify:
+                            spotifyPlayback
+                    )
+
+            if didStart {
+                showingRelayedStrengthWorkout =
+                    true
+            }
+        }
+    }
+
+    private func startDeviceRelayIfNeeded() {
+        guard
+            appSession.signedIn,
+            ATHLTHDeviceRole.isIPhone
+        else {
+            deviceRelay.stopListening()
+            return
+        }
+
+        deviceRelay.startListening {
+            command in
+            try await processWorkoutDeviceRelayCommand(
+                command
+            )
+        }
     }
 
     private var lifecycleContent: some View {
@@ -279,10 +474,14 @@ struct AppRootView: View {
             // before secondary account/network work begins.
             await Task.yield()
 
-            // Watch availability is discovered independently of workout capture.
-            // The user chooses iPhone vs Apple Watch for each workout.
-            watchConnection.connect()
-            syncSpotifyPlaybackToWatch()
+            // Only the paired iPhone owns Apple Watch connectivity. iPad is a
+            // controller/secondary screen and never activates WatchConnectivity.
+            if ATHLTHDeviceRole.supportsDirectAppleWatch {
+                watchConnection.connect()
+                syncSpotifyPlaybackToWatch()
+            }
+
+            startDeviceRelayIfNeeded()
 
             // If Apple Watch already owns a workout, HealthKit may deliver the
             // mirroring callback just after app activation. Give that callback
@@ -404,7 +603,21 @@ struct AppRootView: View {
 
             lastFullLifecycleRefreshAt = Date()
         }
-        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) { IPhoneWorkoutView() }
+        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) {
+            IPhoneWorkoutView()
+        }
+        .fullScreenCover(
+            isPresented:
+                $showingRelayedStrengthWorkout
+        ) {
+            ActiveStrengthWorkoutView()
+                .environmentObject(
+                    strengthWorkout
+                )
+                .environmentObject(
+                    appSession
+                )
+        }
         .onChange(of: watchConnection.lastSpotifyCommand) { _, command in
             guard let command else { return }
             handleWatchSpotifyCommand(command)
@@ -441,9 +654,11 @@ struct AppRootView: View {
             if phase == .active {
                 spotifyPlayback
                     .applicationDidBecomeActive()
+                startDeviceRelayIfNeeded()
             } else {
                 spotifyPlayback
                     .applicationWillResignActive()
+                deviceRelay.stopListening()
             }
 
             phoneWorkout.checkpoint()
@@ -478,11 +693,22 @@ struct AppRootView: View {
 
             guard phase == .active else { return }
 
-            // Refresh Watch availability whenever the app becomes active.
-            // This is connection state, not a global workout-device choice.
-            watchConnection.connect()
+            // Apple Watch belongs to the paired iPhone. iPad does not query,
+            // activate or present WatchConnectivity state.
+            if ATHLTHDeviceRole.supportsDirectAppleWatch {
+                watchConnection.connect()
+            }
 
             Task {
+                if ATHLTHDeviceRole.isIPhone {
+                    await deviceRelay
+                        .refreshPending {
+                            command in
+                            try await processWorkoutDeviceRelayCommand(
+                                command
+                            )
+                        }
+                }
                 await allowWatchMirroringToAttachIfNeeded()
 
                 if !workoutMirroring.hasActiveMirroredWorkout,
@@ -493,6 +719,13 @@ struct AppRootView: View {
 
                 syncHomeAssistantWatchConfiguration()
                 await syncHomeAssistantSnapshot()
+            }
+        }
+        .onChange(of: appSession.signedIn) { _, signedIn in
+            if signedIn {
+                startDeviceRelayIfNeeded()
+            } else {
+                deviceRelay.stopListening()
             }
         }
         .onReceive(
