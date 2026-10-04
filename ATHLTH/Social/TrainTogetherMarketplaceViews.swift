@@ -1865,7 +1865,7 @@ struct TrainTogetherPostDetailView:
 private struct TrainTogetherJoinRequestSheet:
     View
 {
-    @Environment(.dismiss)
+    @Environment(\.dismiss)
     private var dismiss
 
     @EnvironmentObject private var marketplace:
@@ -2005,7 +2005,7 @@ private struct TrainTogetherJoinRequestSheet:
 struct TrainTogetherPostCreateView:
     View
 {
-    @Environment(.dismiss)
+    @Environment(\.dismiss)
     private var dismiss
 
     @EnvironmentObject private var session:
