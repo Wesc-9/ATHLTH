@@ -2025,22 +2025,59 @@ struct DirectMessageThreadView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            threadHero
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+
             if let conversationID {
                 messagesView(conversationID)
             } else if let loadError {
                 ContentUnavailableView(
-                    "Messages unavailable",
-                    systemImage: "exclamationmark.bubble",
-                    description: Text(loadError)
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Messages unavailable",
+                        norwegian:
+                            "Meldinger utilgjengelig"
+                    ),
+                    systemImage:
+                        "exclamationmark.bubble",
+                    description:
+                        Text(loadError)
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
                 )
             } else {
-                ProgressView("Opening conversation…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Opening conversation…",
+                        norwegian:
+                            "Åpner samtalen…"
+                    )
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
             }
         }
-        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
-        .navigationTitle(friend.resolvedName)
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.14)
+            )
+        )
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
+        )
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
@@ -2064,6 +2101,130 @@ struct DirectMessageThreadView: View {
         .task(id: friend.userID) {
             await openAndPoll()
         }
+    }
+
+    private var threadHero: some View {
+        ATHLTHCard {
+            HStack(spacing: 14) {
+                SocialAvatar(
+                    profile: friend,
+                    size: 54
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        friend.resolvedName
+                    )
+                    .font(
+                        .title3
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                    Text(
+                        threadStatusText
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(
+                    systemName:
+                        threadStatusIcon
+                )
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.white)
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitality,
+                    in: Circle()
+                )
+            }
+        }
+    }
+
+    private var threadStatusText: String {
+        if isIncomingRequest {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Message request · needs your reply",
+                norwegian:
+                    "Meldingsforespørsel · venter på svar"
+            )
+        }
+
+        if isOutgoingRequest {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Message request sent",
+                norwegian:
+                    "Meldingsforespørsel sendt"
+            )
+        }
+
+        if !pendingChallengesFromFriend.isEmpty {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Challenge waiting for response",
+                norwegian:
+                    "Challenge venter på svar"
+            )
+        }
+
+        if !outgoingChallengesToFriend.isEmpty {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Challenge sent · waiting",
+                norwegian:
+                    "Challenge sendt · venter"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "ATHLTH conversation",
+            norwegian:
+                "ATHLTH-samtale"
+        )
+    }
+
+    private var threadStatusIcon: String {
+        if isIncomingRequest {
+            return "envelope.badge.fill"
+        }
+
+        if isOutgoingRequest {
+            return "paperplane.fill"
+        }
+
+        if !pendingChallengesFromFriend.isEmpty ||
+            !outgoingChallengesToFriend.isEmpty {
+            return "trophy.fill"
+        }
+
+        return "message.fill"
     }
 
     @ViewBuilder
