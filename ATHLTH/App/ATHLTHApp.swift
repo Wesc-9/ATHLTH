@@ -2508,7 +2508,7 @@ struct AppRootView: View {
     }
 
     private func handleStrengthWorkoutLiveUpdate(
-        _ workout: StrengthWorkoutSession?
+        _ workout: StrengthWorkoutLog?
     ) {
         guard ATHLTHDeviceRole.isIPhone else {
             return
