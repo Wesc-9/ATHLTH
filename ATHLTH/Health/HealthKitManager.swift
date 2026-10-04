@@ -90,7 +90,14 @@ final class HealthKitManager: ObservableObject {
         hasTrainingHealthData || personalDetails.hasAnyValue
     }
 
-    private let healthStore = HKHealthStore()
+    /// Called after a HealthKit background observer has refreshed ATHLTH's
+    /// in-memory health snapshot, before the HealthKit completion handler is
+    /// released. This lets integrations finish a small background network
+    /// update while iOS still grants execution time.
+    var backgroundRefreshDidComplete:
+        (@MainActor @Sendable () async -> Void)?
+
+        private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var observerQueries: [HKObserverQuery] = []
     private var backgroundRefreshTask: Task<Void, Never>?
@@ -814,6 +821,11 @@ final class HealthKitManager: ObservableObject {
                 await self.refreshAll()
             } else {
                 await self.refreshHealthSignals()
+            }
+
+            if let handler =
+                    self.backgroundRefreshDidComplete {
+                await handler()
             }
         }
 
