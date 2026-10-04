@@ -2749,105 +2749,343 @@ struct FriendProfileView: View {
     }
 
     private func performanceCard(
-        _ performance: SocialPerformanceStats
+        _ performance:
+            SocialPerformanceStats
     ) -> some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Performance")
-                    .font(.headline)
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Personal records",
+                        norwegian:
+                            "Personlige rekorder"
+                    ),
+                    systemImage:
+                        "chart.bar.fill"
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
 
-                remoteStatRow(
-                    "Fastest 1K",
-                    value: formatTime(performance.fastest1KSeconds)
-                )
-                remoteStatRow(
-                    "Fastest 5K",
-                    value: formatTime(performance.fastest5KSeconds)
-                )
-                remoteStatRow(
-                    "Marathon",
-                    value: formatTime(performance.fastestMarathonSeconds)
-                )
-                remoteStatRow(
-                    "Longest Run",
-                    value: formatDistance(performance.longestRunMeters)
-                )
-                remoteStatRow(
-                    "Workouts",
-                    value: "\(performance.totalWorkoutCount)"
-                )
-                remoteStatRow(
-                    "Running",
-                    value: formatDistance(
-                        performance.totalRunningDistanceMeters
+                Spacer()
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Shared",
+                        norwegian: "Delt"
                     )
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            HStack(spacing: 8) {
+                remoteRecordTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Fastest 1K",
+                            norwegian: "Raskeste 1 km"
+                        ),
+                    value:
+                        formatTime(
+                            performance
+                                .fastest1KSeconds
+                        ),
+                    icon: "1.circle.fill",
+                    tint: .blue
+                )
+
+                remoteRecordTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Fastest 5K",
+                            norwegian: "Raskeste 5 km"
+                        ),
+                    value:
+                        formatTime(
+                            performance
+                                .fastest5KSeconds
+                        ),
+                    icon: "5.circle.fill",
+                    tint: .green
+                )
+
+                remoteRecordTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Marathon",
+                            norwegian: "Maraton"
+                        ),
+                    value:
+                        formatTime(
+                            performance
+                                .fastestMarathonSeconds
+                        ),
+                    icon:
+                        "flag.checkered",
+                    tint: .indigo
+                )
+
+                remoteRecordTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Longest run",
+                            norwegian:
+                                "Lengste løpetur"
+                        ),
+                    value:
+                        formatDistance(
+                            performance
+                                .longestRunMeters
+                        ),
+                    icon:
+                        "point.topleft.down.to.point.bottomright.curvepath",
+                    tint: .purple
                 )
             }
         }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border
+                    .opacity(0.56),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
-    private func remoteStatRow(
-        _ title: String,
-        value: String
+    private func remoteRecordTile(
+        title: String,
+        value: String,
+        icon: String,
+        tint: Color
     ) -> some View {
-        HStack {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 29,
+                    height: 29
+                )
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 9,
+                        style: .continuous
+                    )
+                )
+
             Text(title)
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-            Spacer()
+                .font(
+                    .system(
+                        size: 8.8,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(2)
+                .minimumScaleFactor(0.66)
+
             Text(value)
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.56)
+        }
+        .padding(9)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 94,
+            alignment: .topLeading
+        )
+        .background(
+            Color.black.opacity(0.022),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(0.09),
+                lineWidth: 0.7
+            )
         }
     }
 
     private func trophyCard(
-        _ items: [SocialTrophyShowcaseItem]
+        _ items:
+            [SocialTrophyShowcaseItem]
     ) -> some View {
-        ATHLTHCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Trophies")
-                    .font(.headline)
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Trophy cabinet",
+                        norwegian:
+                            "Troféskap"
+                    ),
+                    systemImage:
+                        "trophy.fill"
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(items) { item in
-                            VStack(spacing: 8) {
-                                ZStack {
-                                    ATHLTHTrophyPlateShape()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    .black,
-                                                    ATHLTHTheme.accent
-                                                        .opacity(0.62)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
+                Spacer()
 
-                                    ATHLTHMarkShape()
-                                        .fill(.white)
-                                        .frame(width: 30, height: 22)
-                                }
-                                .frame(width: 72, height: 82)
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Showcase",
+                        norwegian: "Utstilling"
+                    )
+                )
+                .font(
+                    .caption.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
 
-                                Text(item.title)
-                                    .font(.caption2.bold())
-                                    .lineLimit(1)
+            HStack(
+                alignment: .top,
+                spacing: 8
+            ) {
+                ForEach(
+                    Array(items.prefix(4))
+                ) { item in
+                    VStack(spacing: 5) {
+                        ZStack {
+                            ATHLTHTrophyPlateShape()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            .black,
+                                            ATHLTHTheme
+                                                .accent
+                                                .opacity(
+                                                    0.62
+                                                )
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
+                                    )
+                                )
 
-                                Text(item.stageLabel)
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 105)
+                            ATHLTHMarkShape()
+                                .fill(.white)
+                                .frame(
+                                    width: 19,
+                                    height: 14
+                                )
                         }
+                        .frame(
+                            width: 46,
+                            height: 52
+                        )
+
+                        Text(item.title)
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(
+                                0.62
+                            )
                     }
+                    .frame(
+                        maxWidth: .infinity
+                    )
                 }
             }
         }
+        .padding(16)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border
+                    .opacity(0.56),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
     private func load(force: Bool = false) async {
