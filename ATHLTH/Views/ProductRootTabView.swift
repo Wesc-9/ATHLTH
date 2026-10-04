@@ -2492,6 +2492,8 @@ struct ATHLTHHomeView: View {
 
                 HStack {
                     Button {
+                        strengthWorkout
+                            .acknowledgeRecoveredWorkout()
                         showingHomeStrengthWorkout = true
                     } label: {
                         Label(
@@ -5313,6 +5315,8 @@ struct ATHLTHTrainView: View {
                     strengthWorkout
                         .recoveredActiveWorkoutNeedsReview,
                 onContinue: {
+                    strengthWorkout
+                        .acknowledgeRecoveredWorkout()
                     showingStrengthWorkout = true
                 },
                 onFinish: {
@@ -5858,6 +5862,8 @@ struct ATHLTHTrainView: View {
             }
         case .strength:
             if strengthWorkout.activeWorkout != nil {
+                strengthWorkout
+                    .acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
             } else {
                 showingStrengthQuickStart = true
