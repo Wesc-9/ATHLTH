@@ -340,6 +340,21 @@ final class WorkoutDeviceRelayStore:
                     norwegian:
                         "Sendt til iPhone."
                 )
+
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(
+                    for: .seconds(4)
+                )
+
+                guard let self,
+                      self.lastQueuedCommandID ==
+                        requestID
+                else {
+                    return
+                }
+
+                self.lastStatusText = nil
+            }
         } catch {
             errorMessage =
                 error.localizedDescription
