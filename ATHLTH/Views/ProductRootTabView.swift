@@ -10258,7 +10258,8 @@ struct ATHLTHProfileView: View {
         ATHLTHPinnedHeroLayout(
             accent:
                 ATHLTHTheme.premiumGold.opacity(0.34),
-            immersiveTransition: true
+            immersiveTransition: true,
+            sheetOverlapOverride: 12
         ) {
             profileHero
         } content: {
@@ -10269,9 +10270,9 @@ struct ATHLTHProfileView: View {
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            // The rounded content sheet starts 38 pt into the hero. Keep only
-            // enough breathing room to clear the four stat cells so the first
-            // section sits directly beneath the hero, matching the profile spec.
+            // Keep the first section comfortably below the profile stats.
+            // The profile uses a smaller sheet overlap so all four stat cells
+            // remain fully visible above the rounded white content sheet.
             .padding(.top, 50)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
