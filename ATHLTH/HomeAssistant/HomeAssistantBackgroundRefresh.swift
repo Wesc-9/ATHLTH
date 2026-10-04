@@ -31,6 +31,17 @@ enum ATHLTHHomeAssistantBackgroundRefresh {
     // MainActor before touching app stores. Creating this callback inside a
     // MainActor-isolated closure causes Swift 6's executor precondition to
     // trap before the Task hop can run.
+    private final class RefreshTaskBox:
+        @unchecked Sendable {
+        let task: BGAppRefreshTask
+
+        init(
+            _ task: BGAppRefreshTask
+        ) {
+            self.task = task
+        }
+    }
+
     nonisolated private static func launchTask(
         _ task: BGTask
     ) {
@@ -43,9 +54,18 @@ enum ATHLTHHomeAssistantBackgroundRefresh {
             return
         }
 
+        // BGTask is not Sendable. Box the immutable reference explicitly
+        // before hopping actors; all actual BGTask interaction then stays on
+        // MainActor. This avoids Swift 6's region-isolation send error without
+        // weakening isolation for the app stores used by the refresh handler.
+        let box =
+            RefreshTaskBox(
+                refreshTask
+            )
+
         Task { @MainActor in
             await handle(
-                refreshTask
+                box.task
             )
         }
     }
