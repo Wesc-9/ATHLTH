@@ -1118,7 +1118,8 @@ struct AppRootView: View {
             runningWorkoutLibrary.switchAccount(userID)
         }
         .task(id: signedInUserID) {
-            guard let userID =
+            guard ATHLTHDeviceRole.isIPhone,
+                  let userID =
                     signedInUserID
             else {
                 return
@@ -2267,7 +2268,8 @@ struct AppRootView: View {
             settings.shareTrainingPresence = privacy.shareTrainingPresence
         }
 
-        if social.privacy?.shareTrainingPresence == true {
+        if ATHLTHDeviceRole.isIPhone,
+           social.privacy?.shareTrainingPresence == true {
             await social.syncPresence(appSession.profile.presence)
         }
     }
@@ -2279,34 +2281,53 @@ struct AppRootView: View {
             return
         }
 
-        if privacy.sharePerformanceStats,
-           let stats = try? await health.profilePerformanceStats() {
-            await social.syncOwnPerformance(stats)
-        }
+        if ATHLTHDeviceRole.isIPhone {
+            if privacy.sharePerformanceStats,
+               let stats =
+                    try? await health
+                        .profilePerformanceStats() {
+                await social
+                    .syncOwnPerformance(stats)
+            }
 
-        if privacy.shareRunningPRs,
-           let runningRecords = try? await health.personalRecords() {
-            await social.publishRunningPersonalRecords(
-                runningRecords,
-                visibility: settings.defaultActivityVisibility
-            )
-        }
+            if privacy.shareRunningPRs,
+               let runningRecords =
+                    try? await health
+                        .personalRecords() {
+                await social
+                    .publishRunningPersonalRecords(
+                        runningRecords,
+                        visibility:
+                            settings
+                                .defaultActivityVisibility
+                    )
+            }
 
-        if privacy.shareStrengthPRs {
-            await social.publishStrengthRepPersonalRecords(
-                strengthWorkout.repPersonalRecords,
-                visibility: settings.defaultActivityVisibility
-            )
-        }
+            if privacy.shareStrengthPRs {
+                await social
+                    .publishStrengthRepPersonalRecords(
+                        strengthWorkout
+                            .repPersonalRecords,
+                        visibility:
+                            settings
+                                .defaultActivityVisibility
+                    )
+            }
 
-        if privacy.shareTrophyCabinet {
-            await social.syncOwnTrophies(trophies.showcaseTrophies)
-
-            if privacy.shareRecentActivity {
-                await social.publishTrophyUnlocks(
-                    trophies.unlocks,
-                    visibility: settings.defaultActivityVisibility
+            if privacy.shareTrophyCabinet {
+                await social.syncOwnTrophies(
+                    trophies.showcaseTrophies
                 )
+
+                if privacy.shareRecentActivity {
+                    await social
+                        .publishTrophyUnlocks(
+                            trophies.unlocks,
+                            visibility:
+                                settings
+                                    .defaultActivityVisibility
+                        )
+                }
             }
         }
 
