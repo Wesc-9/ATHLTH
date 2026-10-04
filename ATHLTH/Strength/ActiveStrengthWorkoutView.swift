@@ -914,19 +914,29 @@ struct ActiveStrengthWorkoutView: View {
                 )
             } else if strength
                 .currentExerciseAllSetsCompleted {
-                focusedExerciseTransition(
-                    workout: workout,
-                    exercise: exercise
-                )
+                VStack(spacing: 12) {
+                    focusedExerciseTransition(
+                        workout: workout,
+                        exercise: exercise
+                    )
+
+                    if let latest =
+                            latestCompletedSet(
+                                in: exercise
+                            ) {
+                        postSetResultButton(
+                            exercise: exercise,
+                            set: latest
+                        )
+                    }
+                }
             } else if strength.isResting {
                 VStack(spacing: 12) {
                     focusedSetRest(
                         exercise: exercise
                     )
 
-                    if exercise.exercise
-                        .supportsStrengthDistanceResult,
-                       let latest =
+                    if let latest =
                             latestCompletedSet(
                                 in: exercise
                             ) {
@@ -3627,7 +3637,11 @@ struct ActiveStrengthWorkoutView: View {
         exercise: StrengthExerciseLog,
         set: StrengthSetLog
     ) -> some View {
-        Button {
+        let supportsDistance =
+            exercise.exercise
+                .supportsStrengthDistanceResult
+
+        return Button {
             editingSetResult =
                 StrengthSetResultEditTarget(
                     exerciseID: exercise.id,
@@ -3641,7 +3655,9 @@ struct ActiveStrengthWorkoutView: View {
             HStack {
                 Image(
                     systemName:
-                        "ruler.fill"
+                        supportsDistance
+                            ? "ruler.fill"
+                            : "pencil.line"
                 )
                 .foregroundStyle(
                     ATHLTHTheme.accentDeep
@@ -3652,29 +3668,45 @@ struct ActiveStrengthWorkoutView: View {
                     spacing: 2
                 ) {
                     Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Add rowed distance",
-                            norwegian:
-                                "Legg inn rodd distanse"
-                        )
+                        supportsDistance
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Add rowed distance",
+                                norwegian:
+                                    "Legg inn rodd distanse"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Edit last set",
+                                norwegian:
+                                    "Rediger siste sett"
+                            )
                     )
                     .font(.subheadline.weight(.semibold))
 
                     Text(
-                        set.resolvedCompletedDistanceMeters.map {
-                            String(
-                                format:
-                                    "%.0f m registered · tap to edit",
-                                $0
+                        supportsDistance
+                            ? (
+                                set.resolvedCompletedDistanceMeters.map {
+                                    String(
+                                        format:
+                                            "%.0f m registered · tap to edit",
+                                        $0
+                                    )
+                                } ??
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Enter the meter result while you rest.",
+                                    norwegian:
+                                        "Registrer meterresultatet mens du hviler."
+                                )
                             )
-                        } ??
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Enter the meter result while you rest.",
-                            norwegian:
-                                "Registrer meterresultatet mens du hviler."
-                        )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Correct reps or split the load before the next set.",
+                                norwegian:
+                                    "Rett repetisjoner eller del belastningen før neste sett."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -4156,7 +4188,9 @@ private struct FreestyleExercisePrescriptionView: View {
 }
 
 struct StrengthSetResultEditTarget: Identifiable {
-    var id: UUID { self.set.id }
+    var id: UUID {
+        return self.set.id
+    }
     let exerciseID: UUID
     let exerciseName: String
     let exercise: ExerciseSnapshot
