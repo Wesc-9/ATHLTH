@@ -120,6 +120,14 @@ private struct HomeAssistantWebhookEnvelope: Encodable {
     let payload: [String: HomeAssistantJSONValue]
 }
 
+private struct HomeAssistantPendingDelivery: Codable, Identifiable {
+    let id: UUID
+    let pairingWebhookID: String
+    let event: String
+    let payload: [String: HomeAssistantJSONValue]
+    let createdAt: Date
+}
+
 enum HomeAssistantJSONValue: Codable, Hashable, Sendable {
     case string(String)
     case int(Int)
@@ -181,6 +189,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectedInstanceName: String?
     @Published private(set) var connectedInstanceURL: URL?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var pendingDeliveryCount: Int = 0
 
     @Published var shareWorkoutState: Bool {
         didSet {
@@ -251,6 +260,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
+    private let pendingDeliveryAccount = "pending-deliveries-v1"
+    private static let maxPendingDeliveries = 16
+    private static let pendingDeliveryMaxAge: TimeInterval =
+        7 * 24 * 60 * 60
     private let discoveryQueue = DispatchQueue(
         label: "com.wesc9.athlth.home-assistant.discovery",
         qos: .userInitiated
@@ -259,6 +272,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     private var browser: NWBrowser?
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var storedPairing: HomeAssistantStoredPairing?
+    private var pendingDeliveries: [HomeAssistantPendingDelivery]
 
     private var oauthClientID: String {
         configuredInfoValue("ATHLTHHomeAssistantClientID")
@@ -307,6 +321,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             service: "com.wesc9.athlth.home-assistant",
             account: "pairing-v1"
         )
+        let restoredPending =
+            Self.readPendingDeliveries(
+                service: "com.wesc9.athlth.home-assistant",
+                account: "pending-deliveries-v1"
+            )
 
         shareWorkoutState = Self.storedBool(
             defaults,
@@ -340,10 +359,22 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         storedPairing = restored
+        pendingDeliveries =
+            Self.filteredPendingDeliveries(
+                restoredPending,
+                pairingWebhookID:
+                    restored?.webhookID
+            )
         connectedInstanceName = restored?.instanceName
         connectedInstanceURL = restored?.instanceURL
         connectionState = restored == nil ? .disconnected : .connected
         super.init()
+        pendingDeliveryCount = pendingDeliveries.count
+
+        if pendingDeliveries.count !=
+            restoredPending.count {
+            persistPendingDeliveries()
+        }
     }
 
     func startDiscovery() {
@@ -471,6 +502,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             service: keychainService,
             account: keychainAccount
         )
+        clearPendingDeliveries()
         storedPairing = nil
         connectedInstanceName = nil
         connectedInstanceURL = nil
@@ -574,6 +606,216 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    private func sendReliably(
+        event: String,
+        payload: [String: HomeAssistantJSONValue]
+    ) async {
+        guard let pairing = storedPairing else {
+            return
+        }
+
+        if event == "sync_snapshot" {
+            pendingDeliveries.removeAll {
+                $0.pairingWebhookID ==
+                    pairing.webhookID &&
+                $0.event == "sync_snapshot"
+            }
+            persistPendingDeliveries()
+        }
+
+        await flushPendingDeliveries()
+
+        let delivery =
+            HomeAssistantPendingDelivery(
+                id: UUID(),
+                pairingWebhookID:
+                    pairing.webhookID,
+                event: event,
+                payload: payload,
+                createdAt: Date()
+            )
+
+        do {
+            try await sendPendingDelivery(
+                delivery
+            )
+        } catch {
+            enqueuePendingDelivery(
+                delivery
+            )
+        }
+    }
+
+    func flushPendingDeliveries() async {
+        guard let pairing = storedPairing else {
+            clearPendingDeliveries()
+            return
+        }
+
+        prunePendingDeliveries(
+            pairingWebhookID:
+                pairing.webhookID
+        )
+
+        let deliveries =
+            pendingDeliveries
+                .sorted {
+                    $0.createdAt <
+                        $1.createdAt
+                }
+
+        for delivery in deliveries {
+            guard pendingDeliveries
+                .contains(
+                    where: {
+                        $0.id == delivery.id
+                    }
+                )
+            else {
+                continue
+            }
+
+            do {
+                try await sendPendingDelivery(
+                    delivery
+                )
+                pendingDeliveries
+                    .removeAll {
+                        $0.id ==
+                            delivery.id
+                    }
+                persistPendingDeliveries()
+            } catch {
+                break
+            }
+        }
+    }
+
+    private func sendPendingDelivery(
+        _ delivery: HomeAssistantPendingDelivery
+    ) async throws {
+        guard let pairing = storedPairing,
+              pairing.webhookID ==
+                delivery.pairingWebhookID
+        else {
+            throw HomeAssistantConnectionError
+                .notConnected
+        }
+
+        var payload = delivery.payload
+        payload["delivery_id"] = .string(
+            delivery.id
+                .uuidString
+                .lowercased()
+        )
+
+        try await send(
+            event: delivery.event,
+            payload: payload
+        )
+    }
+
+    private func enqueuePendingDelivery(
+        _ delivery: HomeAssistantPendingDelivery
+    ) {
+        guard let pairing = storedPairing,
+              pairing.webhookID ==
+                delivery.pairingWebhookID
+        else {
+            return
+        }
+
+        if delivery.event == "sync_snapshot" {
+            pendingDeliveries.removeAll {
+                $0.pairingWebhookID ==
+                    pairing.webhookID &&
+                $0.event ==
+                    "sync_snapshot"
+            }
+        }
+
+        pendingDeliveries.append(delivery)
+        prunePendingDeliveries(
+            pairingWebhookID:
+                pairing.webhookID
+        )
+
+        if pendingDeliveries.count >
+            Self.maxPendingDeliveries {
+            pendingDeliveries =
+                Array(
+                    pendingDeliveries
+                        .sorted {
+                            $0.createdAt >
+                                $1.createdAt
+                        }
+                        .prefix(
+                            Self.maxPendingDeliveries
+                        )
+                        .reversed()
+                )
+        }
+
+        persistPendingDeliveries()
+    }
+
+    private func prunePendingDeliveries(
+        pairingWebhookID: String
+    ) {
+        let cutoff =
+            Date().addingTimeInterval(
+                -Self.pendingDeliveryMaxAge
+            )
+
+        pendingDeliveries.removeAll {
+            $0.pairingWebhookID !=
+                pairingWebhookID ||
+            $0.createdAt < cutoff
+        }
+        pendingDeliveryCount =
+            pendingDeliveries.count
+    }
+
+    private func persistPendingDeliveries() {
+        pendingDeliveryCount =
+            pendingDeliveries.count
+
+        guard !pendingDeliveries.isEmpty else {
+            Self.deleteSecureItem(
+                service: keychainService,
+                account:
+                    pendingDeliveryAccount
+            )
+            return
+        }
+
+        guard let data =
+                try? JSONEncoder()
+                    .encode(
+                        pendingDeliveries
+                    )
+        else {
+            return
+        }
+
+        _ = Self.writeSecureData(
+            data,
+            service: keychainService,
+            account:
+                pendingDeliveryAccount
+        )
+    }
+
+    private func clearPendingDeliveries() {
+        pendingDeliveries.removeAll()
+        pendingDeliveryCount = 0
+        Self.deleteSecureItem(
+            service: keychainService,
+            account:
+                pendingDeliveryAccount
+        )
+    }
+
     func sendConnectionTest() async {
         guard isConnected else {
             return
@@ -627,7 +869,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             return
         }
 
-        try? await send(
+        await sendReliably(
             event: "sync_snapshot",
             payload: [
                 "state": .object([
@@ -690,7 +932,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
             }
 
-            try? await send(
+            await sendReliably(
                 event: "workout_finished",
                 payload: payload
             )
@@ -698,7 +940,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
 
         if shareWorkoutState {
-            try? await send(
+            await sendReliably(
                 event: "sync_snapshot",
                 payload: [
                     "state": .object([
@@ -862,7 +1104,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .null
 
-        try? await send(
+        await sendReliably(
             event: "sync_snapshot",
             payload: [
                 "state": .object(state)
@@ -901,7 +1143,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             return
         }
 
-        try? await send(
+        await sendReliably(
             event: "sync_snapshot",
             payload: [
                 "state": .object(state)
@@ -1108,7 +1350,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 lastErrorMessage = nil
                 connectionState = .connected
 
-                try? await send(
+                await sendReliably(
                     event: "sync_snapshot",
                     payload: [
                         "state": .object([
@@ -1267,40 +1509,13 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     ) throws {
         let data = try JSONEncoder().encode(pairing)
 
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount
-        ]
-
-        let attributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String:
-                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
-
-        let status = SecItemUpdate(
-            query as CFDictionary,
-            attributes as CFDictionary
-        )
-
-        if status == errSecItemNotFound {
-            var item = query
-            attributes.forEach {
-                item[$0.key] = $0.value
-            }
-
-            guard SecItemAdd(
-                item as CFDictionary,
-                nil
-            ) == errSecSuccess else {
-                throw HomeAssistantConnectionError.secureStorageFailed
-            }
-            return
-        }
-
-        guard status == errSecSuccess else {
-            throw HomeAssistantConnectionError.secureStorageFailed
+        guard Self.writeSecureData(
+            data,
+            service: keychainService,
+            account: keychainAccount
+        ) else {
+            throw HomeAssistantConnectionError
+                .secureStorageFailed
         }
     }
 
@@ -1319,25 +1534,147 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         return value
     }
 
-    private static func readStoredPairing(
+    private static func readPendingDeliveries(
         service: String,
         account: String
-    ) -> HomeAssistantStoredPairing? {
+    ) -> [HomeAssistantPendingDelivery] {
+        guard let data = readSecureData(
+            service: service,
+            account: account
+        ) else {
+            return []
+        }
+
+        return (
+            try? JSONDecoder().decode(
+                [HomeAssistantPendingDelivery].self,
+                from: data
+            )
+        ) ?? []
+    }
+
+    private static func filteredPendingDeliveries(
+        _ deliveries:
+            [HomeAssistantPendingDelivery],
+        pairingWebhookID: String?
+    ) -> [HomeAssistantPendingDelivery] {
+        guard let pairingWebhookID else {
+            return []
+        }
+
+        let cutoff =
+            Date().addingTimeInterval(
+                -pendingDeliveryMaxAge
+            )
+
+        return deliveries
+            .filter {
+                $0.pairingWebhookID ==
+                    pairingWebhookID &&
+                $0.createdAt >= cutoff
+            }
+            .sorted {
+                $0.createdAt < $1.createdAt
+            }
+            .suffix(maxPendingDeliveries)
+            .map { $0 }
+    }
+
+    private static func readSecureData(
+        service: String,
+        account: String
+    ) -> Data? {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecClass as String:
+                kSecClassGenericPassword,
+            kSecAttrService as String:
+                service,
+            kSecAttrAccount as String:
+                account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String:
+                kSecMatchLimitOne
         ]
 
         var item: CFTypeRef?
         guard SecItemCopyMatching(
             query as CFDictionary,
             &item
-        ) == errSecSuccess,
-              let data = item as? Data
+        ) == errSecSuccess
         else {
+            return nil
+        }
+
+        return item as? Data
+    }
+
+    private static func writeSecureData(
+        _ data: Data,
+        service: String,
+        account: String
+    ) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String:
+                kSecClassGenericPassword,
+            kSecAttrService as String:
+                service,
+            kSecAttrAccount as String:
+                account
+        ]
+
+        let attributes: [String: Any] = [
+            kSecValueData as String:
+                data,
+            kSecAttrAccessible as String:
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let status = SecItemUpdate(
+            query as CFDictionary,
+            attributes as CFDictionary
+        )
+
+        if status == errSecItemNotFound {
+            var item = query
+            attributes.forEach {
+                item[$0.key] =
+                    $0.value
+            }
+
+            return SecItemAdd(
+                item as CFDictionary,
+                nil
+            ) == errSecSuccess
+        }
+
+        return status == errSecSuccess
+    }
+
+    private static func deleteSecureItem(
+        service: String,
+        account: String
+    ) {
+        let query: [String: Any] = [
+            kSecClass as String:
+                kSecClassGenericPassword,
+            kSecAttrService as String:
+                service,
+            kSecAttrAccount as String:
+                account
+        ]
+        SecItemDelete(
+            query as CFDictionary
+        )
+    }
+
+    private static func readStoredPairing(
+        service: String,
+        account: String
+    ) -> HomeAssistantStoredPairing? {
+        guard let data = readSecureData(
+            service: service,
+            account: account
+        ) else {
             return nil
         }
 
@@ -1351,12 +1688,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         service: String,
         account: String
     ) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(query as CFDictionary)
+        deleteSecureItem(
+            service: service,
+            account: account
+        )
     }
 
     nonisolated private static func instance(
