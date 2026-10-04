@@ -1129,7 +1129,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         heart: HeartSummary,
         training: TrainingHealthSummary,
         recoveryScore: Int?,
-        recoveryState: String?
+        recoveryState: String?,
+        trainingLoad: Double?
     ) async {
         guard isConnected else {
             return
@@ -1211,6 +1212,20 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                                 .string
                         )
                     ?? .null
+                )
+                : .null
+
+        state["training_load"] =
+            shareTrainingLoad &&
+                trainingLoad?.isFinite == true
+                ? .double(
+                    min(
+                        max(
+                            trainingLoad ?? 0,
+                            0
+                        ),
+                        10
+                    )
                 )
                 : .null
 
