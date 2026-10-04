@@ -216,11 +216,6 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let distance =
                 workout.distanceMeters /
                 splitMeters
-            let averagePace =
-                workout.distanceMeters >= 50
-                    ? elapsed /
-                        max(distance, 0.001)
-                    : nil
             let currentPace =
                 workout
                     .currentPaceSecondsPerKilometer
@@ -323,24 +318,6 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                                     ? "/km"
                                     : "/mi"
                         )
-
-                        focusedDivider
-
-                        focusedMetric(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "AVG",
-                                    norwegian: "SNITT"
-                                ),
-                            value:
-                                paceValue(
-                                    averagePace
-                                ),
-                            unit:
-                                isMetric
-                                    ? "/km"
-                                    : "/mi"
-                        )
                     }
                 }
             }
@@ -426,7 +403,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 150,
+            minHeight: 172,
             alignment: .leading
         )
         .padding(.horizontal, 18)
@@ -487,7 +464,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 118,
+            minHeight: 142,
             alignment: .leading
         )
         .padding(.horizontal, 12)
@@ -500,7 +477,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             )
             .frame(
                 width: 0.7,
-                height: 78
+                height: 94
             )
     }
 
