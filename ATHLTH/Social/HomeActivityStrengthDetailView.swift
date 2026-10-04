@@ -857,7 +857,7 @@ struct HomeActivityStrengthDetailView: View {
                     if let duration =
                             segment.durationSeconds {
                         return
-                            durationText(
+                            formatSetDuration(
                                 seconds:
                                     TimeInterval(
                                         duration
@@ -880,7 +880,7 @@ struct HomeActivityStrengthDetailView: View {
         if let duration =
                 set.resolvedCompletedDurationSeconds {
             parts.append(
-                durationText(
+                formatSetDuration(
                     seconds:
                         TimeInterval(duration)
                 )
@@ -935,7 +935,7 @@ struct HomeActivityStrengthDetailView: View {
             )
     }
 
-    private func durationText(
+    private func formatSetDuration(
         seconds: TimeInterval
     ) -> String {
         let total =
