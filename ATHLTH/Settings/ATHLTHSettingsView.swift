@@ -16,6 +16,7 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
 
     @State private var showingMembership = false
     @State private var healthRequestInProgress = false
@@ -493,17 +494,27 @@ struct ATHLTHSettingsView: View {
 
                             SettingsDivider()
 
-                            PremiumSettingsRow(
-                                icon: "house",
-                                iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
-                                iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
-                                title: "Home Assistant",
-                                subtitle: "Home Assistant integration is planned"
-                            ) {
-                                Text("Planned")
-                                    .font(.subheadline)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            NavigationLink {
+                                HomeAssistantSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "house.fill",
+                                    iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
+                                    iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
+                                    title: "Home Assistant",
+                                    subtitle: homeAssistant.connectionSubtitle
+                                ) {
+                                    connectionTrailing(
+                                        homeAssistant.connectionState.title,
+                                        showChevron: true,
+                                        loading:
+                                            homeAssistant.connectionState == .discovering ||
+                                            homeAssistant.connectionState == .authorizing ||
+                                            homeAssistant.connectionState == .pairing
+                                    )
+                                }
                             }
+                            .buttonStyle(.plain)
                         }
                     }
 
