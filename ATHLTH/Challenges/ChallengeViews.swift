@@ -7188,6 +7188,7 @@ private struct ChallengeReviewCard: View {
 }
 
 struct ChallengeDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
@@ -7201,6 +7202,8 @@ struct ChallengeDetailView: View {
 
     @State private var showingManualStrengthAttempt = false
     @State private var showingCancel = false
+    @State private var deletingChallenge = false
+    @State private var challengeDeleteError: String?
     @State private var showingChallengeTargetGhost = false
 
     private var challenge: ATHLTHChallenge? {
@@ -7280,16 +7283,23 @@ struct ChallengeDetailView: View {
                         if challenge.creatorID == session.profile.userID &&
                            challenge.status != .completed &&
                            challenge.status != .cancelled {
-                            Button(
-                                ATHLTHLocalization.choose(
-                                    english: "Cancel Challenge",
-                                    norwegian: "Avlys challenge"
-                                ),
-                                role: .destructive
-                            ) {
+                            Button(role: .destructive) {
+                                challengeDeleteError = nil
                                 showingCancel = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Delete Challenge",
+                                        norwegian: "Slett utfordring"
+                                    ),
+                                    systemImage: "trash"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 46)
                             }
-                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .tint(.red)
                         }
                     }
                     .padding()
@@ -7367,21 +7377,226 @@ struct ChallengeDetailView: View {
                         )
                     }
                 }
-                .confirmationDialog(
-                    "Cancel this challenge?",
-                    isPresented: $showingCancel,
-                    titleVisibility: .visible
+                .sheet(
+                    isPresented:
+                        $showingCancel
                 ) {
-                    Button("Cancel Challenge", role: .destructive) {
-                        challenges.cancel(challenge.id)
-                    }
-                    Button("Keep Challenge", role: .cancel) {}
+                    challengeDeletionSheet(
+                        challenge
+                    )
+                    .presentationDetents([
+                        .height(330)
+                    ])
+                    .presentationDragIndicator(
+                        .visible
+                    )
+                    .interactiveDismissDisabled(
+                        deletingChallenge
+                    )
                 }
             } else {
                 ContentUnavailableView(
                     "Challenge unavailable",
                     systemImage: "person.2.slash"
                 )
+            }
+        }
+    }
+
+    private func challengeDeletionSheet(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        VStack(spacing: 18) {
+            Capsule()
+                .fill(
+                    Color.secondary.opacity(0.22)
+                )
+                .frame(
+                    width: 42,
+                    height: 5
+                )
+                .padding(.top, 4)
+
+            ZStack {
+                Circle()
+                    .fill(
+                        Color.red.opacity(0.10)
+                    )
+                    .frame(
+                        width: 58,
+                        height: 58
+                    )
+
+                Image(
+                    systemName: "trash.fill"
+                )
+                .font(
+                    .system(
+                        size: 24,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.red)
+            }
+
+            VStack(spacing: 7) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Delete this challenge?",
+                        norwegian:
+                            "Slette denne utfordringen?"
+                    )
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The challenge is removed for everyone, including invitations and recorded attempts. This cannot be undone.",
+                        norwegian:
+                            "Utfordringen fjernes for alle, inkludert invitasjoner og registrerte forsøk. Dette kan ikke angres."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+
+            if let challengeDeleteError {
+                Text(challengeDeleteError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(
+                        .center
+                    )
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    showingCancel = false
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Keep",
+                            norwegian: "Behold"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 46)
+                }
+                .buttonStyle(.bordered)
+                .disabled(
+                    deletingChallenge
+                )
+
+                Button(role: .destructive) {
+                    deleteChallenge(
+                        challenge
+                    )
+                } label: {
+                    HStack(spacing: 7) {
+                        if deletingChallenge {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        Text(
+                            deletingChallenge
+                                ? ATHLTHLocalization.choose(
+                                    english: "Deleting…",
+                                    norwegian: "Sletter…"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Delete",
+                                    norwegian: "Slett"
+                                )
+                        )
+                    }
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 46)
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(.red)
+                .disabled(
+                    deletingChallenge
+                )
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.bottom, 20)
+        .background(
+            ATHLTHTheme.canvasTop
+                .ignoresSafeArea()
+        )
+    }
+
+    private func deleteChallenge(
+        _ challenge: ATHLTHChallenge
+    ) {
+        guard !deletingChallenge
+        else {
+            return
+        }
+
+        deletingChallenge = true
+        challengeDeleteError = nil
+
+        Task { @MainActor in
+            let deleted =
+                await social
+                    .deleteChallenge(
+                        challengeID:
+                            challenge.id
+                    )
+
+            if deleted {
+                challenges.remove(
+                    challenge.id
+                )
+                deletingChallenge =
+                    false
+                showingCancel =
+                    false
+                dismiss()
+            } else {
+                deletingChallenge =
+                    false
+                challengeDeleteError =
+                    social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The challenge could not be deleted. Try again.",
+                        norwegian:
+                            "Utfordringen kunne ikke slettes. Prøv igjen."
+                    )
             }
         }
     }
