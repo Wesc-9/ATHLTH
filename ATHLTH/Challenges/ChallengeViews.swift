@@ -2950,6 +2950,317 @@ struct ChallengeCreationView: View {
         }
     }
 
+    private func creationSelectionSheet(
+        _ sheet: ChallengeCreationSelectionSheet
+    ) -> some View {
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.14)
+                )
+
+                ScrollView {
+                    LazyVStack(
+                        spacing: 10
+                    ) {
+                        creationSelectionChoices(
+                            sheet
+                        )
+                    }
+                    .padding(16)
+                    .frame(
+                        maxWidth: 620
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .scrollIndicators(
+                    .hidden
+                )
+            }
+            .navigationTitle(
+                selectionSheetTitle(
+                    sheet
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        activeSelectionSheet =
+                            nil
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func creationSelectionChoices(
+        _ sheet: ChallengeCreationSelectionSheet
+    ) -> some View {
+        switch sheet {
+        case .sport:
+            ForEach(
+                ATHLTHChallengeSport
+                    .allCases
+            ) { option in
+                selectionSheetButton(
+                    title: option.title,
+                    subtitle: nil,
+                    icon:
+                        option.systemImage,
+                    selected:
+                        sport == option
+                ) {
+                    sport = option
+                    activeSelectionSheet =
+                        nil
+                }
+            }
+
+        case .scoring:
+            ForEach(
+                scoringOptions
+            ) { option in
+                selectionSheetButton(
+                    title: option.title,
+                    subtitle:
+                        scoringSubtitle(
+                            option
+                        ),
+                    icon:
+                        scoringIcon(
+                            option
+                        ),
+                    selected:
+                        effectiveScoring ==
+                            option
+                ) {
+                    scoring = option
+                    activeSelectionSheet =
+                        nil
+                }
+            }
+
+        case .course:
+            selectionSheetButton(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Run anywhere",
+                        norwegian:
+                            "Løp hvor som helst"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Everyone completes the same distance on their own course.",
+                        norwegian:
+                            "Alle gjennomfører samme distanse på valgfri løype."
+                    ),
+                icon: "figure.run",
+                selected:
+                    !usesSpecificRoute
+            ) {
+                usesSpecificRoute =
+                    false
+                activeSelectionSheet =
+                    nil
+            }
+
+            selectionSheetButton(
+                title:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Specific route",
+                        norwegian:
+                            "Bestemt rute"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Everyone competes on the same saved route.",
+                        norwegian:
+                            "Alle konkurrerer på den samme lagrede ruten."
+                    ),
+                icon:
+                    "point.topleft.down.to.point.bottomright.curvepath",
+                selected:
+                    usesSpecificRoute
+            ) {
+                usesSpecificRoute =
+                    true
+                activeSelectionSheet =
+                    nil
+            }
+
+        case .verification:
+            ForEach(
+                ChallengeVerificationPolicy
+                    .allCases
+            ) { policy in
+                selectionSheetButton(
+                    title: policy.title,
+                    subtitle:
+                        policy.subtitle,
+                    icon:
+                        "checkmark.shield.fill",
+                    selected:
+                        verificationPolicy ==
+                            policy
+                ) {
+                    verificationPolicy =
+                        policy
+                    activeSelectionSheet =
+                        nil
+                }
+            }
+
+        case .visibility:
+            selectionSheetButton(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Public",
+                        norwegian: "Offentlig"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Visible to ATHLTH users.",
+                        norwegian:
+                            "Synlig for ATHLTH-brukere."
+                    ),
+                icon: "globe",
+                selected:
+                    visibility ==
+                        .publicProfile
+            ) {
+                visibility =
+                    .publicProfile
+                activeSelectionSheet =
+                    nil
+            }
+
+            selectionSheetButton(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Followers",
+                        norwegian: "Følgere"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Visible to people who follow you.",
+                        norwegian:
+                            "Synlig for personer som følger deg."
+                    ),
+                icon: "person.2.fill",
+                selected:
+                    visibility ==
+                        .friends
+            ) {
+                visibility =
+                    .friends
+                activeSelectionSheet =
+                    nil
+            }
+
+            selectionSheetButton(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Private",
+                        norwegian: "Privat"
+                    ),
+                subtitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Only invited participants can see it.",
+                        norwegian:
+                            "Kun inviterte deltakere kan se den."
+                    ),
+                icon: "lock.fill",
+                selected:
+                    visibility ==
+                        .privateOnly
+            ) {
+                visibility =
+                    .privateOnly
+                activeSelectionSheet =
+                    nil
+            }
+        }
+    }
+
+    private func selectionSheetButton(
+        title: String,
+        subtitle: String?,
+        icon: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(
+            action: action
+        ) {
+            ATHLTHPremiumChoiceRow(
+                title: title,
+                icon: icon,
+                subtitle: subtitle,
+                selected: selected,
+                tint:
+                    ATHLTHTheme
+                        .vitality
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func selectionSheetTitle(
+        _ sheet: ChallengeCreationSelectionSheet
+    ) -> String {
+        switch sheet {
+        case .sport:
+            return ATHLTHLocalization.choose(
+                english: "Activity",
+                norwegian: "Aktivitet"
+            )
+        case .scoring:
+            return ATHLTHLocalization.choose(
+                english: "Scoring",
+                norwegian: "Poengberegning"
+            )
+        case .course:
+            return ATHLTHLocalization.choose(
+                english: "Course",
+                norwegian: "Løype"
+            )
+        case .verification:
+            return ATHLTHLocalization.choose(
+                english: "Verification",
+                norwegian: "Verifisering"
+            )
+        case .visibility:
+            return ATHLTHLocalization.choose(
+                english: "Visibility",
+                norwegian: "Synlighet"
+            )
+        }
+    }
+
     private var creationInvitePicker:
         some View {
         NavigationStack {
