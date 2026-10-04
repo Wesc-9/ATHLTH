@@ -17,16 +17,74 @@ struct MessageInboxDestinationView: View {
     }
 }
 
+private enum MessageInboxFilter:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case priority
+    case direct
+    case voice
+    case groups
+    case archive
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .priority:
+            return ATHLTHLocalization.choose(
+                english: "Priority",
+                norwegian: "Prioritet"
+            )
+        case .direct:
+            return ATHLTHLocalization.choose(
+                english: "Direct",
+                norwegian: "Direkte"
+            )
+        case .voice:
+            return ATHLTHLocalization.choose(
+                english: "Voice Notes",
+                norwegian: "Lydnotater"
+            )
+        case .groups:
+            return ATHLTHLocalization.choose(
+                english: "Groups",
+                norwegian: "Grupper"
+            )
+        case .archive:
+            return ATHLTHLocalization.choose(
+                english: "Archive",
+                norwegian: "Arkiv"
+            )
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .priority: return "star.fill"
+        case .direct: return "bubble.left"
+        case .voice: return "waveform"
+        case .groups: return "person.3.fill"
+        case .archive: return "archivebox"
+        }
+    }
+}
+
 struct MessageInboxView: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var realtime:
+        ATHLTHRealtimeSocialStore
 
     var onNewMessage: () -> Void = {}
 
     @State private var searchText = ""
     @State private var showingSearch = false
+    @State private var selectedFilter:
+        MessageInboxFilter = .priority
 
     var body: some View {
         ScrollView {
@@ -41,6 +99,12 @@ struct MessageInboxView: View {
                         )
                 }
 
+                if !recentPeople.isEmpty {
+                    recentPeopleStrip
+                }
+
+                inboxFilterBar
+
                 if let error = displayableError {
                     inboxErrorCard(error)
                 }
@@ -48,8 +112,12 @@ struct MessageInboxView: View {
                 if !displayedPersonItems.isEmpty {
                     inboxSectionLabel(
                         normalizedSearch.isEmpty
-                            ? "CONVERSATIONS"
-                            : "RESULTS",
+                            ? selectedFilter.title
+                                .uppercased()
+                            : ATHLTHLocalization.choose(
+                                english: "RESULTS",
+                                norwegian: "RESULTATER"
+                            ),
                         count: displayedPersonItems.count
                     )
 
@@ -63,7 +131,11 @@ struct MessageInboxView: View {
                                         )
                                     } label: {
                                         MessagePersonRow(
-                                            item: item
+                                            item: item,
+                                            isOnline:
+                                                realtime.isOnline(
+                                                    item.friend.userID
+                                                )
                                         )
                                     }
                                 } else if let firstChallenge =
@@ -78,7 +150,11 @@ struct MessageInboxView: View {
                                         )
                                     } label: {
                                         MessagePersonRow(
-                                            item: item
+                                            item: item,
+                                            isOnline:
+                                                realtime.isOnline(
+                                                    item.friend.userID
+                                                )
                                         )
                                     }
                                 }
@@ -108,6 +184,36 @@ struct MessageInboxView: View {
                                                 )
                                                     ? "pin.slash"
                                                     : "pin.fill"
+                                        )
+                                    }
+
+                                    Button {
+                                        withAnimation(
+                                            .easeInOut(duration: 0.18)
+                                        ) {
+                                            messaging.toggleArchived(
+                                                conversation.id
+                                            )
+                                        }
+                                    } label: {
+                                        Label(
+                                            messaging.isArchived(
+                                                conversation.id
+                                            )
+                                                ? ATHLTHLocalization.choose(
+                                                    english: "Move to inbox",
+                                                    norwegian: "Flytt til innboks"
+                                                )
+                                                : ATHLTHLocalization.choose(
+                                                    english: "Archive",
+                                                    norwegian: "Arkiver"
+                                                ),
+                                            systemImage:
+                                                messaging.isArchived(
+                                                    conversation.id
+                                                )
+                                                    ? "tray.and.arrow.up"
+                                                    : "archivebox"
                                         )
                                     }
                                 }
@@ -145,141 +251,492 @@ struct MessageInboxView: View {
             )
             await messaging.refresh()
             messaging.loadPinnedConversations()
+            await realtime.refreshOnlineUsers()
         }
     }
 
     private var messagesHeader: some View {
-        ATHLTHPremiumScreenHeader(
-            eyebrow:
-                ATHLTHLocalization.choose(
-                    english: "Messages",
-                    norwegian: "Meldinger"
-                ),
-            title:
-                ATHLTHLocalization.choose(
-                    english: "Your conversations",
-                    norwegian: "Dine samtaler"
-                ),
-            subtitle:
-                inboxSummaryText,
-            icon:
-                "bubble.left.and.bubble.right.fill",
-            tint:
-                ATHLTHTheme.vitality
+        VStack(
+            alignment: .leading,
+            spacing: 16
         ) {
-            VStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    inboxMetric(
-                        value:
-                            personInboxItems.count,
-                        label:
-                            ATHLTHLocalization.choose(
-                                english: "People",
-                                norwegian: "Personer"
-                            )
-                    )
-
-                    inboxMetric(
-                        value:
-                            messaging.unreadCount,
-                        label:
-                            ATHLTHLocalization.choose(
-                                english: "Unread",
-                                norwegian: "Ulest"
-                            )
-                    )
-
-                    inboxMetric(
-                        value:
-                            totalRequestCount,
-                        label:
-                            ATHLTHLocalization.choose(
-                                english: "Needs reply",
-                                norwegian: "Venter svar"
-                            )
-                    )
+            HStack(alignment: .center) {
+                NavigationLink {
+                    ATHLTHProfileView()
+                } label: {
+                    ownProfileAvatar
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Open your profile",
+                        norwegian: "Åpne profilen din"
+                    )
+                )
 
-                HStack(spacing: 10) {
-                    Button {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.20
-                            )
-                        ) {
-                            showingSearch.toggle()
-                            if !showingSearch {
-                                searchText = ""
-                            }
-                        }
-                    } label: {
-                        Label(
+                Spacer()
+
+                Text("ATHLTH")
+                    .font(
+                        .system(
+                            size: 23,
+                            weight: .medium,
+                            design: .rounded
+                        )
+                    )
+                    .tracking(7)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .padding(.leading, 7)
+
+                Spacer()
+
+                HStack(spacing: 9) {
+                    headerAction(
+                        systemImage:
+                            showingSearch
+                                ? "xmark"
+                                : "magnifyingglass",
+                        accessibilityLabel:
                             showingSearch
                                 ? ATHLTHLocalization.choose(
                                     english: "Close search",
                                     norwegian: "Lukk søk"
                                 )
                                 : ATHLTHLocalization.choose(
-                                    english: "Search",
-                                    norwegian: "Søk"
-                                ),
-                            systemImage:
-                                showingSearch
-                                    ? "xmark"
-                                    : "magnifyingglass"
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .padding(
-                            .vertical,
-                            11
-                        )
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(
-                        ATHLTHTheme
-                            .vitality
-                    )
-
-                    Button(
-                        action:
-                            onNewMessage
+                                    english: "Search messages",
+                                    norwegian: "Søk i meldinger"
+                                )
                     ) {
-                        Label(
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.20
+                            )
+                        ) {
+                            showingSearch.toggle()
+
+                            if !showingSearch {
+                                searchText = ""
+                            }
+                        }
+                    }
+
+                    headerAction(
+                        systemImage: "plus",
+                        accessibilityLabel:
                             ATHLTHLocalization.choose(
                                 english: "New message",
                                 norwegian: "Ny melding"
                             ),
-                            systemImage:
-                                "square.and.pencil"
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .padding(
-                            .vertical,
-                            11
-                        )
-                    }
-                    .buttonStyle(
-                        .borderedProminent
-                    )
-                    .tint(
-                        ATHLTHTheme
-                            .vitality
+                        action: onNewMessage
                     )
                 }
             }
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "INNER CIRCLE",
+                        norwegian: "INNER CIRCLE"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .tracking(3.2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Messages",
+                        norwegian: "Meldinger"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 40,
+                        weight: .bold,
+                        design: .serif
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The people who move you forward.",
+                        norwegian:
+                            "Menneskene som får deg videre."
+                    )
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .regular
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
         }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private var ownProfileAvatar:
+        some View {
+        if let avatarURL =
+                session.profile.avatarURL {
+            ATHLTHStorageImage(
+                url: avatarURL
+            ) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    ownProfileAvatarFallback
+                }
+            }
+            .frame(
+                width: 48,
+                height: 48
+            )
+            .clipShape(Circle())
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.white.opacity(
+                            0.96
+                        ),
+                        lineWidth: 2
+                    )
+            }
+        } else {
+            ownProfileAvatarFallback
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+        }
+    }
+
+    private var ownProfileAvatarFallback:
+        some View {
+        Circle()
+            .fill(
+                ATHLTHTheme.accentSoft
+            )
+            .overlay {
+                Image(
+                    systemName: "person.fill"
+                )
+                .font(
+                    .system(
+                        size: 21,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+            }
+    }
+
+    private var recentPeople:
+        [MessagePersonInboxItem] {
+        personInboxItems
+            .filter {
+                guard let conversation =
+                        $0.conversation
+                else {
+                    return true
+                }
+
+                return !messaging
+                    .isArchived(
+                        conversation.id
+                    )
+            }
+            .sorted {
+                if $0.isPinned !=
+                    $1.isPinned {
+                    return $0.isPinned
+                }
+
+                return $0.latestActivityAt >
+                    $1.latestActivityAt
+            }
+            .prefix(8)
+            .map { $0 }
+    }
+
+    private var recentPeopleStrip:
+        some View {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 16) {
+                ForEach(recentPeople) { item in
+                    recentPersonLink(item)
+                }
+            }
+            .padding(
+                .horizontal,
+                2
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func recentPersonLink(
+        _ item: MessagePersonInboxItem
+    ) -> some View {
+        if item.conversation != nil {
+            NavigationLink {
+                DirectMessageThreadView(
+                    friend: item.friend
+                )
+            } label: {
+                recentPersonBadge(item)
+            }
+            .buttonStyle(.plain)
+        } else if let challenge =
+                    item.pendingChallenges.first ??
+                    item.outgoingChallenges.first {
+            NavigationLink {
+                ChallengeDetailView(
+                    challengeID:
+                        challenge.id
+                )
+            } label: {
+                recentPersonBadge(item)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func recentPersonBadge(
+        _ item: MessagePersonInboxItem
+    ) -> some View {
+        VStack(spacing: 6) {
+            ZStack(
+                alignment:
+                    .bottomTrailing
+            ) {
+                SocialAvatar(
+                    profile: item.friend,
+                    size: 60
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white.opacity(
+                                0.94
+                            ),
+                            lineWidth: 2
+                        )
+                }
+
+                if realtime.isOnline(
+                    item.friend.userID
+                ) {
+                    Circle()
+                        .fill(
+                            Color.green
+                        )
+                        .frame(
+                            width: 14,
+                            height: 14
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                } else if item.needsResponse {
+                    Circle()
+                        .fill(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                        .frame(
+                            width: 14,
+                            height: 14
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                }
+            }
+
+            Text(
+                item.friend
+                    .resolvedName
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+            .lineLimit(1)
+            .frame(
+                width: 74
+            )
+        }
+    }
+
+    private var inboxFilterBar:
+        some View {
+        ScrollView(
+            .horizontal,
+            showsIndicators: false
+        ) {
+            HStack(spacing: 8) {
+                ForEach(
+                    MessageInboxFilter
+                        .allCases
+                ) { filter in
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            selectedFilter =
+                                filter
+                        }
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(
+                                systemName:
+                                    filter.icon
+                            )
+
+                            Text(filter.title)
+
+                            if filter ==
+                                .priority,
+                               priorityCount > 0 {
+                                Text(
+                                    "\(priorityCount)"
+                                )
+                                .font(
+                                    .system(
+                                        size: 10,
+                                        weight:
+                                            .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .frame(
+                                    minWidth: 20,
+                                    minHeight: 20
+                                )
+                                .background(
+                                    Color.orange,
+                                    in: Capsule()
+                                )
+                            }
+                        }
+                        .font(
+                            .system(
+                                size: 12,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            selectedFilter ==
+                                filter
+                                ? (
+                                    filter ==
+                                        .priority
+                                        ? Color.orange
+                                        : ATHLTHTheme
+                                            .accentDeep
+                                )
+                                : ATHLTHTheme
+                                    .mutedText
+                        )
+                        .padding(
+                            .horizontal,
+                            12
+                        )
+                        .frame(height: 40)
+                        .background(
+                            selectedFilter ==
+                                filter
+                                ? (
+                                    filter ==
+                                        .priority
+                                        ? Color.orange
+                                            .opacity(
+                                                0.10
+                                            )
+                                        : ATHLTHTheme
+                                            .accentSoft
+                                )
+                                : Color.white
+                                    .opacity(
+                                        0.74
+                                    ),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.black
+                                        .opacity(
+                                            0.035
+                                        ),
+                                    lineWidth:
+                                        0.7
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(
+                .horizontal,
+                1
+            )
+        }
+    }
+
+    private var priorityCount: Int {
+        personInboxItems.filter {
+            $0.isPinned ||
+            $0.needsResponse ||
+            $0.unreadCount > 0
+        }
+        .count
     }
 
     private func inboxMetric(
@@ -606,38 +1063,113 @@ struct MessageInboxView: View {
 
     private var displayedPersonItems:
         [MessagePersonInboxItem] {
-        let matching =
-            personInboxItems.filter { item in
-                guard !normalizedSearch.isEmpty else {
+        var matching =
+            personInboxItems.filter {
+                item in
+
+                guard
+                    !normalizedSearch.isEmpty
+                else {
                     return true
                 }
 
-                return item.friend.resolvedName.lowercased()
-                    .contains(normalizedSearch) ||
-                    item.friend.usernameLabel.lowercased()
-                        .contains(normalizedSearch) ||
-                    (item.lastMessage?.body?.lowercased()
-                        .contains(normalizedSearch) ?? false) ||
-                    (item.lastMessage?.attachmentTitle?
+                return item.friend
+                    .resolvedName
+                    .lowercased()
+                    .contains(
+                        normalizedSearch
+                    ) ||
+                    item.friend
+                        .usernameLabel
                         .lowercased()
-                        .contains(normalizedSearch) ?? false) ||
-                    item.pendingChallenges.contains {
-                        $0.title.lowercased()
-                            .contains(normalizedSearch) ||
-                        $0.sport.title.lowercased()
-                            .contains(normalizedSearch)
-                    } ||
-                    item.outgoingChallenges.contains {
-                        $0.title.lowercased()
-                            .contains(normalizedSearch) ||
-                        $0.sport.title.lowercased()
-                            .contains(normalizedSearch)
-                    }
+                        .contains(
+                            normalizedSearch
+                        ) ||
+                    (
+                        item.lastMessage?
+                            .body?
+                            .lowercased()
+                            .contains(
+                                normalizedSearch
+                            ) ?? false
+                    ) ||
+                    (
+                        item.lastMessage?
+                            .attachmentTitle?
+                            .lowercased()
+                            .contains(
+                                normalizedSearch
+                            ) ?? false
+                    ) ||
+                    item.pendingChallenges
+                        .contains {
+                            $0.title
+                                .lowercased()
+                                .contains(
+                                    normalizedSearch
+                                ) ||
+                            $0.sport
+                                .title
+                                .lowercased()
+                                .contains(
+                                    normalizedSearch
+                                )
+                        } ||
+                    item.outgoingChallenges
+                        .contains {
+                            $0.title
+                                .lowercased()
+                                .contains(
+                                    normalizedSearch
+                                ) ||
+                            $0.sport
+                                .title
+                                .lowercased()
+                                .contains(
+                                    normalizedSearch
+                                )
+                        }
             }
 
-        return matching.sorted { lhs, rhs in
-            if lhs.isPinned != rhs.isPinned {
-                return lhs.isPinned && !rhs.isPinned
+        matching =
+            matching.filter { item in
+                let archived =
+                    item.conversation.map {
+                        messaging
+                            .isArchived(
+                                $0.id
+                            )
+                    } ?? false
+
+                switch selectedFilter {
+                case .archive:
+                    return archived
+                case .direct:
+                    return !archived &&
+                        item.conversation !=
+                            nil
+                case .voice:
+                    return !archived &&
+                        item.isVoiceNote
+                case .groups:
+                    return !archived &&
+                        item.hasGroupLikeActivity
+                case .priority:
+                    return !archived
+                }
+            }
+
+        return matching.sorted {
+            lhs,
+            rhs in
+
+            if selectedFilter ==
+                .priority {
+                if lhs.priorityRank !=
+                    rhs.priorityRank {
+                    return lhs.priorityRank >
+                        rhs.priorityRank
+                }
             }
 
             return lhs.latestActivityAt >
