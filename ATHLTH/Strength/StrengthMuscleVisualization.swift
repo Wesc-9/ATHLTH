@@ -51,6 +51,8 @@ enum StrengthMuscleRegion: String, CaseIterable, Identifiable {
         case .calves: return "Calves"
         case .shins: return "Shins"
         }
+    }
+
     var activityDisplayTitle: String {
         switch self {
         case .chest:
@@ -144,8 +146,6 @@ enum StrengthMuscleRegion: String, CaseIterable, Identifiable {
                 norwegian: "Skinnebein"
             )
         }
-    }
-
     }
 }
 
