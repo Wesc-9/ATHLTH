@@ -1773,8 +1773,13 @@ struct DirectMessageThreadView: View {
     private func openAndPoll() async {
         do {
             let id = try await messaging.openConversation(with: friend.userID)
-            conversationID = id
+
+            // Keep the thread in its loading state until the backend status
+            // and messages have been refreshed. This avoids briefly showing
+            // a stale "message request" composer after a pending conversation
+            // has already been promoted to accepted.
             await messaging.refreshConversation(id)
+            conversationID = id
             markLocalMessageNotificationsRead(conversationID: id)
 
             while !Task.isCancelled {
