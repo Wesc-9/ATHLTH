@@ -277,6 +277,20 @@ struct HomeAssistantSettingsView: View {
                 }
                 .buttonStyle(.bordered)
             }
+
+            if homeAssistant.lastConnectionTestSucceeded {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Connection OK · Home Assistant responds",
+                        norwegian: "Tilkobling OK · Home Assistant svarer"
+                    ),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
+            }
         }
         .padding(18)
         .background(
@@ -287,16 +301,35 @@ struct HomeAssistantSettingsView: View {
 
     private var sharingCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Shared with Home Assistant",
-                        norwegian: "Delt med Home Assistant"
-                    ),
-                    systemImage: "slider.horizontal.3"
-                )
-                .font(.headline)
-                .foregroundStyle(ATHLTHTheme.primaryText)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Shared with Home Assistant",
+                            norwegian: "Delt med Home Assistant"
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Spacer()
+
+                    Button {
+                        homeAssistant.enableAllSharing()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Select all",
+                                norwegian: "Velg alle"
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                        .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
 
                 Text(
                     ATHLTHLocalization.choose(
@@ -777,19 +810,38 @@ struct HomeAssistantSettingsView: View {
 
                                 Spacer()
 
-                                if let version = instance.version {
-                                    Text(version)
-                                        .font(.caption2.weight(.medium))
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText
-                                        )
-                                }
+                                VStack(
+                                    alignment: .trailing,
+                                    spacing: 6
+                                ) {
+                                    if let version = instance.version {
+                                        Text(version)
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText
+                                            )
+                                    }
 
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(
-                                        ATHLTHTheme.mutedText.opacity(0.7)
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Connect",
+                                            norwegian: "Koble til"
+                                        ),
+                                        systemImage: "link"
                                     )
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 11)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        Color(
+                                            red: 0.12,
+                                            green: 0.58,
+                                            blue: 0.86
+                                        ),
+                                        in: Capsule()
+                                    )
+                                }
                             }
                             .padding(.vertical, 12)
                         }
