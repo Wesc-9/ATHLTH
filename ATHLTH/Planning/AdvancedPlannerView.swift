@@ -6609,7 +6609,7 @@ struct SessionEditorView: View {
         _ planned: PlannedExercise
     ) -> String {
         var parts = [
-            "\(planned.sets) × \(planned.reps ?? 0)"
+            planned.compactTargetSummary
         ]
 
         if let weight = planned.targetWeightKilograms {
