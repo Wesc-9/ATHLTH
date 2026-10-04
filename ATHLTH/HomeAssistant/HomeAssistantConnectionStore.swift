@@ -182,6 +182,73 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectedInstanceURL: URL?
     @Published private(set) var lastErrorMessage: String?
 
+    @Published var shareWorkoutState: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareWorkoutState,
+                forKey: Self.shareWorkoutStateKey
+            )
+        }
+    }
+
+    @Published var shareCompletedWorkouts: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareCompletedWorkouts,
+                forKey: Self.shareCompletedWorkoutsKey
+            )
+        }
+    }
+
+    @Published var shareRecovery: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareRecovery,
+                forKey: Self.shareRecoveryKey
+            )
+        }
+    }
+
+    @Published var shareTrainingLoad: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareTrainingLoad,
+                forKey: Self.shareTrainingLoadKey
+            )
+        }
+    }
+
+    @Published var shareWeeklyProgress: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareWeeklyProgress,
+                forKey: Self.shareWeeklyProgressKey
+            )
+        }
+    }
+
+    @Published var shareNextWorkout: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareNextWorkout,
+                forKey: Self.shareNextWorkoutKey
+            )
+        }
+    }
+
+    private static let shareWorkoutStateKey =
+        "athlth.homeAssistant.shareWorkoutState"
+    private static let shareCompletedWorkoutsKey =
+        "athlth.homeAssistant.shareCompletedWorkouts"
+    private static let shareRecoveryKey =
+        "athlth.homeAssistant.shareRecovery"
+    private static let shareTrainingLoadKey =
+        "athlth.homeAssistant.shareTrainingLoad"
+    private static let shareWeeklyProgressKey =
+        "athlth.homeAssistant.shareWeeklyProgress"
+    private static let shareNextWorkoutKey =
+        "athlth.homeAssistant.shareNextWorkout"
+
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
     private let discoveryQueue = DispatchQueue(
@@ -235,10 +302,43 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     }
 
     override init() {
+        let defaults = UserDefaults.standard
         let restored = Self.readStoredPairing(
             service: "com.wesc9.athlth.home-assistant",
             account: "pairing-v1"
         )
+
+        shareWorkoutState = Self.storedBool(
+            defaults,
+            key: Self.shareWorkoutStateKey,
+            defaultValue: true
+        )
+        shareCompletedWorkouts = Self.storedBool(
+            defaults,
+            key: Self.shareCompletedWorkoutsKey,
+            defaultValue: true
+        )
+        shareRecovery = Self.storedBool(
+            defaults,
+            key: Self.shareRecoveryKey,
+            defaultValue: false
+        )
+        shareTrainingLoad = Self.storedBool(
+            defaults,
+            key: Self.shareTrainingLoadKey,
+            defaultValue: false
+        )
+        shareWeeklyProgress = Self.storedBool(
+            defaults,
+            key: Self.shareWeeklyProgressKey,
+            defaultValue: true
+        )
+        shareNextWorkout = Self.storedBool(
+            defaults,
+            key: Self.shareNextWorkoutKey,
+            defaultValue: true
+        )
+
         storedPairing = restored
         connectedInstanceName = restored?.instanceName
         connectedInstanceURL = restored?.instanceURL
@@ -405,6 +505,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         var request = URLRequest(url: pairing.webhookURL)
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue(
@@ -441,9 +542,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             try await send(
                 event: "sync_snapshot",
                 payload: [
-                    "state": .object([
-                        "connection_test": .bool(true)
-                    ])
+                    "state": .object([:])
                 ]
             )
             lastErrorMessage = nil
@@ -452,6 +551,303 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             lastErrorMessage = error.localizedDescription
             connectionState = .error(error.localizedDescription)
         }
+    }
+
+    func sendWorkoutStarted(
+        name: String?,
+        startedAt: Date?
+    ) async {
+        guard isConnected,
+              shareWorkoutState
+        else {
+            return
+        }
+
+        var payload: [String: HomeAssistantJSONValue] = [:]
+        if let name = Self.sanitizedText(name) {
+            payload["name"] = .string(name)
+        }
+        if let startedAt {
+            payload["started_at"] = .string(
+                Self.iso8601(startedAt)
+            )
+        }
+
+        try? await send(
+            event: "workout_started",
+            payload: payload
+        )
+    }
+
+    func sendWorkoutCancelled() async {
+        guard isConnected,
+              shareWorkoutState
+        else {
+            return
+        }
+
+        try? await send(
+            event: "workout_cancelled"
+        )
+    }
+
+    func sendCompletedWorkout(
+        name: String,
+        type: String,
+        startedAt: Date,
+        endedAt: Date,
+        duration: TimeInterval,
+        distanceMeters: Double?
+    ) async {
+        guard isConnected else {
+            return
+        }
+
+        if shareCompletedWorkouts {
+            var payload: [String: HomeAssistantJSONValue] = [
+                "completed": .bool(true),
+                "name": .string(
+                    Self.sanitizedText(name) ?? "Workout"
+                ),
+                "type": .string(
+                    Self.sanitizedText(type) ?? "workout"
+                ),
+                "started_at": .string(
+                    Self.iso8601(startedAt)
+                ),
+                "ended_at": .string(
+                    Self.iso8601(endedAt)
+                ),
+                "duration_seconds": .double(
+                    max(duration, 0)
+                )
+            ]
+
+            if let distanceMeters,
+               distanceMeters.isFinite,
+               distanceMeters >= 0 {
+                payload["distance_meters"] = .double(
+                    distanceMeters
+                )
+            }
+
+            try? await send(
+                event: "workout_finished",
+                payload: payload
+            )
+            return
+        }
+
+        if shareWorkoutState {
+            try? await send(
+                event: "sync_snapshot",
+                payload: [
+                    "state": .object([
+                        "workout_active": .bool(false),
+                        "active_workout": .null
+                    ])
+                ]
+            )
+        }
+    }
+
+    func sendRecovery(score: Int?) async {
+        guard isConnected,
+              shareRecovery,
+              let score
+        else {
+            return
+        }
+
+        try? await send(
+            event: "recovery_updated",
+            payload: [
+                "score": .int(
+                    min(max(score, 0), 100)
+                )
+            ]
+        )
+    }
+
+    func sendTrainingLoad(ratio: Double?) async {
+        guard isConnected,
+              shareTrainingLoad,
+              let ratio,
+              ratio.isFinite
+        else {
+            return
+        }
+
+        try? await send(
+            event: "training_load_updated",
+            payload: [
+                "load": .double(
+                    min(max(ratio, 0), 10)
+                )
+            ]
+        )
+    }
+
+    func sendWeeklyProgress(percent: Double?) async {
+        guard isConnected,
+              shareWeeklyProgress,
+              let percent,
+              percent.isFinite
+        else {
+            return
+        }
+
+        try? await send(
+            event: "weekly_progress_updated",
+            payload: [
+                "percent": .double(
+                    min(max(percent, 0), 100)
+                )
+            ]
+        )
+    }
+
+    func sendNextWorkout(
+        name: String?
+    ) async {
+        guard isConnected,
+              shareNextWorkout
+        else {
+            return
+        }
+
+        try? await send(
+            event: "next_workout_updated",
+            payload: [
+                "name":
+                    Self.sanitizedText(name)
+                        .map(HomeAssistantJSONValue.string)
+                    ?? .null
+            ]
+        )
+    }
+
+    func syncSnapshot(
+        workoutActive: Bool,
+        activeWorkout: String?,
+        lastWorkout: String?,
+        recoveryScore: Int?,
+        trainingLoad: Double?,
+        weeklyProgress: Double?,
+        nextWorkout: String?
+    ) async {
+        guard isConnected else {
+            return
+        }
+
+        var state: [String: HomeAssistantJSONValue] = [:]
+
+        if shareWorkoutState {
+            state["workout_active"] = .bool(workoutActive)
+            state["active_workout"] =
+                Self.sanitizedText(activeWorkout)
+                    .map(HomeAssistantJSONValue.string)
+                ?? .null
+        } else {
+            state["workout_active"] = .bool(false)
+            state["active_workout"] = .null
+        }
+
+        state["last_workout"] =
+            shareCompletedWorkouts
+                ? (
+                    Self.sanitizedText(lastWorkout)
+                        .map(HomeAssistantJSONValue.string)
+                    ?? .null
+                )
+                : .null
+
+        state["recovery_score"] =
+            shareRecovery && recoveryScore != nil
+                ? .int(
+                    min(
+                        max(recoveryScore ?? 0, 0),
+                        100
+                    )
+                )
+                : .null
+
+        state["training_load"] =
+            shareTrainingLoad &&
+                trainingLoad?.isFinite == true
+                ? .double(
+                    min(
+                        max(trainingLoad ?? 0, 0),
+                        10
+                    )
+                )
+                : .null
+
+        state["weekly_progress"] =
+            shareWeeklyProgress &&
+                weeklyProgress?.isFinite == true
+                ? .double(
+                    min(
+                        max(weeklyProgress ?? 0, 0),
+                        100
+                    )
+                )
+                : .null
+
+        state["next_workout"] =
+            shareNextWorkout
+                ? (
+                    Self.sanitizedText(nextWorkout)
+                        .map(HomeAssistantJSONValue.string)
+                    ?? .null
+                )
+                : .null
+
+        try? await send(
+            event: "sync_snapshot",
+            payload: [
+                "state": .object(state)
+            ]
+        )
+    }
+
+    func clearDisabledValues() async {
+        guard isConnected else {
+            return
+        }
+
+        var state: [String: HomeAssistantJSONValue] = [:]
+
+        if !shareWorkoutState {
+            state["workout_active"] = .bool(false)
+            state["active_workout"] = .null
+        }
+        if !shareCompletedWorkouts {
+            state["last_workout"] = .null
+        }
+        if !shareRecovery {
+            state["recovery_score"] = .null
+        }
+        if !shareTrainingLoad {
+            state["training_load"] = .null
+        }
+        if !shareWeeklyProgress {
+            state["weekly_progress"] = .null
+        }
+        if !shareNextWorkout {
+            state["next_workout"] = .null
+        }
+
+        guard !state.isEmpty else {
+            return
+        }
+
+        try? await send(
+            event: "sync_snapshot",
+            payload: [
+                "state": .object(state)
+            ]
+        )
     }
 
     private func beginAuthorization(
@@ -619,34 +1015,58 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 baseURL: baseURL
             )
 
-            connectionState = .pairing
+            do {
+                connectionState = .pairing
 
-            let pairResponse = try await requestPairing(
-                accessToken: token.accessToken,
-                baseURL: baseURL
-            )
+                let pairResponse = try await requestPairing(
+                    accessToken: token.accessToken,
+                    baseURL: baseURL
+                )
 
-            let pairing = HomeAssistantStoredPairing(
-                instanceName: instanceName,
-                instanceURL: baseURL,
-                protocolVersion: pairResponse.protocolVersion,
-                clientID: pairResponse.clientID,
-                webhookID: pairResponse.webhookID,
-                webhookURL: pairResponse.webhookURL,
-                webhookPath: pairResponse.webhookPath,
-                sharedSecret: pairResponse.sharedSecret,
-                signatureAlgorithm:
-                    pairResponse.signatureAlgorithm,
-                capabilities: pairResponse.capabilities,
-                pairedAt: Date()
-            )
+                try Self.validatePairResponse(
+                    pairResponse
+                )
 
-            try storePairing(pairing)
-            storedPairing = pairing
-            connectedInstanceName = instanceName
-            connectedInstanceURL = baseURL
-            lastErrorMessage = nil
-            connectionState = .connected
+                let pairing = HomeAssistantStoredPairing(
+                    instanceName: instanceName,
+                    instanceURL: baseURL,
+                    protocolVersion: pairResponse.protocolVersion,
+                    clientID: pairResponse.clientID,
+                    webhookID: pairResponse.webhookID,
+                    webhookURL: pairResponse.webhookURL,
+                    webhookPath: pairResponse.webhookPath,
+                    sharedSecret: pairResponse.sharedSecret,
+                    signatureAlgorithm:
+                        pairResponse.signatureAlgorithm,
+                    capabilities: pairResponse.capabilities,
+                    pairedAt: Date()
+                )
+
+                try storePairing(pairing)
+                storedPairing = pairing
+                connectedInstanceName = instanceName
+                connectedInstanceURL = baseURL
+                lastErrorMessage = nil
+                connectionState = .connected
+
+                try? await send(
+                    event: "sync_snapshot",
+                    payload: [
+                        "state": .object([
+                            "workout_active": .bool(false),
+                            "active_workout": .null
+                        ])
+                    ]
+                )
+            } catch {
+                if let refreshToken = token.refreshToken {
+                    await revoke(
+                        refreshToken: refreshToken,
+                        baseURL: baseURL
+                    )
+                }
+                throw error
+            }
 
             if let refreshToken = token.refreshToken {
                 await revoke(
@@ -654,15 +1074,6 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     baseURL: baseURL
                 )
             }
-
-            try? await send(
-                event: "sync_snapshot",
-                payload: [
-                    "state": .object([
-                        "workout_active": .bool(false)
-                    ])
-                ]
-            )
         } catch {
             lastErrorMessage = error.localizedDescription
             connectionState = .error(error.localizedDescription)
@@ -680,6 +1091,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue(
             "application/x-www-form-urlencoded",
@@ -726,6 +1138,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue(
             "Bearer \(accessToken)",
@@ -777,6 +1190,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue(
             "application/x-www-form-urlencoded",
@@ -1097,6 +1511,83 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    private static func validatePairResponse(
+        _ response: HomeAssistantPairResponse
+    ) throws {
+        guard response.protocolVersion == 1 else {
+            throw HomeAssistantConnectionError.unsupportedProtocol(
+                response.protocolVersion
+            )
+        }
+
+        guard response.signatureAlgorithm
+            .caseInsensitiveCompare("HMAC-SHA256") ==
+                .orderedSame
+        else {
+            throw HomeAssistantConnectionError
+                .unsupportedSignatureAlgorithm(
+                    response.signatureAlgorithm
+                )
+        }
+
+        guard !response.webhookID.isEmpty,
+              !response.sharedSecret.isEmpty,
+              response.sharedSecret.count >= 32,
+              let scheme =
+                response.webhookURL.scheme?
+                    .lowercased(),
+              scheme == "https" ||
+                scheme == "http",
+              response.webhookURL.host != nil,
+              response.capabilities.contains(
+                "sync_snapshot"
+              ),
+              response.capabilities.contains(
+                "unpair"
+              )
+        else {
+            throw HomeAssistantConnectionError.invalidPairingResponse
+        }
+    }
+
+    private static func storedBool(
+        _ defaults: UserDefaults,
+        key: String,
+        defaultValue: Bool
+    ) -> Bool {
+        guard defaults.object(
+            forKey: key
+        ) != nil else {
+            return defaultValue
+        }
+
+        return defaults.bool(
+            forKey: key
+        )
+    }
+
+    private static func sanitizedText(
+        _ value: String?
+    ) -> String? {
+        guard let value = value?
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ),
+              !value.isEmpty
+        else {
+            return nil
+        }
+
+        return String(value.prefix(200))
+    }
+
+    private static func iso8601(
+        _ date: Date
+    ) -> String {
+        ISO8601DateFormatter()
+            .string(from: date)
+    }
+
     private static func errorMessage(from data: Data) -> String {
         guard !data.isEmpty,
               let object = try? JSONSerialization.jsonObject(
@@ -1177,6 +1668,9 @@ private enum HomeAssistantConnectionError: LocalizedError {
     case integrationMissing
     case adminRequired
     case pairingFailed(String)
+    case unsupportedProtocol(Int)
+    case unsupportedSignatureAlgorithm(String)
+    case invalidPairingResponse
     case secureStorageFailed
     case webhookRejected
 
@@ -1218,6 +1712,27 @@ private enum HomeAssistantConnectionError: LocalizedError {
             return ATHLTHLocalization.choose(
                 english: "Pairing failed: \(message)",
                 norwegian: "Paringen feilet: \(message)"
+            )
+        case .unsupportedProtocol(let version):
+            return ATHLTHLocalization.choose(
+                english:
+                    "This Home Assistant integration uses unsupported ATHLTH protocol version \(version). Update ATHLTH and the Home Assistant integration.",
+                norwegian:
+                    "Home Assistant-integrasjonen bruker en ATHLTH-protokollversjon som ikke støttes (\(version)). Oppdater ATHLTH og Home Assistant-integrasjonen."
+            )
+        case .unsupportedSignatureAlgorithm(let algorithm):
+            return ATHLTHLocalization.choose(
+                english:
+                    "Unsupported Home Assistant signing algorithm: \(algorithm).",
+                norwegian:
+                    "Home Assistant bruker en signeringsalgoritme som ikke støttes: \(algorithm)."
+            )
+        case .invalidPairingResponse:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant returned incomplete or unsafe pairing information.",
+                norwegian:
+                    "Home Assistant returnerte ufullstendig eller usikker paringsinformasjon."
             )
         case .secureStorageFailed:
             return ATHLTHLocalization.choose(
