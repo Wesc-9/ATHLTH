@@ -290,6 +290,7 @@ struct StrengthProgressionSuggestion: Hashable {
     let previousReps: Int
     let suggestedWeightKilograms: Double
     let suggestedReps: Int
+    var reason: String? = nil
 }
 
 struct StrengthPersonalRecord: Identifiable, Hashable {

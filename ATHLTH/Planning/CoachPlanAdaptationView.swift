@@ -12,6 +12,10 @@ struct CoachPlanAdaptationView: View {
     @State private var infoMessage: String?
     @State private var appliedRecordID: UUID?
 
+    init(initialNotes: String = "") {
+        _userNotes = State(initialValue: initialNotes)
+    }
+
     private let service = CoachPlanAdaptationService()
 
     private var plan: TrainingPlan? {

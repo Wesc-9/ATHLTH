@@ -1206,62 +1206,15 @@ final class StrengthWorkoutStore: ObservableObject {
                 .plannedReps ??
             draftReps
 
-        let previousSet =
-            workoutHistory
-                .filter(\.isFinished)
-                .sorted {
-                    $0.startedAt >
-                    $1.startedAt
-                }
-                .lazy
-                .flatMap(\.exercises)
-                .filter {
-                    $0.exercise.name
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .lowercased() ==
-                    name
-                }
-                .flatMap(\.sets)
-                .first {
-                    $0.countsTowardTrainingLoad &&
-                    ($0.completedReps ?? 0) > 0 &&
-                    ($0.completedWeightKilograms ?? 0) > 0
-                }
-
-        guard let previousSet,
-              let previousWeight =
-                previousSet
-                    .completedWeightKilograms,
-              let previousReps =
-                previousSet.completedReps
-        else {
-            return nil
-        }
-
-        let increment =
-            previousWeight >= 100
-                ? 5.0
-                : 2.5
-        let metOrExceededTarget =
-            previousReps >= targetReps
-        let suggestedWeight =
-            metOrExceededTarget
-                ? previousWeight + increment
-                : previousWeight
-
-        return StrengthProgressionSuggestion(
-            previousWeightKilograms:
-                previousWeight,
-            previousReps:
-                previousReps,
-            suggestedWeightKilograms:
-                suggestedWeight,
-            suggestedReps:
-                targetReps
-        )
+        let previousExercise = workoutHistory
+            .filter(\.isFinished)
+            .sorted { $0.startedAt > $1.startedAt }
+            .lazy
+            .flatMap(\.exercises)
+            .first { $0.exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name
+                && $0.sets.contains { $0.countsTowardTrainingLoad } }
+        guard let previousExercise else { return nil }
+        return AthleteStrengthProgression.suggestion(sets: previousExercise.sets, targetReps: targetReps)
     }
 
     private func advanceGroupedSetIfNeeded(

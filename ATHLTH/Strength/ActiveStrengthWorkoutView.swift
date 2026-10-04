@@ -2518,6 +2518,9 @@ struct ActiveStrengthWorkoutView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                if let reason = suggestion.reason {
+                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
