@@ -9623,7 +9623,7 @@ struct ATHLTHProfileView: View {
             // The pinned/immersive transition visually overlaps the content
             // with the hero, so this needs a little more breathing room than
             // the standard section spacing.
-            .padding(.top, 72)
+            .padding(.top, 96)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -10010,28 +10010,28 @@ struct ATHLTHProfileView: View {
         title: String,
         icon: String
     ) -> some View {
-        VStack(spacing: 3) {
-            HStack(spacing: 5) {
+        VStack(spacing: 2) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 13,
+                            size: 12,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 15)
+                    .frame(width: 14)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 14,
+                            size: 13,
                             weight: .bold,
                             design: .rounded
                         )
                     )
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.68)
+                    .minimumScaleFactor(0.60)
             }
             .frame(
                 maxWidth: .infinity,
@@ -10041,12 +10041,12 @@ struct ATHLTHProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 8.5,
+                        size: 8,
                         weight: .medium
                     )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.68)
+                .minimumScaleFactor(0.60)
                 .multilineTextAlignment(.center)
                 .frame(
                     maxWidth: .infinity,
@@ -10054,19 +10054,19 @@ struct ATHLTHProfileView: View {
                 )
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 3)
         .frame(maxWidth: .infinity)
-        .frame(height: 46)
+        .frame(height: 42)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 15,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 15,
                 style: .continuous
             )
             .stroke(
@@ -10125,7 +10125,7 @@ struct ATHLTHProfileView: View {
                                 ATHLTHTrophyCoreView(
                                     trophy:
                                         trophy,
-                                    size: 36
+                                    size: 28
                                 )
 
                                 Text(
@@ -10189,8 +10189,8 @@ struct ATHLTHProfileView: View {
                                     )
                                 }
                                 .frame(
-                                    width: 36,
-                                    height: 41
+                                    width: 28,
+                                    height: 32
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
