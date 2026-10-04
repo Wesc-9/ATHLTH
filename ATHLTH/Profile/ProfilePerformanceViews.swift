@@ -8495,7 +8495,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 15,
+                        size: 14,
                         weight: .bold
                     )
                 )
@@ -8506,7 +8506,7 @@ struct ProfileRecordShowcasePickerView:
 
                 Text(group.title)
                     .font(
-                        .headline
+                        .subheadline
                             .weight(.bold)
                     )
 
@@ -8555,7 +8555,7 @@ struct ProfileRecordShowcasePickerView:
                 }
             }
         }
-        .padding(10)
+        .padding(9)
         .background(
             Color.white.opacity(0.88),
             in: RoundedRectangle(
