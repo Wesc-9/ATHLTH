@@ -1636,8 +1636,6 @@ struct RunQuickStartSheet: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .disabled(disabled)
-                    .opacity(disabled ? 0.48 : 1)
                 }
             }
             .padding(.top, 10)
@@ -1763,6 +1761,8 @@ struct RunQuickStartSheet: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(disabled)
+                    .opacity(disabled ? 0.48 : 1)
                 }
             }
             .padding(.top, 10)
