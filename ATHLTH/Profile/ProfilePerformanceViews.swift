@@ -25,8 +25,8 @@ enum ProfileRecordGroup:
             )
         case .appleHealth:
             return ATHLTHLocalization.choose(
-                english: "Other Apple Health",
-                norwegian: "Andre Apple Health"
+                english: "Apple Health",
+                norwegian: "Apple Health"
             )
         }
     }
@@ -61,11 +61,20 @@ enum ProfileFeaturedRecordKind:
     case strengthEstimatedOneRM
     case strengthWorkoutVolume
     case strengthBestRepPR
+    case strengthLongestHealthWorkout
 
     case longestRide
     case longestWalkOrHike
+    case longestSwim
     case longestWorkout
+    case longestHIITWorkout
+    case longestRowingWorkout
+    case longestEllipticalWorkout
+    case longestStairClimbingWorkout
+    case longestYogaWorkout
+    case longestCoreWorkout
     case mostActiveCalories
+    case mostStepsInWorkout
 
     static let showcaseLimit = 4
     static let storageKey =
@@ -95,13 +104,11 @@ enum ProfileFeaturedRecordKind:
         case .strengthHeaviestSet,
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
-             .strengthBestRepPR:
+             .strengthBestRepPR,
+             .strengthLongestHealthWorkout:
             return .strength
 
-        case .longestRide,
-             .longestWalkOrHike,
-             .longestWorkout,
-             .mostActiveCalories:
+        default:
             return .appleHealth
         }
     }
@@ -122,14 +129,32 @@ enum ProfileFeaturedRecordKind:
             return .fastestMarathon
         case .longestRun:
             return .longestRun
+        case .strengthLongestHealthWorkout:
+            return .longestStrengthWorkout
         case .longestRide:
             return .longestRide
         case .longestWalkOrHike:
             return .longestWalkOrHike
+        case .longestSwim:
+            return .longestSwim
         case .longestWorkout:
             return .longestWorkout
+        case .longestHIITWorkout:
+            return .longestHIITWorkout
+        case .longestRowingWorkout:
+            return .longestRowingWorkout
+        case .longestEllipticalWorkout:
+            return .longestEllipticalWorkout
+        case .longestStairClimbingWorkout:
+            return .longestStairClimbingWorkout
+        case .longestYogaWorkout:
+            return .longestYogaWorkout
+        case .longestCoreWorkout:
+            return .longestCoreWorkout
         case .mostActiveCalories:
             return .mostActiveCalories
+        case .mostStepsInWorkout:
+            return .mostStepsInWorkout
         case .strengthHeaviestSet,
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
@@ -195,6 +220,11 @@ enum ProfileFeaturedRecordKind:
                 english: "Best rep PR",
                 norwegian: "Beste repetisjons-PR"
             )
+        case .strengthLongestHealthWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest strength workout",
+                norwegian: "Lengste styrkeøkt"
+            )
         case .longestRide:
             return ATHLTHLocalization.choose(
                 english: "Longest ride",
@@ -205,32 +235,69 @@ enum ProfileFeaturedRecordKind:
                 english: "Longest walk / hike",
                 norwegian: "Lengste gåtur / fjelltur"
             )
+        case .longestSwim:
+            return ATHLTHLocalization.choose(
+                english: "Longest swim",
+                norwegian: "Lengste svømmetur"
+            )
         case .longestWorkout:
             return ATHLTHLocalization.choose(
                 english: "Longest workout",
                 norwegian: "Lengste økt"
+            )
+        case .longestHIITWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest HIIT workout",
+                norwegian: "Lengste HIIT-økt"
+            )
+        case .longestRowingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest rowing workout",
+                norwegian: "Lengste roøkt"
+            )
+        case .longestEllipticalWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest elliptical workout",
+                norwegian: "Lengste ellipseøkt"
+            )
+        case .longestStairClimbingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest stair workout",
+                norwegian: "Lengste trappeøkt"
+            )
+        case .longestYogaWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest yoga workout",
+                norwegian: "Lengste yogaøkt"
+            )
+        case .longestCoreWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Longest core workout",
+                norwegian: "Lengste kjernestyrkeøkt"
             )
         case .mostActiveCalories:
             return ATHLTHLocalization.choose(
                 english: "Most active calories",
                 norwegian: "Flest aktive kalorier"
             )
+        case .mostStepsInWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Most steps in a workout",
+                norwegian: "Flest steg i én økt"
+            )
         }
     }
 
     var shortTitle: String {
         switch self {
-        case .fastest1K:
-            return "1 km"
+        case .fastest1K: return "1 km"
         case .fastestMile:
             return ATHLTHLocalization.choose(
                 english: "Mile",
                 norwegian: "Mile"
             )
-        case .fastest5K:
-            return "5 km"
-        case .fastest10K:
-            return "10 km"
+        case .fastest5K: return "5 km"
+        case .fastest10K: return "10 km"
         case .fastestHalfMarathon:
             return ATHLTHLocalization.choose(
                 english: "Half",
@@ -251,8 +318,7 @@ enum ProfileFeaturedRecordKind:
                 english: "Heaviest",
                 norwegian: "Tyngst"
             )
-        case .strengthEstimatedOneRM:
-            return "1RM"
+        case .strengthEstimatedOneRM: return "1RM"
         case .strengthWorkoutVolume:
             return ATHLTHLocalization.choose(
                 english: "Volume",
@@ -262,6 +328,11 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Rep PR",
                 norwegian: "Rep-PR"
+            )
+        case .strengthLongestHealthWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Duration",
+                norwegian: "Varighet"
             )
         case .longestRide:
             return ATHLTHLocalization.choose(
@@ -273,35 +344,57 @@ enum ProfileFeaturedRecordKind:
                 english: "Walk / hike",
                 norwegian: "Tur"
             )
+        case .longestSwim:
+            return ATHLTHLocalization.choose(
+                english: "Swim",
+                norwegian: "Svømming"
+            )
         case .longestWorkout:
             return ATHLTHLocalization.choose(
                 english: "Workout",
                 norwegian: "Økt"
+            )
+        case .longestHIITWorkout: return "HIIT"
+        case .longestRowingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Rowing",
+                norwegian: "Roing"
+            )
+        case .longestEllipticalWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Elliptical",
+                norwegian: "Ellipse"
+            )
+        case .longestStairClimbingWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Stairs",
+                norwegian: "Trapp"
+            )
+        case .longestYogaWorkout: return "Yoga"
+        case .longestCoreWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Core",
+                norwegian: "Kjerne"
             )
         case .mostActiveCalories:
             return ATHLTHLocalization.choose(
                 english: "Calories",
                 norwegian: "Kalorier"
             )
+        case .mostStepsInWorkout:
+            return ATHLTHLocalization.choose(
+                english: "Steps",
+                norwegian: "Steg"
+            )
         }
     }
 
     var icon: String {
+        if let healthKind {
+            return healthKind.systemImage
+        }
+
         switch self {
-        case .fastest1K:
-            return "1.circle.fill"
-        case .fastestMile:
-            return "m.circle.fill"
-        case .fastest5K:
-            return "5.circle.fill"
-        case .fastest10K:
-            return "10.circle.fill"
-        case .fastestHalfMarathon:
-            return "figure.run"
-        case .fastestMarathon:
-            return "flag.checkered"
-        case .longestRun:
-            return "point.topleft.down.to.point.bottomright.curvepath"
         case .strengthHeaviestSet:
             return "dumbbell.fill"
         case .strengthEstimatedOneRM:
@@ -310,49 +403,39 @@ enum ProfileFeaturedRecordKind:
             return "chart.bar.fill"
         case .strengthBestRepPR:
             return "repeat"
-        case .longestRide:
-            return "figure.outdoor.cycle"
-        case .longestWalkOrHike:
-            return "figure.hiking"
-        case .longestWorkout:
-            return "clock.fill"
-        case .mostActiveCalories:
-            return "flame.fill"
+        default:
+            return "chart.bar.fill"
         }
     }
 
     var tint: Color {
         switch self {
-        case .fastest1K:
-            return .blue
-        case .fastestMile:
-            return .cyan
-        case .fastest5K:
-            return .green
-        case .fastest10K:
-            return .orange
-        case .fastestHalfMarathon:
-            return .pink
-        case .fastestMarathon:
-            return .indigo
-        case .longestRun:
-            return .purple
-        case .strengthHeaviestSet:
-            return .blue
-        case .strengthEstimatedOneRM:
-            return .green
-        case .strengthWorkoutVolume:
-            return .indigo
-        case .strengthBestRepPR:
-            return .orange
-        case .longestRide:
-            return .green
-        case .longestWalkOrHike:
-            return .brown
-        case .longestWorkout:
-            return .indigo
-        case .mostActiveCalories:
-            return .orange
+        case .fastest1K: return .blue
+        case .fastestMile: return .cyan
+        case .fastest5K: return .green
+        case .fastest10K: return .orange
+        case .fastestHalfMarathon: return .pink
+        case .fastestMarathon: return .indigo
+        case .longestRun: return .purple
+
+        case .strengthHeaviestSet: return .blue
+        case .strengthEstimatedOneRM: return .green
+        case .strengthWorkoutVolume: return .indigo
+        case .strengthBestRepPR: return .orange
+        case .strengthLongestHealthWorkout: return .cyan
+
+        case .longestRide: return .green
+        case .longestWalkOrHike: return .brown
+        case .longestSwim: return .cyan
+        case .longestWorkout: return .indigo
+        case .longestHIITWorkout: return .orange
+        case .longestRowingWorkout: return .blue
+        case .longestEllipticalWorkout: return .purple
+        case .longestStairClimbingWorkout: return .mint
+        case .longestYogaWorkout: return .teal
+        case .longestCoreWorkout: return .pink
+        case .mostActiveCalories: return .orange
+        case .mostStepsInWorkout: return .green
         }
     }
 
@@ -447,13 +530,7 @@ enum ProfileFeaturedRecordKind:
                 }?
                 .value ?? "—"
 
-        case .fastestMile,
-             .fastest10K,
-             .fastestHalfMarathon,
-             .longestRide,
-             .longestWalkOrHike,
-             .longestWorkout,
-             .mostActiveCalories:
+        default:
             return "—"
         }
     }
@@ -499,7 +576,6 @@ enum ProfileFeaturedRecordKind:
             .joined(separator: ",")
     }
 }
-
 
 struct ProfilePerformanceSection: View {
     let stats: ProfilePerformanceStats?
@@ -6837,8 +6913,11 @@ private struct PerformanceTrainingVolumeDetailView:
                     )
                 )
                 .font(
-                    .headline
-                        .weight(.bold)
+                    .system(
+                        size: 14,
+                        weight: .bold,
+                        design: .rounded
+                    )
                 )
 
                 Spacer()
@@ -8087,7 +8166,7 @@ struct ProfileRecordShowcasePickerView:
                 .padding(12)
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 94,
+                    minHeight: 82,
                     alignment: .leading
                 )
                 .background(
@@ -8167,7 +8246,7 @@ struct ProfileRecordShowcasePickerView:
                 }
                 .frame(
                     maxWidth: .infinity,
-                    minHeight: 94
+                    minHeight: 82
                 )
                 .background(
                     Color.black
@@ -8272,14 +8351,18 @@ struct ProfileRecordShowcasePickerView:
                 columns: [
                     GridItem(
                         .flexible(),
-                        spacing: 8
+                        spacing: 7
                     ),
                     GridItem(
                         .flexible(),
-                        spacing: 8
+                        spacing: 7
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 7
                     )
                 ],
-                spacing: 8
+                spacing: 7
             ) {
                 ForEach(
                     candidates(
@@ -8347,8 +8430,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 34,
-                        height: 34
+                        width: 28,
+                        height: 28
                     )
                     .background(
                         kind.tint
@@ -8411,18 +8494,18 @@ struct ProfileRecordShowcasePickerView:
 
                 Text(kind.title)
                     .font(
-                        .caption
-                            .weight(
-                                .semibold
-                            )
+                        .system(
+                            size: 9,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
                             .primaryText
                     )
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(
-                        0.76
+                        0.72
                     )
 
                 Text(
@@ -8479,10 +8562,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(10)
+            .padding(8)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 116,
+                minHeight: 98,
                 alignment: .topLeading
             )
             .background(
