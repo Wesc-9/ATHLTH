@@ -6775,25 +6775,106 @@ private final class MeetupLocationSearchStore:
 }
 
 struct MeetupLocationPicker: View {
-    @Binding var coordinate: CLLocationCoordinate2D?
-    @Binding var position: MapCameraPosition
+    @Binding var coordinate:
+        CLLocationCoordinate2D?
+    @Binding var position:
+        MapCameraPosition
+    var onCoordinateSelected:
+        ((CLLocationCoordinate2D) -> Void)? =
+        nil
 
     var body: some View {
         MapReader { proxy in
             Map(position: $position) {
                 if let coordinate {
-                    Marker("Meet here", coordinate: coordinate)
-                        .tint(ATHLTHTheme.accent)
+                    Marker(
+                        ATHLTHLocalization.choose(
+                            english: "Meet here",
+                            norwegian: "Møtes her"
+                        ),
+                        coordinate:
+                            coordinate
+                    )
+                    .tint(
+                        ATHLTHTheme
+                            .vitality
+                    )
                 }
             }
-            .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(height: 178)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .border,
+                    lineWidth: 0.8
+                )
+            }
+            .overlay(
+                alignment:
+                    .topLeading
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Tap to fine-tune",
+                        norwegian:
+                            "Trykk for å finjustere"
+                    ),
+                    systemImage:
+                        "hand.tap.fill"
+                )
+                .font(
+                    .caption2
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .padding(
+                    .vertical,
+                    7
+                )
+                .background(
+                    .ultraThinMaterial,
+                    in: Capsule()
+                )
+                .padding(10)
+            }
+            .contentShape(Rectangle())
             .onTapGesture { point in
-                if let location = proxy.convert(point, from: .local) {
+                if let location =
+                    proxy.convert(
+                        point,
+                        from: .local
+                    ) {
                     coordinate = location
+                    onCoordinateSelected?(
+                        location
+                    )
                 }
             }
         }
+        .frame(
+            maxWidth: .infinity
+        )
     }
 }
 
