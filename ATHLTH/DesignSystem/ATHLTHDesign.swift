@@ -387,6 +387,178 @@ struct ATHLTHPremiumChoiceRow: View {
     }
 }
 
+struct ATHLTHPremiumScreenShell<Content: View>: View {
+    var accent: Color = ATHLTHTheme.vitality
+    var maxContentWidth: CGFloat = 760
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent: accent.opacity(0.18)
+            )
+
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    content
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 34)
+                .frame(
+                    maxWidth:
+                        maxContentWidth
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(
+                .interactively
+            )
+        }
+    }
+}
+
+struct ATHLTHPremiumScreenHeader<Actions: View>: View {
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    var tint: Color = ATHLTHTheme.vitality
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                HStack(
+                    alignment: .top,
+                    spacing: 14
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
+                        Text(eyebrow.uppercased())
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(2)
+                            .foregroundStyle(
+                                tint
+                            )
+
+                        Text(title)
+                            .font(
+                                .system(
+                                    size: 31,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(2)
+                            .minimumScaleFactor(
+                                0.82
+                            )
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(
+                        systemName: icon
+                    )
+                    .font(
+                        .system(
+                            size: 26,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 60,
+                        height: 60
+                    )
+                    .background(
+                        tint,
+                        in: Circle()
+                    )
+                }
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+
+                actions
+            }
+        }
+    }
+}
+
+struct ATHLTHPremiumIconButton: View {
+    let systemImage: String
+    let accessibilityLabel: String
+    var tint: Color = ATHLTHTheme.vitality
+    let action: () -> Void
+
+    var body: some View {
+        Button(
+            action: action
+        ) {
+            Image(
+                systemName: systemImage
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .primaryText
+            )
+            .frame(
+                width: 42,
+                height: 42
+            )
+            .background(
+                Color.white.opacity(0.78),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        tint.opacity(0.12),
+                        lineWidth: 0.8
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            accessibilityLabel
+        )
+    }
+}
+
 struct ATHLTHMetric: View {
     let title: String
     let value: String
