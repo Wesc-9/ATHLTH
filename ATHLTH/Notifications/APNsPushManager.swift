@@ -208,6 +208,7 @@ final class ATHLTHAppDelegate: NSObject,
             [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        ATHLTHHomeAssistantBackgroundRefresh.register()
         HealthKitManager.shared.prepareBackgroundObserversAtLaunch()
 
         // APNs registration is independent from alert permission. The user
