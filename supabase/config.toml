@@ -1,5 +1,5 @@
 # Disposable local Supabase stack; hosted project settings are unchanged.
-project_id = "ATHLTH-1.6.1"
+project_id = "ATHLTH-1.6.0"
 
 [api]
 enabled = true
