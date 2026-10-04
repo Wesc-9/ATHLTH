@@ -1592,7 +1592,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 96)
+            .padding(.top, 116)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1874,7 +1874,7 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .frame(height: 296)
+        .frame(height: 282)
         .clipped()
     }
 
@@ -1897,7 +1897,7 @@ struct FriendProfileView: View {
     private func remoteProfileStats(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             remoteHeroStat(
                 value:
                     followOverview
@@ -1962,7 +1962,7 @@ struct FriendProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 12,
+                            size: 11,
                             weight: .semibold
                         )
                     )
@@ -1971,7 +1971,7 @@ struct FriendProfileView: View {
                 Text(value)
                     .font(
                         .system(
-                            size: 13,
+                            size: 12,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1984,7 +1984,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 8,
+                        size: 7.5,
                         weight: .medium
                     )
                 )
@@ -1994,17 +1994,17 @@ struct FriendProfileView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 3)
         .frame(maxWidth: .infinity)
-        .frame(height: 42)
+        .frame(height: 38)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 15,
+                cornerRadius: 13,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 15,
+                cornerRadius: 13,
                 style: .continuous
             )
             .stroke(
@@ -2243,7 +2243,7 @@ struct FriendProfileView: View {
                     .primaryText
         )
         .frame(maxWidth: .infinity)
-        .frame(height: 48)
+        .frame(height: 46)
         .background(
             emphasized
                 ? ATHLTHTheme
@@ -3126,7 +3126,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 8.8,
+                        size: 8.0,
                         weight: .semibold
                     )
                 )
@@ -3140,7 +3140,7 @@ struct FriendProfileView: View {
             Text(value)
                 .font(
                     .system(
-                        size: 14,
+                        size: 13,
                         weight: .bold,
                         design: .rounded
                     )
@@ -3149,10 +3149,10 @@ struct FriendProfileView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.56)
         }
-        .padding(9)
+        .padding(8)
         .frame(
             maxWidth: .infinity,
-            minHeight: 94,
+            minHeight: 78,
             alignment: .topLeading
         )
         .background(
@@ -3263,19 +3263,19 @@ struct FriendProfileView: View {
                                 ATHLTHMarkShape()
                                     .fill(.white)
                                     .frame(
-                                        width: 10,
-                                        height: 8
+                                        width: 8,
+                                        height: 6
                                     )
                             }
                             .frame(
-                                width: 26,
-                                height: 30
+                                width: 22,
+                                height: 25
                             )
 
                             Text(item.title)
                                 .font(
                                     .system(
-                                        size: 8,
+                                        size: 7.4,
                                         weight: .bold
                                     )
                                 )
