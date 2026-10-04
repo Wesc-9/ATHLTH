@@ -18,6 +18,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         )
     @Published private(set) var errorMessage: String?
     @Published var isPresentationRequested = false
+    @Published private(set) var isUserMinimized = false
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
@@ -88,6 +89,24 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    func presentWorkout() {
+        guard snapshot != nil else {
+            return
+        }
+
+        isUserMinimized = false
+        isPresentationRequested = true
+    }
+
+    func minimizeWorkout() {
+        guard hasActiveMirroredWorkout else {
+            return
+        }
+
+        isUserMinimized = true
+        isPresentationRequested = false
+    }
+
     func dismissSummary() {
         guard !hasActiveMirroredWorkout else { return }
 
@@ -95,6 +114,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         publish {
             self.isPresentationRequested = false
+            self.isUserMinimized = false
             self.snapshot = nil
             self.errorMessage = nil
             self.connectionText =
@@ -127,6 +147,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         publish {
             self.snapshot = initialSnapshot
+            self.isUserMinimized = false
             self.connectionText =
                 ATHLTHLocalization.choose(
                     english: "Live from Apple Watch",
@@ -174,7 +195,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                             norwegian:
                                 "Direkte fra Apple Watch"
                         )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
         }
 
         if latestSnapshot.state == .completed ||
@@ -349,7 +372,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                         english: "Live from Apple Watch",
                         norwegian: "Direkte fra Apple Watch"
                     )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
 
             if newState == .completed {
                 self.mirroredSession = nil
@@ -379,7 +404,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                     english: "Mirroring error",
                     norwegian: "Feil ved speiling"
                 )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
         }
     }
