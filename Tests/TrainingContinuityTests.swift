@@ -232,6 +232,105 @@ final class TrainingContinuityTests: XCTestCase {
     }
 
     @MainActor
+    func testRecoveredStrengthCheckpointIsVisibleAndDiscardable() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let first = StrengthWorkoutStore()
+        first.switchAccount(owner)
+        first.startFreestyle(
+            watchSessionID: nil,
+            captureDevice: .iPhone
+        )
+        let id = first.activeWorkout?.id
+        first.checkpoint()
+
+        let reopened = StrengthWorkoutStore()
+        reopened.switchAccount(owner)
+
+        XCTAssertEqual(
+            reopened.activeWorkout?.id,
+            id
+        )
+        XCTAssertTrue(
+            reopened.hasRecoveredActiveWorkout
+        )
+        XCTAssertFalse(
+            reopened.recoveredActiveWorkoutNeedsReview
+        )
+
+        reopened.discardActiveWorkout()
+
+        XCTAssertNil(reopened.activeWorkout)
+        XCTAssertFalse(
+            reopened.hasRecoveredActiveWorkout
+        )
+
+        let afterDiscard =
+            StrengthWorkoutStore()
+        afterDiscard.switchAccount(owner)
+        XCTAssertNil(
+            afterDiscard.activeWorkout
+        )
+    }
+
+    @MainActor
+    func testOldPhoneRecoveryRequiresReviewAndIsGloballyVisible() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let checkpoint =
+            Date()
+                .addingTimeInterval(
+                    -(13 * 60 * 60)
+                )
+        let saved = PhoneWorkout(
+            walking: false,
+            start:
+                checkpoint
+                    .addingTimeInterval(-900),
+            accumulatedSeconds: 900,
+            resumedAt: nil,
+            lastCheckpoint: checkpoint,
+            pauses: [
+                PhoneWorkoutPauseInterval(
+                    startedAt: checkpoint,
+                    endedAt: nil
+                )
+            ]
+        )
+        AccountLocalStorage.write(
+            saved,
+            name: "phoneActive",
+            userID: owner
+        )
+
+        let store = IPhoneWorkoutStore()
+        store.switchAccount(owner)
+
+        XCTAssertTrue(
+            store.hasRecoveredActiveWorkout
+        )
+        XCTAssertTrue(
+            store.recoveredActiveWorkoutNeedsReview
+        )
+        XCTAssertTrue(
+            store.isUserMinimized
+        )
+
+        store.discardActiveWorkout()
+
+        XCTAssertNil(store.active)
+        XCTAssertFalse(
+            store.hasRecoveredActiveWorkout
+        )
+
+        let reopened = IPhoneWorkoutStore()
+        reopened.switchAccount(owner)
+        XCTAssertNil(reopened.active)
+    }
+
+    @MainActor
     func testCloudBackupRequiresSeparateOptInForEachAccount() {
         let first = UUID(), second = UUID()
         defer {
