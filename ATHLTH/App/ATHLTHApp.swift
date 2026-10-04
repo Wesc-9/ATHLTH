@@ -799,26 +799,67 @@ struct AppRootView: View {
                     phoneWorkout.presentWorkout()
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "figure.run")
-                            .font(
-                                .system(
-                                    size: 20,
-                                    weight: .semibold
-                                )
-                            )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Return to iPhone workout",
-                                norwegian:
-                                    "Tilbake til iPhone-økt"
-                            )
+                        Image(
+                            systemName:
+                                phoneWorkout
+                                    .active?
+                                    .walking == true
+                                    ? "figure.walk"
+                                    : "figure.run"
                         )
                         .font(
-                            .headline
-                                .weight(.semibold)
+                            .system(
+                                size: 20,
+                                weight: .semibold
+                            )
                         )
+                        .foregroundStyle(
+                            phoneWorkout
+                                .recoveredActiveWorkoutNeedsReview
+                                ? Color.orange
+                                : ATHLTHTheme.accentDeep
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 1
+                        ) {
+                            Text(
+                                phoneWorkout
+                                    .hasRecoveredActiveWorkout
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Unfinished iPhone workout",
+                                        norwegian:
+                                            "Uferdig iPhone-økt"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Return to iPhone workout",
+                                        norwegian:
+                                            "Tilbake til iPhone-økt"
+                                    )
+                            )
+                            .font(
+                                .headline
+                                    .weight(.semibold)
+                            )
+
+                            if let recoveredAt =
+                                    phoneWorkout
+                                        .recoveredActiveWorkoutReferenceDate {
+                                Text(
+                                    recoveredAt.formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+                        }
                     }
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
