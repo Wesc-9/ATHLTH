@@ -484,7 +484,7 @@ struct MessageInboxView: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        ATHLTHTheme.vitalitySoft,
                         in: Capsule()
                     )
             }
@@ -506,7 +506,7 @@ struct MessageInboxView: View {
             .foregroundStyle(ATHLTHTheme.accentDeep)
             .frame(width: 66, height: 66)
             .background(
-                ATHLTHTheme.accentSoft,
+                ATHLTHTheme.vitalitySoft,
                 in: Circle()
             )
 
@@ -1527,10 +1527,10 @@ private struct MessageRequestRow: View {
 
                 Text(direction == .incoming ? "Request" : "Pending")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .foregroundStyle(ATHLTHTheme.vitality)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(ATHLTHTheme.accentSoft, in: Capsule())
+                    .background(ATHLTHTheme.vitalitySoft, in: Capsule())
             }
 
             if let body = message?.body, !body.isEmpty {
@@ -1544,7 +1544,7 @@ private struct MessageRequestRow: View {
                 HStack(spacing: 8) {
                     Button("Accept", action: onAccept)
                         .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accent)
+                        .tint(ATHLTHTheme.vitality)
 
                     Button("Decline", action: onDecline)
                         .buttonStyle(.bordered)
@@ -1609,7 +1609,7 @@ private struct MessageConversationRow: View {
 
                 if unreadCount > 0 {
                     Circle()
-                        .fill(ATHLTHTheme.accent)
+                        .fill(ATHLTHTheme.vitality)
                         .frame(width: 11, height: 11)
                         .overlay {
                             Circle()
@@ -1682,7 +1682,7 @@ private struct MessageConversationRow: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(
-                                ATHLTHTheme.accentSoft,
+                                ATHLTHTheme.vitalitySoft,
                                 in: Capsule()
                             )
                     }
@@ -1701,7 +1701,7 @@ private struct MessageConversationRow: View {
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(
-                                ATHLTHTheme.accentSoft,
+                                ATHLTHTheme.vitalitySoft,
                                 in: Capsule()
                             )
                     }
@@ -1823,7 +1823,7 @@ private struct MessageConversationRow: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 25, height: 25)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        ATHLTHTheme.vitalitySoft,
                         in: Circle()
                     )
 
@@ -1859,7 +1859,7 @@ private struct MessageConversationRow: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                     .frame(width: 27, height: 27)
                     .background(
-                        ATHLTHTheme.accentSoft,
+                        ATHLTHTheme.vitalitySoft,
                         in: RoundedRectangle(
                             cornerRadius: 8,
                             style: .continuous
@@ -2807,7 +2807,7 @@ struct DirectMessageThreadView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
+                .tint(ATHLTHTheme.vitality)
                 .frame(maxWidth: .infinity)
 
                 Menu {
@@ -2837,7 +2837,7 @@ struct DirectMessageThreadView: View {
     private var outgoingRequestBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "clock.fill")
-                .foregroundStyle(ATHLTHTheme.accent)
+                .foregroundStyle(ATHLTHTheme.vitality)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Message request sent")
@@ -2859,9 +2859,9 @@ struct DirectMessageThreadView: View {
             if let selectedShare {
                 HStack(spacing: 10) {
                     Image(systemName: selectedShare.kind.systemImage)
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .foregroundStyle(ATHLTHTheme.vitality)
                         .frame(width: 34, height: 34)
-                        .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 10))
+                        .background(ATHLTHTheme.vitalitySoft, in: RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selectedShare.title)
@@ -2904,7 +2904,7 @@ struct DirectMessageThreadView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
                             .frame(width: 38, height: 38)
-                            .background(ATHLTHTheme.accentSoft, in: Circle())
+                            .background(ATHLTHTheme.vitalitySoft, in: Circle())
                     }
                     .buttonStyle(.plain)
                     .disabled(conversationID == nil)
@@ -2940,7 +2940,7 @@ struct DirectMessageThreadView: View {
                             .frame(width: 38, height: 38)
                     }
                 }
-                .background(ATHLTHTheme.accent, in: Circle())
+                .background(ATHLTHTheme.vitality, in: Circle())
                 .buttonStyle(.plain)
                 .disabled(!canSend || isSending)
                 .opacity(canSend ? 1 : 0.45)
@@ -3995,7 +3995,7 @@ private struct MessageBubble: View {
                     VStack(alignment: .leading, spacing: 9) {
                         HStack(spacing: 8) {
                             Image(systemName: attachmentKind.systemImage)
-                                .foregroundStyle(ATHLTHTheme.accent)
+                                .foregroundStyle(ATHLTHTheme.vitality)
                             Text(attachmentKind.title.uppercased())
                                 .font(.caption2.weight(.semibold))
                                 .tracking(1)
@@ -4056,7 +4056,7 @@ private struct MessageBubble: View {
                                 .font(.caption.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
-                            .tint(ATHLTHTheme.accent)
+                            .tint(ATHLTHTheme.vitality)
                         }
                     }
                     .padding(13)
@@ -4135,58 +4135,175 @@ struct MessageSharePicker: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(MessageShareKind.allCases) { kind in
-                            Button {
-                                selectedKind = kind
-                            } label: {
-                                Label(kind.title, systemImage: kind.systemImage)
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .foregroundStyle(
-                                        selectedKind == kind
-                                            ? Color.white
-                                            : ATHLTHTheme.primaryText
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.16)
+                )
+
+                ScrollView {
+                    LazyVStack(
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
+                        ATHLTHPremiumScreenHeader(
+                            eyebrow:
+                                ATHLTHLocalization.choose(
+                                    english: "Share",
+                                    norwegian: "Del"
+                                ),
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Share with athlete",
+                                    norwegian: "Del med utøver"
+                                ),
+                            subtitle:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Send a workout, plan, route or challenge directly in the conversation.",
+                                    norwegian:
+                                        "Send en økt, plan, rute eller challenge direkte i samtalen."
+                                ),
+                            icon:
+                                "square.and.arrow.up.fill",
+                            tint:
+                                ATHLTHTheme
+                                    .vitality
+                        ) {
+                            EmptyView()
+                        }
+
+                        ScrollView(
+                            .horizontal,
+                            showsIndicators: false
+                        ) {
+                            HStack(spacing: 8) {
+                                ForEach(
+                                    MessageShareKind
+                                        .allCases
+                                ) { kind in
+                                    Button {
+                                        selectedKind =
+                                            kind
+                                    } label: {
+                                        Label(
+                                            kind.title,
+                                            systemImage:
+                                                kind.systemImage
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .padding(
+                                            .horizontal,
+                                            12
+                                        )
+                                        .padding(
+                                            .vertical,
+                                            9
+                                        )
+                                        .foregroundStyle(
+                                            selectedKind ==
+                                                kind
+                                                ? Color.white
+                                                : ATHLTHTheme
+                                                    .primaryText
+                                        )
+                                        .background(
+                                            selectedKind ==
+                                                kind
+                                                ? ATHLTHTheme
+                                                    .vitality
+                                                : Color.white
+                                                    .opacity(
+                                                        0.68
+                                                    ),
+                                            in: Capsule()
+                                        )
+                                    }
+                                    .buttonStyle(
+                                        .plain
                                     )
-                                    .background(
-                                        selectedKind == kind
-                                            ? ATHLTHTheme.accent
-                                            : Color(.secondarySystemGroupedBackground),
-                                        in: Capsule()
-                                    )
+                                }
                             }
-                            .buttonStyle(.plain)
+                        }
+
+                        LazyVStack(
+                            spacing: 10
+                        ) {
+                            shareContent
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
+                    .padding(16)
+                    .padding(
+                        .bottom,
+                        28
+                    )
+                    .frame(
+                        maxWidth: 680
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
                 }
-
-                List {
-                    shareContent
-                }
-                .listStyle(.insetGrouped)
+                .scrollIndicators(
+                    .hidden
+                )
             }
-            .navigationTitle("Share with Athlete")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbarBackground(
+                .hidden,
+                for: .navigationBar
+            )
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
                 }
             }
             .alert(
-                "Could Not Share",
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could Not Share",
+                    norwegian:
+                        "Kunne ikke dele"
+                ),
                 isPresented: Binding(
-                    get: { shareError != nil },
-                    set: { if !$0 { shareError = nil } }
+                    get: {
+                        shareError != nil
+                    },
+                    set: {
+                        if !$0 {
+                            shareError = nil
+                        }
+                    }
                 )
             ) {
-                Button("OK", role: .cancel) {}
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
             } message: {
-                Text(shareError ?? "")
+                Text(
+                    shareError ?? ""
+                )
             }
         }
     }
@@ -4467,27 +4584,105 @@ struct MessageSharePicker: View {
         subtitle: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        Button(
+            action: action
+        ) {
             HStack(spacing: 13) {
-                Image(systemName: icon)
-                    .foregroundStyle(ATHLTHTheme.accent)
-                    .frame(width: 40, height: 40)
-                    .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+                Image(
+                    systemName: icon
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                )
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
                         .lineLimit(2)
                 }
 
                 Spacer()
 
-                Image(systemName: "paperplane.fill")
-                    .foregroundStyle(ATHLTHTheme.accent)
+                Image(
+                    systemName:
+                        "paperplane.fill"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+            }
+            .padding(13)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.95),
+                        ATHLTHTheme
+                            .cardWarm
+                            .opacity(0.72)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white
+                        .opacity(0.9),
+                    lineWidth: 0.8
+                )
             }
         }
         .buttonStyle(.plain)
