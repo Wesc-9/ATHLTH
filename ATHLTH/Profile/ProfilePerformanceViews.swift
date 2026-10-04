@@ -49,10 +49,15 @@ enum ProfileFeaturedRecordKind:
     Identifiable,
     Hashable
 {
+    case fastest400M
+    case fastest800M
     case fastest1K
     case fastestMile
+    case fastest3K
     case fastest5K
     case fastest10K
+    case fastest15K
+    case fastest10Mile
     case fastestHalfMarathon
     case fastestMarathon
     case longestRun
@@ -92,10 +97,15 @@ enum ProfileFeaturedRecordKind:
 
     var group: ProfileRecordGroup {
         switch self {
-        case .fastest1K,
+        case .fastest400M,
+             .fastest800M,
+             .fastest1K,
              .fastestMile,
+             .fastest3K,
              .fastest5K,
              .fastest10K,
+             .fastest15K,
+             .fastest10Mile,
              .fastestHalfMarathon,
              .fastestMarathon,
              .longestRun:
@@ -126,14 +136,24 @@ enum ProfileFeaturedRecordKind:
 
     var healthKind: HealthPersonalRecordKind? {
         switch self {
+        case .fastest400M:
+            return .fastest400M
+        case .fastest800M:
+            return .fastest800M
         case .fastest1K:
             return .fastest1K
         case .fastestMile:
             return .fastestMile
+        case .fastest3K:
+            return .fastest3K
         case .fastest5K:
             return .fastest5K
         case .fastest10K:
             return .fastest10K
+        case .fastest15K:
+            return .fastest15K
+        case .fastest10Mile:
+            return .fastest10Mile
         case .fastestHalfMarathon:
             return .fastestHalfMarathon
         case .fastestMarathon:
@@ -176,6 +196,16 @@ enum ProfileFeaturedRecordKind:
 
     var title: String {
         switch self {
+        case .fastest400M:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 400 m",
+                norwegian: "Raskeste 400 m"
+            )
+        case .fastest800M:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 800 m",
+                norwegian: "Raskeste 800 m"
+            )
         case .fastest1K:
             return ATHLTHLocalization.choose(
                 english: "Fastest 1K",
@@ -186,6 +216,11 @@ enum ProfileFeaturedRecordKind:
                 english: "Fastest mile",
                 norwegian: "Raskeste mile"
             )
+        case .fastest3K:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 3K",
+                norwegian: "Raskeste 3 km"
+            )
         case .fastest5K:
             return ATHLTHLocalization.choose(
                 english: "Fastest 5K",
@@ -195,6 +230,16 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Fastest 10K",
                 norwegian: "Raskeste 10 km"
+            )
+        case .fastest15K:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 15K",
+                norwegian: "Raskeste 15 km"
+            )
+        case .fastest10Mile:
+            return ATHLTHLocalization.choose(
+                english: "Fastest 10 miles",
+                norwegian: "Raskeste 10 miles"
             )
         case .fastestHalfMarathon:
             return ATHLTHLocalization.choose(
@@ -301,14 +346,24 @@ enum ProfileFeaturedRecordKind:
 
     var shortTitle: String {
         switch self {
+        case .fastest400M:
+            return "400 m"
+        case .fastest800M:
+            return "800 m"
         case .fastest1K:
             return "1 km"
         case .fastestMile:
             return "Mile"
+        case .fastest3K:
+            return "3 km"
         case .fastest5K:
             return "5 km"
         case .fastest10K:
             return "10 km"
+        case .fastest15K:
+            return "15 km"
+        case .fastest10Mile:
+            return "10 mi"
         case .fastestHalfMarathon:
             return ATHLTHLocalization.choose(
                 english: "Half",
@@ -402,14 +457,24 @@ enum ProfileFeaturedRecordKind:
 
     var icon: String {
         switch self {
+        case .fastest400M:
+            return "4.circle.fill"
+        case .fastest800M:
+            return "8.circle.fill"
         case .fastest1K:
             return "1.circle.fill"
         case .fastestMile:
             return "m.circle.fill"
+        case .fastest3K:
+            return "3.circle.fill"
         case .fastest5K:
             return "5.circle.fill"
         case .fastest10K:
             return "10.circle.fill"
+        case .fastest15K:
+            return "15.circle.fill"
+        case .fastest10Mile:
+            return "figure.run.circle.fill"
         case .fastestHalfMarathon:
             return "figure.run"
         case .fastestMarathon:
@@ -454,14 +519,24 @@ enum ProfileFeaturedRecordKind:
 
     var tint: Color {
         switch self {
+        case .fastest400M:
+            return .mint
+        case .fastest800M:
+            return .teal
         case .fastest1K:
             return .blue
         case .fastestMile:
             return .cyan
+        case .fastest3K:
+            return .indigo
         case .fastest5K:
             return .green
         case .fastest10K:
             return .orange
+        case .fastest15K:
+            return .pink
+        case .fastest10Mile:
+            return .purple
         case .fastestHalfMarathon:
             return .pink
         case .fastestMarathon:
@@ -597,8 +672,13 @@ enum ProfileFeaturedRecordKind:
                 }?
                 .value ?? "—"
 
-        case .fastestMile,
+        case .fastest400M,
+             .fastest800M,
+             .fastestMile,
+             .fastest3K,
              .fastest10K,
+             .fastest15K,
+             .fastest10Mile,
              .fastestHalfMarathon,
              .longestStrengthWorkout,
              .longestRide,
