@@ -28,6 +28,30 @@ struct RouteGuardianDraft {
                 .routeAlertAnnounceBackOnRoute
     }
 
+    mutating func load(
+        configuration:
+            WatchRouteAlertConfiguration
+    ) {
+        enabled = configuration.enabled
+        deviationMeters =
+            configuration.deviationMeters
+        graceSeconds =
+            Int(
+                configuration
+                    .graceSeconds
+                    .rounded()
+            )
+        repeatSeconds =
+            Int(
+                configuration
+                    .repeatSeconds
+                    .rounded()
+            )
+        delivery = configuration.delivery
+        announceBackOnRoute =
+            configuration.announceBackOnRoute
+    }
+
     var configuration:
         WatchRouteAlertConfiguration {
         WatchRouteAlertConfiguration(
@@ -109,6 +133,38 @@ struct GhostQuickStartDraft {
         targetTimeText =
             GhostTargetTimeFormatter
                 .string(seconds)
+    }
+
+    @MainActor
+    mutating func load(
+        targetDuration:
+            TimeInterval?,
+        updates:
+            WatchGhostRaceAudioConfiguration?,
+        route:
+            TrainingRoute?,
+        settings:
+            AppSettingsStore
+    ) {
+        load(
+            route: route,
+            settings: settings
+        )
+
+        if let targetDuration,
+           targetDuration > 0 {
+            enabled = true
+            targetTimeText =
+                GhostTargetTimeFormatter
+                    .string(
+                        targetDuration
+                    )
+        }
+
+        if let updates {
+            updatesEnabled =
+                updates.enabled
+        }
     }
 
     var targetDuration:
@@ -288,7 +344,7 @@ struct PerWorkoutAudioCoachView:
     }
 }
 
-private struct PerWorkoutRouteGuardianView:
+struct PerWorkoutRouteGuardianView:
     View
 {
     @Binding var draft:
@@ -372,7 +428,7 @@ private struct PerWorkoutRouteGuardianView:
     }
 }
 
-private struct PerWorkoutGhostView: View {
+struct PerWorkoutGhostView: View {
     @Binding var draft:
         GhostQuickStartDraft
     let route: TrainingRoute?
