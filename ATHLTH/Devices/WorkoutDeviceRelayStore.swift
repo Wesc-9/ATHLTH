@@ -103,6 +103,8 @@ struct WorkoutDeviceRelayEnvelope:
         TimeInterval?
     let ghostUpdates:
         WatchGhostRaceAudioConfiguration?
+    var runEnvironment: RunEnvironment? = nil
+    var treadmillInclinePercent: Double? = nil
     let spotifyPlaylist:
         SpotifyPlaylistReference?
     let spotifyAutoplay: Bool
