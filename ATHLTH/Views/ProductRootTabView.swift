@@ -9886,7 +9886,7 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .frame(height: 282)
+        .frame(height: 300)
         .clipped()
     }
 
