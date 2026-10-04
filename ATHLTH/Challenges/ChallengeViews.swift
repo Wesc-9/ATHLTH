@@ -6684,63 +6684,257 @@ struct ChallengeDetailView: View {
     private func detailHero(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            ChallengeCoverArtworkView(
-                sport: challenge.sport,
-                artworkName: challenge.rules.coverArtworkName,
-                remoteURL: challenge.rules.coverImageURL
-            )
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                HStack(
+                    alignment: .top,
+                    spacing: 16
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 7
+                    ) {
+                        Text("ATHLTH CHALLENGE")
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
 
-            LinearGradient(
-                colors: [.clear, .clear, .black.opacity(0.50)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+                        Text(challenge.title)
+                            .font(
+                                .system(
+                                    size: 30,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.82)
+                    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("ATHLTH CHALLENGE")
-                        .font(.caption2.bold())
-                        .tracking(1.5)
+                    Spacer(minLength: 8)
+
+                    Image(
+                        systemName:
+                            challenge.sport
+                                .systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 29,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 66,
+                        height: 66
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitality,
+                        in: Circle()
+                    )
+                }
+
+                Text(
+                    challengeHeroSubtitle(
+                        challenge
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+                HStack(spacing: 8) {
+                    challengeHeroChip(
+                        title:
+                            heroInviteChipTitle(
+                                challenge
+                            ),
+                        icon: "envelope.fill",
+                        emphasized:
+                            currentParticipant?
+                                .state ==
+                            .invited
+                    )
+
+                    challengeHeroChip(
+                        title: "Leaderboard",
+                        icon:
+                            "chart.bar.fill",
+                        emphasized: false
+                    )
+
+                    challengeHeroChip(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Rules",
+                                norwegian: "Regler"
+                            ),
+                        icon:
+                            "list.bullet.rectangle.fill",
+                        emphasized: false
+                    )
+                }
+
+                HStack(spacing: 7) {
+                    Label(
+                        timeText(challenge),
+                        systemImage:
+                            "clock.fill"
+                    )
+                    .lineLimit(1)
 
                     Spacer()
 
-                    if challenge.rulesAreLocked {
-                        Label("LOCKED", systemImage: "lock.fill")
-                            .font(.caption2.bold())
+                    if challenge
+                        .rulesAreLocked {
+                        Label(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Locked",
+                                    norwegian:
+                                        "Låst"
+                                ),
+                            systemImage:
+                                "lock.fill"
+                        )
                     }
                 }
-
-                Spacer()
-
-                Text(challenge.title)
-                    .font(.system(size: 31, weight: .bold))
-                    .lineLimit(2)
-
-                if let summary = challenge.rules.summary,
-                   !summary.isEmpty {
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.86))
-                        .lineLimit(2)
-                }
-
-                HStack {
-                    Label(
-                        challenge.rules.scoring.title,
-                        systemImage: challenge.sport.systemImage
-                    )
-                    Spacer()
-                    Text(timeText(challenge))
-                }
-                .font(.caption)
+                .font(
+                    .caption2
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
             }
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.24), radius: 5, y: 2)
-            .padding(20)
         }
-        .frame(height: 250)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private func challengeHeroSubtitle(
+        _ challenge: ATHLTHChallenge
+    ) -> String {
+        if let summary =
+                challenge.rules.summary?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+           !summary.isEmpty {
+            return summary
+        }
+
+        if challenge.sport == .running,
+           let distance =
+                challenge.rules
+                    .targetDistanceMeters {
+            return ATHLTHLocalization.format(
+                english:
+                    "Compete with other athletes and see who completes %.2f km fastest.",
+                norwegian:
+                    "Konkurrer med andre og se hvem som løper %.2f km raskest.",
+                distance / 1_000
+            )
+        }
+
+        return ATHLTHLocalization.format(
+            english:
+                "Compete with other athletes in %@.",
+            norwegian:
+                "Konkurrer med andre i %@.",
+            challenge.rules
+                .scoring.title
+        )
+    }
+
+    private func heroInviteChipTitle(
+        _ challenge: ATHLTHChallenge
+    ) -> String {
+        if currentParticipant?.state ==
+            .invited {
+            return ATHLTHLocalization.choose(
+                english: "Invitation",
+                norwegian: "Invitasjon"
+            )
+        }
+
+        if challenge.creatorID ==
+            session.profile.userID {
+            return ATHLTHLocalization.choose(
+                english: "Created",
+                norwegian: "Opprettet"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Challenge",
+            norwegian: "Challenge"
+        )
+    }
+
+    private func challengeHeroChip(
+        title: String,
+        icon: String,
+        emphasized: Bool
+    ) -> some View {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .caption
+                .weight(.semibold)
+        )
+        .foregroundStyle(
+            emphasized
+                ? Color.white
+                : ATHLTHTheme
+                    .primaryText
+        )
+        .lineLimit(1)
+        .minimumScaleFactor(0.80)
+        .frame(
+            maxWidth: .infinity
+        )
+        .padding(
+            .horizontal,
+            9
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            emphasized
+                ? ATHLTHTheme
+                    .vitality
+                : ATHLTHTheme
+                    .cardWarm
+                    .opacity(0.72),
+            in: Capsule()
+        )
     }
 
     private func leaderboardCard(_ challenge: ATHLTHChallenge) -> some View {
