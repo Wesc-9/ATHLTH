@@ -890,6 +890,13 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var draftReps: Int
     var draftWeightKilograms: Double
     var draftRestSeconds: Int
+
+    // Optional machine/time fields preserve compatibility with Watch builds
+    // that only knew reps + kilograms.
+    var draftDurationSeconds: Int? = nil
+    var draftResistanceLevel: Int? = nil
+    var targetKindRaw: String? = nil
+    var loadKindRaw: String? = nil
     var isResting: Bool
     var restEndsAt: Date?
     var currentExerciseComplete: Bool
@@ -928,6 +935,9 @@ struct WatchStrengthCommand: Codable, Hashable {
     var reps: Int?
     var weightKilograms: Double?
     var restSeconds: Int?
+    var durationSeconds: Int? = nil
+    var resistanceLevel: Int? = nil
+    var distanceMeters: Double? = nil
     var addRestSeconds: Int?
     var sentAt: Date
     var rpe: Double? = nil
