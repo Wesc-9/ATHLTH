@@ -3634,7 +3634,18 @@ private struct MessageBubble: View {
         return isMine ? "Shared by you" : "Shared by \(friend.resolvedName)"
     }
 
-    private var challengeStatusText: String? {
+    private enum ChallengeStatusKind {
+        case waitingOutgoing
+        case waitingIncoming
+        case accepted
+        case declined
+        case withdrawn
+        case expired
+        case cancelled
+    }
+
+    private var challengeStatusKind:
+        ChallengeStatusKind? {
         guard
             message.attachmentKind ==
                 .challenge,
@@ -3649,10 +3660,7 @@ private struct MessageBubble: View {
         }
 
         if challenge.status == .cancelled {
-            return ATHLTHLocalization.choose(
-                english: "Cancelled",
-                norwegian: "Avlyst"
-            )
+            return .cancelled
         }
 
         let participantUserID =
@@ -3682,26 +3690,42 @@ private struct MessageBubble: View {
             if let endsAt =
                     challenge.rules.endsAt,
                endsAt <= Date() {
-                return ATHLTHLocalization.choose(
-                    english: "Expired",
-                    norwegian: "Utløpt"
-                )
+                return .expired
             }
 
             return challenge.creatorID ==
                 currentUserID
-                ? ATHLTHLocalization.choose(
-                    english:
-                        "Sent · waiting",
-                    norwegian:
-                        "Sendt · venter"
-                )
-                : ATHLTHLocalization.choose(
-                    english:
-                        "Waiting for response",
-                    norwegian:
-                        "Venter på svar"
-                )
+                ? .waitingOutgoing
+                : .waitingIncoming
+
+        case .accepted:
+            return .accepted
+
+        case .declined:
+            return .declined
+
+        case .withdrawn:
+            return .withdrawn
+        }
+    }
+
+    private var challengeStatusText: String? {
+        guard let challengeStatusKind else {
+            return nil
+        }
+
+        switch challengeStatusKind {
+        case .waitingOutgoing:
+            return ATHLTHLocalization.choose(
+                english: "Sent · waiting",
+                norwegian: "Sendt · venter"
+            )
+
+        case .waitingIncoming:
+            return ATHLTHLocalization.choose(
+                english: "Waiting for response",
+                norwegian: "Venter på svar"
+            )
 
         case .accepted:
             return ATHLTHLocalization.choose(
@@ -3718,48 +3742,40 @@ private struct MessageBubble: View {
         case .withdrawn:
             return ATHLTHLocalization.choose(
                 english: "Withdrawn",
-                norwegian:
-                    "Trukket tilbake"
+                norwegian: "Trukket tilbake"
+            )
+
+        case .expired:
+            return ATHLTHLocalization.choose(
+                english: "Expired",
+                norwegian: "Utløpt"
+            )
+
+        case .cancelled:
+            return ATHLTHLocalization.choose(
+                english: "Cancelled",
+                norwegian: "Avlyst"
             )
         }
     }
 
     private var challengeStatusSystemImage: String {
-        guard
-            message.attachmentKind ==
-                .challenge
-        else {
-            return "bolt.fill"
-        }
-
-        switch challengeStatusText {
-        case ATHLTHLocalization.choose(
-            english: "Accepted",
-            norwegian: "Godtatt"
-        ):
+        switch challengeStatusKind {
+        case .accepted:
             return "checkmark.circle.fill"
-
-        case ATHLTHLocalization.choose(
-            english: "Declined",
-            norwegian: "Avslått"
-        ):
+        case .declined:
             return "xmark.circle.fill"
-
-        case ATHLTHLocalization.choose(
-            english: "Withdrawn",
-            norwegian:
-                "Trukket tilbake"
-        ):
+        case .withdrawn:
             return "arrow.uturn.backward.circle.fill"
-
-        case ATHLTHLocalization.choose(
-            english: "Expired",
-            norwegian: "Utløpt"
-        ):
+        case .expired:
             return "clock.badge.xmark"
-
-        default:
+        case .cancelled:
+            return "nosign"
+        case .waitingOutgoing,
+             .waitingIncoming:
             return "clock.fill"
+        case .none:
+            return "bolt.fill"
         }
     }
 
