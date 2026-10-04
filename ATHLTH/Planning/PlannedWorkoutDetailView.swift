@@ -347,11 +347,7 @@ struct PlannedWorkoutDetailView: View {
                     plannedGuidanceTile(
                         title: "Audio Coach",
                         subtitle:
-                            currentWorkout
-                                .audioCoachConfiguration?
-                                .enabled ??
-                            settings
-                                .audioCoachEnabledByDefault
+                            runGuidanceAudioCoachEnabled
                                 ? ATHLTHLocalization.choose(
                                     english: "On",
                                     norwegian: "På"
@@ -363,11 +359,7 @@ struct PlannedWorkoutDetailView: View {
                         icon:
                             "waveform.and.person.filled",
                         active:
-                            currentWorkout
-                                .audioCoachConfiguration?
-                                .enabled ??
-                            settings
-                                .audioCoachEnabledByDefault
+                            runGuidanceAudioCoachEnabled
                     )
 
                     if currentWorkout.kind ==
@@ -432,6 +424,15 @@ struct PlannedWorkoutDetailView: View {
                 }
             }
         }
+    }
+
+    private var runGuidanceAudioCoachEnabled:
+        Bool {
+        currentWorkout
+            .audioCoachConfiguration?
+            .enabled ??
+        settings
+            .audioCoachEnabledByDefault
     }
 
     private var ghostDetailText:
