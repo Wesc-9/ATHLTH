@@ -1648,29 +1648,59 @@ struct ChallengeCreationView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                HStack(spacing: 10) {
-                    creationDateControl(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Starts",
-                                norwegian: "Starter"
-                            ),
-                        selection: $startsAt,
-                        range:
-                            Date()...Date.distantFuture
-                    )
-
-                    if hasEnd {
+                ViewThatFits(
+                    in: .horizontal
+                ) {
+                    HStack(spacing: 10) {
                         creationDateControl(
                             title:
                                 ATHLTHLocalization.choose(
-                                    english: "Ends",
-                                    norwegian: "Slutter"
+                                    english: "Starts",
+                                    norwegian: "Starter"
                                 ),
-                            selection: $endsAt,
+                            selection: $startsAt,
                             range:
-                                startsAt...Date.distantFuture
+                                Date()...Date.distantFuture
                         )
+
+                        if hasEnd {
+                            creationDateControl(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Ends",
+                                        norwegian: "Slutter"
+                                    ),
+                                selection: $endsAt,
+                                range:
+                                    startsAt...Date.distantFuture
+                            )
+                        }
+                    }
+
+                    VStack(spacing: 10) {
+                        creationDateControl(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Starts",
+                                    norwegian: "Starter"
+                                ),
+                            selection: $startsAt,
+                            range:
+                                Date()...Date.distantFuture
+                        )
+
+                        if hasEnd {
+                            creationDateControl(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Ends",
+                                        norwegian: "Slutter"
+                                    ),
+                                selection: $endsAt,
+                                range:
+                                    startsAt...Date.distantFuture
+                            )
+                        }
                     }
                 }
 
