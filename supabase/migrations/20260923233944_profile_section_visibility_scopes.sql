@@ -1,6 +1,3 @@
--- Per-section social visibility scopes for profile setup.
--- Values: private (Off), friends, public.
-
 alter table public.profile_social_settings
   add column if not exists training_presence_visibility text not null default 'private'
     check (training_presence_visibility in ('private','friends','public')),

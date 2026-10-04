@@ -2056,7 +2056,7 @@ struct CommunityContentAvatar: View {
         Group {
             if let value = profile.avatarURL,
                let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -2104,7 +2104,7 @@ struct CommunityGroupIdentityAvatar: View {
         Group {
             if let value = group.imageURL,
                let url = URL(string: value) {
-                AsyncImage(url: url) {
+                ATHLTHStorageImage(url: url) {
                     phase in
 
                     switch phase {

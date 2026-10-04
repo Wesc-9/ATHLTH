@@ -1443,7 +1443,7 @@ private struct CommunityShowcaseAvatar: View {
     var body: some View {
         Group {
             if let url {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image

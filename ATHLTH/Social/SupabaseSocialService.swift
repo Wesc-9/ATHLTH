@@ -1391,7 +1391,7 @@ final class SupabaseSocialService: Sendable {
                 storagePath,
                 data: jpegData,
                 options: FileOptions(
-                    cacheControl: "31536000",
+                    cacheControl: "60",
                     contentType: "image/jpeg",
                     upsert: true
                 )
@@ -1478,7 +1478,7 @@ final class SupabaseSocialService: Sendable {
                 storagePath,
                 data: jpegData,
                 options: FileOptions(
-                    cacheControl: "31536000",
+                    cacheControl: "60",
                     contentType: "image/jpeg",
                     upsert: false
                 )

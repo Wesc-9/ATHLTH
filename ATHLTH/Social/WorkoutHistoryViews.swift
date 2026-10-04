@@ -2140,7 +2140,7 @@ struct PostWorkoutReviewView: View {
                         ForEach(
                             existingWorkoutMedia
                         ) { media in
-                            AsyncImage(
+                            ATHLTHStorageImage(
                                 url:
                                     URL(
                                         string:

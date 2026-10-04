@@ -1705,7 +1705,7 @@ struct RouteDetailView: View {
     ) -> some View {
         if let avatar = attempt.avatarURL,
            let url = URL(string: avatar) {
-            AsyncImage(url: url) { phase in
+            ATHLTHStorageImage(url: url) { phase in
                 if case .success(let image) = phase {
                     image
                         .resizable()

@@ -1,7 +1,3 @@
--- Add covering indexes for foreign-key columns used heavily by Community
--- and weekly challenge queries, and remove anonymous execute access from the
--- admin-only weekly challenge shift RPC.
-
 create index if not exists community_group_activity_actor_id_idx
   on public.community_group_activity(actor_id);
 
@@ -43,6 +39,5 @@ create index if not exists official_weekly_challenges_created_by_idx
 
 revoke execute on function public.shift_official_weekly_challenges_forward(timestamptz)
   from public, anon;
-
 grant execute on function public.shift_official_weekly_challenges_forward(timestamptz)
   to authenticated;

@@ -537,7 +537,7 @@ struct ChallengeCoverArtworkView: View {
             Group {
                 if let remoteURL,
                    let url = URL(string: remoteURL) {
-                    AsyncImage(url: url) { phase in
+                    ATHLTHStorageImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
                             coverImage(image, size: proxy.size)

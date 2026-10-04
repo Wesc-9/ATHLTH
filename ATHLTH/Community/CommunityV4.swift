@@ -4015,7 +4015,7 @@ private struct CommunityEventFeedCoverView:
                         ],
                    let url =
                         URL(string: rawURL) {
-                    AsyncImage(url: url) {
+                    ATHLTHStorageImage(url: url) {
                         phase in
                         switch phase {
                         case .success(
@@ -4493,7 +4493,7 @@ private struct CommunityReferenceAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        ATHLTHStorageImage(url: url) { phase in
             switch phase {
             case .success(let image):
                 image
@@ -6512,7 +6512,7 @@ private struct CommunityV4Avatar: View {
                let url = URL(
                     string: raw
                ) {
-                AsyncImage(
+                ATHLTHStorageImage(
                     url: url
                 ) { phase in
                     switch phase {

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { removeAccountStorage } from "../_shared/account-storage-cleanup.ts";
 
 type DeleteAccountRequest = { confirm?: boolean };
 
@@ -17,7 +18,7 @@ function b64url(value: Uint8Array | string): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
-function pemBytes(pem: string): Uint8Array {
+function pemBytes(pem: string): Uint8Array<ArrayBuffer> {
   const cleaned = pem
     .replaceAll("\\n", "\n")
     .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -144,17 +145,24 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const avatarPath = `${user.id}/avatar.jpg`;
-  const { error: avatarDeleteError } = await admin.storage
-    .from("profile-avatars")
-    .remove([avatarPath]);
-
-  if (avatarDeleteError) {
-    console.error("ATHLTH avatar cleanup failed.", {
-      userID: user.id,
-      message: avatarDeleteError.message,
+  try {
+    await removeAccountStorage(user.id, async (userID, limit) => {
+      const { data, error } = await admin.rpc("account_storage_objects_for_deletion", {
+        p_user_id: userID, p_limit: limit,
+      });
+      if (error) throw error;
+      if (!Array.isArray(data)) throw new Error("Invalid storage inventory.");
+      return data;
+    }, async (bucket, paths) => {
+      const { error } = await admin.storage.from(bucket).remove(paths);
+      if (error) throw error;
     });
-    return json({ error: "Unable to remove profile media before account deletion." }, 500);
+  } catch (error) {
+    console.error("ATHLTH account media cleanup failed.", {
+      userID: user.id,
+      message: error instanceof Error ? error.message : "Storage cleanup failed",
+    });
+    return json({ error: "Unable to remove account media. Please retry account deletion." }, 503);
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);

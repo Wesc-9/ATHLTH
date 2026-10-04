@@ -6,6 +6,8 @@ import WidgetKit
 enum ATHLTHSurfaceCoordinator {
     private static var lastWidgetReloadAt: Date?
     private static var lastSnapshotWriteAt: Date?
+    private static var accountSurfacesEnabled = false
+    private static var accountGeneration: UInt64 = 0
 
     static func publishSnapshot(
         health: HealthKitManager,
@@ -13,6 +15,11 @@ enum ATHLTHSurfaceCoordinator {
         goals: GoalStore,
         workout: WatchWorkoutLiveSnapshot?
     ) {
+        guard session.signedIn else {
+            clearAccountSurfaces()
+            return
+        }
+        accountSurfacesEnabled = true
         let next = nextWorkout(
             in: session.activePlan,
             referenceDate: Date()
@@ -112,11 +119,24 @@ enum ATHLTHSurfaceCoordinator {
     static func syncLiveActivity(
         with snapshot: WatchWorkoutLiveSnapshot?
     ) {
+        let generation = accountGeneration
         Task {
+            guard generation == accountGeneration else { return }
             await ATHLTHLiveActivityController.shared.sync(
-                with: snapshot
+                with: accountSurfacesEnabled ? snapshot : nil
             )
         }
+    }
+
+    static func clearAccountSurfaces() {
+        accountSurfacesEnabled = false
+        accountGeneration &+= 1
+        ATHLTHSurfaceSharedStore.save(.empty)
+        lastWidgetReloadAt = nil
+        lastSnapshotWriteAt = nil
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHHomeWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ATHLTHLockScreenWidget")
+        syncLiveActivity(with: nil)
     }
 
     private static func nextWorkout(
@@ -183,13 +203,15 @@ private final class ATHLTHLiveActivityController {
     func sync(
         with snapshot: WatchWorkoutLiveSnapshot?
     ) async {
+        guard let snapshot else {
+            await endExistingActivities()
+            lastPhase = nil
+            lastUpdateAt = nil
+            return
+        }
         guard ActivityAuthorizationInfo()
             .areActivitiesEnabled
         else {
-            return
-        }
-
-        guard let snapshot else {
             return
         }
 

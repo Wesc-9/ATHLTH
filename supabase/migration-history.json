@@ -1,0 +1,518 @@
+{
+  "project": "hnkybbzxffvyhzrstqdo",
+  "capturedAt": "2026-10-04",
+  "migrations": [
+    {
+      "file": "20260920083124_athlth_core_identity_foundation.sql",
+      "sha256": "7664999ad9a6c4f1cc4eca0948506c36133578a35ede946e192ffffc8a10a4ba"
+    },
+    {
+      "file": "20260920083158_lock_down_new_user_trigger_function.sql",
+      "sha256": "961b00deaea096b749224cab80be9207a4a8496761ea5c8b856d0ae93d7bc20a"
+    },
+    {
+      "file": "20260920084342_backend_onboarding_and_username_availability.sql",
+      "sha256": "f79ca0ba437db755797c497b3ee50a77c2e38ade6d244058bffbf31d765819f6"
+    },
+    {
+      "file": "20260920084424_username_availability_ignore_current_user.sql",
+      "sha256": "3917fb9b936adfa022f358a0d68a9321a3d50b45004786b1c62793b09bbc938c"
+    },
+    {
+      "file": "20260920093348_app_store_transaction_submission_inbox.sql",
+      "sha256": "4c8fdf0da6f146d794bfb8b8c7f84c84b9a865a298339a97ee6e26ff5faa5d57"
+    },
+    {
+      "file": "20260920093409_submit_app_store_transaction_rpc.sql",
+      "sha256": "1b9cd67bfd92ae443d7fa149061cb543280bfed36ff89fa44cf6905bce092080"
+    },
+    {
+      "file": "20260922183345_athlth_social_friends_challenges_foundation.sql",
+      "sha256": "c6775f4d37ec290840ef2d3ba2444d35de132dab9b4de5eb0397241eb4f35db6"
+    },
+    {
+      "file": "20260922185545_friends_social_challenges_foundation.sql",
+      "sha256": "0dff91aa3a58005313a7feb9916b8db19ed5e84c6306203f3666ae5220e20b35"
+    },
+    {
+      "file": "20260922194705_add_social_training_plans.sql",
+      "sha256": "30212db9f4fe75e0b72d915c63bc72ea8bb4f74262924becb2fa5f84c2740ce0"
+    },
+    {
+      "file": "20260922201621_social_group_workouts_and_activity_feed.sql",
+      "sha256": "09b08eb2ee789814ec8b01a99e0dcbffd96d5679938d42d8d0d9b585332b0cb8"
+    },
+    {
+      "file": "20260923105857_direct_messages_and_training_shares.sql",
+      "sha256": "c7adda87c342fb7dba3822b548b39f667abb3d89f1c58432caf01859141b3da3"
+    },
+    {
+      "file": "20260923110635_direct_message_privacy.sql",
+      "sha256": "59c66e957d9893713841f5be88cd9175fe034cc887ac4f163a5b1135253b8969"
+    },
+    {
+      "file": "20260923111158_direct_message_sender_index.sql",
+      "sha256": "e8f1df5054121ce7e45ff02b5f2609ef7b1c015cb09c0ea14f8cccee0040121c"
+    },
+    {
+      "file": "20260923115415_message_requests.sql",
+      "sha256": "62ab03ce0b9a8315298ef99d69b68780dc27aaf37f29306739133a4326f2087e"
+    },
+    {
+      "file": "20260923115900_fix_message_request_rls.sql",
+      "sha256": "d01bbd9e19241732a1dc7e017d0887265c6c59745d4868a76a963deca04ccba4"
+    },
+    {
+      "file": "20260923120117_message_request_requester_index.sql",
+      "sha256": "51d57c522a0d1b7bdf15d0c0d563cddd475d2cb8c4d01b938c416b5038d8388f"
+    },
+    {
+      "file": "20260923120252_message_request_profile_visibility.sql",
+      "sha256": "c56b491b24a77cf239c45a3c2d4ddb6e1937aa38401cab0afdea27f5ff221ad6"
+    },
+    {
+      "file": "20260923123650_profile_avatars.sql",
+      "sha256": "9d2ad8ff46fc4fbaf3d705781c35158ad7126efb3cd6cbafdf242b708d8b2ee1"
+    },
+    {
+      "file": "20260923123850_username_availability.sql",
+      "sha256": "1cb6ac532949498ea331a7ed9e821566897ec09db50d0a1f0972afe4a7a65e52"
+    },
+    {
+      "file": "20260923171945_privacy_first_social_and_rpc_hardening.sql",
+      "sha256": "7967f8162bd056f65d5f9ed5a86c6b44d52bc049b236ad1dfd9579354c56f9ee"
+    },
+    {
+      "file": "20260923172942_privacy_first_legacy_user_preferences.sql",
+      "sha256": "66ec22ec836561ff8f41fd199ce15df535a89ca19c09052717a7bbff58f8df95"
+    },
+    {
+      "file": "20260923174144_apple_sign_in_revocation_tokens.sql",
+      "sha256": "c330a348ba4d28abd3d885ff1e126a4202d433e4f10bd9d5615988f43458dc82"
+    },
+    {
+      "file": "20260923174543_apple_sign_in_tokens_service_policy.sql",
+      "sha256": "93b1884d4ef808e99b47c6a6d203aad7f6942f4863cb199a0562516fd1822a11"
+    },
+    {
+      "file": "20260923214748_community_public_events.sql",
+      "sha256": "6917b1634c007ce14e91b58411ba822ef0d6414970acff605e430c6879248c76"
+    },
+    {
+      "file": "20260923233944_profile_section_visibility_scopes.sql",
+      "sha256": "caa917dad45b9a4e0faf4d0bd427b8b14292a2983c97f514322c5d5ebeaa205e"
+    },
+    {
+      "file": "20260923234407_social_activity_visibility_scopes.sql",
+      "sha256": "711bb04737fd7f10b3272fa4ef04a6151acd5303c67645115ed9552dd17769ff"
+    },
+    {
+      "file": "20260923235825_apns_remote_push_pipeline.sql",
+      "sha256": "6b00e3657a52e9baa130c9aea4dbe5c905d768bd049471e1fb26aa772310b599"
+    },
+    {
+      "file": "20260924065101_training_focus_privacy_and_private_defaults.sql",
+      "sha256": "6d3e15d48019d964ff54fb255f79e6c827caaea7b340886e3e9027360b1c5174"
+    },
+    {
+      "file": "20260924192612_profile_follows_and_profile_gear.sql",
+      "sha256": "a24b53df4843eb417ce23afcecbd65c939863f6a71de3523b4287283e76aef40"
+    },
+    {
+      "file": "20260924193226_optimize_profile_follow_and_gear_rls.sql",
+      "sha256": "ef9bd6daa06f5ee74d2e897328b1f8b9b0b0f9d3c82e37435416aeeea687f4ba"
+    },
+    {
+      "file": "20260924204043_public_route_discovery.sql",
+      "sha256": "1ca539a396472844106605001c8724b0f1167a758dd046b46a466075ee4b5f6a"
+    },
+    {
+      "file": "20260924213155_profile_avatar_upsert_rls_and_10mb.sql",
+      "sha256": "f8395693d44c3c6f65d779ae1da191f120325b4e2c3f46669ca6fc0faaf4d630"
+    },
+    {
+      "file": "20260925000742_gear_v2_workout_usage.sql",
+      "sha256": "6f555a48c1459220d5600ac570eee5f3f5a74d4cd2c74f5c5cfd4bc442bbfe20"
+    },
+    {
+      "file": "20260925002654_gear_v2_gear_fk_index.sql",
+      "sha256": "8ec417b8b92f283aa509d5ee955ae3f5add157a698933b1c556876d7c26ab309"
+    },
+    {
+      "file": "20260925073436_community_groups_chat_events_challenges.sql",
+      "sha256": "5f0af5548cc29c85a490b2a220ee5ab38edef7adc2d67f7a5d55adabc349cbbf"
+    },
+    {
+      "file": "20260925073518_community_group_message_sender_name.sql",
+      "sha256": "300f63a8330f4b2e79a6ea084248dc7d30361d3938ea165724f7a60543c96db1"
+    },
+    {
+      "file": "20260926075808_route_attempts_and_route_visibility.sql",
+      "sha256": "ff09ae5f4f3cf2e4fdc50621aed00f33afa9354f51235478e329cbd8faeff435"
+    },
+    {
+      "file": "20260926075826_route_attempt_leaderboard_view.sql",
+      "sha256": "e77e9da551bc4d4bec14053334d7450b75ea78d3be54dbe77fa7d1242215d31e"
+    },
+    {
+      "file": "20260926080747_index_community_routes_owner.sql",
+      "sha256": "c96584a129cef39c759bd5bc514588ec8be65e84b2c15f3b4b4b3f59fa858bcf"
+    },
+    {
+      "file": "20260926151426_search_discoverable_default_on.sql",
+      "sha256": "30a6126baf324c4926bdec6c037743384814e9ecc0205bd9ea5409736f855f8d"
+    },
+    {
+      "file": "20260926153458_community_groups_optional_location.sql",
+      "sha256": "26f4de147451154c80d35b42d2fb1c36db7ccc47d20c4f52778b129363af8d97"
+    },
+    {
+      "file": "20260926154347_community_group_identity_announcements_activity.sql",
+      "sha256": "d0595231ea048e472647fb039a5c14e641d4a311dd665a12234ba60d2d0f5520"
+    },
+    {
+      "file": "20260926173220_community_group_v2_roles.sql",
+      "sha256": "eea336d1150fb00d7cc661528c4404d01a0251213867f142e20891fa50e804bb"
+    },
+    {
+      "file": "20260926174653_community_group_v3_mentions_rsvp.sql",
+      "sha256": "97773dcd9b38b57b832d54dc5f2c416908949cef63e85e6addd33d0a9b142655"
+    },
+    {
+      "file": "20260926175216_group_v3_role_semantics.sql",
+      "sha256": "22926b2c6056e7f1434510c94e125edb85944780e28aecccf627dabbf1702034"
+    },
+    {
+      "file": "20260926175514_contributor_update_only.sql",
+      "sha256": "c4f89c7cb0ecdef668464a715cbc9fdca4a7865dbc2fd903b5029fdf31d3a02a"
+    },
+    {
+      "file": "20260926175628_group_manager_remove_members.sql",
+      "sha256": "ef64653d5eb5b6dec5e7b7fb2fd1fa82754c652cf05a162d71ae526904ec603e"
+    },
+    {
+      "file": "20260926175957_group_v3_security_indexes.sql",
+      "sha256": "9718f340b1f1564fc2736999242779e20416cc79e08cfd3a3225c0d6cf89b2cc"
+    },
+    {
+      "file": "20260926180101_preserve_message_requests_with_mentions.sql",
+      "sha256": "51062f5a45f48eb6048249e64ca115401af10f0195cd787ddf438bedf8973115"
+    },
+    {
+      "file": "20260926180412_align_group_content_permissions.sql",
+      "sha256": "ec6f9c0f490a689987b04fe4eae47c7a4838990cdd6b6841ff33d785b5c3c5ab"
+    },
+    {
+      "file": "20260926182025_contributor_publishing_powers.sql",
+      "sha256": "48643eae7d7a8ca92b990f6eca90fce9e0ae14b27a6f096f68a64d4d81e58467"
+    },
+    {
+      "file": "20260926184142_group_notifications_and_content_images.sql",
+      "sha256": "9445f0628ffe840212e32bc07f13e73cc91dd6e3ea1a823e8b7f417764c22f56"
+    },
+    {
+      "file": "20260926192906_advanced_group_events_challenges.sql",
+      "sha256": "621c9bac9732af39d71c3af5c23cffd38b5bf1dac34d3b1ecb59ef816397c1b0"
+    },
+    {
+      "file": "20260926193133_advanced_group_create_apis.sql",
+      "sha256": "40e77fb568aef9a6f6763d51feb5114cbd9267e6f651eb54ee1b09ff79b2d9be"
+    },
+    {
+      "file": "20260926193546_advanced_group_update_apis.sql",
+      "sha256": "026fa2e9c4b0433641096f92f5cc4f52bdea65782a9f57e2ced44c1a42eb6092"
+    },
+    {
+      "file": "20260926194656_lock_group_challenge_window_after_start.sql",
+      "sha256": "d3e8899dbc54c4da211a9e237861b5e76e9e0948bfe3e30df007bf370f9bcb81"
+    },
+    {
+      "file": "20260926195007_group_cohosts_manage_content.sql",
+      "sha256": "7a8692c14ea5c511123c2a49c4ca482f524cd167c1498e62877e9814eb26acc5"
+    },
+    {
+      "file": "20260926195123_protect_group_content_drafts.sql",
+      "sha256": "e1a1a3856560554a0d6b431db3950e23bafd8b1b6af103b4ccd06784f527761a"
+    },
+    {
+      "file": "20260926195359_group_cohosts_update_assigned_content.sql",
+      "sha256": "ae0924de72d68d1a3980ef5c993ca0fa3357cb69f5e1b88e652752a914857127"
+    },
+    {
+      "file": "20260926195707_atomic_group_content_hosts.sql",
+      "sha256": "60f8b61274ea973d262e8a14373d1c5989662826323f9a35af6d4fc9bfe148a4"
+    },
+    {
+      "file": "20260926195840_group_content_comment_mentions.sql",
+      "sha256": "30f0617376f1892d324536f0eab64c31877d823455f73fbeca1d0bc3cc8b934d"
+    },
+    {
+      "file": "20260926200050_group_strength_metrics_manual_results.sql",
+      "sha256": "03e7545a32509c463cad1a685a2ef670526a445199b1a8bece0517265fce91e9"
+    },
+    {
+      "file": "20260926230922_official_weekly_running_challenges.sql",
+      "sha256": "3a4d4dfbe69af62a321c1170d8db8ada90e085be9c50fd7bd93624978ff3b234"
+    },
+    {
+      "file": "20260926232611_weekly_challenge_completion_tracking.sql",
+      "sha256": "1866ff8948eebcd5b61790c3432cc5cd0eb226c133c51021ad724b8abb21e382"
+    },
+    {
+      "file": "20260927002112_gear_catalog_and_profile_catalog_link.sql",
+      "sha256": "cc186e16aee9d7b6f6608dcd578a53a2385c7228b1d6d48bc2913ffe7aa52076"
+    },
+    {
+      "file": "20260927010803_community_event_attendance_status.sql",
+      "sha256": "3cd82faafb42bac530f2dbb522cd6f12a71753cc6980571d5826bef4d0989fde"
+    },
+    {
+      "file": "20260927014609_public_profile_default.sql",
+      "sha256": "b00f887b364ad08659087d5b3883b21df5fe2f2a6a6ed5ce22c80b42a1d29fd4"
+    },
+    {
+      "file": "20260927022650_fix_group_content_policy_helper_execute.sql",
+      "sha256": "0e5b0f25b42c2fbe819bcc507ae256842efd033be270d3dd094892cd7e05ea00"
+    },
+    {
+      "file": "20260927023559_club_posts_reactions_and_leaderboard.sql",
+      "sha256": "21ebcd705833afe997d9fcd35fc714636fa38418fcb9749870b4750c2770182c"
+    },
+    {
+      "file": "20260927024212_fix_club_leaderboard_aggregate_aliases.sql",
+      "sha256": "26ee87d91e2431b6823bc0cd4152d8dccb23a759e3db5a5d1e831c82338e98b6"
+    },
+    {
+      "file": "20260927024821_exclude_manual_results_from_club_workouts.sql",
+      "sha256": "9942b7f5a76b4906f12b93f5a795f59ff6d9ff06584580b3172e163216fe5fa5"
+    },
+    {
+      "file": "20260927072302_ai_provider_quota_snapshot.sql",
+      "sha256": "8d4f9a9a4d61b86c50080950d116b563598a5cdb654ff7a692ba25cd88eaae88"
+    },
+    {
+      "file": "20260927072700_align_profile_section_privacy.sql",
+      "sha256": "038353d759e82fbaac68462a9ee948275556d36c9944c2942bddf71e88e3b355"
+    },
+    {
+      "file": "20260927072706_route_catalog_search.sql",
+      "sha256": "438994a2061cdfb82cdd55cd0682ebd62e754a100290f1e2e60c298b941db99d"
+    },
+    {
+      "file": "20260927082441_official_weekly_challenge_creator_on_delete.sql",
+      "sha256": "2e8e10fc57ce73c68e36644d2987a5f8402952d1524e621d4cdd45af91b9cd2f"
+    },
+    {
+      "file": "20260927115441_ghost_race_friend_challenges.sql",
+      "sha256": "d0042cc53ce53a36451fa2f48a5b4b9a88c6d06c96b0932dae5bce5576052d8f"
+    },
+    {
+      "file": "20260927120147_harden_ghost_race_friend_privacy.sql",
+      "sha256": "f69199534ec04634de5af4b16278a5af23f9f500df374634df1d7de60e4967a1"
+    },
+    {
+      "file": "20260927183621_fix_profile_avatar_storage_policy_helper_execute.sql",
+      "sha256": "1081e96209017e9e7175f5c7b436e328dd8cf816a7200a3929be9f968f272349"
+    },
+    {
+      "file": "20260927192335_official_weekly_challenge_cover_storage.sql",
+      "sha256": "54354cc8323b9cc32e12bdcef1f4ed765329b26a21661d1de59be98f87a94ec2"
+    },
+    {
+      "file": "20260927193601_switch_weekly_challenge_covers_to_groq_recipe.sql",
+      "sha256": "fef2ad52ca1d392bd47a8a31913fe71dc31721f7d0a8d5923f20acbd044764e9"
+    },
+    {
+      "file": "20260927200421_public_profile_follow_requests.sql",
+      "sha256": "b6198a411b86b32b6537e4e2715817b7dfb674128fe28e3458a2bce93c16bca3"
+    },
+    {
+      "file": "20260927201117_private_profiles_only_follow_requests.sql",
+      "sha256": "a2ca6d0b86354056057559e2292d223c1a00f8ba017595b15e7cd3fc27991837"
+    },
+    {
+      "file": "20260927205357_account_training_backups.sql",
+      "sha256": "757adef59e4b4dbf0615998dd2633c904979702f266293ead3f643c2fc6010ab"
+    },
+    {
+      "file": "20260927212416_followers_activity_visibility.sql",
+      "sha256": "a1fc954b27e2b8dfd0df0b7e6fade13720b78da6569266e7c117aefeddfb32fd"
+    },
+    {
+      "file": "20260928014116_training_backup_consent.sql",
+      "sha256": "d71c0dfead1cebba7dfb0f5c079599a9de88771abe6508490fad87e03e26cdb7"
+    },
+    {
+      "file": "20260928200224_training_plan_library_and_favorites.sql",
+      "sha256": "ceb877b3d54d6d7c1d48aa4a00da6d4f608c99de7af7c5b68adc5e5b0fe4fd7e"
+    },
+    {
+      "file": "20260928201523_follow_only_social_and_mutual_dm.sql",
+      "sha256": "845740d6b3fc616641037217b6204ee5fa8bcf830e9d661b2409c85d9a0dc295"
+    },
+    {
+      "file": "20260928203915_profile_follow_dm_privacy_hardening.sql",
+      "sha256": "b0e23babf5aa86500a9d6da5168e16d1bc8de75d630676add458dc154163fbaf"
+    },
+    {
+      "file": "20260928204714_training_plan_catalog_v2.sql",
+      "sha256": "46c406508e956c96b37dbf2efb1919b252a421a3fe1e221ad11714795210dc11"
+    },
+    {
+      "file": "20260928204716_grant_social_section_rls_helper.sql",
+      "sha256": "f2c82d1aaaf2cd89ebef8997e80d25fbe2a43b4458bd615dab93946114b837f5"
+    },
+    {
+      "file": "20260928204737_grant_follow_rls_helpers.sql",
+      "sha256": "2841086bc4814f94a0fc45b067b4b1a26823600b73b8fdffaa425462837afc85"
+    },
+    {
+      "file": "20260928205133_allow_follow_inbox_event_kinds.sql",
+      "sha256": "7fe5bf0c0680bde6aed4e4b08da73385a75ef48b08e4cf8c373303c86eca48ed"
+    },
+    {
+      "file": "20260929080838_workout_hero_image_assets.sql",
+      "sha256": "ae25bc57974133188e72e3b86b576df3589288a6aee4c2b5f479c657fe1da656"
+    },
+    {
+      "file": "20260929084314_activity_center_visual_feature_flag.sql",
+      "sha256": "c35057a2f9b0a616254c4ca6e7ef5005b81a0dbc618166c7a7e9d1e79c193ed1"
+    },
+    {
+      "file": "20260929091814_public_trail_mode.sql",
+      "sha256": "021e60388a78510227ee9ba45876a714af190d42f9f474167c0f2cbada698777"
+    },
+    {
+      "file": "20260929093534_public_trail_cache_refresh_state.sql",
+      "sha256": "6afa3c17d23ed90c6f3c89950f3dda7b1f2c14a30a27835e2398cf4e49cc5338"
+    },
+    {
+      "file": "20260929094650_workout_place_checkins.sql",
+      "sha256": "f4ccc18d1b6fa359d8e60fbc7e0f62eb91020051bb2209064cb12f78a024d5e0"
+    },
+    {
+      "file": "20260929105357_realtime_presence_live_workouts.sql",
+      "sha256": "ce761fd35555ebfca513a72245f868c4c6effc93338a418906e68808266e5bcf"
+    },
+    {
+      "file": "20260929105446_harden_live_workout_cleanup.sql",
+      "sha256": "045688f3c138804efb7df9f3c6a730c469bed95d2da9f9d627fda1da55ab4e3b"
+    },
+    {
+      "file": "20260929120356_live_workout_hr_and_expiry_cleanup.sql",
+      "sha256": "c7c17b17bb1ebb20574fbcfa2aa3d05d202b7336e0e715be0e265dee73f71b8e"
+    },
+    {
+      "file": "20260929120453_harden_live_cleanup_invoker.sql",
+      "sha256": "877ee55224703415f1b3cc683b1ea96b6edc3e370ac0d34b76c4b41746cf3083"
+    },
+    {
+      "file": "20260929121506_online_presence_explicit_opt_in_default.sql",
+      "sha256": "230185e1212a3ec6d8cadfa561df5323544a8a89444f5662538cc3e24430cc0a"
+    },
+    {
+      "file": "20260929125857_restrict_realtime_table_grants.sql",
+      "sha256": "047008f992eb021cbeb2fbd1bba98c537cdd34af6136f53cbbb04651fc5cf1aa"
+    },
+    {
+      "file": "20260929162414_add_missing_fk_indexes_and_harden_weekly_shift.sql",
+      "sha256": "e910fe28e2793fbf6ba0c0185a96ba834d4975ab91b49f5e2e45b7d2902c09c9"
+    },
+    {
+      "file": "20260929215921_public_trail_viewport_metadata.sql",
+      "sha256": "ecf0303ce9b91cc71a8a8250c472f6d9ac29c65c9bf640bb816c4eb2af962851"
+    },
+    {
+      "file": "20260929220703_public_trail_bounds_search.sql",
+      "sha256": "e4cbe724cd9bfac30c496246f5012e4d8abc847c87da03df6491ddf2403dbdeb"
+    },
+    {
+      "file": "20260930104713_fix_dm_rpc_helper_execute.sql",
+      "sha256": "72881f785b8297c645cf03a5c7a1ce3c0ef62510efb6f95862bbff59c41edfc4"
+    },
+    {
+      "file": "20260930203132_fix_public_profile_follow_rls.sql",
+      "sha256": "fd6bd48dc1e050d15de84f9b6b1ac0e5a73eee8af9d80112277ace1deb0a5e86"
+    },
+    {
+      "file": "20260930205636_unified_workout_and_hyrox_catalog.sql",
+      "sha256": "273bb7129a5e7a7106a4b10d5b0a0e634c87918aa79ffe6c4a31eb405588c090"
+    },
+    {
+      "file": "20260930220732_remove_legacy_friendships.sql",
+      "sha256": "0ab1a756990d48efb6b56542231b7228484f72af738ddfab6eb6b2590faa1ccc"
+    },
+    {
+      "file": "20260930223123_social_comments_mutes_and_reactions.sql",
+      "sha256": "b147f2af71c4bd1b141d819115f10131c42614e407c3987844c00a5eb0f453f1"
+    },
+    {
+      "file": "20261001091325_club_visual_identity_and_featured_challenge.sql",
+      "sha256": "bb962b2af27be331b59520dbf912daa496541e2ec8b8e31ea3e3ba6465df7991"
+    },
+    {
+      "file": "20261001124845_allow_kartverket_public_trails.sql",
+      "sha256": "a07047f08a1cd1723677d3e708ce99afefb09c61fb1b9eedb81698e83850a79b"
+    },
+    {
+      "file": "20261001160216_ghost_live_session_route_context.sql",
+      "sha256": "6235b0846133203227dcf0a625fb9f68bfa676a406331747eb3af0a552f54b05"
+    },
+    {
+      "file": "20261001215248_workout_media_profile_moments.sql",
+      "sha256": "c5e760a87e97ae0108847ffb24f81a3719b8b40c48577efc909f15d659afbe1d"
+    },
+    {
+      "file": "20261001215312_optimize_workout_media_rls.sql",
+      "sha256": "bfddf6287f5ec8397fdf97335bf13736a0d72f89228b8d342bbf75544bed2d7e"
+    },
+    {
+      "file": "20261002083355_train_together_workout_snapshot.sql",
+      "sha256": "c94cf982ee17d2c7a08f18629c10ced04d5d947e71b1c8a5a4ad59fa26edc4c8"
+    },
+    {
+      "file": "20261002091025_trophy_cloud_state_hardening.sql",
+      "sha256": "d7a313e06eb101b946770db1b745a68bca985ed455199b097a6f6df33b12af27"
+    },
+    {
+      "file": "20261002092324_trophy_cloud_state_deny_direct_access.sql",
+      "sha256": "6f05e4973f7a354d7e61f45dea87a79febc2d14057f4067e3b8b7a4559aad10b"
+    },
+    {
+      "file": "20261002095657_freeze_trophy_engravings_once_generated.sql",
+      "sha256": "88980ccefc4e6801fd8f8a5eebf5387224be7b78f1742265a94e47771bc7659a"
+    },
+    {
+      "file": "20261003175856_fix_community_group_image_upsert_select.sql",
+      "sha256": "465af0e1e95bf8a06cad90ec2949b6b7db0865a5736d3c6afc3a3e3397e269f9"
+    },
+    {
+      "file": "20261003220316_fix_social_challenge_upsert_select.sql",
+      "sha256": "80497dbea9a1d29a649b6ab9a8e4761c33f2ca7f36635adae91c5f51dbd05d48"
+    },
+    {
+      "file": "20261003231506_v159_release_hardening.sql",
+      "sha256": "11cd816925ec92eb24fcbfe59030c9b1975583c122310556f4ca623c9b689e45"
+    },
+    {
+      "file": "20261003232121_train_together_ready_lobby.sql",
+      "sha256": "12ee92a2a01cc7a49c194b7d9601e3652989551079589de357d0fca1c0172281"
+    },
+    {
+      "file": "20261003232124_notification_language_per_device.sql",
+      "sha256": "7a133bdcf53f07f2ab1b96d672a180648c24f5ed5dc8bdf945cbde12d08d5d09"
+    },
+    {
+      "file": "20261003232750_event_cover_storage_select.sql",
+      "sha256": "7b4d3ee727d39af31f2b895294880860c163b3341cb237456891f5c7a62425a5"
+    },
+    {
+      "file": "20261003232937_explicit_internal_only_rls.sql",
+      "sha256": "fc577e7431697a9c3cc09cd691f55f19c935f693457f6798d0bfad635d40729e"
+    },
+    {
+      "file": "20261004081956_remote_profile_workout_media.sql",
+      "sha256": "038c6dfeda2829af9321153432c1ab767c9c2deca6df848e65e540268437296c"
+    }
+  ]
+}

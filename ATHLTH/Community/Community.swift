@@ -563,7 +563,7 @@ final class SupabaseCommunityService {
                 storagePath,
                 data: jpegData,
                 options: FileOptions(
-                    cacheControl: "31536000",
+                    cacheControl: "60",
                     contentType: "image/jpeg",
                     upsert: true
                 )
@@ -992,7 +992,7 @@ private struct CommunityAvatar: View {
         Group {
             if let rawURL = profile.avatarURL,
                let url = URL(string: rawURL) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -1308,7 +1308,7 @@ struct CommunityEventDetailView: View {
                 item.event.coverImageURL,
            let url =
                 URL(string: rawURL) {
-            AsyncImage(url: url) { phase in
+            ATHLTHStorageImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

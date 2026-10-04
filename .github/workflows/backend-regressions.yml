@@ -1,0 +1,42 @@
+name: ATHLTH 1.6.0 backend regressions
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [release/v1.6.0]
+  push:
+    branches: [release/v1.6.0]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.81.3
+      - name: Validate cross-component contracts
+        run: python3 scripts/verify_v160_contracts.py
+      - name: Test account media cleanup
+        run: node supabase/functions/_shared/account-storage-cleanup.test.ts
+      - name: Typecheck changed Edge Functions
+        run: deno check supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts
+      - name: Start disposable Supabase database
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Replay migrations and verify privacy rules
+        run: |
+          supabase db reset --local --no-seed
+          docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/v160_audit.sql
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

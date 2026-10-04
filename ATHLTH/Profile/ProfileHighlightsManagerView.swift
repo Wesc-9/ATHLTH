@@ -427,7 +427,7 @@ struct ProfileHighlightsManagerView: View {
             HStack(
                 spacing: 12
             ) {
-                AsyncImage(
+                ATHLTHStorageImage(
                     url:
                         URL(
                             string:

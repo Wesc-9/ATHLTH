@@ -1,5 +1,3 @@
--- Preserve legacy inbox event kinds while allowing the follow-only product
--- terminology used by new profile follow requests.
 alter table public.social_inbox_events
   drop constraint if exists social_inbox_events_kind_check;
 

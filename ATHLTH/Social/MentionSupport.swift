@@ -244,7 +244,7 @@ struct ATHLTHMentionSuggestionList: View {
                 )
         } else if let value = suggestion.avatarURL,
                   let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
+            ATHLTHStorageImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

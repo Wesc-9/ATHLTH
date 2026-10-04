@@ -6246,7 +6246,7 @@ struct CommunityGroupsView: View {
                 group.imageURL,
            let url =
                 URL(string: value) {
-            AsyncImage(url: url) {
+            ATHLTHStorageImage(url: url) {
                 phase in
 
                 switch phase {
@@ -7072,7 +7072,7 @@ struct CommunityGroupDetailView: View {
         Group {
             if let value = currentGroup.imageURL,
                let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -13557,7 +13557,7 @@ struct CommunityGroupSettingsView: View {
                     .scaledToFill()
             } else if let value = currentGroup.imageURL,
                       let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -13694,7 +13694,7 @@ private struct CommunityGroupProfileAvatar: View {
         Group {
             if let value = profile.avatarURL,
                let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image

@@ -1,8 +1,3 @@
--- Fix Club content RLS helper execution.
--- The event/challenge SELECT and UPDATE policies call this helper as the
--- authenticated role. Keep the existing signature stable, bind p_user_id to
--- auth.uid() to prevent caller spoofing, and allow authenticated policy use.
-
 create or replace function private.can_manage_community_group_content(
   p_group_id uuid,
   p_content_type text,

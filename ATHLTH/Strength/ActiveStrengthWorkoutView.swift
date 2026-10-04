@@ -1145,7 +1145,7 @@ struct ActiveStrengthWorkoutView: View {
         if let imageURL =
                 exercise.exercise
                     .imageURL {
-            AsyncImage(
+            ATHLTHStorageImage(
                 url: imageURL
             ) { phase in
                 switch phase {

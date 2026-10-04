@@ -1,5 +1,3 @@
--- Per-category social visibility scopes for goals and PR activity.
-
 alter table public.profile_social_settings
   add column if not exists goals_visibility text not null default 'private'
     check (goals_visibility in ('private','friends','public')),

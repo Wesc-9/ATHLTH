@@ -2816,7 +2816,7 @@ struct FriendProfileView: View {
                     ForEach(
                         Array(media.prefix(4))
                     ) { item in
-                    AsyncImage(
+                    ATHLTHStorageImage(
                         url:
                             URL(
                                 string:
@@ -3987,7 +3987,7 @@ struct SocialAvatar: View {
         Group {
             if let avatarURL = profile.avatarURL,
                let url = URL(string: avatarURL) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image

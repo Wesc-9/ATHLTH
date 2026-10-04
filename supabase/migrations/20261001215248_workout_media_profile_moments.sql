@@ -1,7 +1,3 @@
--- Workout photos attached to completed ATHLTH sessions.
--- The first version is intentionally owner-scoped; public/friend profile
--- visibility can be widened later through the social privacy layer.
-
 create table if not exists public.workout_media (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users(id) on delete cascade,

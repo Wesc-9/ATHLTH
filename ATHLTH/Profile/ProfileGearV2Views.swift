@@ -443,7 +443,7 @@ struct WorkoutGearSelectionCard: View {
 
             if let imageURL = item.imageURL,
                let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -606,7 +606,7 @@ struct ProfileGearDetailView: View {
 
                     if let value = currentItem.imageURL,
                        let url = URL(string: value) {
-                        AsyncImage(url: url) { phase in
+                        ATHLTHStorageImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
                                 image

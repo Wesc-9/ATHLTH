@@ -1,6 +1,3 @@
--- ATHLTH Friends, Social and Challenges foundation.
--- Applied to Supabase migration history as 20260922183345.
-
 create schema if not exists private;
 
 create table if not exists public.profile_social_settings (
@@ -33,7 +30,8 @@ create table if not exists public.social_profile_cards (
 alter table public.social_profile_cards add column if not exists bio text;
 
 create unique index if not exists social_profile_cards_username_idx
-  on public.social_profile_cards(username) where username is not null;
+  on public.social_profile_cards(username)
+  where username is not null;
 
 create table if not exists public.friend_requests (
   id uuid primary key default gen_random_uuid(),
@@ -49,8 +47,10 @@ create table if not exists public.friend_requests (
 create unique index if not exists friend_requests_one_pending_pair_idx
   on public.friend_requests (least(sender_id, recipient_id), greatest(sender_id, recipient_id))
   where status = 'pending';
-create index if not exists friend_requests_sender_idx on public.friend_requests(sender_id, status, created_at desc);
-create index if not exists friend_requests_recipient_idx on public.friend_requests(recipient_id, status, created_at desc);
+create index if not exists friend_requests_sender_idx
+  on public.friend_requests(sender_id, status, created_at desc);
+create index if not exists friend_requests_recipient_idx
+  on public.friend_requests(recipient_id, status, created_at desc);
 
 create table if not exists public.friendships (
   id uuid primary key default gen_random_uuid(),
@@ -133,10 +133,13 @@ create table if not exists public.social_activities (
   created_at timestamptz not null default now()
 );
 alter table public.social_activities add column if not exists event_key text;
-create index if not exists social_activities_actor_created_idx on public.social_activities(actor_id, created_at desc);
-create index if not exists social_activities_created_idx on public.social_activities(created_at desc);
+create index if not exists social_activities_actor_created_idx
+  on public.social_activities(actor_id, created_at desc);
+create index if not exists social_activities_created_idx
+  on public.social_activities(created_at desc);
 create unique index if not exists social_activities_actor_event_key_idx
-  on public.social_activities(actor_id, event_key) where event_key is not null;
+  on public.social_activities(actor_id, event_key)
+  where event_key is not null;
 
 create table if not exists public.social_activity_reactions (
   id uuid primary key default gen_random_uuid(),
@@ -205,9 +208,12 @@ create table if not exists public.social_challenge_attempts (
   is_eligible boolean not null default true,
   ineligibility_reason text
 );
-create index if not exists social_challenge_attempts_challenge_idx on public.social_challenge_attempts(challenge_id, submitted_at desc);
-create index if not exists social_challenge_attempts_user_idx on public.social_challenge_attempts(user_id, submitted_at desc);
-create index if not exists social_challenge_attempts_participant_idx on public.social_challenge_attempts(participant_id);
+create index if not exists social_challenge_attempts_challenge_idx
+  on public.social_challenge_attempts(challenge_id, submitted_at desc);
+create index if not exists social_challenge_attempts_user_idx
+  on public.social_challenge_attempts(user_id, submitted_at desc);
+create index if not exists social_challenge_attempts_participant_idx
+  on public.social_challenge_attempts(participant_id);
 create unique index if not exists social_challenge_attempts_source_idx
   on public.social_challenge_attempts(challenge_id, user_id, source_workout_id)
   where source_workout_id is not null;
@@ -222,8 +228,10 @@ create table if not exists public.social_challenge_checkins (
   verified_near_meetup boolean not null default false,
   unique (challenge_id, participant_id)
 );
-create index if not exists social_challenge_checkins_participant_idx on public.social_challenge_checkins(participant_id);
-create index if not exists social_challenge_checkins_user_idx on public.social_challenge_checkins(user_id);
+create index if not exists social_challenge_checkins_participant_idx
+  on public.social_challenge_checkins(participant_id);
+create index if not exists social_challenge_checkins_user_idx
+  on public.social_challenge_checkins(user_id);
 
 create table if not exists public.social_inbox_events (
   id uuid primary key default gen_random_uuid(),
@@ -236,10 +244,13 @@ create table if not exists public.social_inbox_events (
   created_at timestamptz not null default now(),
   read_at timestamptz
 );
-create index if not exists social_inbox_events_recipient_idx on public.social_inbox_events(recipient_id, read_at, created_at desc);
+create index if not exists social_inbox_events_recipient_idx
+  on public.social_inbox_events(recipient_id, read_at, created_at desc);
 
 insert into public.profile_social_settings (user_id, profile_visibility, share_training_presence)
-select p.id, coalesce(up.profile_visibility, 'friends'), coalesce(up.share_training_presence, true)
+select p.id,
+       coalesce(up.profile_visibility, 'friends'),
+       coalesce(up.share_training_presence, true)
 from public.profiles p
 left join public.user_preferences up on up.user_id = p.id
 on conflict (user_id) do nothing;
@@ -265,9 +276,13 @@ begin
   values (new.id)
   on conflict (user_id) do nothing;
 
-  insert into public.social_profile_cards (user_id, username, display_name, bio, avatar_url, created_at, updated_at)
-  values (new.id, new.username, new.display_name, new.bio, new.avatar_url,
-          coalesce(new.created_at, now()), coalesce(new.updated_at, now()))
+  insert into public.social_profile_cards (
+    user_id, username, display_name, bio, avatar_url, created_at, updated_at
+  )
+  values (
+    new.id, new.username, new.display_name, new.bio, new.avatar_url,
+    coalesce(new.created_at, now()), coalesce(new.updated_at, now())
+  )
   on conflict (user_id) do update
   set username = excluded.username,
       display_name = excluded.display_name,
@@ -306,9 +321,13 @@ returns boolean language sql stable security definer
 set search_path = pg_catalog, public, private
 as $$
   select (select auth.uid()) = owner_id
-    or ((select auth.uid()) is not null
-        and not private.is_blocked(owner_id)
-        and coalesce((select s.discoverable from public.profile_social_settings s where s.user_id = owner_id), false));
+    or (
+      (select auth.uid()) is not null
+      and not private.is_blocked(owner_id)
+      and coalesce((
+        select s.discoverable from public.profile_social_settings s where s.user_id = owner_id
+      ), false)
+    );
 $$;
 
 create or replace function private.can_view_social_profile(owner_id uuid)
@@ -320,11 +339,15 @@ as $$
       (select auth.uid()) is not null
       and not private.is_blocked(owner_id)
       and (
-        coalesce((select s.profile_visibility = 'public'
-                  from public.profile_social_settings s where s.user_id = owner_id), false)
+        coalesce((
+          select s.profile_visibility = 'public'
+          from public.profile_social_settings s where s.user_id = owner_id
+        ), false)
         or (
-          coalesce((select s.profile_visibility = 'friends'
-                    from public.profile_social_settings s where s.user_id = owner_id), false)
+          coalesce((
+            select s.profile_visibility = 'friends'
+            from public.profile_social_settings s where s.user_id = owner_id
+          ), false)
           and private.are_friends(owner_id)
         )
       )
@@ -423,13 +446,17 @@ as $$
     or (
       not private.is_blocked(owner_id)
       and (
-        coalesce((select s.discoverable from public.profile_social_settings s where s.user_id = owner_id), false)
+        coalesce((
+          select s.discoverable from public.profile_social_settings s where s.user_id = owner_id
+        ), false)
         or private.are_friends(owner_id)
         or exists (
           select 1 from public.friend_requests fr
-          where ((fr.sender_id = (select auth.uid()) and fr.recipient_id = owner_id)
-              or (fr.recipient_id = (select auth.uid()) and fr.sender_id = owner_id))
-            and fr.status = 'pending'
+          where (
+            (fr.sender_id = (select auth.uid()) and fr.recipient_id = owner_id)
+            or (fr.recipient_id = (select auth.uid()) and fr.sender_id = owner_id)
+          )
+          and fr.status = 'pending'
         )
         or exists (
           select 1
@@ -526,8 +553,7 @@ grant select, insert, update on public.social_challenge_checkins to authenticate
 grant select, update, delete on public.social_inbox_events to authenticated;
 
 drop policy if exists social_settings_select_own on public.profile_social_settings;
-create policy social_settings_select_own on public.profile_social_settings for select to authenticated
-using ((select auth.uid()) = user_id);
+create policy social_settings_select_own on public.profile_social_settings for select to authenticated using ((select auth.uid()) = user_id);
 drop policy if exists social_settings_update_own on public.profile_social_settings;
 create policy social_settings_update_own on public.profile_social_settings for update to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -570,8 +596,7 @@ drop policy if exists social_performance_select_allowed on public.social_perform
 create policy social_performance_select_allowed on public.social_performance_stats for select to authenticated
 using (private.can_view_social_section(user_id, 'performance'));
 drop policy if exists social_performance_insert_own on public.social_performance_stats;
-create policy social_performance_insert_own on public.social_performance_stats for insert to authenticated
-with check ((select auth.uid()) = user_id);
+create policy social_performance_insert_own on public.social_performance_stats for insert to authenticated with check ((select auth.uid()) = user_id);
 drop policy if exists social_performance_update_own on public.social_performance_stats;
 create policy social_performance_update_own on public.social_performance_stats for update to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -580,8 +605,7 @@ drop policy if exists social_trophies_select_allowed on public.social_trophy_sho
 create policy social_trophies_select_allowed on public.social_trophy_showcases for select to authenticated
 using (private.can_view_social_section(user_id, 'trophies'));
 drop policy if exists social_trophies_insert_own on public.social_trophy_showcases;
-create policy social_trophies_insert_own on public.social_trophy_showcases for insert to authenticated
-with check ((select auth.uid()) = user_id);
+create policy social_trophies_insert_own on public.social_trophy_showcases for insert to authenticated with check ((select auth.uid()) = user_id);
 drop policy if exists social_trophies_update_own on public.social_trophy_showcases;
 create policy social_trophies_update_own on public.social_trophy_showcases for update to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -590,8 +614,7 @@ drop policy if exists social_presence_select_allowed on public.social_presence;
 create policy social_presence_select_allowed on public.social_presence for select to authenticated
 using (private.can_view_social_section(user_id, 'presence'));
 drop policy if exists social_presence_insert_own on public.social_presence;
-create policy social_presence_insert_own on public.social_presence for insert to authenticated
-with check ((select auth.uid()) = user_id);
+create policy social_presence_insert_own on public.social_presence for insert to authenticated with check ((select auth.uid()) = user_id);
 drop policy if exists social_presence_update_own on public.social_presence;
 create policy social_presence_update_own on public.social_presence for update to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -600,40 +623,31 @@ drop policy if exists social_activities_select_allowed on public.social_activiti
 create policy social_activities_select_allowed on public.social_activities for select to authenticated
 using (private.can_view_activity(actor_id, visibility));
 drop policy if exists social_activities_insert_own on public.social_activities;
-create policy social_activities_insert_own on public.social_activities for insert to authenticated
-with check ((select auth.uid()) = actor_id);
+create policy social_activities_insert_own on public.social_activities for insert to authenticated with check ((select auth.uid()) = actor_id);
 drop policy if exists social_activities_update_own on public.social_activities;
 create policy social_activities_update_own on public.social_activities for update to authenticated
 using ((select auth.uid()) = actor_id) with check ((select auth.uid()) = actor_id);
 drop policy if exists social_activities_delete_own on public.social_activities;
-create policy social_activities_delete_own on public.social_activities for delete to authenticated
-using ((select auth.uid()) = actor_id);
+create policy social_activities_delete_own on public.social_activities for delete to authenticated using ((select auth.uid()) = actor_id);
 
 drop policy if exists social_reactions_select_visible on public.social_activity_reactions;
 create policy social_reactions_select_visible on public.social_activity_reactions for select to authenticated
-using (exists (
-  select 1 from public.social_activities a
-  where a.id = activity_id and private.can_view_activity(a.actor_id, a.visibility)
-));
+using (exists (select 1 from public.social_activities a where a.id = activity_id and private.can_view_activity(a.actor_id, a.visibility)));
 drop policy if exists social_reactions_insert_own on public.social_activity_reactions;
 create policy social_reactions_insert_own on public.social_activity_reactions for insert to authenticated
 with check ((select auth.uid()) = user_id and exists (
-  select 1 from public.social_activities a
-  where a.id = activity_id and private.can_view_activity(a.actor_id, a.visibility)
+  select 1 from public.social_activities a where a.id = activity_id and private.can_view_activity(a.actor_id, a.visibility)
 ));
 drop policy if exists social_reactions_update_own on public.social_activity_reactions;
 create policy social_reactions_update_own on public.social_activity_reactions for update to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 drop policy if exists social_reactions_delete_own on public.social_activity_reactions;
-create policy social_reactions_delete_own on public.social_activity_reactions for delete to authenticated
-using ((select auth.uid()) = user_id);
+create policy social_reactions_delete_own on public.social_activity_reactions for delete to authenticated using ((select auth.uid()) = user_id);
 
 drop policy if exists social_challenges_select_allowed on public.social_challenges;
-create policy social_challenges_select_allowed on public.social_challenges for select to authenticated
-using (private.can_view_challenge(id));
+create policy social_challenges_select_allowed on public.social_challenges for select to authenticated using (private.can_view_challenge(id));
 drop policy if exists social_challenges_insert_creator on public.social_challenges;
-create policy social_challenges_insert_creator on public.social_challenges for insert to authenticated
-with check ((select auth.uid()) = creator_id);
+create policy social_challenges_insert_creator on public.social_challenges for insert to authenticated with check ((select auth.uid()) = creator_id);
 drop policy if exists social_challenges_update_creator on public.social_challenges;
 create policy social_challenges_update_creator on public.social_challenges for update to authenticated
 using ((select auth.uid()) = creator_id) with check ((select auth.uid()) = creator_id);
@@ -679,14 +693,12 @@ create policy social_challenge_checkins_update_self on public.social_challenge_c
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists social_inbox_select_own on public.social_inbox_events;
-create policy social_inbox_select_own on public.social_inbox_events for select to authenticated
-using ((select auth.uid()) = recipient_id);
+create policy social_inbox_select_own on public.social_inbox_events for select to authenticated using ((select auth.uid()) = recipient_id);
 drop policy if exists social_inbox_update_own on public.social_inbox_events;
 create policy social_inbox_update_own on public.social_inbox_events for update to authenticated
 using ((select auth.uid()) = recipient_id) with check ((select auth.uid()) = recipient_id);
 drop policy if exists social_inbox_delete_own on public.social_inbox_events;
-create policy social_inbox_delete_own on public.social_inbox_events for delete to authenticated
-using ((select auth.uid()) = recipient_id);
+create policy social_inbox_delete_own on public.social_inbox_events for delete to authenticated using ((select auth.uid()) = recipient_id);
 
 create or replace function private.guard_friend_request()
 returns trigger language plpgsql security definer
@@ -762,7 +774,6 @@ begin
   if old.status = 'pending' and new.status = 'accepted' then
     a := least(new.sender_id, new.recipient_id);
     b := greatest(new.sender_id, new.recipient_id);
-
     insert into public.friendships (user_a, user_b) values (a, b)
     on conflict (user_a, user_b) do nothing;
 

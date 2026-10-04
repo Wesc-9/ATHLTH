@@ -1,9 +1,3 @@
--- Harden Profile / Follow / DM privacy and add minimal social profile
--- sections for gear and active goals.
---
--- The legacy public.friend_requests table name is retained only for backwards
--- compatibility. Product semantics are follow requests.
-
 alter table public.profile_social_settings
   add column if not exists gear_visibility text not null default 'private'
     check (gear_visibility in ('private','friends','public')),

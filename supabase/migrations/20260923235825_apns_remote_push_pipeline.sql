@@ -45,6 +45,8 @@ begin
     raise exception 'Invalid APNs token';
   end if;
 
+  -- A physical app installation belongs to exactly one signed-in ATHLTH
+  -- account. Claim it when accounts change on the same iPhone.
   delete from public.notification_devices d
   where d.app_bundle_id = p_app_bundle_id
     and d.apns_environment = p_apns_environment
@@ -142,6 +144,7 @@ begin
   return new;
 exception
   when others then
+    -- Push delivery must never make the originating social action fail.
     raise warning 'ATHLTH push enqueue failed for event %: %', new.id, sqlerrm;
     return new;
 end;

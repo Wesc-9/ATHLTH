@@ -868,7 +868,7 @@ struct OfficialWeeklyChallengeArtwork: View {
             } else if let remoteURL = URL(string: challenge.heroAsset),
                       remoteURL.scheme == "https" ||
                       remoteURL.scheme == "http" {
-                AsyncImage(url: remoteURL) { phase in
+                ATHLTHStorageImage(url: remoteURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -4174,7 +4174,7 @@ private struct OfficialChallengeAvatar: View {
     var body: some View {
         Group {
             if let url {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image

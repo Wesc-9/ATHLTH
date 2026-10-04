@@ -7,8 +7,8 @@ import {
 
 const BUNDLE_ID = "com.wesc9.athlth";
 const PRODUCT_IDS = new Set([
-  "com.wesc9.athlth.paid.monthly",
-  "com.wesc9.athlth.paid.yearly",
+  "com.wesc9.athlth.plus.monthly",
+  "com.wesc9.athlth.plus.yearly",
 ]);
 
 const APPLE_ROOTS = [
@@ -135,7 +135,7 @@ export default {
       return Response.json({ error: "Method not allowed." }, { status: 405 });
     }
 
-    const userID = ctx.userClaims?.sub;
+    const userID = ctx.userClaims?.id;
     if (!userID) {
       return Response.json({ error: "Missing authenticated user." }, { status: 401 });
     }

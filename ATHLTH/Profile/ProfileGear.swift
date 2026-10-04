@@ -1236,7 +1236,7 @@ struct ProfileGearSummaryView: View {
                 if let item,
                    let value = item.imageURL,
                    let url = URL(string: value) {
-                    AsyncImage(url: url) { phase in
+                    ATHLTHStorageImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
                             image
@@ -1543,7 +1543,7 @@ struct ProfileGearThumb: View {
 
             if let value = item.imageURL,
                let url = URL(string: value) {
-                AsyncImage(url: url) { phase in
+                ATHLTHStorageImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -2386,7 +2386,7 @@ struct ProfileGearEditorView: View {
         } else if let existing,
                   let value = existing.imageURL,
                   let url = URL(string: value) {
-            AsyncImage(url: url) { phase in
+            ATHLTHStorageImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

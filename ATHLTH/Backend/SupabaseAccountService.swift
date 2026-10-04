@@ -403,15 +403,9 @@ final class SupabaseAccountService: ObservableObject {
             throw SupabaseAccountError.invalidProfile("Display name cannot be empty.")
         }
 
-        guard cleanUsername.count >= 3 else {
-            throw SupabaseAccountError.invalidProfile("Username must be at least 3 characters.")
-        }
-
-        guard cleanUsername.allSatisfy({
-            $0.isLetter || $0.isNumber || $0 == "_" || $0 == "."
-        }) else {
+        guard UsernameGenerator.isValid(cleanUsername) else {
             throw SupabaseAccountError.invalidProfile(
-                "Username can use letters, numbers, underscore and periods."
+                "Username must be 3–20 characters and use only a–z, 0–9 and underscore."
             )
         }
 

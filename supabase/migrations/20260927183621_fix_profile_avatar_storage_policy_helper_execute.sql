@@ -1,14 +1,3 @@
--- ATHLTH 1.4.3: fix profile-avatar uploads blocked by an unrelated
--- community content Storage RLS helper.
---
--- storage.objects INSERT policies are permissive and may evaluate multiple
--- policy expressions. The community-content image policy calls this helper,
--- so authenticated users must be allowed to execute it even when uploading
--- into another bucket such as profile-avatars.
---
--- Keep the helper internal and bind p_user_id to the actual authenticated
--- user so granting EXECUTE cannot be used to spoof another user's identity.
-
 create or replace function private.can_create_community_group_content(
   p_group_id uuid,
   p_user_id uuid

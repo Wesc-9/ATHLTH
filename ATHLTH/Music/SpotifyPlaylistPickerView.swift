@@ -167,7 +167,7 @@ struct SpotifyPlaylistPickerView: View {
         _ playlist: SpotifyPlaylistReference
     ) -> some View {
         if let artworkURL = playlist.artworkURL {
-            AsyncImage(url: artworkURL) { phase in
+            ATHLTHStorageImage(url: artworkURL) { phase in
                 switch phase {
                 case .success(let image):
                     image
