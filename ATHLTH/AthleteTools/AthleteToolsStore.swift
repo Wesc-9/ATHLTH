@@ -16,7 +16,7 @@ final class AthleteToolsStore: ObservableObject {
     private var checkingLoad = false
 
     func switchAccount(_ id: UUID?) async {
-        guard userID != id else { return }
+        guard userID != id || (id != nil && !cycleReady) else { return }
         let oldID = userID
         restoring = true
         userID = id
@@ -35,8 +35,9 @@ final class AthleteToolsStore: ObservableObject {
                 cycleReady = true
             } catch { self.error = "Unable to open the private diary. Existing data has been preserved." }
         }
+        fuelEndsAt = data.fuelEndsAt
         restoring = false
-        if let oldID { await cancelNotifications(for: oldID) }
+        if let oldID, oldID != id { await cancelNotifications(for: oldID) }
     }
 
     private func persist() {
@@ -65,8 +66,10 @@ final class AthleteToolsStore: ObservableObject {
     }
 
     func requestNotifications() async -> Bool {
+        guard let id = userID else { return false }
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+            guard userID == id else { return false }
             if !granted { error = "Notifications are disabled. Enable them in iOS Settings to receive reminders." }
             return granted
         } catch { self.error = error.localizedDescription; return false }
@@ -84,6 +87,7 @@ final class AthleteToolsStore: ObservableObject {
     func stopFuelReminders() async {
         guard let id = userID else { return }
         fuelEndsAt = nil
+        data.fuelEndsAt = nil
         await cancelNotifications(for: id, category: "fuel.")
     }
     func startFuelReminders(at start: Date) async {
@@ -110,6 +114,7 @@ final class AthleteToolsStore: ObservableObject {
             }
             guard userID == id else { await cancelNotifications(for: id, category: "fuel."); return }
             fuelEndsAt = start.addingTimeInterval(Double(plan.durationMinutes) * 60)
+            data.fuelEndsAt = fuelEndsAt
         } catch {
             await cancelNotifications(for: id, category: "fuel.")
             self.error = "Reminders could not be scheduled. No partial plan was kept."

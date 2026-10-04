@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import MapKit
 import SwiftUI
 import UIKit
@@ -58,7 +59,7 @@ final class AthleteOfflinePackStore: ObservableObject {
             staging = temporary
             try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
             let sessions = plan.weeks.flatMap(\.days).flatMap(\.sessions)
-            let routeIDs = Set(sessions.compactMap(\.routeID) + sessions.compactMap { $0.runningWorkout?.routeID })
+            let routeIDs = Set(sessions.compactMap(\.routeID) + sessions.compactMap { $0.runningWorkout?.routeID } + sessions.flatMap { $0.runningWorkouts ?? [] }.compactMap(\.routeID))
             let selectedRoutes = routes.filter { routeIDs.contains($0.id) }
             var pack = AthleteOfflinePack(plan: plan, routes: selectedRoutes, downloadedAt: Date(), mapRouteIDs: [], exerciseImageIDs: [], missingAssets: 0)
             for route in selectedRoutes {
@@ -94,7 +95,12 @@ final class AthleteOfflinePackStore: ObservableObject {
                 do {
                     let (bytes, response) = try await URLSession.shared.data(from: url)
                     guard (response as? HTTPURLResponse)?.statusCode == 200, bytes.count <= 5_000_000,
-                          let image = UIImage(data: bytes), let png = image.pngData() else { throw CocoaError(.fileReadCorruptFile) }
+                          let source = CGImageSourceCreateWithData(bytes as CFData, nil),
+                          let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                            kCGImageSourceCreateThumbnailFromImageAlways: true,
+                            kCGImageSourceThumbnailMaxPixelSize: 1024,
+                            kCGImageSourceCreateThumbnailWithTransform: true
+                          ] as CFDictionary), let png = UIImage(cgImage: thumbnail).pngData() else { throw CocoaError(.fileReadCorruptFile) }
                     try png.write(to: temporary.appendingPathComponent(exercise.id.uuidString + ".png"), options: .atomic)
                     pack.exerciseImageIDs.append(exercise.id)
                 } catch { if Task.isCancelled { throw CancellationError() }; pack.missingAssets += 1 }
@@ -162,6 +168,16 @@ private struct AthleteOfflinePackView: View {
                 Section(session.title) {
                     if let notes = session.notes { Text(notes) }
                     if let duration = session.durationMinutes { Text("\(duration) min") }
+                    if let distance = session.targetDistanceKilometers { Text("\(distance, specifier: "%.1f") km") }
+                    ForEach(session.runningWorkouts ?? session.runningWorkout.map { [$0] } ?? []) { workout in
+                        Text(workout.title).font(.headline)
+                        Text(workout.summary)
+                        ForEach(workout.blocks) { block in
+                            Text("\(block.title) · \(block.repetitions)× \(targetText(block.work))")
+                            if let recovery = block.recovery { Text("Recovery: \(targetText(recovery))").font(.caption) }
+                            if let notes = block.notes { Text(notes).font(.caption) }
+                        }
+                    }
                     ForEach(session.exercises) { exercise in
                         VStack(alignment: .leading) {
                             Text(exercise.embeddedExercise.name).font(.headline)
@@ -179,5 +195,15 @@ private struct AthleteOfflinePackView: View {
                 }
             }
         }.navigationTitle(pack.plan.title)
+    }
+    private func targetText(_ target: RunningStepTarget) -> String {
+        var pieces: [String] = []
+        if let distance = target.distanceMeters { pieces.append(String(format: "%.0f m", distance)) }
+        if let duration = target.durationSeconds { pieces.append(String(format: "%.1f min", duration / 60)) }
+        if let rpe = target.intensity.rpe { pieces.append(String(format: "RPE %.0f", rpe)) }
+        if let zone = target.intensity.heartRateZone { pieces.append("HR zone \(zone)") }
+        if let pace = target.intensity.paceMinSecondsPerKilometer { pieces.append(String(format: "Pace %.0f sec/km", pace)) }
+        if pieces.isEmpty { pieces.append(target.intensity.kind.title) }
+        return pieces.joined(separator: " · ")
     }
 }

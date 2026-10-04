@@ -8,20 +8,21 @@ struct AthleteToolsView: View {
         Group {
             if session.signedIn {
                 List {
-                    NavigationLink("Race calendar & preparation", systemImage: "flag.checkered") { AthleteRaceCalendarView() }
-                    NavigationLink("Training load", systemImage: "chart.xyaxis.line") { AthleteLoadView() }
-                    NavigationLink("Strength progression", systemImage: "scalemass") {
-                        List {
-                            Text("During a strength workout, progression hints use your previous working sets, reps and RPE/RIR. Tap Use to accept a suggestion.")
-                            Text("Warm-up sets are excluded. Very high effort can suggest a reduction; missing effort data keeps the current load.")
-                        }.navigationTitle("Strength progression")
+                    Section("Plan & progress") {
+                        NavigationLink { AthleteRaceCalendarView() } label: { Label("Race calendar & preparation", systemImage: "flag.checkered") }
+                        NavigationLink { AthleteLoadView() } label: { Label("Training load", systemImage: "chart.xyaxis.line") }
+                        NavigationLink { strengthInformation } label: { Label("Strength progression", systemImage: "scalemass") }
                     }
-                    NavigationLink("Offline training packs", systemImage: "arrow.down.circle") { AthleteOfflineView() }
-                    NavigationLink("Fuel & hydration", systemImage: "drop") { AthleteFuelView() }
-                    NavigationLink("Private cycle diary", systemImage: "lock.shield") { AthleteCycleView() }
-                    NavigationLink("Gear maintenance", systemImage: "wrench.and.screwdriver") { AthleteGearMaintenanceView() }
-                    NavigationLink("Coach sharing", systemImage: "person.badge.shield.checkmark") { AthleteCoachView() }
-                    NavigationLink("Training partners", systemImage: "person.2") { AthletePartnerView() }
+                    Section("Prepare & recover") {
+                        NavigationLink { AthleteOfflineView() } label: { Label("Offline training packs", systemImage: "arrow.down.circle") }
+                        NavigationLink { AthleteFuelView() } label: { Label("Fuel & hydration", systemImage: "drop") }
+                        NavigationLink { AthleteCycleView() } label: { Label("Private cycle diary", systemImage: "lock.shield") }
+                        NavigationLink { AthleteGearMaintenanceView() } label: { Label("Gear maintenance", systemImage: "wrench.and.screwdriver") }
+                    }
+                    Section("Train together") {
+                        NavigationLink { AthleteCoachView() } label: { Label("Coach sharing", systemImage: "person.badge.shield.checkmark") }
+                        NavigationLink { AthletePartnerView() } label: { Label("Training partners", systemImage: "person.2") }
+                    }
                     Section("Route sharing") {
                         Text("Each workout's sharing screen includes route privacy and an optional preview. Routes stay private until you choose to include a map.")
                     }
@@ -38,6 +39,12 @@ struct AthleteToolsView: View {
         .alert("Athlete Tools", isPresented: Binding(get: { tools.error != nil }, set: { if !$0 { tools.error = nil } })) {
             Button("OK") { tools.error = nil }
         } message: { Text(tools.error ?? "") }
+    }
+    private var strengthInformation: some View {
+        List {
+            Text("During a strength workout, progression hints use your previous working sets, reps and RPE/RIR. Tap Use to accept a suggestion.")
+            Text("Warm-up sets are excluded. Very high effort can suggest a reduction; missing effort data keeps the current load.")
+        }.navigationTitle("Strength progression")
     }
 }
 

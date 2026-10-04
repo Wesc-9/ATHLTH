@@ -60,6 +60,8 @@ begin
   if p_coach is null or actor = p_coach or private.is_blocked(p_coach)
     or not exists(select 1 from public.profile_follows where follower_id = actor and following_id = p_coach)
   then raise exception 'Choose an unblocked athlete you follow' using errcode='42501'; end if;
+  if exists(select 1 from public.athlete_coach_connections where athlete_id=actor and coach_id=p_coach and state <> 'revoked')
+  then raise exception 'Already connected. Edit the existing connection instead'; end if;
   if (select count(*) from public.athlete_coach_connections where athlete_id=actor and state <> 'revoked') >= 20
   then raise exception 'Too many coach connections'; end if;
   insert into public.athlete_coach_connections(athlete_id,coach_id,share_workouts,share_plan,share_readiness)
@@ -149,3 +151,20 @@ create policy partner_insert on public.training_partner_availability for insert 
  user_id=(select auth.uid()) and starts_at >= now() - interval '5 minutes' and starts_at <= now()+interval '30 days'
 );
 create policy partner_delete on public.training_partner_availability for delete to authenticated using(user_id=(select auth.uid()));
+
+-- Serialize publication per athlete and bound live availability.
+create function private.limit_training_partner_availability() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+ if auth.uid() is not null and auth.uid() <> new.user_id then
+  raise exception 'Cannot publish another athlete availability' using errcode='42501';
+ end if;
+ perform pg_advisory_xact_lock(hashtextextended(new.user_id::text, 761));
+ if (select count(*) from public.training_partner_availability where user_id=new.user_id and ends_at>now()) >= 20 then
+  raise exception 'Withdraw an existing availability before publishing another';
+ end if;
+ return new;
+end $$;
+revoke all on function private.limit_training_partner_availability() from public,anon,authenticated;
+create trigger limit_training_partner_availability before insert on public.training_partner_availability
+ for each row execute function private.limit_training_partner_availability();

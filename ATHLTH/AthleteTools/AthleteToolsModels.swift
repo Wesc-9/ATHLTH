@@ -66,6 +66,7 @@ struct AthleteToolsData: Codable {
     var services: [AthleteGearService] = []
     var loadNotifications = false
     var lastLoadWarning: Date?
+    var fuelEndsAt: Date? = nil
 }
 
 struct AthleteLoadSample: Hashable {
