@@ -3335,6 +3335,15 @@ struct AppRootView: View {
             calendarEvents:
                 homeAssistantCalendarEvents()
         )
+
+        await syncHomeAssistantPhoneWorkoutLiveState(
+            phoneWorkout.active,
+            force: true
+        )
+        await syncHomeAssistantStrengthLiveState(
+            strengthWorkout.activeWorkout,
+            force: true
+        )
     }
 
     private func homeAssistantPlannedOccurrences()
