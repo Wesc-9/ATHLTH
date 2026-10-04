@@ -1056,7 +1056,7 @@ struct AppRootView: View {
         ) { _ in
             guard appSession.signedIn else { return }
 
-            Task {
+            _ = Task<Void, Never> { @MainActor in
                 // The backend already delivered this event through APNs.
                 // Pull the authoritative inbox immediately so the Home bell
                 // updates while ATHLTH is open, without scheduling a duplicate
@@ -2836,12 +2836,12 @@ struct AppRootView: View {
         let pace =
             workout
                 .currentPaceSecondsPerKilometer
-        let speed =
-            pace.flatMap { value in
+        let speed: Double? =
+            pace.flatMap { value -> Double? in
                 guard value > 0 else {
                     return nil
                 }
-                return 3_600 / value
+                return 3_600.0 / value
             }
         let environment =
             String(
