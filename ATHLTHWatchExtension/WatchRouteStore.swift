@@ -341,6 +341,19 @@ final class WatchRouteStore: NSObject, ObservableObject {
 
             spotifyPlaybackState = playbackState
 
+        case .homeAssistantConfiguration:
+            guard let configuration =
+                    try? JSONDecoder().decode(
+                        WatchHomeAssistantConfiguration.self,
+                        from: data
+                    )
+            else {
+                return
+            }
+
+            WatchHomeAssistantBridge.shared
+                .apply(configuration)
+
         case .route,
              .workoutResult,
              .workoutCommand,
@@ -627,7 +640,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .liveSurfaceContext ||
            transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot ||
-           transferKind == .spotifyPlaybackState {
+           transferKind == .spotifyPlaybackState ||
+           transferKind == .homeAssistantConfiguration {
             let sentAt =
                 payload[
                     WatchTransferMetadataKey.sentAt
