@@ -2884,6 +2884,8 @@ private struct ThreadOutgoingChallengeCard: View {
     let challenge: ATHLTHChallenge
     let onCancel: () -> Void
 
+    @State private var showingCancelConfirmation = false
+
     var body: some View {
         VStack(
             alignment: .leading,
@@ -2994,9 +2996,10 @@ private struct ThreadOutgoingChallengeCard: View {
                 .buttonStyle(.bordered)
 
                 Button(
-                    role: .destructive,
-                    action: onCancel
+                    role: .destructive
                 ) {
+                    showingCancelConfirmation = true
+                } label: {
                     Text(
                         ATHLTHLocalization
                             .choose(
@@ -3045,6 +3048,38 @@ private struct ThreadOutgoingChallengeCard: View {
                     .opacity(0.12),
                 lineWidth: 0.9
             )
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english:
+                    "Cancel this challenge invite?",
+                norwegian:
+                    "Avlyse denne challenge-invitasjonen?"
+            ),
+            isPresented:
+                $showingCancelConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Cancel invite",
+                    norwegian:
+                        "Avlys invitasjon"
+                ),
+                role: .destructive,
+                action: onCancel
+            )
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Keep invite",
+                    norwegian:
+                        "Behold invitasjonen"
+                ),
+                role: .cancel
+            ) {}
         }
     }
 }
