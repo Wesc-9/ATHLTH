@@ -3261,6 +3261,19 @@ private struct ThreadChallengeLifecycleEventRow: View {
             }
 
             Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(
+                .caption
+                    .weight(.semibold)
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
         }
         .padding(
             .horizontal,
@@ -3767,10 +3780,16 @@ private struct MessageBubble: View {
                 : .waitingIncoming
 
         case .accepted:
-            return .accepted
+            return challenge.creatorID ==
+                currentUserID
+                ? .waitingOutgoing
+                : .accepted
 
         case .declined:
-            return .declined
+            return challenge.creatorID ==
+                currentUserID
+                ? .waitingOutgoing
+                : .declined
 
         case .withdrawn:
             return .withdrawn
@@ -3785,8 +3804,8 @@ private struct MessageBubble: View {
         switch challengeStatusKind {
         case .waitingOutgoing:
             return ATHLTHLocalization.choose(
-                english: "Sent · waiting",
-                norwegian: "Sendt · venter"
+                english: "Sent",
+                norwegian: "Sendt"
             )
 
         case .waitingIncoming:
