@@ -3138,6 +3138,12 @@ final class AppSessionStore: ObservableObject {
                 source.spotifyAutoplayOnStart,
             targetAlertConfiguration:
                 source.targetAlertConfiguration,
+            routeAlertConfiguration:
+                source.routeAlertConfiguration,
+            ghostTargetDurationSeconds:
+                source.ghostTargetDurationSeconds,
+            ghostUpdates:
+                source.ghostUpdates,
             workoutTemplateID:
                 source.workoutTemplateID,
             workoutBlocks:
