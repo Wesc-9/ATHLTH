@@ -398,6 +398,12 @@ extension RunQuickStartConfiguration {
             audioCoach
         snapshot.autoPauseEnabled =
             autoPauseEnabled
+        snapshot.routeAlertConfiguration =
+            routeAlerts
+        snapshot.ghostTargetDurationSeconds =
+            ghostTargetDurationSeconds
+        snapshot.ghostUpdates =
+            ghostUpdates
 
         return SocialWorkoutInvitePayload(
             workout: snapshot,
