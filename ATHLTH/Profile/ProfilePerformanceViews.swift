@@ -4944,6 +4944,18 @@ struct PerformanceStatsView: View {
     private var runningItems: [PerformanceMetricItem] {
         [
             runningRecordItem(
+                kind: .fastest400M,
+                title: text("Fastest 400 m", "Raskeste 400 m"),
+                icon: "4.circle.fill",
+                tint: .mint
+            ),
+            runningRecordItem(
+                kind: .fastest800M,
+                title: text("Fastest 800 m", "Raskeste 800 m"),
+                icon: "8.circle.fill",
+                tint: .teal
+            ),
+            runningRecordItem(
                 kind: .fastest1K,
                 title: text("Fastest 1K", "Raskeste 1 km"),
                 icon: "1.circle.fill",
@@ -4957,6 +4969,12 @@ struct PerformanceStatsView: View {
                 tint: .cyan
             ),
             runningRecordItem(
+                kind: .fastest3K,
+                title: text("Fastest 3K", "Raskeste 3 km"),
+                icon: "3.circle.fill",
+                tint: .indigo
+            ),
+            runningRecordItem(
                 kind: .fastest5K,
                 title: text("Fastest 5K", "Raskeste 5 km"),
                 icon: "5.circle.fill",
@@ -4968,6 +4986,18 @@ struct PerformanceStatsView: View {
                 title: text("Fastest 10K", "Raskeste 10 km"),
                 icon: "10.circle.fill",
                 tint: .orange
+            ),
+            runningRecordItem(
+                kind: .fastest15K,
+                title: text("Fastest 15K", "Raskeste 15 km"),
+                icon: "15.circle.fill",
+                tint: .pink
+            ),
+            runningRecordItem(
+                kind: .fastest10Mile,
+                title: text("Fastest 10 miles", "Raskeste 10 miles"),
+                icon: "figure.run.circle.fill",
+                tint: .purple
             ),
             runningRecordItem(
                 kind: .fastestHalfMarathon,
