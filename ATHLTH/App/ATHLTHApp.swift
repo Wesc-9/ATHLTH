@@ -447,6 +447,7 @@ struct AppRootView: View {
                     await resumeForegroundRefreshIfNeeded()
                 }
 
+                syncHomeAssistantWatchConfiguration()
                 await syncHomeAssistantSnapshot()
             }
         }
@@ -763,6 +764,7 @@ struct AppRootView: View {
                     if homeAssistant.isConnected {
                         await homeAssistant.disconnect()
                     }
+                    syncHomeAssistantWatchConfiguration()
                 }
                 return
             }
@@ -785,6 +787,8 @@ struct AppRootView: View {
             }
         }
         .onChange(of: homeAssistant.connectionState) { _, state in
+            syncHomeAssistantWatchConfiguration()
+
             guard state == .connected else {
                 return
             }
@@ -794,7 +798,14 @@ struct AppRootView: View {
             }
         }
         .onChange(of: homeAssistant.shareWorkoutState) { _, _ in
+            syncHomeAssistantWatchConfiguration()
             Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: watchConnection.state) { _, state in
+            guard state == .ready else {
+                return
+            }
+            syncHomeAssistantWatchConfiguration()
         }
         .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
@@ -1949,6 +1960,13 @@ struct AppRootView: View {
                 appSession.profile.username
         )
         notifications.syncTrophyEvents(from: trophies.unlocks)
+    }
+
+    @MainActor
+    private func syncHomeAssistantWatchConfiguration() {
+        watchConnection.sendHomeAssistantConfiguration(
+            homeAssistant.watchConfiguration
+        )
     }
 
     @MainActor
