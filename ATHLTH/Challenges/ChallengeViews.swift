@@ -6473,50 +6473,85 @@ struct ChallengeDetailView: View {
         }
     }
 
-    private var heartRateProfileRequiredCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(
-                "Set your maximum heart rate",
-                systemImage: "heart.text.square"
-            )
-            .font(.headline)
-            .foregroundStyle(.orange)
+    private var heartRateProfileRequiredCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Set your maximum heart rate",
+                            norwegian:
+                                "Angi makspuls"
+                        ),
+                    trailing: nil
+                )
 
-            Text(
-                "This challenge uses personal heart-rate zones. Your max HR stays private and is used only to calculate your own zone boundaries."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This challenge uses personal heart-rate zones. Your max HR stays private and is used only to calculate your own zone boundaries.",
+                        norwegian:
+                            "Denne challengen bruker personlige pulssoner. Makspulsen din forblir privat og brukes kun til å beregne dine egne soner."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
 
-            NavigationLink {
-                PersonalHealthProfileView()
-            } label: {
-                Text("Open Health Profile")
-                    .frame(maxWidth: .infinity)
+                NavigationLink {
+                    PersonalHealthProfileView()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open Health Profile",
+                            norwegian:
+                                "Åpne helseprofil"
+                        ),
+                        systemImage:
+                            "heart.text.square.fill"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .controlSize(.large)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
         }
-        .padding()
-        .challengeCard()
     }
 
     private func publicJoinCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
-            Label(
-                ATHLTHLocalization.choose(
-                    english: "Open challenge",
-                    norwegian: "Åpen challenge"
-                ),
-                systemImage:
-                    "person.badge.plus"
-            )
-            .font(.headline)
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open challenge",
+                            norwegian:
+                                "Åpen challenge"
+                        ),
+                    trailing: nil
+                )
 
             Text(
                 ATHLTHLocalization.choose(
@@ -6556,10 +6591,13 @@ struct ChallengeDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
+            .tint(
+                ATHLTHTheme
+                    .vitality
+            )
+            .controlSize(.large)
+            }
         }
-        .padding()
-        .challengeCard()
     }
 
     private func invitationResponseCard(
@@ -7457,15 +7495,30 @@ struct ChallengeDetailView: View {
         _ challenge: ATHLTHChallenge,
         meetup: ChallengeMeetup
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Meet & Train", systemImage: "mappin.and.ellipse")
-                    .font(.headline)
-                Spacer()
-                Text(meetup.scheduledAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Meet & Train",
+                            norwegian:
+                                "Møt & tren"
+                        ),
+                    trailing:
+                        meetup.scheduledAt
+                            .formatted(
+                                date:
+                                    .abbreviated,
+                                time:
+                                    .shortened
+                            ),
+                    trailingIcon:
+                        "calendar"
+                )
 
             Text(meetup.placeName)
                 .font(.title3.weight(.semibold))
@@ -7550,9 +7603,8 @@ struct ChallengeDetailView: View {
             Text("Check-in is explicit. ATHLTH requests a one-time location only when you press “I'm here”; it does not continuously expose your live location to other participants.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+            }
         }
-        .padding()
-        .challengeCard()
     }
 
     private func participantsCard(
