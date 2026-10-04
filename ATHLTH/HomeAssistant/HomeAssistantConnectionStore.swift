@@ -283,6 +283,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectedInstanceName: String?
     @Published private(set) var connectedInstanceURL: URL?
     @Published private(set) var lastErrorMessage: String?
+    @Published private(set) var lastConnectionTestSucceeded = false
     @Published private(set) var pendingDeliveryCount: Int = 0
 
     @Published var shareWorkoutState: Bool {
@@ -826,6 +827,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         connectedInstanceURL = nil
         discoveredInstances = []
         lastErrorMessage = nil
+        lastConnectionTestSucceeded = false
         connectionState = .disconnected
     }
 
@@ -1512,6 +1514,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             return
         }
 
+        lastConnectionTestSucceeded = false
+
         do {
             try await send(
                 event: "sync_snapshot",
@@ -1520,11 +1524,31 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 ]
             )
             lastErrorMessage = nil
+            lastConnectionTestSucceeded = true
             connectionState = .connected
         } catch {
+            lastConnectionTestSucceeded = false
             lastErrorMessage = error.localizedDescription
             connectionState = .error(error.localizedDescription)
         }
+    }
+
+    func enableAllSharing() {
+        shareWorkoutState = true
+        shareCompletedWorkouts = true
+        shareRecovery = true
+        shareTrainingLoad = true
+        shareSleep = true
+        shareHRV = true
+        shareRestingHeartRate = true
+        shareRespiratoryRate = true
+        shareWeeklyProgress = true
+        shareNextWorkout = true
+        shareTrainingCalendar = true
+        shareGoals = true
+        shareLiveWorkoutDetails = true
+        shareStrengthDetails = true
+        shareMilestoneEvents = true
     }
 
     func sendWorkoutStarted(
