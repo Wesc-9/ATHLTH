@@ -2632,69 +2632,72 @@ struct AppRootView: View {
         -> (title: String, time: Date)? {
         let now = Date()
 
-        guard let occurrence =
-                homeAssistantPlannedOccurrences()
-                    .filter { occurrence in
-                        guard let start =
-                                occurrence
-                                    .session
-                                    .scheduledStart,
-                              start >= now
-                        else {
+        let candidates =
+            homeAssistantPlannedOccurrences()
+                .filter { occurrence in
+                    guard let start =
+                            occurrence.session
+                                .scheduledStart,
+                          start >= now
+                    else {
+                        return false
+                    }
+
+                    if let planID =
+                            occurrence.planID {
+                        if appSession
+                            .isPlanSessionSkipped(
+                                planID: planID,
+                                sessionID:
+                                    occurrence
+                                        .session
+                                        .id
+                            ) {
                             return false
                         }
 
-                        if let planID =
-                                occurrence.planID {
-                            if appSession
-                                .isPlanSessionSkipped(
-                                    planID: planID,
-                                    sessionID:
-                                        occurrence
-                                            .session
-                                            .id
-                                ) {
-                                return false
-                            }
-
-                            if appSession
-                                .isPlanSessionManuallyCompleted(
-                                    planID: planID,
-                                    sessionID:
-                                        occurrence
-                                            .session
-                                            .id
-                                ) {
-                                return false
-                            }
+                        if appSession
+                            .isPlanSessionManuallyCompleted(
+                                planID: planID,
+                                sessionID:
+                                    occurrence
+                                        .session
+                                        .id
+                            ) {
+                            return false
                         }
+                    }
 
-                        return true
-                    }
-                    .sorted {
-                        (
-                            $0.session
-                                .scheduledStart ??
-                            .distantFuture
-                        ) <
-                        (
-                            $1.session
-                                .scheduledStart ??
-                            .distantFuture
-                        )
-                    }
-                    .first,
-              let start =
-                    occurrence
-                        .session
-                        .scheduledStart
+                    return true
+                }
+                .sorted { lhs, rhs in
+                    let lhsStart =
+                        lhs.session
+                            .scheduledStart ??
+                        .distantFuture
+                    let rhsStart =
+                        rhs.session
+                            .scheduledStart ??
+                        .distantFuture
+                    return lhsStart < rhsStart
+                }
+
+        guard let occurrence =
+                candidates.first
+        else {
+            return nil
+        }
+
+        guard let start =
+                occurrence.session
+                    .scheduledStart
         else {
             return nil
         }
 
         return (
-            title: occurrence.session.title,
-            time: start
+            occurrence.session.title,
+            start
         )
     }
 
