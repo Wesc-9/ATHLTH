@@ -195,7 +195,7 @@ struct HealthProgressSnapshot: Equatable {
     }
 }
 
-enum HealthPersonalRecordKind: String, Hashable {
+enum HealthPersonalRecordKind: String, CaseIterable, Hashable {
     case longestRun
     case fastest1K
     case fastestMile
