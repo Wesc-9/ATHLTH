@@ -743,7 +743,7 @@ struct MirroredWorkoutLiveView: View {
                         )
                         .font(
                             .system(
-                                size: 64,
+                                size: 80,
                                 weight: .bold,
                                 design:
                                     .rounded
@@ -830,21 +830,6 @@ struct MirroredWorkoutLiveView: View {
                                 incline
                             ),
                         unit: "%"
-                    )
-                } else {
-                    runningMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "AVG PACE",
-                                norwegian:
-                                    "SNITTEMPO"
-                            ),
-                        value:
-                            averageRunningPaceText(
-                                snapshot
-                            ),
-                        unit: "/km"
                     )
                 }
             }
@@ -936,7 +921,7 @@ struct MirroredWorkoutLiveView: View {
                 Text(value)
                     .font(
                         .system(
-                            size: 46,
+                            size: 58,
                             weight: .bold,
                             design: .rounded
                         )
@@ -960,7 +945,7 @@ struct MirroredWorkoutLiveView: View {
             }
             .frame(
                 maxWidth: .infinity,
-                minHeight: 126,
+                minHeight: 148,
                 alignment: .leading
             )
         }
