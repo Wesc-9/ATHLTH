@@ -890,62 +890,47 @@ enum ProfileFeaturedRecordKind:
             self == .strengthDips ||
             self == .strengthChinUps
 
+        let matchingRepRecords =
+            strengthRepRecords.filter { record in
+                matches(record.exerciseName)
+            }
+
+        let matchingStrengthRecords =
+            strengthRecords.filter { record in
+                record.kind == .heaviestSet &&
+                    matches(record.title)
+            }
+
         if isRepFirst,
-           let repRecord =
-                strengthRepRecords
-                    .filter {
-                        matches(
-                            $0.exerciseName
-                        )
-                    }
-                    .max(
-                        by: {
-                            if $0.reps ==
-                                $1.reps {
-                                return $0.weightKilograms <
-                                    $1.weightKilograms
-                            }
-                            return $0.reps <
-                                $1.reps
-                        }
-                    ) {
-            if repRecord.weightKilograms >
-                0 {
+           let repRecord = matchingRepRecords.max(
+               by: { lhs, rhs in
+                   if lhs.reps == rhs.reps {
+                       return lhs.weightKilograms <
+                           rhs.weightKilograms
+                   }
+                   return lhs.reps < rhs.reps
+               }
+           ) {
+            if repRecord.weightKilograms > 0 {
                 return repRecord.value
             }
 
             return "\(repRecord.reps) reps"
         }
 
-        if let record =
-                strengthRecords
-                    .filter {
-                        $0.kind ==
-                            .heaviestSet &&
-                        matches($0.title)
-                    }
-                    .max(
-                        by: {
-                            $0.score <
-                                $1.score
-                        }
-                    ) {
+        if let record = matchingStrengthRecords.max(
+            by: { lhs, rhs in
+                lhs.score < rhs.score
+            }
+        ) {
             return record.value
         }
 
-        if let repRecord =
-                strengthRepRecords
-                    .filter {
-                        matches(
-                            $0.exerciseName
-                        )
-                    }
-                    .max(
-                        by: {
-                            $0.weightKilograms <
-                                $1.weightKilograms
-                        }
-                    ) {
+        if let repRecord = matchingRepRecords.max(
+            by: { lhs, rhs in
+                lhs.weightKilograms < rhs.weightKilograms
+            }
+        ) {
             return repRecord.value
         }
 

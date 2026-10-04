@@ -14,6 +14,7 @@ struct HomeAssistantSettingsView: View {
 
                 if homeAssistant.isConnected {
                     connectedCard
+                    sharingCard
                 } else {
                     discoveryCard
                     manualConnectionCard
@@ -30,7 +31,7 @@ struct HomeAssistantSettingsView: View {
             .padding(.top, 18)
             .padding(.bottom, 36)
         }
-        .background(ATHLTHTheme.background.ignoresSafeArea())
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
         .navigationTitle("Home Assistant")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -40,6 +41,24 @@ struct HomeAssistantSettingsView: View {
         }
         .onDisappear {
             homeAssistant.stopDiscovery()
+        }
+        .onChange(of: homeAssistant.shareWorkoutState) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareRecovery) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareTrainingLoad) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareWeeklyProgress) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareNextWorkout) { _, _ in
+            clearDisabledValues()
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -56,8 +75,10 @@ struct HomeAssistantSettingsView: View {
                 ),
                 role: .destructive
             ) {
-                homeAssistant.disconnect()
-                homeAssistant.startDiscovery()
+                Task {
+                    await homeAssistant.disconnect()
+                    homeAssistant.startDiscovery()
+                }
             }
 
             Button(
@@ -225,9 +246,190 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
+    }
+
+    private var sharingCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Shared with Home Assistant",
+                        norwegian: "Delt med Home Assistant"
+                    ),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Choose exactly which ATHLTH data is sent to your Home Assistant. Recovery and training load stay off until you enable them.",
+                        norwegian:
+                            "Velg nøyaktig hvilke ATHLTH-data som sendes til Home Assistant. Recovery og belastning er av til du selv slår dem på."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Active workout",
+                    norwegian: "Aktiv økt"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Lets automations know when training starts and stops.",
+                    norwegian:
+                        "Lar automasjoner vite når trening starter og stopper."
+                ),
+                icon: "figure.run",
+                isOn: $homeAssistant.shareWorkoutState
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Completed workouts",
+                    norwegian: "Fullførte økter"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares workout name, type, duration and distance when available.",
+                    norwegian:
+                        "Deler navn, type, varighet og distanse når det finnes."
+                ),
+                icon: "checkmark.circle",
+                isOn: $homeAssistant.shareCompletedWorkouts
+            )
+
+            sharingToggle(
+                title: "Recovery",
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares ATHLTH's 0–100 recovery score. Off by default.",
+                    norwegian:
+                        "Deler ATHLTH sin recovery-score fra 0–100. Av som standard."
+                ),
+                icon: "heart.text.square",
+                isOn: $homeAssistant.shareRecovery
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Training load",
+                    norwegian: "Belastning"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the recent-to-baseline training load ratio. Off by default.",
+                    norwegian:
+                        "Deler forholdet mellom nyere og normal treningsbelastning. Av som standard."
+                ),
+                icon: "chart.line.uptrend.xyaxis",
+                isOn: $homeAssistant.shareTrainingLoad
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Weekly progress",
+                    norwegian: "Ukens fremdrift"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares completion progress for the current training week.",
+                    norwegian:
+                        "Deler fremdriften for inneværende treningsuke."
+                ),
+                icon: "calendar.badge.checkmark",
+                isOn: $homeAssistant.shareWeeklyProgress
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Next workout",
+                    norwegian: "Neste økt"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the title of the next planned workout.",
+                    norwegian:
+                        "Deler navnet på den neste planlagte økten."
+                ),
+                icon: "calendar.badge.clock",
+                isOn: $homeAssistant.shareNextWorkout
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Turning a category off also clears its current value from the ATHLTH entities in Home Assistant.",
+                    norwegian:
+                        "Når du slår av en kategori, fjernes også den gjeldende verdien fra ATHLTH-entitetene i Home Assistant."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+    }
+
+    private func sharingToggle(
+        title: String,
+        detail: String,
+        icon: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 34, height: 34)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+        }
+    }
+
+    private func clearDisabledValues() {
+        guard homeAssistant.isConnected else {
+            return
+        }
+
+        Task {
+            await homeAssistant.clearDisabledValues()
+        }
     }
 
     private var discoveryCard: some View {
@@ -385,7 +587,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
@@ -422,7 +624,7 @@ struct HomeAssistantSettingsView: View {
             .padding(.horizontal, 14)
             .frame(height: 48)
             .background(
-                ATHLTHTheme.background,
+                ATHLTHTheme.canvasTop,
                 in: RoundedRectangle(
                     cornerRadius: 14,
                     style: .continuous
@@ -453,7 +655,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
@@ -484,7 +686,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
