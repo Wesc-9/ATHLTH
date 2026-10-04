@@ -1771,7 +1771,7 @@ struct FriendProfileView: View {
                     ) {
                         SocialAvatar(
                             profile: profile.card,
-                            size: 92
+                            size: 84
                         )
                         .overlay {
                             Circle()
