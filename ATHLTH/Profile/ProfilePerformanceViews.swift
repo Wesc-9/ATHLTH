@@ -62,6 +62,16 @@ enum ProfileFeaturedRecordKind:
     case fastestMarathon
     case longestRun
 
+    // Exercise-specific strength records shown in the profile picker.
+    case strengthBenchPress
+    case strengthBackSquat
+    case strengthDeadlift
+    case strengthShoulderPress
+    case strengthPullUps
+    case strengthDips
+    case strengthChinUps
+    case strengthFrontSquat
+
     case strengthHeaviestSet
     case strengthEstimatedOneRM
     case strengthWorkoutVolume
@@ -111,7 +121,15 @@ enum ProfileFeaturedRecordKind:
              .longestRun:
             return .running
 
-        case .strengthHeaviestSet,
+        case .strengthBenchPress,
+             .strengthBackSquat,
+             .strengthDeadlift,
+             .strengthShoulderPress,
+             .strengthPullUps,
+             .strengthDips,
+             .strengthChinUps,
+             .strengthFrontSquat,
+             .strengthHeaviestSet,
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
              .strengthBestRepPR,
@@ -186,7 +204,15 @@ enum ProfileFeaturedRecordKind:
             return .mostActiveCalories
         case .mostStepsInWorkout:
             return .mostStepsInWorkout
-        case .strengthHeaviestSet,
+        case .strengthBenchPress,
+             .strengthBackSquat,
+             .strengthDeadlift,
+             .strengthShoulderPress,
+             .strengthPullUps,
+             .strengthDips,
+             .strengthChinUps,
+             .strengthFrontSquat,
+             .strengthHeaviestSet,
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
              .strengthBestRepPR:
@@ -255,6 +281,37 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Longest run",
                 norwegian: "Lengste løpetur"
+            )
+        case .strengthBenchPress:
+            return ATHLTHLocalization.choose(
+                english: "Bench press",
+                norwegian: "Benkpress"
+            )
+        case .strengthBackSquat:
+            return ATHLTHLocalization.choose(
+                english: "Back squat",
+                norwegian: "Knebøy"
+            )
+        case .strengthDeadlift:
+            return ATHLTHLocalization.choose(
+                english: "Deadlift",
+                norwegian: "Markløft"
+            )
+        case .strengthShoulderPress:
+            return ATHLTHLocalization.choose(
+                english: "Shoulder press",
+                norwegian: "Skulderpress"
+            )
+        case .strengthPullUps:
+            return "Pullups"
+        case .strengthDips:
+            return "Dips"
+        case .strengthChinUps:
+            return "Chins"
+        case .strengthFrontSquat:
+            return ATHLTHLocalization.choose(
+                english: "Front squat",
+                norwegian: "Frontbøy"
             )
         case .strengthHeaviestSet:
             return ATHLTHLocalization.choose(
@@ -379,6 +436,37 @@ enum ProfileFeaturedRecordKind:
                 english: "Run",
                 norwegian: "Løp"
             )
+        case .strengthBenchPress:
+            return ATHLTHLocalization.choose(
+                english: "Bench",
+                norwegian: "Benkpress"
+            )
+        case .strengthBackSquat:
+            return ATHLTHLocalization.choose(
+                english: "Squat",
+                norwegian: "Knebøy"
+            )
+        case .strengthDeadlift:
+            return ATHLTHLocalization.choose(
+                english: "Deadlift",
+                norwegian: "Markløft"
+            )
+        case .strengthShoulderPress:
+            return ATHLTHLocalization.choose(
+                english: "Shoulder",
+                norwegian: "Skulder"
+            )
+        case .strengthPullUps:
+            return "Pullups"
+        case .strengthDips:
+            return "Dips"
+        case .strengthChinUps:
+            return "Chins"
+        case .strengthFrontSquat:
+            return ATHLTHLocalization.choose(
+                english: "Front squat",
+                norwegian: "Frontbøy"
+            )
         case .strengthHeaviestSet:
             return ATHLTHLocalization.choose(
                 english: "Heaviest",
@@ -481,9 +569,20 @@ enum ProfileFeaturedRecordKind:
             return "flag.checkered"
         case .longestRun:
             return "point.topleft.down.to.point.bottomright.curvepath"
-        case .strengthHeaviestSet,
+        case .strengthBenchPress,
+             .strengthBackSquat,
+             .strengthDeadlift,
+             .strengthShoulderPress,
+             .strengthFrontSquat,
+             .strengthHeaviestSet,
              .longestStrengthWorkout:
             return "dumbbell.fill"
+        case .strengthPullUps:
+            return "figure.climbing"
+        case .strengthDips:
+            return "figure.strengthtraining.functional"
+        case .strengthChinUps:
+            return "figure.strengthtraining.traditional"
         case .strengthEstimatedOneRM:
             return "bolt.fill"
         case .strengthWorkoutVolume:
@@ -542,6 +641,22 @@ enum ProfileFeaturedRecordKind:
         case .fastestMarathon:
             return .indigo
         case .longestRun:
+            return .purple
+        case .strengthBenchPress:
+            return .blue
+        case .strengthBackSquat:
+            return .mint
+        case .strengthDeadlift:
+            return .indigo
+        case .strengthShoulderPress:
+            return .yellow
+        case .strengthPullUps:
+            return .pink
+        case .strengthDips:
+            return .cyan
+        case .strengthChinUps:
+            return .orange
+        case .strengthFrontSquat:
             return .purple
         case .strengthHeaviestSet:
             return .blue
@@ -629,6 +744,21 @@ enum ProfileFeaturedRecordKind:
                     kilometers
                 )
 
+        case .strengthBenchPress,
+             .strengthBackSquat,
+             .strengthDeadlift,
+             .strengthShoulderPress,
+             .strengthPullUps,
+             .strengthDips,
+             .strengthChinUps,
+             .strengthFrontSquat:
+            return strengthExerciseDisplayValue(
+                strengthRecords:
+                    strengthRecords,
+                strengthRepRecords:
+                    strengthRepRecords
+            )
+
         case .strengthHeaviestSet:
             return strengthRecords
                 .filter {
@@ -695,6 +825,131 @@ enum ProfileFeaturedRecordKind:
              .mostStepsInWorkout:
             return "—"
         }
+    }
+
+    private func strengthExerciseDisplayValue(
+        strengthRecords: [StrengthPersonalRecord],
+        strengthRepRecords: [StrengthRepPersonalRecord]
+    ) -> String {
+        func normalized(_ value: String) -> String {
+            value
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: .current
+                )
+                .lowercased()
+        }
+
+        func matches(_ value: String) -> Bool {
+            let value = normalized(value)
+
+            switch self {
+            case .strengthBenchPress:
+                return value.contains("bench press") ||
+                    value.contains("benkpress")
+            case .strengthBackSquat:
+                let isSquat =
+                    value.contains("back squat") ||
+                    value.contains("knebøy") ||
+                    value.contains("kneboy") ||
+                    value == "squat"
+                return isSquat &&
+                    !value.contains("front")
+            case .strengthDeadlift:
+                return value.contains("deadlift") ||
+                    value.contains("markløft") ||
+                    value.contains("markloft")
+            case .strengthShoulderPress:
+                return value.contains("shoulder press") ||
+                    value.contains("overhead press") ||
+                    value.contains("military press") ||
+                    value.contains("skulderpress")
+            case .strengthPullUps:
+                return value.contains("pullup") ||
+                    value.contains("pull-up") ||
+                    value.contains("pull up")
+            case .strengthDips:
+                return value == "dip" ||
+                    value.contains("dips")
+            case .strengthChinUps:
+                return value.contains("chinup") ||
+                    value.contains("chin-up") ||
+                    value.contains("chin up") ||
+                    value == "chins"
+            case .strengthFrontSquat:
+                return value.contains("front squat") ||
+                    value.contains("frontbøy") ||
+                    value.contains("frontboy")
+            default:
+                return false
+            }
+        }
+
+        let isRepFirst =
+            self == .strengthPullUps ||
+            self == .strengthDips ||
+            self == .strengthChinUps
+
+        if isRepFirst,
+           let repRecord =
+                strengthRepRecords
+                    .filter {
+                        matches(
+                            $0.exerciseName
+                        )
+                    }
+                    .max(
+                        by: {
+                            if $0.reps ==
+                                $1.reps {
+                                return $0.weightKilograms <
+                                    $1.weightKilograms
+                            }
+                            return $0.reps <
+                                $1.reps
+                        }
+                    ) {
+            if repRecord.weightKilograms >
+                0 {
+                return repRecord.value
+            }
+
+            return "\(repRecord.reps) reps"
+        }
+
+        if let record =
+                strengthRecords
+                    .filter {
+                        $0.kind ==
+                            .heaviestSet &&
+                        matches($0.title)
+                    }
+                    .max(
+                        by: {
+                            $0.score <
+                                $1.score
+                        }
+                    ) {
+            return record.value
+        }
+
+        if let repRecord =
+                strengthRepRecords
+                    .filter {
+                        matches(
+                            $0.exerciseName
+                        )
+                    }
+                    .max(
+                        by: {
+                            $0.weightKilograms <
+                                $1.weightKilograms
+                        }
+                    ) {
+            return repRecord.value
+        }
+
+        return "—"
     }
 
     static func decodedSelection(
