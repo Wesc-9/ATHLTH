@@ -9638,87 +9638,6 @@ struct ATHLTHProfileView: View {
             .dark,
             for: .navigationBar
         )
-        .toolbar {
-            ToolbarItemGroup(
-                placement: .topBarTrailing
-            ) {
-                NavigationLink {
-                    ATHLTHEditProfileView()
-                } label: {
-                    Image(
-                        systemName: "pencil"
-                    )
-                    .font(
-                        .system(
-                            size: 14,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 34,
-                        height: 34
-                    )
-                    .background(
-                        Color.black.opacity(0.24),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(0.28),
-                                lineWidth: 0.8
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Edit Profile",
-                        norwegian: "Rediger profil"
-                    )
-                )
-
-                NavigationLink {
-                    ATHLTHSettingsView()
-                } label: {
-                    Image(
-                        systemName:
-                            "gearshape.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 34,
-                        height: 34
-                    )
-                    .background(
-                        Color.black.opacity(0.24),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(0.28),
-                                lineWidth: 0.8
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Settings",
-                        norwegian:
-                            "Innstillinger"
-                    )
-                )
-            }
-        }
         .background {
             ATHLTHSwipeBackEnabler()
                 .frame(
@@ -9884,6 +9803,83 @@ struct ATHLTHProfileView: View {
                     y: 5
                 )
             }
+        }
+        .overlay(
+            alignment: .topTrailing
+        ) {
+            HStack(spacing: 10) {
+                NavigationLink {
+                    ATHLTHEditProfileView()
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+                        .background(
+                            Color.black.opacity(0.30),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.30),
+                                    lineWidth: 0.8
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Edit Profile",
+                        norwegian: "Rediger profil"
+                    )
+                )
+
+                NavigationLink {
+                    ATHLTHSettingsView()
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(
+                            .system(
+                                size: 17,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+                        .background(
+                            Color.black.opacity(0.30),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.30),
+                                    lineWidth: 0.8
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Settings",
+                        norwegian: "Innstillinger"
+                    )
+                )
+            }
+            .padding(.top, 72)
+            .padding(.trailing, 18)
         }
         .frame(height: 236)
         .clipped()
