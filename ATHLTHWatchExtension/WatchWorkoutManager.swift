@@ -1435,13 +1435,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func sendStrengthCommand(
         _ rawCommand: WatchStrengthCommand
     ) -> Bool {
-        guard WCSession.isSupported(),
-              WCSession.default.activationState ==
-                .activated
-        else {
-            return false
-        }
-
         var command = rawCommand
         if command.kind == .requestSnapshot,
            command.bootstrapSnapshot == nil,
@@ -1486,21 +1479,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .timeIntervalSince1970
         ]
 
-        // Always queue a durable copy. sendMessage remains the low-latency
-        // fast path, while transferUserInfo guarantees replay after hours
-        // away from iPhone or the internet.
-        WCSession.default.transferUserInfo(
-            payload
-        )
-
-        if WCSession.default.isReachable {
-            WCSession.default.sendMessage(
-                payload,
-                replyHandler: nil,
-                errorHandler: nil
+        if WCSession.isSupported(),
+           WCSession.default.activationState ==
+                .activated {
+            // Always queue a durable copy. sendMessage remains the low-latency
+            // fast path, while transferUserInfo guarantees replay after hours
+            // away from iPhone or the internet.
+            WCSession.default.transferUserInfo(
+                payload
             )
+
+            if WCSession.default.isReachable {
+                WCSession.default.sendMessage(
+                    payload,
+                    replyHandler: nil,
+                    errorHandler: nil
+                )
+            }
         }
 
+        // No companion session is required for local Watch logging. The full
+        // journal is also embedded in WatchWorkoutResult at finish.
         persistWorkoutRecoveryState()
         return true
     }
@@ -1595,6 +1594,65 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 allowsLiveExerciseBuilding:
                     true
             )
+
+        strengthCommandJournal = []
+        publish {
+            self.strengthSession =
+                snapshot
+            self.strengthActionPending =
+                false
+        }
+        persistWorkoutRecoveryState()
+    }
+
+    private func markStandaloneStrengthStarted() {
+        guard var snapshot =
+                strengthSession
+        else {
+            return
+        }
+
+        let now = Date()
+        snapshot.startedAt = now
+        snapshot.updatedAt = now
+        snapshot.inputMode =
+            .appleWatch
+        snapshot.isResting = false
+        snapshot.restEndsAt = nil
+        snapshot.completedSets = 0
+        snapshot.allExercisesComplete =
+            false
+        snapshot.currentExerciseComplete =
+            false
+        snapshot.exerciseIndex = 0
+        snapshot.setIndex = 0
+        snapshot.setNumber =
+            snapshot.setCount > 0
+                ? 1
+                : nil
+
+        if let first =
+                snapshot.exerciseQueue?
+                    .sorted(by: {
+                        $0.index < $1.index
+                    })
+                    .first {
+            snapshot.exerciseName =
+                first.name
+            snapshot.primaryMuscles =
+                first.primaryMuscles
+            snapshot.setCount =
+                first.setCount
+            snapshot.hasNextExercise =
+                (snapshot.exerciseQueue?.count ??
+                    0) > 1
+            applyStrengthPlanDefaults(
+                to: &snapshot,
+                exerciseIndex:
+                    first.index,
+                setIndex: 0
+            )
+        }
 
         strengthCommandJournal = []
         publish {
@@ -1844,6 +1902,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if kind == .strength {
             ensureStandaloneStrengthSession()
+            markStandaloneStrengthStarted()
         }
 
         let configuration =
@@ -2013,6 +2072,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         if kind == .strength {
             ensureStandaloneStrengthSession()
+            markStandaloneStrengthStarted()
         }
 
         let configuration = HKWorkoutConfiguration()
