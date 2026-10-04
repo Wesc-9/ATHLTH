@@ -299,6 +299,7 @@ struct AppRootView: View {
     @State private var lastFullLifecycleRefreshAt: Date?
     @State private var showingNotificationPermissionPrimer = false
     @State private var showingRelayedStrengthWorkout = false
+    @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
 
     @AppStorage("athlth.notifications.permissionPrimerShown")
     private var notificationPermissionPrimerShown = false
@@ -337,6 +338,32 @@ struct AppRootView: View {
         guard ATHLTHDeviceRole.isIPhone else {
             return
         }
+
+        guard Date() >= relayedWorkoutLaunchGuardUntil,
+              phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !workoutMirroring.hasActiveMirroredWorkout
+        else {
+            throw NSError(
+                domain:
+                    "ATHLTH.DeviceRelay",
+                code: 409,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Another workout is already active or starting on this iPhone.",
+                            norwegian:
+                                "En annen økt er allerede aktiv eller i ferd med å starte på denne iPhonen."
+                        )
+                ]
+            )
+        }
+
+        // Protect the small launch window before HealthKit mirroring or a local
+        // workout store has had time to publish its active state.
+        relayedWorkoutLaunchGuardUntil =
+            Date().addingTimeInterval(20)
 
         let envelope = command.envelope
         let payload = envelope.workoutPayload
