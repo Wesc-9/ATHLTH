@@ -1826,7 +1826,14 @@ struct AppRootView: View {
         if result.kind == .strength,
            let snapshot =
                 result.strengthSnapshot {
-            if strengthWorkout.activeWorkout == nil {
+            let alreadyCompleted =
+                strengthWorkout
+                    .completedWorkout?
+                    .id ==
+                snapshot.workoutID
+
+            if strengthWorkout.activeWorkout == nil,
+               !alreadyCompleted {
                 strengthWorkout
                     .startFromWatchSnapshot(
                         snapshot,
