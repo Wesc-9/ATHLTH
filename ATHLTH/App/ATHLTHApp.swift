@@ -1363,7 +1363,8 @@ struct AppRootView: View {
                 startedAt: publishable.startDate,
                 endedAt: publishable.endDate,
                 duration: publishable.duration,
-                distanceMeters: publishable.distanceMeters
+                distanceMeters: publishable.distanceMeters,
+                device: "Apple Watch"
             )
 
             await refreshHealthAfterWatchCompletion()
@@ -1662,7 +1663,11 @@ struct AppRootView: View {
                 startedAt: publishable.startDate,
                 endedAt: publishable.endDate,
                 duration: publishable.duration,
-                distanceMeters: publishable.distanceMeters
+                distanceMeters: publishable.distanceMeters,
+                device:
+                    workout.captureDevice == .appleWatch
+                        ? "Apple Watch"
+                        : "iPhone"
             )
 
             if workout.captureDevice == .appleWatch {
