@@ -492,8 +492,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                         where: {
                             $0.id == restoredID &&
                             $0.activity == "running" &&
-                            $0.ownerID !=
-                                currentUserID
+                            (
+                                $0.ownerID !=
+                                    currentUserID ||
+                                (
+                                    $0.ghostChallengeID != nil &&
+                                    $0.opponentUserID ==
+                                        currentUserID
+                                )
+                            )
                         }
                     ) {
                 selectedLiveGhostSessionID =
@@ -1008,10 +1015,18 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             return
         }
 
-        guard session.activity == "running",
-              session.ownerID != currentUserID
+        guard session.activity == "running"
         else {
             return
+        }
+
+        if session.ownerID == currentUserID {
+            guard
+                session.ghostChallengeID != nil,
+                session.opponentUserID != nil
+            else {
+                return
+            }
         }
 
         selectedLiveGhostSessionID =
@@ -1044,13 +1059,17 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     ) -> ATHLTHLiveGhostComparison? {
         guard let selectedSession =
                 selectedLiveGhostSession,
+              let opponentUserID =
+                liveGhostOpponentUserID(
+                    in: selectedSession
+                ),
               let livePoint =
                 liveLocations.first(
                     where: {
                         $0.sessionID ==
                             selectedSession.id &&
                         $0.userID ==
-                            selectedSession.ownerID
+                            opponentUserID
                     }
                 )
         else {
@@ -1124,7 +1143,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 sessionID:
                     selectedSession.id,
                 opponentUserID:
-                    selectedSession.ownerID,
+                    opponentUserID,
                 opponentDistanceMeters:
                     livePoint.distanceMeters,
                 opponentElapsedSeconds:
@@ -1201,6 +1220,23 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             updatedAt:
                 livePoint.updatedAt
         )
+    }
+
+    private func liveGhostOpponentUserID(
+        in session:
+            ATHLTHLiveWorkoutSession
+    ) -> UUID? {
+        guard let currentUserID else {
+            return session.ownerID
+        }
+
+        if session.ownerID ==
+            currentUserID {
+            return session
+                .opponentUserID
+        }
+
+        return session.ownerID
     }
 
     private func sanitizedRouteProgress(
