@@ -160,6 +160,7 @@ struct AppRootView: View {
     @EnvironmentObject private var communityEvents: CommunityEventStore
     @EnvironmentObject private var communityGroups: CommunityGroupStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
+    @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
     @EnvironmentObject private var trophies: TrophyStore
 
     @State private var authCallbackError: String?
@@ -440,14 +441,13 @@ struct AppRootView: View {
             Task {
                 await allowWatchMirroringToAttachIfNeeded()
 
-                guard !workoutMirroring.hasActiveMirroredWorkout,
-                      !ATHLTHWatchWorkoutRuntime
-                        .isMirroredWorkoutActive
-                else {
-                    return
+                if !workoutMirroring.hasActiveMirroredWorkout,
+                   !ATHLTHWatchWorkoutRuntime
+                        .isMirroredWorkoutActive {
+                    await resumeForegroundRefreshIfNeeded()
                 }
 
-                await resumeForegroundRefreshIfNeeded()
+                await syncHomeAssistantSnapshot()
             }
         }
         .onReceive(
@@ -489,6 +489,16 @@ struct AppRootView: View {
                             maximumHeartRateBPM: maxHR
                         )
                 }
+
+                await syncHomeAssistantSnapshot()
+            }
+        }
+        .onChange(of: health.recovery.score) { _, score in
+            Task {
+                await homeAssistant.sendRecovery(
+                    score: score
+                )
+                await syncHomeAssistantSnapshot()
             }
         }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
@@ -653,17 +663,35 @@ struct AppRootView: View {
                 await syncCalendarIfAllowed(
                     plan: plan
                 )
+                await syncHomeAssistantSnapshot()
+            }
+        }
+        .onChange(
+            of: appSession.standalonePlannedSessions.map(\.id)
+        ) { _, _ in
+            Task {
+                await syncHomeAssistantSnapshot()
             }
         }
         .onChange(of: appSession.profile.presence) { _, presence in
-            guard appSession.signedIn,
-                  social.privacy?.shareTrainingPresence == true
-            else {
+            guard appSession.signedIn else {
                 return
             }
 
             Task {
-                await social.syncPresence(presence)
+                if presence.state == .training {
+                    await homeAssistant.sendWorkoutStarted(
+                        name: presence.workoutTitle,
+                        startedAt: presence.startedAt
+                    )
+                } else {
+                    await homeAssistant.sendWorkoutCancelled()
+                }
+
+                if social.privacy?
+                    .shareTrainingPresence == true {
+                    await social.syncPresence(presence)
+                }
             }
         }
         .onChange(of: settings.profileVisibility) { _, visibility in
@@ -728,7 +756,14 @@ struct AppRootView: View {
             )
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
-            guard signedIn else { return }
+            guard signedIn else {
+                Task {
+                    if homeAssistant.isConnected {
+                        await homeAssistant.disconnect()
+                    }
+                }
+                return
+            }
 
             appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
             scheduleNotificationPermissionPrimerIfNeeded()
@@ -744,7 +779,35 @@ struct AppRootView: View {
                 if health.hasRequestedAuthorization {
                     await syncSocialOwnedData()
                 }
+                await syncHomeAssistantSnapshot()
             }
+        }
+        .onChange(of: homeAssistant.connectionState) { _, state in
+            guard state == .connected else {
+                return
+            }
+
+            Task {
+                await syncHomeAssistantSnapshot()
+            }
+        }
+        .onChange(of: homeAssistant.shareWorkoutState) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareRecovery) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareTrainingLoad) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareWeeklyProgress) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareNextWorkout) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: appSession.onboardingCompleted) { _, completed in
             guard completed else { return }
@@ -1257,6 +1320,15 @@ struct AppRootView: View {
             .recordWatchWorkout(result)
 
         Task { @MainActor in
+            await homeAssistant.sendCompletedWorkout(
+                name: publishable.title,
+                type: publishable.activity.rawValue,
+                startedAt: publishable.startDate,
+                endedAt: publishable.endDate,
+                duration: publishable.duration,
+                distanceMeters: publishable.distanceMeters
+            )
+
             await refreshHealthAfterWatchCompletion()
 
             await officialWeeklyChallenges
@@ -1401,6 +1473,15 @@ struct AppRootView: View {
         )
 
         Task {
+            await homeAssistant.sendCompletedWorkout(
+                name: publishable.title,
+                type: publishable.activity.rawValue,
+                startedAt: publishable.startDate,
+                endedAt: publishable.endDate,
+                duration: publishable.duration,
+                distanceMeters: publishable.distanceMeters
+            )
+
             await officialWeeklyChallenges
                 .syncCompletionState(
                     workouts: health.workouts
@@ -1538,6 +1619,15 @@ struct AppRootView: View {
         )
 
         Task {
+            await homeAssistant.sendCompletedWorkout(
+                name: publishable.title,
+                type: publishable.activity.rawValue,
+                startedAt: publishable.startDate,
+                endedAt: publishable.endDate,
+                duration: publishable.duration,
+                distanceMeters: publishable.distanceMeters
+            )
+
             if workout.captureDevice == .appleWatch {
                 await refreshHealthAfterWatchCompletion()
                 await officialWeeklyChallenges
@@ -1857,6 +1947,332 @@ struct AppRootView: View {
                 appSession.profile.username
         )
         notifications.syncTrophyEvents(from: trophies.unlocks)
+    }
+
+    @MainActor
+    private func syncHomeAssistantSnapshot() async {
+        guard appSession.signedIn,
+              homeAssistant.isConnected
+        else {
+            return
+        }
+
+        let latestWorkout =
+            health.workouts.max {
+                $0.startDate < $1.startDate
+            }
+
+        let trainingLoad: Double?
+        if homeAssistant.shareTrainingLoad {
+            trainingLoad =
+                await health
+                    .recoveryTrendSnapshot(
+                        days: 28
+                    )
+                    .trainingLoad
+                    .ratio
+        } else {
+            trainingLoad = nil
+        }
+
+        let presence =
+            appSession.profile.presence
+
+        await homeAssistant.syncSnapshot(
+            workoutActive:
+                presence.state == .training,
+            activeWorkout:
+                presence.state == .training
+                    ? presence.workoutTitle
+                    : nil,
+            lastWorkout:
+                latestWorkout?
+                    .activity
+                    .rawValue,
+            recoveryScore:
+                health.recovery.score,
+            trainingLoad:
+                trainingLoad,
+            weeklyProgress:
+                homeAssistantWeeklyProgress(),
+            nextWorkout:
+                homeAssistantNextWorkoutTitle()
+        )
+    }
+
+    private func homeAssistantPlannedOccurrences()
+        -> [
+            (
+                planID: UUID?,
+                session: PlannedSession
+            )
+        ] {
+        var plansByID: [UUID: TrainingPlan] = [:]
+
+        if let activePlan =
+                appSession.activePlan {
+            plansByID[activePlan.id] =
+                activePlan
+        }
+
+        for plan in appSession.scheduledPlans {
+            plansByID[plan.id] = plan
+        }
+
+        var occurrences:
+            [
+                (
+                    planID: UUID?,
+                    session: PlannedSession
+                )
+            ] = []
+
+        for plan in plansByID.values {
+            for session in
+                plan.weeks
+                    .flatMap(\.days)
+                    .flatMap(\.sessions) {
+                occurrences.append(
+                    (
+                        planID: plan.id,
+                        session: session
+                    )
+                )
+            }
+        }
+
+        occurrences.append(
+            contentsOf:
+                appSession
+                    .standalonePlannedSessions
+                    .map {
+                        (
+                            planID: nil,
+                            session: $0
+                        )
+                    }
+        )
+
+        return occurrences
+    }
+
+    private func homeAssistantNextWorkoutTitle()
+        -> String? {
+        let now = Date()
+
+        return homeAssistantPlannedOccurrences()
+            .filter { occurrence in
+                guard let start =
+                        occurrence
+                            .session
+                            .scheduledStart,
+                      start >= now
+                else {
+                    return false
+                }
+
+                if let planID =
+                        occurrence.planID {
+                    if appSession
+                        .isPlanSessionSkipped(
+                            planID: planID,
+                            sessionID:
+                                occurrence
+                                    .session
+                                    .id
+                        ) {
+                        return false
+                    }
+
+                    if appSession
+                        .isPlanSessionManuallyCompleted(
+                            planID: planID,
+                            sessionID:
+                                occurrence
+                                    .session
+                                    .id
+                        ) {
+                        return false
+                    }
+                }
+
+                return true
+            }
+            .sorted {
+                (
+                    $0.session
+                        .scheduledStart ??
+                    .distantFuture
+                ) <
+                (
+                    $1.session
+                        .scheduledStart ??
+                    .distantFuture
+                )
+            }
+            .first?
+            .session
+            .title
+    }
+
+    private func homeAssistantWeeklyProgress()
+        -> Double? {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+
+        guard let week =
+                calendar.dateInterval(
+                    of: .weekOfYear,
+                    for: Date()
+                )
+        else {
+            return nil
+        }
+
+        var remainingActual =
+            health.workouts
+                .filter {
+                    week.contains(
+                        $0.startDate
+                    )
+                }
+
+        var completed = 0
+        var unfinished = 0
+
+        let planned =
+            homeAssistantPlannedOccurrences()
+                .filter {
+                    guard let start =
+                            $0.session
+                                .scheduledStart
+                    else {
+                        return false
+                    }
+                    return week.contains(start)
+                }
+                .sorted {
+                    (
+                        $0.session
+                            .scheduledStart ??
+                        .distantFuture
+                    ) <
+                    (
+                        $1.session
+                            .scheduledStart ??
+                        .distantFuture
+                    )
+                }
+
+        for occurrence in planned {
+            if let planID = occurrence.planID {
+                if appSession
+                    .isPlanSessionSkipped(
+                        planID: planID,
+                        sessionID:
+                            occurrence.session.id
+                    ) {
+                    continue
+                }
+
+                if appSession
+                    .isPlanSessionManuallyCompleted(
+                        planID: planID,
+                        sessionID:
+                            occurrence.session.id
+                    ) {
+                    completed += 1
+                    continue
+                }
+            }
+
+            if let index =
+                    remainingActual
+                        .firstIndex(
+                            where: {
+                                homeAssistantWorkout(
+                                    $0,
+                                    matches:
+                                        occurrence
+                                            .session,
+                                    calendar:
+                                        calendar
+                                )
+                            }
+                        ) {
+                completed += 1
+                remainingActual.remove(
+                    at: index
+                )
+            } else {
+                unfinished += 1
+            }
+        }
+
+        completed += remainingActual.count
+        let total = completed + unfinished
+
+        guard total > 0 else {
+            return 0
+        }
+
+        return min(
+            max(
+                Double(completed) /
+                    Double(total) *
+                    100,
+                0
+            ),
+            100
+        )
+    }
+
+    private func homeAssistantWorkout(
+        _ workout: WorkoutSummary,
+        matches planned: PlannedSession,
+        calendar: Calendar
+    ) -> Bool {
+        guard let start =
+                planned.scheduledStart,
+              calendar.isDate(
+                workout.startDate,
+                inSameDayAs: start
+              )
+        else {
+            return false
+        }
+
+        switch planned.kind {
+        case .running:
+            return workout.activity ==
+                .running
+        case .walking:
+            return workout.activity ==
+                .walking ||
+                workout.activity ==
+                    .hiking
+        case .strength:
+            return workout.activity ==
+                .strength
+        case .mobility:
+            return workout.activity ==
+                .yoga ||
+                workout.activity ==
+                    .coreTraining
+        case .recovery:
+            return false
+        case .custom:
+            return workout.activity ==
+                .hiit ||
+                workout.activity ==
+                    .rowing ||
+                workout.activity ==
+                    .cycling ||
+                workout.activity ==
+                    .stairClimbing ||
+                workout.activity ==
+                    .other
+        }
     }
 
     private func syncPushPreferences() async {
