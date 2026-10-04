@@ -724,7 +724,7 @@ final class StrengthWorkoutStore: ObservableObject {
         _ exercise: Exercise,
         sets: Int = 3,
         reps: Int? = 8,
-        targetKind: StrengthExerciseTargetKind = .reps,
+        targetKind: StrengthExerciseTargetKind? = nil,
         targetDurationSeconds: Int? = nil,
         targetWeightKilograms: Double? = nil,
         restSeconds: Int? = 90,
@@ -732,6 +732,11 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         guard var workout = activeWorkout else { return }
 
+        let resolvedTargetKind =
+            targetKind ??
+            exercise
+                .snapshot
+                .defaultStrengthTargetKind
         let setCount = max(sets, 1)
         let log = StrengthExerciseLog(
             id: UUID(),
@@ -742,7 +747,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     id: UUID(),
                     setNumber: number,
                     plannedReps:
-                        targetKind == .reps
+                        resolvedTargetKind == .reps
                             ? reps
                             : nil,
                     plannedWeightKilograms: targetWeightKilograms,
@@ -761,9 +766,9 @@ final class StrengthWorkoutStore: ObservableObject {
                         )
                             ? true
                             : nil,
-                    targetKind: targetKind,
+                    targetKind: resolvedTargetKind,
                     plannedDurationSeconds:
-                        targetKind == .time
+                        resolvedTargetKind == .time
                             ? max(
                                 targetDurationSeconds ??
                                     exercise
