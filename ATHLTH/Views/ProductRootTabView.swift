@@ -2444,7 +2444,17 @@ struct ATHLTHHomeView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("WORKOUT IN PROGRESS")
+                        Text(
+                            strengthWorkout.hasRecoveredActiveWorkout
+                                ? ATHLTHLocalization.choose(
+                                    english: "UNFINISHED WORKOUT",
+                                    norwegian: "UFERDIG ØKT"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "WORKOUT IN PROGRESS",
+                                    norwegian: "ØKT PÅGÅR"
+                                )
+                        )
                             .font(.system(size: 9, weight: .bold))
                             .tracking(1.2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2454,9 +2464,26 @@ struct ATHLTHHomeView: View {
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(1)
 
-                        Text(active.startedAt, style: .timer)
+                        if let recoveredAt =
+                                strengthWorkout
+                                    .recoveredActiveWorkoutReferenceDate {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english: "Last saved %@",
+                                    norwegian: "Sist lagret %@",
+                                    recoveredAt.formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    )
+                                )
+                            )
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        } else {
+                            Text(active.startedAt, style: .timer)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     Spacer()
@@ -4880,6 +4907,8 @@ struct ATHLTHTrainView: View {
             alignment: .leading
         )
 
+        unfinishedWorkoutRecoveryCards
+
         if let plan = session.activePlan {
             todaysPlanCard(plan)
         } else {
@@ -5229,6 +5258,252 @@ struct ATHLTHTrainView: View {
     }
 
     @ViewBuilder
+    private var unfinishedWorkoutRecoveryCards: some View {
+        if phoneWorkout.hasRecoveredActiveWorkout,
+           let active = phoneWorkout.active {
+            unfinishedWorkoutRecoveryCard(
+                title: active.title,
+                activity:
+                    active.walking
+                        ? ATHLTHLocalization.choose(
+                            english: "Walk",
+                            norwegian: "Gange"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Run",
+                            norwegian: "Løping"
+                        ),
+                source: "iPhone",
+                lastUpdated:
+                    phoneWorkout
+                        .recoveredActiveWorkoutReferenceDate ??
+                    active.lastCheckpoint,
+                needsReview:
+                    phoneWorkout
+                        .recoveredActiveWorkoutNeedsReview,
+                onContinue: {
+                    phoneWorkout.presentWorkout()
+                },
+                onFinish: {
+                    Task {
+                        await phoneWorkout.finish()
+                    }
+                },
+                onDiscard: {
+                    phoneWorkout.discardActiveWorkout()
+                }
+            )
+        }
+
+        if strengthWorkout.hasRecoveredActiveWorkout,
+           let active = strengthWorkout.activeWorkout {
+            unfinishedWorkoutRecoveryCard(
+                title: active.title,
+                activity:
+                    ATHLTHLocalization.choose(
+                        english: "Strength",
+                        norwegian: "Styrke"
+                    ),
+                source: active.captureDevice.title,
+                lastUpdated:
+                    strengthWorkout
+                        .recoveredActiveWorkoutReferenceDate ??
+                    active.startedAt,
+                needsReview:
+                    strengthWorkout
+                        .recoveredActiveWorkoutNeedsReview,
+                onContinue: {
+                    showingStrengthWorkout = true
+                },
+                onFinish: {
+                    strengthWorkout.finish()
+                },
+                onDiscard: {
+                    strengthWorkout.discardActiveWorkout()
+                }
+            )
+        }
+    }
+
+    private func unfinishedWorkoutRecoveryCard(
+        title: String,
+        activity: String,
+        source: String,
+        lastUpdated: Date,
+        needsReview: Bool,
+        onContinue: @escaping () -> Void,
+        onFinish: @escaping () -> Void,
+        onDiscard: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        needsReview
+                            ? "exclamationmark.arrow.triangle.2.circlepath"
+                            : "arrow.counterclockwise.circle.fill"
+                )
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(
+                    needsReview
+                        ? Color.orange
+                        : ATHLTHTheme.accentDeep
+                )
+                .frame(width: 38, height: 38)
+                .background(
+                    (
+                        needsReview
+                            ? Color.orange
+                            : ATHLTHTheme.accent
+                    )
+                    .opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "UNFINISHED WORKOUT",
+                            norwegian: "UFERDIG ØKT"
+                        )
+                    )
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.25)
+                    .foregroundStyle(
+                        needsReview
+                            ? Color.orange
+                            : ATHLTHTheme.mutedText
+                    )
+
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text(
+                        "\(activity) · \(source) · " +
+                        lastUpdated.formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                }
+
+                Spacer()
+            }
+
+            Text(
+                needsReview
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "This workout has been inactive for more than 12 hours. Continue it, end and save it, or discard it before starting something new.",
+                        norwegian:
+                            "Denne økten har vært inaktiv i mer enn 12 timer. Fortsett den, avslutt og lagre den, eller forkast den før du starter noe nytt."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "ATHLTH recovered this workout from the last saved checkpoint.",
+                        norwegian:
+                            "ATHLTH gjenopprettet denne økten fra siste lagrede punkt."
+                    )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+
+            HStack(spacing: 8) {
+                Button(action: onContinue) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Continue",
+                            norwegian: "Fortsett"
+                        ),
+                        systemImage: "play.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+                Menu {
+                    Button {
+                        onFinish()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "End and save",
+                                norwegian: "Avslutt og lagre"
+                            ),
+                            systemImage: "checkmark.circle"
+                        )
+                    }
+
+                    Button(
+                        role: .destructive
+                    ) {
+                        onDiscard()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Discard workout",
+                                norwegian: "Forkast økt"
+                            ),
+                            systemImage: "trash"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(width: 42, height: 34)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(14)
+        .background(
+            (
+                needsReview
+                    ? Color.orange
+                    : ATHLTHTheme.accent
+            )
+            .opacity(0.055),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                (
+                    needsReview
+                        ? Color.orange
+                        : ATHLTHTheme.accent
+                )
+                .opacity(0.16),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    @ViewBuilder
     private var planContent: some View {
         if session.activePlan != nil {
             VStack(alignment: .leading, spacing: 16) {
@@ -5474,7 +5749,9 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
-        watchConnection.isReady
+        watchConnection.isReady &&
+        phoneWorkout.active == nil &&
+        strengthWorkout.activeWorkout == nil
     }
 
     private var quickStartCustomSubtitle: String {
@@ -5494,10 +5771,32 @@ struct ATHLTHTrainView: View {
     ) -> String {
         switch kind {
         case .running:
+            if let active = phoneWorkout.active {
+                return active.walking
+                    ? ATHLTHLocalization.choose(
+                        english: "Walk in progress",
+                        norwegian: "Gåøkt pågår"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Continue workout",
+                        norwegian: "Fortsett økt"
+                    )
+            }
             return watchConnection.isReady
                 ? "iPhone / Watch · Free / Route / Workout"
                 : "iPhone · Free Run"
         case .walking:
+            if let active = phoneWorkout.active {
+                return active.walking
+                    ? ATHLTHLocalization.choose(
+                        english: "Continue workout",
+                        norwegian: "Fortsett økt"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Run in progress",
+                        norwegian: "Løpeøkt pågår"
+                    )
+            }
             return watchConnection.isReady
                 ? "iPhone / Watch · Free Walk"
                 : "iPhone · Free Walk"
@@ -5518,14 +5817,23 @@ struct ATHLTHTrainView: View {
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
-        guard phoneWorkout.active == nil else { return false }
+        if let active = phoneWorkout.active {
+            switch kind {
+            case .running:
+                return !active.walking
+            case .walking:
+                return active.walking
+            case .strength, .mobility, .recovery, .custom:
+                return false
+            }
+        }
 
         switch kind {
         case .running, .walking:
             return true
         case .strength:
-            // An unfinished strength checkpoint is a resumable workout,
-            // not a reason to disable the Strength quick-start tile.
+            // A recovered strength checkpoint is resumable and is surfaced
+            // explicitly above, so it must never silently disable Strength.
             return true
         case .mobility, .recovery, .custom:
             return false
@@ -5535,9 +5843,19 @@ struct ATHLTHTrainView: View {
     private func handleQuickStart(_ kind: WorkoutKind) {
         switch kind {
         case .running:
-            showingRunQuickStart = true
+            if let active = phoneWorkout.active,
+               !active.walking {
+                phoneWorkout.presentWorkout()
+            } else {
+                showingRunQuickStart = true
+            }
         case .walking:
-            showingWalkQuickStart = true
+            if let active = phoneWorkout.active,
+               active.walking {
+                phoneWorkout.presentWorkout()
+            } else {
+                showingWalkQuickStart = true
+            }
         case .strength:
             if strengthWorkout.activeWorkout != nil {
                 showingStrengthWorkout = true
