@@ -617,6 +617,62 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    func pairLocally(
+        to instance: HomeAssistantDiscoveredInstance,
+        pairingCode: String
+    ) {
+        guard let baseURL = instance.preferredURL else {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant was found, but it did not advertise a usable local URL.",
+                norwegian:
+                    "Home Assistant ble funnet, men annonserte ingen brukbar lokal adresse."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        Task {
+            await completeLocalPairing(
+                baseURL: baseURL,
+                instanceName: instance.name,
+                pairingCode: pairingCode
+            )
+        }
+    }
+
+    func pairLocallyManually(
+        address: String,
+        pairingCode: String
+    ) {
+        guard let baseURL =
+                Self.normalizedBaseURL(
+                    from: address
+                )
+        else {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Enter a valid Home Assistant address.",
+                norwegian:
+                    "Skriv inn en gyldig Home Assistant-adresse."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        Task {
+            await completeLocalPairing(
+                baseURL: baseURL,
+                instanceName:
+                    baseURL.host
+                    ?? "Home Assistant",
+                pairingCode: pairingCode
+            )
+        }
+    }
+
     func connect(to instance: HomeAssistantDiscoveredInstance) {
         guard let baseURL = instance.preferredURL else {
             lastErrorMessage = ATHLTHLocalization.choose(
@@ -1936,6 +1992,181 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    private func completeLocalPairing(
+        baseURL: URL,
+        instanceName: String,
+        pairingCode: String
+    ) async {
+        let normalizedCode =
+            pairingCode.filter(\.isNumber)
+
+        guard normalizedCode.count == 6 else {
+            let message =
+                HomeAssistantConnectionError
+                    .invalidLocalPairingCode
+                    .localizedDescription
+            lastErrorMessage = message
+            connectionState =
+                .error(message)
+            return
+        }
+
+        stopDiscovery()
+        lastErrorMessage = nil
+        connectionState = .pairing
+
+        do {
+            let response =
+                try await requestLocalPairing(
+                    pairingCode:
+                        normalizedCode,
+                    baseURL: baseURL
+                )
+
+            try Self.validatePairResponse(
+                response
+            )
+
+            let pairing =
+                HomeAssistantStoredPairing(
+                    instanceName:
+                        instanceName,
+                    instanceURL:
+                        baseURL,
+                    protocolVersion:
+                        response
+                            .protocolVersion,
+                    clientID:
+                        response.clientID,
+                    webhookID:
+                        response.webhookID,
+                    webhookURL:
+                        response.webhookURL,
+                    webhookPath:
+                        response.webhookPath,
+                    sharedSecret:
+                        response.sharedSecret,
+                    signatureAlgorithm:
+                        response
+                            .signatureAlgorithm,
+                    capabilities:
+                        response.capabilities,
+                    pairedAt: Date()
+                )
+
+            try storePairing(pairing)
+            storedPairing = pairing
+            connectedInstanceName =
+                instanceName
+            connectedInstanceURL =
+                baseURL
+            lastErrorMessage = nil
+            connectionState = .connected
+
+            await sendReliably(
+                event: "sync_snapshot",
+                payload: [
+                    "state": .object([
+                        "workout_active":
+                            .bool(false),
+                        "active_workout":
+                            .null
+                    ])
+                ]
+            )
+        } catch {
+            lastErrorMessage =
+                error.localizedDescription
+            connectionState =
+                .error(
+                    error.localizedDescription
+                )
+        }
+    }
+
+    private func requestLocalPairing(
+        pairingCode: String,
+        baseURL: URL
+    ) async throws
+        -> HomeAssistantPairResponse {
+        let endpoint =
+            baseURL.appending(
+                path:
+                    "api/athlth/pair/local",
+                directoryHint:
+                    .notDirectory
+            )
+
+        var request =
+            URLRequest(url: endpoint)
+        request.timeoutInterval = 15
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField:
+                "Accept"
+        )
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField:
+                "Content-Type"
+        )
+        request.setValue(
+            "no-store",
+            forHTTPHeaderField:
+                "Cache-Control"
+        )
+        request.httpBody =
+            try JSONSerialization.data(
+                withJSONObject: [
+                    "pairing_code":
+                        pairingCode,
+                    "client_id":
+                        clientInstallationID(),
+                    "client_name":
+                        "ATHLTH iPhone"
+                ]
+            )
+
+        let (data, response) =
+            try await URLSession.shared
+                .data(for: request)
+
+        guard let httpResponse =
+                response
+                    as? HTTPURLResponse
+        else {
+            throw HomeAssistantConnectionError
+                .invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200..<300:
+            return try JSONDecoder()
+                .decode(
+                    HomeAssistantPairResponse
+                        .self,
+                    from: data
+                )
+        case 401:
+            throw HomeAssistantConnectionError
+                .invalidLocalPairingCode
+        case 403:
+            throw HomeAssistantConnectionError
+                .localNetworkPairingRequired
+        case 404:
+            throw HomeAssistantConnectionError
+                .integrationMissing
+        default:
+            throw HomeAssistantConnectionError
+                .pairingFailed(
+                    Self.errorMessage(
+                        from: data
+                    )
+                )
+        }
+    }
+
     private func beginAuthorization(
         baseURL: URL,
         instanceName: String
@@ -2976,6 +3207,8 @@ private enum HomeAssistantConnectionError: LocalizedError {
     case invalidResponse
     case authorizationFailed(String)
     case integrationMissing
+    case invalidLocalPairingCode
+    case localNetworkPairingRequired
     case adminRequired
     case pairingFailed(String)
     case unsupportedProtocol(Int)
@@ -3011,6 +3244,20 @@ private enum HomeAssistantConnectionError: LocalizedError {
                     "Install and add the ATHLTH integration in Home Assistant first.",
                 norwegian:
                     "Installer og legg til ATHLTH-integrasjonen i Home Assistant først."
+            )
+        case .invalidLocalPairingCode:
+            return ATHLTHLocalization.choose(
+                english:
+                    "The Home Assistant pairing code is invalid or has expired. Generate a new code in Home Assistant and try again.",
+                norwegian:
+                    "Paringskoden fra Home Assistant er ugyldig eller har utløpt. Generer en ny kode i Home Assistant og prøv igjen."
+            )
+        case .localNetworkPairingRequired:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Code pairing only works on the same local network as Home Assistant. Use Home Assistant sign-in as a fallback.",
+                norwegian:
+                    "Kodeparing fungerer bare på samme lokalnett som Home Assistant. Bruk Home Assistant-innlogging som reserve."
             )
         case .adminRequired:
             return ATHLTHLocalization.choose(
