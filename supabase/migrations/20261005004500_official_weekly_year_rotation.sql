@@ -37,12 +37,8 @@ declare
   v_hero text;
   v_inserted integer := 0;
 begin
-  if auth.uid() is null then
-    raise exception 'Authentication required';
-  end if;
-
-  if p_weeks_ahead < 4 or p_weeks_ahead > 106 then
-    raise exception 'p_weeks_ahead must be between 4 and 106';
+  if p_weeks_ahead < 4 or p_weeks_ahead > 52 then
+    raise exception 'p_weeks_ahead must be between 4 and 52';
   end if;
 
   -- Prevent two simultaneous app refreshes from creating the same slots.
