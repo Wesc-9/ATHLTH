@@ -241,6 +241,17 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var rir: Double? = nil
     var isWarmUp: Bool? = nil
 
+    // Optional keeps workout history created before timed strength targets
+    // fully decodable. Legacy sets remain repetition-based.
+    var targetKind: StrengthExerciseTargetKind? = nil
+    var plannedDurationSeconds: Int? = nil
+    var completedDurationSeconds: Int? = nil
+
+    var resolvedTargetKind: StrengthExerciseTargetKind {
+        targetKind ??
+            (plannedDurationSeconds != nil ? .time : .reps)
+    }
+
     var isCompleted: Bool {
         completedAt != nil
     }
