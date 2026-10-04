@@ -1190,43 +1190,48 @@ final class StrengthWorkoutStore: ObservableObject {
                 exerciseIndex
             ].sets[setIndex]
 
-        let cleaned =
-            segments
-                .map {
-                    StrengthSetEffortSegment(
-                        id: $0.id,
-                        reps:
-                            $0.reps.map {
-                                max($0, 0)
-                            },
-                        weightKilograms:
-                            $0.weightKilograms.map {
-                                max($0, 0)
-                            },
-                        durationSeconds:
-                            $0.durationSeconds.map {
-                                min(
-                                    max($0, 0),
-                                    7_200
-                                )
-                            },
-                        distanceMeters:
-                            $0.distanceMeters.map {
-                                max($0, 0)
-                            },
-                        resistanceLevel:
-                            $0.resistanceLevel.map {
-                                min(max($0, 1), 10)
-                            }
-                    )
+        let cleaned: [StrengthSetEffortSegment] =
+            segments.compactMap { segment in
+                let reps = segment.reps.map { value in
+                    max(value, 0)
                 }
-                .filter {
-                    ($0.reps ?? 0) > 0 ||
-                    ($0.weightKilograms ?? 0) > 0 ||
-                    ($0.durationSeconds ?? 0) > 0 ||
-                    ($0.distanceMeters ?? 0) > 0 ||
-                    $0.resistanceLevel != nil
+                let weight =
+                    segment.weightKilograms.map { value in
+                        max(value, 0)
+                    }
+                let duration =
+                    segment.durationSeconds.map { value in
+                        min(max(value, 0), 7_200)
+                    }
+                let distance =
+                    segment.distanceMeters.map { value in
+                        max(value, 0)
+                    }
+                let resistance =
+                    segment.resistanceLevel.map { value in
+                        min(max(value, 1), 10)
+                    }
+
+                let hasValue =
+                    (reps ?? 0) > 0 ||
+                    (weight ?? 0) > 0 ||
+                    (duration ?? 0) > 0 ||
+                    (distance ?? 0) > 0 ||
+                    resistance != nil
+
+                guard hasValue else {
+                    return nil
                 }
+
+                return StrengthSetEffortSegment(
+                    id: segment.id,
+                    reps: reps,
+                    weightKilograms: weight,
+                    durationSeconds: duration,
+                    distanceMeters: distance,
+                    resistanceLevel: resistance
+                )
+            }
 
         set.effortSegments =
             cleaned.isEmpty
@@ -1235,11 +1240,11 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let totalReps =
             cleaned
-                .compactMap(\.reps)
+                .compactMap { $0.reps }
                 .reduce(0, +)
         let totalDuration =
             cleaned
-                .compactMap(\.durationSeconds)
+                .compactMap { $0.durationSeconds }
                 .reduce(0, +)
 
         set.completedReps =
@@ -1253,7 +1258,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let segmentWeights =
             cleaned
-                .compactMap(\.weightKilograms)
+                .compactMap { $0.weightKilograms }
                 .filter { $0 > 0 }
         if !segmentWeights.isEmpty {
             set.completedWeightKilograms =
@@ -1262,7 +1267,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let segmentResistance =
             cleaned
-                .compactMap(\.resistanceLevel)
+                .compactMap { $0.resistanceLevel }
                 .last
         set.completedResistanceLevel =
             resistanceLevel.map {
@@ -1273,7 +1278,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let segmentDistance =
             cleaned
-                .compactMap(\.distanceMeters)
+                .compactMap { $0.distanceMeters }
                 .reduce(0, +)
         set.completedDistanceMeters =
             distanceMeters.map {
@@ -1392,42 +1397,46 @@ final class StrengthWorkoutStore: ObservableObject {
                 exerciseIndex
             ].sets[setIndex]
 
-        let cleaned =
-            segments
-                .map {
-                    StrengthSetEffortSegment(
-                        id: $0.id,
-                        reps:
-                            $0.reps.map {
-                                max($0, 0)
-                            },
-                        weightKilograms:
-                            $0.weightKilograms.map {
-                                max($0, 0)
-                            },
-                        durationSeconds:
-                            $0.durationSeconds.map {
-                                min(max($0, 0), 7_200)
-                            },
-                        distanceMeters:
-                            $0.distanceMeters.map {
-                                max($0, 0)
-                            },
-                        resistanceLevel:
-                            $0.resistanceLevel.map {
-                                min(max($0, 1), 10)
-                            }
-                    )
+        let cleaned: [StrengthSetEffortSegment] =
+            segments.map { segment in
+                let reps = segment.reps.map { value in
+                    max(value, 0)
                 }
+                let weight =
+                    segment.weightKilograms.map { value in
+                        max(value, 0)
+                    }
+                let duration =
+                    segment.durationSeconds.map { value in
+                        min(max(value, 0), 7_200)
+                    }
+                let distance =
+                    segment.distanceMeters.map { value in
+                        max(value, 0)
+                    }
+                let resistance =
+                    segment.resistanceLevel.map { value in
+                        min(max(value, 1), 10)
+                    }
+
+                return StrengthSetEffortSegment(
+                    id: segment.id,
+                    reps: reps,
+                    weightKilograms: weight,
+                    durationSeconds: duration,
+                    distanceMeters: distance,
+                    resistanceLevel: resistance
+                )
+            }
 
         set.effortSegments = cleaned
         let reps =
             cleaned
-                .compactMap(\.reps)
+                .compactMap { $0.reps }
                 .reduce(0, +)
         let duration =
             cleaned
-                .compactMap(\.durationSeconds)
+                .compactMap { $0.durationSeconds }
                 .reduce(0, +)
         set.completedReps =
             reps > 0 ? reps : nil
@@ -1437,7 +1446,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 : set.completedDurationSeconds
         set.completedWeightKilograms =
             cleaned
-                .compactMap(\.weightKilograms)
+                .compactMap { $0.weightKilograms }
                 .max() ??
             set.completedWeightKilograms
         set.completedResistanceLevel =
@@ -1445,12 +1454,12 @@ final class StrengthWorkoutStore: ObservableObject {
                 min(max($0, 1), 10)
             } ??
             cleaned
-                .compactMap(\.resistanceLevel)
+                .compactMap { $0.resistanceLevel }
                 .last ??
             set.completedResistanceLevel
         let segmentDistance =
             cleaned
-                .compactMap(\.distanceMeters)
+                .compactMap { $0.distanceMeters }
                 .reduce(0, +)
         set.completedDistanceMeters =
             distanceMeters.map {
