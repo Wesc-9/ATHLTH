@@ -539,3 +539,4 @@ validate-after-compile-fixes-build-trigger
 Validate 1.6.0 profile rebuild
 Validate profile strength record fix
 Validate 1.6.0 profile records and remote profile rebuild
+Validate expanded profile records and Health fixes
