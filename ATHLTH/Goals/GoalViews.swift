@@ -417,6 +417,13 @@ struct GoalDetailView: View {
                 maxWidth: .infinity
             )
             .frame(height: 322)
+            // Match the Home Goal card: overscan the artwork slightly
+            // before clipping so light source-image edges can never
+            // appear at the top or bottom of the full-width hero.
+            .scaleEffect(
+                1.12,
+                anchor: .center
+            )
             .clipped()
 
             LinearGradient(
