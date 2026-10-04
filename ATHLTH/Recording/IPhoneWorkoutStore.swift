@@ -585,6 +585,42 @@ final class IPhoneWorkoutStore:
         showingWorkout = false
     }
 
+    func setTreadmillInclinePercent(
+        _ percent: Double
+    ) {
+        guard var workout = active,
+              workout.runEnvironment ==
+                .treadmill
+        else {
+            return
+        }
+
+        let value =
+            min(
+                max(percent, 0),
+                20
+            )
+
+        workout.treadmillInclinePercent =
+            value
+        workout.lastCheckpoint = Date()
+        active = workout
+
+        message =
+            ATHLTHLocalization.format(
+                english:
+                    "Treadmill · %.1f%% incline",
+                norwegian:
+                    "Tredemølle · %.1f%% stigning",
+                value
+            )
+
+        persistActiveCheckpoint(
+            force: true
+        )
+        syncLiveActivity()
+    }
+
     func liveViewDidAppear() {
         liveViewIsVisible = true
         isUserMinimized = false
