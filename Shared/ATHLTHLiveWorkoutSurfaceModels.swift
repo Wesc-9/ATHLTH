@@ -129,6 +129,14 @@ struct ATHLTHLiveGhostContext: Codable, Hashable {
     var estimatedTimeDeltaSeconds: TimeInterval?
     var updatedAt: Date
 
+    // Optional V2 race context. Defaults keep older Watch/widget payloads
+    // backwards compatible.
+    var opponentName: String? = nil
+    var opponentDistanceMeters: Double? = nil
+    var ownProgressPercent: Double? = nil
+    var opponentProgressPercent: Double? = nil
+    var connectionText: String? = nil
+
     // Platform-neutral so iPhone, Watch and Widget targets can all decode it.
     var audio:
         ATHLTHLiveGhostAudioContext? = nil
