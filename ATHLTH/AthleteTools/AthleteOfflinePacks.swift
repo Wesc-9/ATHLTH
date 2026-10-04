@@ -166,6 +166,9 @@ private struct AthleteOfflinePackView: View {
         List {
             ForEach(pack.plan.weeks.flatMap(\.days).flatMap(\.sessions)) { session in
                 Section(session.title) {
+                    NavigationLink("Open workout controls") {
+                        PlannedWorkoutDetailView(planID: pack.plan.id, workout: session, isHealthCompleted: false)
+                    }
                     if let notes = session.notes { Text(notes) }
                     if let duration = session.durationMinutes { Text("\(duration) min") }
                     if let distance = session.targetDistanceKilometers { Text("\(distance, specifier: "%.1f") km") }

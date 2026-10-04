@@ -26,42 +26,6 @@ struct GhostFriendRaceHubView: View {
     var body: some View {
         List {
             Section {
-                QuickStartWorkoutDeviceCard(
-                    selection: $captureDevice,
-                    watchConnected:
-                        watchConnection.isReady &&
-                        !watchConnection
-                            .workoutLaunchInProgress,
-                    iPhoneEnabled:
-                        phoneWorkout.active == nil,
-                    iPhoneSubtitle:
-                        phoneWorkout.active == nil
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Record the friend Ghost Race with iPhone GPS while the other device can remain a companion.",
-                                norwegian:
-                                    "Registrer Friend Ghost Race med GPS på iPhone, mens den andre enheten kan brukes som companion."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "Finish the active iPhone workout before starting a friend Ghost Race.",
-                                norwegian:
-                                    "Fullfør den aktive iPhone-økten før du starter Friend Ghost Race."
-                            )
-                )
-                .listRowInsets(
-                    EdgeInsets(
-                        top: 6,
-                        leading: 0,
-                        bottom: 6,
-                        trailing: 0
-                    )
-                )
-                .listRowBackground(
-                    Color.clear
-                )
-            }
-            Section {
                 privacyCard
             }
 
@@ -362,37 +326,30 @@ struct GhostFriendRaceHubView: View {
                     .buttonStyle(.bordered)
                 }
 
-                Button {
-                    Task {
-                        await start(challenge)
-                    }
-                } label: {
-                    if startingChallengeID ==
-                        challenge.id {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Label(
-                            "Race this ghost",
-                            systemImage:
-                                "figure.run"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.vitality)
-                .disabled(
-                    startingChallengeID != nil ||
-                    (
-                        captureDevice == .iPhone
-                            ? phoneWorkout.active != nil
-                            : (
-                                !watchConnection.isReady ||
-                                watchConnection
-                                    .workoutLaunchInProgress
-                            )
+                NavigationLink {
+                    LiveGhostRaceLobbyView(
+                        challenge: challenge
                     )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open Live Ghost lobby",
+                            norwegian:
+                                "Åpne Live Ghost-lobby"
+                        ),
+                        systemImage:
+                            "person.2.wave.2.fill"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
                 )
             }
         }
@@ -449,6 +406,29 @@ struct GhostFriendRaceHubView: View {
                     }
                     .font(.caption.weight(.semibold))
                 }
+            }
+
+            if challenge.status == .accepted {
+                NavigationLink {
+                    LiveGhostRaceLobbyView(
+                        challenge: challenge
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open Live Ghost lobby",
+                            norwegian:
+                                "Åpne Live Ghost-lobby"
+                        ),
+                        systemImage:
+                            "person.2.wave.2.fill"
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
             }
         }
         .padding(.vertical, 4)

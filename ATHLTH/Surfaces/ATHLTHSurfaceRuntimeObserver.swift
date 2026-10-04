@@ -13,6 +13,8 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var social:
+        SocialStore
     @EnvironmentObject private var watchConnection:
         AppleWatchConnectionStore
 
@@ -220,9 +222,41 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 return nil
             }
 
+            let opponentName =
+                social.visibleProfiles
+                    .first {
+                        $0.userID ==
+                            comparison
+                                .opponentUserID
+                    }?
+                    .resolvedName ??
+                social.following
+                    .first {
+                        $0.userID ==
+                            comparison
+                                .opponentUserID
+                    }?
+                    .resolvedName ??
+                "ATHLTH athlete"
+
+            let connectionText: String
+            switch realtime
+                .liveGhostConnectionState {
+            case .live:
+                connectionText = "LIVE"
+            case .delayed(let seconds):
+                connectionText =
+                    "Delayed · \(seconds)s"
+            case .reconnecting(let seconds):
+                connectionText =
+                    "Reconnecting · \(seconds)s"
+            case .waiting:
+                connectionText = "Waiting"
+            }
+
             return ATHLTHLiveGhostContext(
                 title:
-                    "Live · \(selectedSession.title)",
+                    "Live · \(opponentName)",
                 distanceDeltaMeters:
                     comparison
                         .signedDistanceMeters,
@@ -231,6 +265,19 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         .estimatedTimeDeltaSeconds,
                 updatedAt:
                     comparison.updatedAt,
+                opponentName:
+                    opponentName,
+                opponentDistanceMeters:
+                    comparison
+                        .opponentDistanceMeters,
+                ownProgressPercent:
+                    comparison
+                        .ownRouteProgressPercent,
+                opponentProgressPercent:
+                    comparison
+                        .opponentRouteProgressPercent,
+                connectionText:
+                    connectionText,
                 audio: {
                     let configuration =
                         settings

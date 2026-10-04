@@ -339,8 +339,16 @@ final class IPhoneWorkoutStore:
         autoPauseEnabled: Bool = false
     ) {
         guard accountID != nil, !saving else { return }
-        showingWorkout = true
-        guard active == nil else { return }
+
+        // If a workout is already active, treat this as a request to return
+        // to its live screen. For a brand-new workout, defer presentation
+        // until after the workout exists and the launch sheet has had time
+        // to dismiss. Presenting a full-screen cover while SwiftUI is still
+        // dismissing the quick-start sheet can otherwise be dropped.
+        if active != nil {
+            showingWorkout = true
+            return
+        }
 
         pendingWalking = walking
         pendingRoute = route
@@ -432,6 +440,9 @@ final class IPhoneWorkoutStore:
             ghostAudioConfiguration:
                 ghostUpdates
         )
+
+        requestLiveWorkoutPresentationAfterLaunch()
+
         message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
         automaticPauseActive = false
@@ -461,6 +472,29 @@ final class IPhoneWorkoutStore:
         announceStructuredStepIfNeeded(
             prefix: "Starting"
         )
+    }
+
+    private func requestLiveWorkoutPresentationAfterLaunch() {
+        showingWorkout = false
+
+        Task { @MainActor [weak self] in
+            // Quick-start is presented as a sheet while the live workout is
+            // a full-screen cover at the app root. Give SwiftUI's dismissal
+            // transaction time to finish before requesting the next
+            // presentation. The workout itself is already running during
+            // this short UI hand-off.
+            try? await Task.sleep(
+                for: .milliseconds(400)
+            )
+
+            guard let self,
+                  self.active != nil
+            else {
+                return
+            }
+
+            self.showingWorkout = true
+        }
     }
 
     func pause() {

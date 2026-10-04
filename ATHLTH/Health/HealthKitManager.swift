@@ -661,17 +661,21 @@ final class HealthKitManager: ObservableObject {
         ]
 
         if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
-            registrations.append((sleepType, .hourly))
+            // Sleep updates are comparatively sparse, so immediate delivery
+            // keeps Home Assistant current without creating a high-rate wake loop.
+            registrations.append((sleepType, .immediate))
         }
 
         let quantityTypes: [(HKQuantityTypeIdentifier, HKUpdateFrequency)] = [
-            // ATHLTH does not show continuous background heart rate outside
-            // an active Watch workout, so hourly delivery avoids waking the
-            // iPhone for every sensor sample.
+            // Continuous raw heart rate can be very high frequency, so keep it
+            // hourly outside an active Watch workout. Recovery signals arrive
+            // much less often and can safely wake ATHLTH as soon as HealthKit
+            // publishes a new sample.
             (.heartRate, .hourly),
-            (.restingHeartRate, .hourly),
+            (.restingHeartRate, .immediate),
             (.walkingHeartRateAverage, .hourly),
-            (.heartRateVariabilitySDNN, .hourly),
+            (.heartRateVariabilitySDNN, .immediate),
+            (.respiratoryRate, .immediate),
             (.activeEnergyBurned, .hourly),
             (.basalEnergyBurned, .hourly),
             (.distanceWalkingRunning, .hourly),

@@ -411,6 +411,62 @@ final class SupabaseGhostFriendRaceService {
             .execute()
     }
 
+    func rematch(
+        _ challenge:
+            GhostFriendRaceChallengeRecord
+    ) async throws {
+        guard let senderID =
+                currentUserID
+        else {
+            throw GhostFriendRaceError
+                .notAuthenticated
+        }
+
+        guard
+            senderID ==
+                challenge.senderID ||
+            senderID ==
+                challenge.recipientID
+        else {
+            throw GhostFriendRaceError
+                .notAccepted
+        }
+
+        let recipientID =
+            senderID ==
+                challenge.senderID
+                ? challenge.recipientID
+                : challenge.senderID
+
+        let payload =
+            GhostFriendRaceInsert(
+                senderID: senderID,
+                recipientID:
+                    recipientID,
+                title: challenge.title,
+                referenceDurationSeconds:
+                    challenge
+                        .referenceDurationSeconds,
+                distanceMeters:
+                    challenge.distanceMeters,
+                routePoints:
+                    challenge.routePoints,
+                privacyTrimmed:
+                    challenge.privacyTrimmed,
+                status:
+                    GhostFriendRaceStatus
+                        .pending
+                        .rawValue
+            )
+
+        try await client
+            .from(
+                "ghost_race_challenges"
+            )
+            .insert(payload)
+            .execute()
+    }
+
     func respond(
         id: UUID,
         status: GhostFriendRaceStatus
@@ -566,6 +622,24 @@ final class GhostFriendRaceStore:
                         .hideRouteStartAndEnd
             )
 
+            await refresh()
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
+    func rematch(
+        _ challenge:
+            GhostFriendRaceChallengeRecord
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            try await service
+                .rematch(challenge)
             await refresh()
             return true
         } catch {

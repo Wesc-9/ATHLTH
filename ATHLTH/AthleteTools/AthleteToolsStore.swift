@@ -38,6 +38,14 @@ final class AthleteToolsStore: ObservableObject {
         fuelEndsAt = data.fuelEndsAt
         restoring = false
         if let oldID, oldID != id { await cancelNotifications(for: oldID) }
+        // Also remove stale reminders from accounts used before this app launch.
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests()
+        let currentPrefix = userID.map { prefix(for: $0) }
+        let staleIDs = pending.filter { request in
+            request.identifier.hasPrefix("athlete-tools.") && !(currentPrefix.map { request.identifier.hasPrefix($0) } ?? false)
+        }.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: staleIDs)
     }
 
     private func persist() {
