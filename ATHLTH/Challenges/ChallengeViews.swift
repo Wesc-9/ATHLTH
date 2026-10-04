@@ -8418,6 +8418,464 @@ struct ChallengeDetailView: View {
             .uppercased()
     }
 
+    private func challengeGhostRaceCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        let liveSessions =
+            liveGhostSessions(
+                for: challenge
+            )
+
+        return ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            "figure.run.circle.fill"
+                    )
+                    .font(.title2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                    .frame(
+                        width: 44,
+                        height: 44
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text("Ghost Race")
+                            .font(.headline)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Race the clock, chase someone live or start a friend Ghost.",
+                                norwegian:
+                                    "Løp mot klokken, jag noen live eller start en Friend Ghost."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                    }
+
+                    Spacer()
+
+                    NavigationLink {
+                        GhostRaceHubView()
+                    } label: {
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(
+                            .caption.bold()
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    ghostCapabilityPill(
+                        title:
+                            "Target",
+                        icon:
+                            "timer",
+                        active:
+                            challenge.rules
+                                .targetGhostAllowed &&
+                            challenge.rules.route != nil
+                    )
+
+                    ghostCapabilityPill(
+                        title:
+                            "Live Ghost",
+                        icon:
+                            "dot.radiowaves.left.and.right",
+                        active:
+                            challenge.rules
+                                .liveGhostAllowed
+                    )
+
+                    ghostCapabilityPill(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Friend",
+                                norwegian: "Venn"
+                            ),
+                        icon:
+                            "person.2.fill",
+                        active: true
+                    )
+                }
+
+                if challenge.rules
+                    .liveGhostAllowed {
+                    if liveSessions.isEmpty {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(
+                                    ATHLTHTheme
+                                        .mutedText
+                                        .opacity(0.18)
+                                )
+                                .frame(
+                                    width: 8,
+                                    height: 8
+                                )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "No challenge participant is running live right now. This updates when someone starts a visible run.",
+                                    norwegian:
+                                        "Ingen deltakere i challengen løper live akkurat nå. Dette oppdateres når noen starter en synlig løpeøkt."
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                        }
+                    } else {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 8
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "LIVE NOW",
+                                    norwegian:
+                                        "LIVE NÅ"
+                                )
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(1.2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+
+                            ForEach(
+                                liveSessions.prefix(3)
+                            ) { liveSession in
+                                NavigationLink {
+                                    GhostRaceHubView()
+                                } label: {
+                                    HStack(
+                                        spacing: 11
+                                    ) {
+                                        Circle()
+                                            .fill(
+                                                ATHLTHTheme
+                                                    .vitality
+                                            )
+                                            .frame(
+                                                width: 9,
+                                                height: 9
+                                            )
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(
+                                                        Color.white,
+                                                        lineWidth: 2
+                                                    )
+                                                    .scaleEffect(1.55)
+                                            }
+
+                                        VStack(
+                                            alignment: .leading,
+                                            spacing: 2
+                                        ) {
+                                            Text(
+                                                liveGhostParticipantName(
+                                                    liveSession,
+                                                    challenge:
+                                                        challenge
+                                                )
+                                            )
+                                            .font(
+                                                .subheadline
+                                                    .weight(.semibold)
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .primaryText
+                                            )
+
+                                            Text(
+                                                ATHLTHLocalization.choose(
+                                                    english:
+                                                        "Running now · use as Live Ghost",
+                                                    norwegian:
+                                                        "Løper nå · bruk som Live Ghost"
+                                                )
+                                            )
+                                            .font(.caption2)
+                                            .foregroundStyle(
+                                                ATHLTHTheme
+                                                    .mutedText
+                                            )
+                                        }
+
+                                        Spacer()
+
+                                        Image(
+                                            systemName:
+                                                "chevron.right"
+                                        )
+                                        .font(
+                                            .caption.bold()
+                                        )
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                    }
+                                    .padding(
+                                        .horizontal,
+                                        12
+                                    )
+                                    .frame(
+                                        minHeight: 54
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .vitalitySoft
+                                            .opacity(0.58),
+                                        in: RoundedRectangle(
+                                            cornerRadius: 15,
+                                            style: .continuous
+                                        )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .simultaneousGesture(
+                                    TapGesture()
+                                        .onEnded {
+                                            realtime
+                                                .selectLiveGhost(
+                                                    liveSession
+                                                )
+                                        }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Live Ghost is disabled by the challenge owner.",
+                            norwegian:
+                                "Live Ghost er deaktivert av challenge-eieren."
+                        ),
+                        systemImage:
+                            "lock.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                if challenge.rules.route != nil,
+                   challenge.rules
+                    .targetGhostAllowed {
+                    Button {
+                        showingChallengeTargetGhost =
+                            true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Set Target Ghost",
+                                norwegian:
+                                    "Sett Target Ghost"
+                            ),
+                            systemImage:
+                                "timer.circle.fill"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .frame(height: 46)
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .tint(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                    .disabled(
+                        settings
+                            .trainingDeviceProvider !=
+                            .appleWatch ||
+                        !watchConnection
+                            .isReady
+                    )
+                }
+
+                NavigationLink {
+                    GhostFriendRaceHubView()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Race a friend with Ghost",
+                            norwegian:
+                                "Løp Ghost mot en venn"
+                        ),
+                        systemImage:
+                            "person.2.wave.2.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+            }
+        }
+    }
+
+    private func liveGhostSessions(
+        for challenge:
+            ATHLTHChallenge
+    ) -> [ATHLTHLiveWorkoutSession] {
+        guard challenge.rules
+                .liveGhostAllowed
+        else {
+            return []
+        }
+
+        let participantIDs =
+            Set(
+                challenge
+                    .participants
+                    .filter {
+                        $0.state == .creator ||
+                        $0.state == .accepted
+                    }
+                    .compactMap(\.userID)
+            )
+
+        return realtime
+            .visibleLiveSessions
+            .filter {
+                $0.activity == "running" &&
+                $0.ownerID !=
+                    session.profile.userID &&
+                participantIDs.contains(
+                    $0.ownerID
+                )
+            }
+            .sorted {
+                $0.startedAt >
+                    $1.startedAt
+            }
+    }
+
+    private func liveGhostParticipantName(
+        _ liveSession:
+            ATHLTHLiveWorkoutSession,
+        challenge:
+            ATHLTHChallenge
+    ) -> String {
+        challenge
+            .participants
+            .first {
+                $0.userID ==
+                    liveSession.ownerID
+            }?
+            .displayName ??
+        ATHLTHLocalization.choose(
+            english: "Challenge runner",
+            norwegian: "Challenge-deltaker"
+        )
+    }
+
+    private func ghostCapabilityPill(
+        title: String,
+        icon: String,
+        active: Bool
+    ) -> some View {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .system(
+                size: 10,
+                weight: .semibold
+            )
+        )
+        .foregroundStyle(
+            active
+                ? ATHLTHTheme
+                    .vitality
+                : ATHLTHTheme
+                    .mutedText
+        )
+        .frame(
+            maxWidth: .infinity
+        )
+        .frame(height: 32)
+        .background(
+            active
+                ? ATHLTHTheme
+                    .vitalitySoft
+                    .opacity(0.72)
+                : Color.primary
+                    .opacity(0.035),
+            in: Capsule()
+        )
+    }
+
     private func targetGhostCard(
         _ challenge: ATHLTHChallenge
     ) -> some View {
