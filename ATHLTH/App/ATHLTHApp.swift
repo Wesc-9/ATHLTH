@@ -1819,6 +1819,34 @@ struct AppRootView: View {
                 result
             )
 
+        // A standalone Watch can complete an entire strength session without
+        // iPhone or internet. Recreate the local ATHLTH strength log from the
+        // embedded prescription and replay the durable Watch action journal
+        // before the ordinary completion path attaches HealthKit metrics.
+        if result.kind == .strength,
+           let snapshot =
+                result.strengthSnapshot {
+            if strengthWorkout.activeWorkout == nil {
+                strengthWorkout
+                    .startFromWatchSnapshot(
+                        snapshot,
+                        watchSessionID:
+                            result.id
+                    )
+            }
+
+            if strengthWorkout.activeWorkout?
+                    .id ==
+                snapshot.workoutID {
+                strengthWorkout
+                    .replayOfflineWatchCommands(
+                        result
+                            .strengthCommands ??
+                        []
+                    )
+            }
+        }
+
         let watchFinishedActiveStrength =
             result.kind == .strength &&
             strengthWorkout.activeWorkout?
