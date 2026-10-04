@@ -7274,7 +7274,7 @@ struct PlannedExerciseEditorView: View {
                                             : nil,
                                     applyWhenAllSetsCompleted: true
                                 )
-                                : .none
+                                : StrengthProgressionRule.none
 
                         onSave(updated)
                         dismiss()
