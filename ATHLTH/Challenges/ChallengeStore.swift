@@ -63,6 +63,27 @@ final class ChallengeStore: ObservableObject {
         }
     }
 
+    func replaceWithRemoteChallenges(
+        _ remote: [ATHLTHChallenge]
+    ) {
+        let normalized =
+            remote.reduce(
+                into:
+                    [UUID: ATHLTHChallenge]()
+            ) {
+                partial,
+                challenge in
+                partial[challenge.id] =
+                    challenge
+            }
+
+        challenges =
+            Array(normalized.values)
+
+        refreshStatuses()
+        persist()
+    }
+
     func mergeRemoteChallenges(_ remote: [ATHLTHChallenge]) {
         var changed = false
 
