@@ -440,7 +440,9 @@ struct AppRootView: View {
                     spotify:
                         spotifyPlayback,
                     ghostRace:
-                        ghostRace
+                        ghostRace,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .walk:
@@ -478,7 +480,9 @@ struct AppRootView: View {
                     watchConnection:
                         watchConnection,
                     spotify:
-                        spotifyPlayback
+                        spotifyPlayback,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .strength:
