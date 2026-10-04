@@ -2434,6 +2434,16 @@ struct AppRootView: View {
             gear: gear,
             trophies: trophies
         )
+
+        emitHomeAssistantImpactEvents(
+            for: workout.id
+        )
+
+        Task {
+            await emitHomeAssistantPersonalRecords(
+                for: workout
+            )
+        }
     }
 
     private func handleCompletedWorkoutReview(
