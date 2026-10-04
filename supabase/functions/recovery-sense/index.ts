@@ -1,3 +1,4 @@
+import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type RecoveryContext = {
@@ -273,6 +274,11 @@ async function verifyPlus(
       ),
     };
   }
+
+  const budgetResponse = await enforceAIRequestBudget(() => admin.rpc("consume_ai_request_budget", {
+    p_user_id: user.id, p_feature: "recovery-sense",
+  }));
+  if (budgetResponse) return { ok: false, response: budgetResponse };
 
   return { ok: true, userID: user.id, groqKey };
 }

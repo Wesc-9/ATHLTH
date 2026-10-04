@@ -81,4 +81,29 @@ do $$ begin
   then raise exception 'Cover image access does not respect content audiences'; end if;
 end $$;
 reset role;
+-- Atomic, weighted user budget shared across endpoints.
+do $$
+declare result record;
+begin
+  if has_function_privilege('authenticated','public.consume_ai_request_budget(uuid,text)','execute')
+  then raise exception 'Clients can consume arbitrary budgets'; end if;
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000001','generate-training-program');
+  if not result.allowed then raise exception 'First generation denied'; end if;
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000001','generate-plan-adaptation');
+  if not result.allowed then raise exception 'Second generation denied'; end if;
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000001','workout-insight');
+  if result.allowed or result.retry_after < 1 or result.retry_after > 60
+  then raise exception 'Shared minute budget bypassed'; end if;
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000002','recovery-sense');
+  if not result.allowed then raise exception 'Another account budget affected'; end if;
+  update private.ai_request_budgets set minute_start=now()-interval '2 minutes',day_units=100
+  where user_id='00000000-0000-0000-0000-000000000001';
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000001','recovery-sense');
+  if result.allowed or result.retry_after < 1 or result.retry_after > 86400
+  then raise exception 'Daily budget bypassed'; end if;
+  update private.ai_request_budgets set day_start=now()-interval '2 days'
+  where user_id='00000000-0000-0000-0000-000000000001';
+  select * into result from public.consume_ai_request_budget('00000000-0000-0000-0000-000000000001','recovery-sense');
+  if not result.allowed then raise exception 'New day budget not reset'; end if;
+end $$;
 rollback;

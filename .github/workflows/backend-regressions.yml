@@ -28,15 +28,18 @@ jobs:
       - name: Validate cross-component contracts
         run: python3 scripts/verify_v160_contracts.py
       - name: Test account media cleanup
-        run: node supabase/functions/_shared/account-storage-cleanup.test.ts
+        run: |
+          node supabase/functions/_shared/account-storage-cleanup.test.ts
+          node supabase/functions/_shared/ai-request-budget.test.ts
       - name: Typecheck changed Edge Functions
-        run: deno check supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts
+        run: deno check supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts scripts/harden_workout_media_cache.ts
       - name: Start disposable Supabase database
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Replay migrations and verify privacy rules
         run: |
           supabase db reset --local --no-seed
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/v160_audit.sql
+          python3 scripts/test_ai_budget_concurrency.py
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup
