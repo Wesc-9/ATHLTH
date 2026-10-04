@@ -440,7 +440,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     ) {
         sendWatchPayload(
             configuration,
-            kind: .audioCoachConfiguration
+            kind: .audioCoachConfiguration,
+            durable: true
         )
     }
 
@@ -449,7 +450,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     ) {
         sendWatchPayload(
             workout,
-            kind: .runningWorkout
+            kind: .runningWorkout,
+            durable: true
         )
     }
 
@@ -628,7 +630,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     private func sendWatchPayload<T: Encodable>(
         _ value: T,
-        kind: WatchTransferKind
+        kind: WatchTransferKind,
+        durable: Bool = false
     ) {
         guard
             let session,
@@ -645,17 +648,28 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 Date().timeIntervalSince1970
         ]
 
+        // Launch-critical configuration must survive the iPhone being put
+        // down or losing Watch reachability immediately after workout start.
+        // The Watch rejects older timestamped payloads, so the queued copy is
+        // safe even when the immediate message arrived first.
+        if durable {
+            session.transferUserInfo(payload)
+        }
+
         if session.isReachable {
             session.sendMessage(
                 payload,
                 replyHandler: nil,
-                errorHandler: Self.makeDurableMessageErrorHandler(
-                    session: session,
-                    payload: payload,
-                    store: self
-                )
+                errorHandler:
+                    durable
+                        ? nil
+                        : Self.makeDurableMessageErrorHandler(
+                            session: session,
+                            payload: payload,
+                            store: self
+                        )
             )
-        } else {
+        } else if !durable {
             session.transferUserInfo(payload)
         }
     }
