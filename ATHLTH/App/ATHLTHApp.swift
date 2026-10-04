@@ -1879,6 +1879,12 @@ struct AppRootView: View {
                             .maximumHeartRateBPM
                 )
 
+            await realtimeSocial
+                .finishCurrentLiveGhostRace(
+                    elapsedSeconds:
+                        result.duration
+                )
+
             await social.finishActiveWorkout(
                 sourceWorkoutID:
                     result
@@ -2045,6 +2051,12 @@ struct AppRootView: View {
                         appSession
                             .onboardingProfile?
                             .maximumHeartRateBPM
+                )
+
+            await realtimeSocial
+                .finishCurrentLiveGhostRace(
+                    elapsedSeconds:
+                        publishable.duration
                 )
 
             await social.finishActiveWorkout(
