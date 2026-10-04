@@ -30,7 +30,7 @@ struct HomeAssistantSettingsView: View {
             .padding(.top, 18)
             .padding(.bottom, 36)
         }
-        .background(ATHLTHTheme.background.ignoresSafeArea())
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
         .navigationTitle("Home Assistant")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -227,7 +227,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
@@ -387,7 +387,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
@@ -424,7 +424,7 @@ struct HomeAssistantSettingsView: View {
             .padding(.horizontal, 14)
             .frame(height: 48)
             .background(
-                ATHLTHTheme.background,
+                ATHLTHTheme.canvasTop,
                 in: RoundedRectangle(
                     cornerRadius: 14,
                     style: .continuous
@@ -455,7 +455,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
@@ -486,7 +486,7 @@ struct HomeAssistantSettingsView: View {
         }
         .padding(18)
         .background(
-            ATHLTHTheme.surface,
+            ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
     }
