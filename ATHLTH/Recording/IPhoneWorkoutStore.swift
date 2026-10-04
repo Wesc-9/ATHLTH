@@ -91,6 +91,8 @@ struct PhoneWorkout: Codable, Identifiable {
     // New recordings use this to preserve pause/resume timing in HKWorkoutBuilder.
     var pauses: [PhoneWorkoutPauseInterval]? = nil
     var autoPauseEnabled: Bool? = nil
+    var runEnvironment: RunEnvironment? = nil
+    var treadmillInclinePercent: Double? = nil
     var distanceMeters: Double = 0
     var points: [PhoneRoutePoint] = []
     var healthID: UUID?
@@ -161,6 +163,7 @@ final class IPhoneWorkoutStore:
     @Published private(set) var active: PhoneWorkout?
     @Published private(set) var history: [PhoneWorkout] = []
     @Published var showingWorkout = false
+    @Published private(set) var liveViewIsVisible = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
     @Published private(set) var automaticPauseActive = false
@@ -170,6 +173,8 @@ final class IPhoneWorkoutStore:
     var lastRouteCompletion: PhoneRouteCompletionSummary?
     private var accountID: UUID?
     private var pendingWalking: Bool?
+    private var pendingRunEnvironment: RunEnvironment = .outdoor
+    private var pendingTreadmillInclinePercent: Double?
     private var pendingRoute: TrainingRoute?
     private var pendingWorkoutTitle: String?
     private var pendingAudioCoach:
@@ -204,6 +209,7 @@ final class IPhoneWorkoutStore:
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
     private var lastActiveCheckpointWriteAt: Date?
+    private var livePresentationRetryTask: Task<Void, Never>?
     private let activeCheckpointInterval: TimeInterval = 5
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
@@ -225,6 +231,8 @@ final class IPhoneWorkoutStore:
         manager.stopUpdatingLocation()
         accountID = userID
         pendingWalking = nil
+        pendingRunEnvironment = .outdoor
+        pendingTreadmillInclinePercent = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -328,6 +336,8 @@ final class IPhoneWorkoutStore:
         walking: Bool,
         route: TrainingRoute? = nil,
         title: String? = nil,
+        environment: RunEnvironment = .outdoor,
+        treadmillInclinePercent: Double? = nil,
         audioCoach:
             WatchAudioCoachConfiguration? = nil,
         structuredWorkout:
@@ -351,7 +361,18 @@ final class IPhoneWorkoutStore:
         }
 
         pendingWalking = walking
-        pendingRoute = route
+        pendingRunEnvironment = environment
+        pendingTreadmillInclinePercent =
+            environment == .treadmill
+                ? min(
+                    max(treadmillInclinePercent ?? 0, 0),
+                    20
+                )
+                : nil
+        pendingRoute =
+            environment == .outdoor
+                ? route
+                : nil
         pendingWorkoutTitle = title
         pendingAudioCoach = audioCoach
         pendingStructuredWorkout = structuredWorkout
@@ -360,7 +381,9 @@ final class IPhoneWorkoutStore:
         pendingAutoPauseEnabled =
             autoPauseEnabled
 
-        if manager.authorizationStatus == .notDetermined {
+        if environment == .treadmill {
+            beginIfAuthorized()
+        } else if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
         } else {
             beginIfAuthorized()
@@ -369,11 +392,21 @@ final class IPhoneWorkoutStore:
 
     private func beginIfAuthorized() {
         guard let walking = pendingWalking else { return }
-        guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
+        let environment = pendingRunEnvironment
+
+        if environment == .outdoor,
+           manager.authorizationStatus != .authorizedAlways,
+           manager.authorizationStatus != .authorizedWhenInUse {
             message = "Allow location access in iPhone Settings to record an outdoor workout."
             return
         }
-        let route = pendingRoute
+
+        let treadmillInclinePercent =
+            pendingTreadmillInclinePercent
+        let route =
+            environment == .outdoor
+                ? pendingRoute
+                : nil
         let workoutTitle = pendingWorkoutTitle
         let audioCoach = pendingAudioCoach
         let structuredWorkout =
@@ -383,9 +416,12 @@ final class IPhoneWorkoutStore:
         let ghostUpdates =
             pendingGhostAudio
         let autoPauseEnabled =
+            environment == .outdoor &&
             pendingAutoPauseEnabled
 
         pendingWalking = nil
+        pendingRunEnvironment = .outdoor
+        pendingTreadmillInclinePercent = nil
         pendingRoute = nil
         pendingWorkoutTitle = nil
         pendingAudioCoach = nil
@@ -414,6 +450,10 @@ final class IPhoneWorkoutStore:
             pauses: [],
             autoPauseEnabled:
                 autoPauseEnabled,
+            runEnvironment:
+                environment,
+            treadmillInclinePercent:
+                treadmillInclinePercent,
             plannedRouteID: route?.id,
             plannedComparisonRouteID:
                 route?.sharedSourceRouteID ??
@@ -443,16 +483,28 @@ final class IPhoneWorkoutStore:
 
         requestLiveWorkoutPresentationAfterLaunch()
 
-        message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
         lastLocation = nil
         automaticPauseActive = false
         autoPauseDetector.reset(
             enabled: autoPauseEnabled
         )
-        manager.distanceFilter =
-            autoPauseEnabled ? 1 : 5
-        manager.allowsBackgroundLocationUpdates = true
-        manager.startUpdatingLocation()
+
+        if environment == .outdoor {
+            message = "Waiting for a reliable GPS signal. Keep your iPhone with you."
+            manager.distanceFilter =
+                autoPauseEnabled ? 1 : 5
+            manager.allowsBackgroundLocationUpdates = true
+            manager.startUpdatingLocation()
+        } else {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            manager.distanceFilter = 5
+            message = ATHLTHLocalization.format(
+                english: "Treadmill run · %.1f%% incline",
+                norwegian: "Tredemølle · %.1f%% stigning",
+                treadmillInclinePercent ?? 0
+            )
+        }
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -475,26 +527,63 @@ final class IPhoneWorkoutStore:
     }
 
     private func requestLiveWorkoutPresentationAfterLaunch() {
+        livePresentationRetryTask?.cancel()
         showingWorkout = false
 
-        Task { @MainActor [weak self] in
-            // Quick-start is presented as a sheet while the live workout is
-            // a full-screen cover at the app root. Give SwiftUI's dismissal
-            // transaction time to finish before requesting the next
-            // presentation. The workout itself is already running during
-            // this short UI hand-off.
-            try? await Task.sleep(
-                for: .milliseconds(400)
-            )
+        livePresentationRetryTask =
+            Task { @MainActor [weak self] in
+                // The quick-start sheet and the live full-screen cover can
+                // overlap during SwiftUI's dismissal transaction. Request
+                // presentation once after dismissal, then make one controlled
+                // retry only if the live view never actually appeared.
+                try? await Task.sleep(
+                    for: .milliseconds(500)
+                )
 
-            guard let self,
-                  self.active != nil
-            else {
-                return
+                guard let self,
+                      self.active != nil,
+                      !Task.isCancelled
+                else {
+                    return
+                }
+
+                self.showingWorkout = true
+
+                try? await Task.sleep(
+                    for: .milliseconds(900)
+                )
+
+                guard self.active != nil,
+                      !self.liveViewIsVisible,
+                      !Task.isCancelled
+                else {
+                    return
+                }
+
+                self.showingWorkout = false
+                await Task.yield()
+                self.showingWorkout = true
             }
+    }
 
-            self.showingWorkout = true
-        }
+    func presentWorkout() {
+        guard active != nil else { return }
+        livePresentationRetryTask?.cancel()
+        showingWorkout = true
+    }
+
+    func minimizeWorkout() {
+        livePresentationRetryTask?.cancel()
+        showingWorkout = false
+    }
+
+    func liveViewDidAppear() {
+        liveViewIsVisible = true
+        livePresentationRetryTask?.cancel()
+    }
+
+    func liveViewDidDisappear() {
+        liveViewIsVisible = false
     }
 
     func pause() {
@@ -586,12 +675,12 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        guard
-            manager.authorizationStatus ==
-                .authorizedAlways ||
-            manager.authorizationStatus ==
-                .authorizedWhenInUse
-        else {
+        let environment =
+            workout.runEnvironment ?? .outdoor
+
+        if environment == .outdoor,
+           manager.authorizationStatus != .authorizedAlways,
+           manager.authorizationStatus != .authorizedWhenInUse {
             message =
                 "Allow location access in iPhone Settings before resuming."
             return
@@ -620,9 +709,20 @@ final class IPhoneWorkoutStore:
                 ? 1
                 : 5
         lastLocation = nil
-        manager.allowsBackgroundLocationUpdates = true
-        manager.startUpdatingLocation()
-        message = nil
+
+        if environment == .outdoor {
+            manager.allowsBackgroundLocationUpdates = true
+            manager.startUpdatingLocation()
+            message = nil
+        } else {
+            manager.stopUpdatingLocation()
+            manager.allowsBackgroundLocationUpdates = false
+            message = ATHLTHLocalization.format(
+                english: "Treadmill run · %.1f%% incline",
+                norwegian: "Tredemølle · %.1f%% stigning",
+                workout.treadmillInclinePercent ?? 0
+            )
+        }
         persistActiveCheckpoint(force: true)
         syncLiveActivity()
 
@@ -922,7 +1022,10 @@ final class IPhoneWorkoutStore:
         let configuration = HKWorkoutConfiguration()
         configuration.activityType =
             workout.walking ? .walking : .running
-        configuration.locationType = .outdoor
+        let isIndoor =
+            workout.runEnvironment == .treadmill
+        configuration.locationType =
+            isIndoor ? .indoor : .outdoor
 
         let builder = HKWorkoutBuilder(
             healthStore: healthStore,
@@ -943,7 +1046,7 @@ final class IPhoneWorkoutStore:
                     HKMetadataKeySyncIdentifier:
                         "athlth-phone-" + workout.id.uuidString,
                     HKMetadataKeySyncVersion: 1,
-                    HKMetadataKeyIndoorWorkout: false
+                    HKMetadataKeyIndoorWorkout: isIndoor
                 ],
                 to: builder
             )
