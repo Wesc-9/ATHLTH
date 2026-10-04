@@ -153,8 +153,58 @@ struct MirroredWorkoutLiveView: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .navigationTitle("Live Workout")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Live Workout",
+                    norwegian: "Live økt"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                if mirroring
+                    .hasActiveMirroredWorkout {
+                    ToolbarItem(
+                        placement:
+                            .topBarLeading
+                    ) {
+                        Button {
+                            mirroring
+                                .minimizeWorkout()
+                        } label: {
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                        }
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Minimize workout",
+                                norwegian:
+                                    "Legg ned økten"
+                            )
+                        )
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    ATHLTHAudioRouteControl(
+                        compact: true
+                    )
+                }
+            }
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
         .task(
