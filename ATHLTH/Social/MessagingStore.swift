@@ -6,6 +6,7 @@ final class MessagingStore: ObservableObject {
     @Published private(set) var recentMessages: [DirectMessageRecord] = []
     @Published private(set) var messagesByConversation: [UUID: [DirectMessageRecord]] = [:]
     @Published private(set) var pinnedConversationIDs: Set<UUID> = []
+    @Published private(set) var archivedConversationIDs: Set<UUID> = []
     @Published private(set) var isRefreshing = false
     @Published var errorMessage: String?
 
@@ -100,6 +101,24 @@ final class MessagingStore: ObservableObject {
 
         let storedIDs = UserDefaults.standard.stringArray(forKey: key) ?? []
         pinnedConversationIDs = Set(storedIDs.compactMap(UUID.init(uuidString:)))
+
+        if let archiveKey = archiveStorageKey {
+            let archivedIDs =
+                UserDefaults.standard
+                    .stringArray(
+                        forKey: archiveKey
+                    ) ?? []
+            archivedConversationIDs =
+                Set(
+                    archivedIDs.compactMap(
+                        UUID.init(
+                            uuidString:
+                        )
+                    )
+                )
+        } else {
+            archivedConversationIDs = []
+        }
     }
 
     func isPinned(_ conversationID: UUID) -> Bool {
@@ -116,9 +135,51 @@ final class MessagingStore: ObservableObject {
         persistPinnedConversations()
     }
 
+    func isArchived(
+        _ conversationID: UUID
+    ) -> Bool {
+        archivedConversationIDs
+            .contains(
+                conversationID
+            )
+    }
+
+    func toggleArchived(
+        _ conversationID: UUID
+    ) {
+        if archivedConversationIDs
+            .contains(
+                conversationID
+            ) {
+            archivedConversationIDs
+                .remove(
+                    conversationID
+                )
+        } else {
+            archivedConversationIDs
+                .insert(
+                    conversationID
+                )
+        }
+
+        persistArchivedConversations()
+    }
+
     private var pinnedStorageKey: String? {
         guard let currentUserID else { return nil }
         return "athlth.messaging.pinned.\(currentUserID.uuidString.lowercased())"
+    }
+
+    private var archiveStorageKey:
+        String? {
+        guard let currentUserID else {
+            return nil
+        }
+
+        return
+            "athlth.messaging.archived." +
+            currentUserID.uuidString
+                .lowercased()
     }
 
     private func persistPinnedConversations() {
@@ -126,6 +187,21 @@ final class MessagingStore: ObservableObject {
 
         UserDefaults.standard.set(
             pinnedConversationIDs
+                .map(\.uuidString)
+                .sorted(),
+            forKey: key
+        )
+    }
+
+    private func persistArchivedConversations() {
+        guard let key =
+                archiveStorageKey
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            archivedConversationIDs
                 .map(\.uuidString)
                 .sorted(),
             forKey: key
@@ -293,6 +369,7 @@ final class MessagingStore: ObservableObject {
         recentMessages = []
         messagesByConversation = [:]
         pinnedConversationIDs = []
+        archivedConversationIDs = []
         errorMessage = nil
     }
 }
