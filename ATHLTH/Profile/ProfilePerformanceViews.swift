@@ -7876,6 +7876,8 @@ private struct PerformanceMilestonesDetailView:
 
 struct ProfileRecordShowcasePickerView:
     View {
+    @Environment(\.dismiss) private var dismiss
+
     let stats: ProfilePerformanceStats?
     var healthRecords:
         [HealthPersonalRecord] = []
@@ -8079,39 +8081,8 @@ struct ProfileRecordShowcasePickerView:
 
                     VStack(
                         alignment: .leading,
-                        spacing: 14
+                        spacing: 12
                     ) {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Available records",
-                                    norwegian:
-                                        "Tilgjengelige rekorder"
-                                )
-                            )
-                            .font(
-                                .headline
-                                    .weight(.bold)
-                            )
-
-                            Spacer()
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Tap to choose",
-                                    norwegian:
-                                        "Trykk for å velge"
-                                )
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-                        }
-
                         recordGroupSection(
                             .running
                         )
@@ -8150,6 +8121,35 @@ struct ProfileRecordShowcasePickerView:
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .frame(width: 38, height: 38)
+                        .background(
+                            Color.white.opacity(0.92),
+                            in: Circle()
+                        )
+                        .shadow(
+                            color: Color.black.opacity(0.06),
+                            radius: 8,
+                            y: 3
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Back",
+                        norwegian: "Tilbake"
+                    )
+                )
+            }
+        }
         .task {
             guard healthRecords
                     .isEmpty,
@@ -8271,7 +8271,7 @@ struct ProfileRecordShowcasePickerView:
                 .padding(18)
             }
         }
-        .frame(height: 168)
+        .frame(height: 116)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 26,
@@ -8512,22 +8512,16 @@ struct ProfileRecordShowcasePickerView:
 
                 Spacer()
 
-                Text(
-                    group == .strength
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "ATHLTH + Apple Health",
-                            norwegian:
-                                "ATHLTH + Apple Health"
+                HStack(spacing: 3) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Tap to choose",
+                            norwegian: "Trykk for å velge"
                         )
-                        : "Apple Health"
-                )
-                .font(
-                    .system(
-                        size: 7.2,
-                        weight: .bold
                     )
-                )
+                    Image(systemName: "chevron.right")
+                }
+                .font(.caption2)
                 .foregroundStyle(
                     ATHLTHTheme
                         .mutedText
@@ -8535,16 +8529,15 @@ struct ProfileRecordShowcasePickerView:
             }
 
             LazyVGrid(
-                columns: [
-                    GridItem(
-                        .adaptive(
-                            minimum: 64,
-                            maximum: 78
+                columns: Array(
+                    repeating:
+                        GridItem(
+                            .flexible(),
+                            spacing: 6
                         ),
-                        spacing: 4
-                    )
-                ],
-                spacing: 4
+                    count: 4
+                ),
+                spacing: 6
             ) {
                 ForEach(
                     candidates(
@@ -8603,7 +8596,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 8,
+                            size: 10,
                             weight:
                                 .semibold
                         )
@@ -8612,8 +8605,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 17,
-                        height: 17
+                        width: 24,
+                        height: 24
                     )
                     .background(
                         kind.tint
@@ -8677,7 +8670,7 @@ struct ProfileRecordShowcasePickerView:
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 6.7,
+                            size: 8.2,
                             weight: .semibold
                         )
                     )
@@ -8697,7 +8690,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 11,
+                        size: 12,
                         weight: .bold,
                         design: .rounded
                     )
@@ -8747,10 +8740,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(4)
+            .padding(7)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 54,
+                minHeight: 74,
                 alignment: .topLeading
             )
             .background(
