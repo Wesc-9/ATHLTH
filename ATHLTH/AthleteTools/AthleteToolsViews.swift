@@ -21,7 +21,15 @@ struct AthleteToolsView: View {
                     }
                     Section("Train together") {
                         NavigationLink { AthleteCoachView() } label: { Label("Coach sharing", systemImage: "person.badge.shield.checkmark") }
-                        NavigationLink { AthletePartnerView() } label: { Label("Training partners", systemImage: "person.2") }
+                        NavigationLink {
+                            TrainTogetherMarketplaceView()
+                        } label: {
+                            Label(
+                                "Train Together",
+                                systemImage:
+                                    "person.2.wave.2.fill"
+                            )
+                        }
                     }
                     Section("Route sharing") {
                         Text("Each workout's sharing screen includes route privacy and an optional preview. Routes stay private until you choose to include a map.")
