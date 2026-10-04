@@ -694,6 +694,7 @@ struct ChallengeCreationView: View {
 
     @State private var meetupEnabled = false
     @State private var meetupPlaceName = ""
+    @State private var meetupPlaceAddress = ""
     @State private var meetupAt = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var meetupCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition: MapCameraPosition = .automatic
@@ -1536,22 +1537,7 @@ struct ChallengeCreationView: View {
                     alignment: .leading,
                     spacing: 12
                 ) {
-                    creationTextField(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Meetup name",
-                                norwegian: "Møtested"
-                            ),
-                        placeholder:
-                            ATHLTHLocalization.choose(
-                                english: "Optional",
-                                norwegian: "Valgfritt"
-                            ),
-                        text:
-                            $meetupPlaceName,
-                        icon:
-                            "mappin.and.ellipse"
-                    )
+                    meetupPlaceSearch
 
                     DatePicker(
                         ATHLTHLocalization.choose(
@@ -1573,7 +1559,24 @@ struct ChallengeCreationView: View {
                             $meetupCoordinate,
                         position:
                             $mapPosition
-                    )
+                    ) { coordinate in
+                        meetupPlaceAddress =
+                            ""
+                        if meetupPlaceName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty {
+                            meetupPlaceName =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Selected map point",
+                                    norwegian:
+                                        "Valgt kartpunkt"
+                                )
+                        }
+                    }
 
                     if selectedRouteID !=
                         nil {
@@ -1608,6 +1611,16 @@ struct ChallengeCreationView: View {
 
                             meetupCoordinate =
                                 coordinate
+                            meetupPlaceName =
+                                route.title
+                            meetupPlaceAddress =
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Route start",
+                                    norwegian:
+                                        "Rutestart"
+                                )
+                            meetupSearch.clear()
                             mapPosition =
                                 .region(
                                     MKCoordinateRegion(
@@ -1669,6 +1682,323 @@ struct ChallengeCreationView: View {
                 )
             }
         }
+    }
+
+    private var meetupPlaceSearch:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "magnifyingglass"
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Search for a place or address",
+                        norwegian:
+                            "Søk etter sted eller adresse"
+                    ),
+                    text:
+                        $meetupSearch.query
+                )
+                .textInputAutocapitalization(
+                    .words
+                )
+                .autocorrectionDisabled(
+                    false
+                )
+
+                if meetupSearch
+                    .isSearching {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if !meetupSearch
+                    .query.isEmpty {
+                    Button {
+                        meetupSearch.clear()
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(
+                .horizontal,
+                12
+            )
+            .frame(height: 48)
+            .background(
+                ATHLTHTheme
+                    .surfaceStone
+                    .opacity(0.72),
+                in: RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .border,
+                    lineWidth: 0.8
+                )
+            }
+            .onChange(
+                of:
+                    meetupSearch.query
+            ) { _, query in
+                meetupSearch
+                    .scheduleSearch(
+                        query
+                    )
+            }
+
+            if !meetupSearch
+                .results.isEmpty {
+                VStack(spacing: 7) {
+                    ForEach(
+                        meetupSearch.results
+                    ) { result in
+                        Button {
+                            selectMeetupSearchResult(
+                                result
+                            )
+                        } label: {
+                            HStack(
+                                alignment: .top,
+                                spacing: 11
+                            ) {
+                                Image(
+                                    systemName:
+                                        "mappin.circle.fill"
+                                )
+                                .font(.title3)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        result.name
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    if !result.address
+                                        .isEmpty,
+                                       result.address !=
+                                        result.name {
+                                        Text(
+                                            result.address
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                        .lineLimit(2)
+                                    }
+                                }
+
+                                Spacer(
+                                    minLength: 6
+                                )
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .caption
+                                        .weight(.bold)
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+                            .padding(11)
+                            .frame(
+                                maxWidth:
+                                    .infinity,
+                                alignment:
+                                    .leading
+                            )
+                            .background(
+                                Color.white
+                                    .opacity(
+                                        0.56
+                                    ),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            14,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if meetupCoordinate != nil {
+                HStack(
+                    alignment: .top,
+                    spacing: 11
+                ) {
+                    Image(
+                        systemName:
+                            "checkmark.circle.fill"
+                    )
+                    .font(.title3)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            meetupPlaceName
+                                .isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Meetup point selected",
+                                    norwegian:
+                                        "Møtested valgt"
+                                )
+                                : meetupPlaceName
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                        if !meetupPlaceAddress
+                            .isEmpty {
+                            Text(
+                                meetupPlaceAddress
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .lineLimit(2)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        clearMeetupPlace()
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark.circle.fill"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(11)
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+            }
+        }
+    }
+
+    private func selectMeetupSearchResult(
+        _ result:
+            MeetupLocationSearchResult
+    ) {
+        meetupPlaceName =
+            result.name
+        meetupPlaceAddress =
+            result.address
+        meetupCoordinate =
+            result.coordinate
+        mapPosition = .region(
+            MKCoordinateRegion(
+                center:
+                    result.coordinate,
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta:
+                            0.012,
+                        longitudeDelta:
+                            0.012
+                    )
+            )
+        )
+        meetupSearch.clear()
+    }
+
+    private func clearMeetupPlace() {
+        meetupPlaceName = ""
+        meetupPlaceAddress = ""
+        meetupCoordinate = nil
+        mapPosition = .automatic
+        meetupSearch.clear()
     }
 
     @ViewBuilder
