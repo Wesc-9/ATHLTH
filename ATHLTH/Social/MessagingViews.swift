@@ -67,7 +67,10 @@ struct MessageInboxView: View {
                                         )
                                     }
                                 } else if let firstChallenge =
-                                            item.pendingChallenges.first {
+                                            (
+                                                item.pendingChallenges.first ??
+                                                item.outgoingChallenges.first
+                                            ) {
                                     NavigationLink {
                                         ChallengeDetailView(
                                             challengeID:
