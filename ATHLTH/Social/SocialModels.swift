@@ -1291,7 +1291,39 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
             }
         }
 
-        strengthMuscleGroups = muscleGroups.isEmpty ? nil : muscleGroups
+        if muscleGroups.isEmpty {
+            for exercise in performedExercises {
+                for region in
+                    StrengthMuscleResolver
+                        .fallbackRegions(
+                            forExerciseName:
+                                exercise
+                                    .exercise
+                                    .name
+                        ) {
+                    let value = region.title
+
+                    if !muscleGroups
+                        .contains(
+                            where: {
+                                $0.caseInsensitiveCompare(
+                                    value
+                                ) ==
+                                    .orderedSame
+                            }
+                        ) {
+                        muscleGroups.append(
+                            value
+                        )
+                    }
+                }
+            }
+        }
+
+        strengthMuscleGroups =
+            muscleGroups.isEmpty
+                ? nil
+                : muscleGroups
         source = "ATHLTH"
     }
 
