@@ -302,6 +302,26 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         storedPairing != nil
     }
 
+    var watchConfiguration: WatchHomeAssistantConfiguration {
+        guard shareWorkoutState,
+              let pairing = storedPairing
+        else {
+            return .disabled
+        }
+
+        return WatchHomeAssistantConfiguration(
+            enabled: true,
+            clientID: pairing.clientID,
+            webhookURL: pairing.webhookURL,
+            fallbackWebhookURL:
+                Self.fallbackWebhookURL(
+                    for: pairing
+                ),
+            sharedSecret: pairing.sharedSecret,
+            updatedAt: Date()
+        )
+    }
+
     var connectionSubtitle: String {
         if let name = connectedInstanceName {
             return ATHLTHLocalization.choose(
