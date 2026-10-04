@@ -582,7 +582,7 @@ enum WorkoutLaunchCoordinator {
                 .sendGhostRace(transfer)
         }
 
-        let watchRunningWorkout =
+        var watchRunningWorkout =
             structuredWorkout ??
             WatchRunningWorkoutTransfer(
                 title: "",
@@ -594,6 +594,21 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .autoPauseEnabled
             )
+
+        watchRunningWorkout
+            .treadmillInclinePercent =
+                configuration.environment ==
+                    .treadmill
+                    ? min(
+                        max(
+                            configuration
+                                .treadmillInclinePercent ??
+                            0,
+                            0
+                        ),
+                        20
+                    )
+                    : nil
 
         // A Watch-owned workout launched from iPhone still uses iPhone as the
         // Audio Coach owner. This keeps spoken guidance on the same system
