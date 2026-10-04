@@ -330,7 +330,23 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     )
             ) {
-                Button("OK") {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Try Again",
+                        norwegian: "Prøv igjen"
+                    )
+                ) {
+                    watchFinishError = nil
+
+                    Task {
+                        await finishWorkout()
+                    }
+                }
+
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {
                     watchFinishError = nil
                 }
             } message: {
@@ -377,6 +393,18 @@ struct ActiveStrengthWorkoutView: View {
                 spotify.endLinkedWorkoutPlaybackSession()
                 appSession.endTrainingStatus()
                 dismiss()
+            }
+            .onChange(
+                of:
+                    workoutMirroring
+                        .snapshot?
+                        .state
+            ) { _, newState in
+                guard newState == .completed else {
+                    return
+                }
+
+                finalizeWatchStrengthFromMirrorIfNeeded()
             }
             .onChange(of: strength.currentSetIndex) {
                 loadDefaultsFromCurrentSet()
@@ -787,31 +815,32 @@ struct ActiveStrengthWorkoutView: View {
 
         switch workout.captureDevice {
         case .appleWatch:
-            // Apple Watch owns HealthKit for this workout. iPhone only asks it
-            // to finish; the local strength log is finalized when the Watch
-            // returns the authoritative result/HealthKit UUID.
-            let sentViaMirroring =
-                workoutMirroring
-                    .hasActiveMirroredWorkout &&
-                workoutMirroring
+            // Use both transports. HealthKit mirroring is the fastest route
+            // when attached, while WatchConnectivity keeps a durable .end
+            // command queued if the mirrored channel disappears mid-finish.
+            if workoutMirroring
+                .hasActiveMirroredWorkout {
+                _ = workoutMirroring
                     .sendCommand(.end)
-
-            if !sentViaMirroring {
-                watchConnection
-                    .sendWorkoutCommand(
-                        .end,
-                        workoutID:
-                            workout.id
-                    )
             }
+
+            watchConnection
+                .sendWorkoutCommand(
+                    .end,
+                    workoutID:
+                        workout.id
+                )
 
             watchFinishTimeoutTask?.cancel()
             let workoutID = workout.id
 
             watchFinishTimeoutTask =
                 Task { @MainActor in
+                    // HealthKit may need several seconds to end collection and
+                    // persist the workout. Retry the durable command once
+                    // before treating the finish as delayed.
                     try? await Task.sleep(
-                        for: .seconds(18)
+                        for: .seconds(10)
                     )
 
                     guard !Task.isCancelled,
@@ -822,13 +851,72 @@ struct ActiveStrengthWorkoutView: View {
                         return
                     }
 
+                    if workoutMirroring
+                        .snapshot?
+                        .state == .completed {
+                        finalizeWatchStrengthFromMirrorIfNeeded()
+                        return
+                    }
+
+                    watchConnection
+                        .sendWorkoutCommand(
+                            .end,
+                            workoutID:
+                                workoutID
+                        )
+
+                    try? await Task.sleep(
+                        for: .seconds(35)
+                    )
+
+                    guard !Task.isCancelled,
+                          strength
+                            .activeWorkout?
+                            .id == workoutID
+                    else {
+                        return
+                    }
+
+                    if workoutMirroring
+                        .snapshot?
+                        .state == .completed {
+                        finalizeWatchStrengthFromMirrorIfNeeded()
+                        return
+                    }
+
+                    // If the Watch is explicitly in its HealthKit ending
+                    // phase, do not show a false error after the old 18-second
+                    // deadline. Give final persistence/delivery extra time.
+                    if workoutMirroring
+                        .snapshot?
+                        .state == .ending {
+                        try? await Task.sleep(
+                            for: .seconds(30)
+                        )
+
+                        guard !Task.isCancelled,
+                              strength
+                                .activeWorkout?
+                                .id == workoutID
+                        else {
+                            return
+                        }
+
+                        if workoutMirroring
+                            .snapshot?
+                            .state == .completed {
+                            finalizeWatchStrengthFromMirrorIfNeeded()
+                            return
+                        }
+                    }
+
                     finishInProgress = false
                     watchFinishError =
                         ATHLTHLocalization.choose(
                             english:
-                                "ATHLTH has not received confirmation that Apple Watch finished the workout. The strength log is still safe. Finish or retry on the Watch, then ATHLTH will attach the Health data when it arrives.",
+                                "Apple Watch has not confirmed the finish yet. Your ATHLTH strength log is safe. You can try again here; if the Watch has already finished, ATHLTH will attach its Health data automatically when it arrives.",
                             norwegian:
-                                "ATHLTH har ikke fått bekreftet at Apple Watch avsluttet økten. Styrkeloggen er fortsatt trygg. Avslutt eller prøv igjen på klokken, så kobler ATHLTH til Health-data når de kommer."
+                                "Apple Watch har ikke bekreftet avslutningen ennå. Styrkeloggen i ATHLTH er trygg. Du kan prøve igjen her; hvis klokken allerede er ferdig, kobler ATHLTH automatisk til Health-data når de kommer."
                         )
                 }
 
@@ -874,6 +962,60 @@ struct ActiveStrengthWorkoutView: View {
             finishInProgress = false
             dismiss()
         }
+    }
+
+    @MainActor
+    private func finalizeWatchStrengthFromMirrorIfNeeded() {
+        guard let workout =
+                strength.activeWorkout,
+              workout.captureDevice ==
+                .appleWatch,
+              let snapshot =
+                workoutMirroring.snapshot,
+              snapshot.kind == .strength,
+              snapshot.state == .completed
+        else {
+            return
+        }
+
+        if let mirroredStartedAt =
+                snapshot.startedAt,
+           abs(
+                mirroredStartedAt
+                    .timeIntervalSince(
+                        workout.startedAt
+                    )
+           ) >= 180 {
+            return
+        }
+
+        watchFinishTimeoutTask?.cancel()
+        watchFinishTimeoutTask = nil
+        watchFinishError = nil
+        finishInProgress = false
+
+        // The mirrored completed state is authoritative proof that the Watch
+        // session ended. Finish the local strength log immediately so the UI
+        // never gets stuck waiting for WCSession delivery. The later
+        // WatchWorkoutResult attaches the HealthKit UUID and final metrics.
+        strength.finish(
+            healthKitWorkoutUUID: nil,
+            duration:
+                max(
+                    snapshot.elapsedTime,
+                    Date()
+                        .timeIntervalSince(
+                            workout.startedAt
+                        )
+                ),
+            activeCalories:
+                snapshot.activeCalories,
+            averageHeartRate:
+                snapshot.averageHeartRate,
+            maxHeartRate:
+                snapshot.maxHeartRate
+        )
+        appSession.endTrainingStatus()
     }
 
     private var finishMessage: String {
