@@ -409,14 +409,20 @@ final class StrengthWorkoutStore: ObservableObject {
 
                 for set in exercise.sets {
                     guard set.countsTowardTrainingLoad,
-                          let weight = set.completedWeightKilograms,
                           let reps = set.completedReps,
-                          weight > 0,
                           reps > 0,
                           reps <= 20
                     else {
                         continue
                     }
+
+                    // Bodyweight movements such as pullups, dips and chins
+                    // often have no external load. Keep those sets eligible
+                    // for rep PRs and represent the missing load as zero.
+                    let weight = max(
+                        set.completedWeightKilograms ?? 0,
+                        0
+                    )
 
                     let date =
                         set.completedAt ??
