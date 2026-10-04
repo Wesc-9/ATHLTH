@@ -2973,10 +2973,9 @@ struct StrengthQuickBuilderView: View {
             exercise.compactTargetSummary
         ]
 
-        if let weight = exercise.targetWeightKilograms {
-            parts.append(
-                String(format: "%.1f kg", weight)
-            )
+        if let load =
+                exercise.compactLoadSummary {
+            parts.append(load)
         }
 
         if let rpe = exercise.targetRPE {
