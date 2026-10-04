@@ -164,6 +164,7 @@ final class IPhoneWorkoutStore:
     @Published private(set) var history: [PhoneWorkout] = []
     @Published var showingWorkout = false
     @Published private(set) var liveViewIsVisible = false
+    @Published private(set) var isUserMinimized = false
     @Published private(set) var message: String?
     @Published private(set) var saving = false
     @Published private(set) var automaticPauseActive = false
@@ -328,6 +329,7 @@ final class IPhoneWorkoutStore:
             }
 
         showingWorkout = false
+        isUserMinimized = false
         message = active == nil ? nil : "Recovered workout paused at the last saved checkpoint. Resume when you are ready."
         lastActiveCheckpointWriteAt = nil
     }
@@ -356,6 +358,7 @@ final class IPhoneWorkoutStore:
         // to dismiss. Presenting a full-screen cover while SwiftUI is still
         // dismissing the quick-start sheet can otherwise be dropped.
         if active != nil {
+            isUserMinimized = false
             showingWorkout = true
             return
         }
@@ -528,6 +531,7 @@ final class IPhoneWorkoutStore:
 
     private func requestLiveWorkoutPresentationAfterLaunch() {
         livePresentationRetryTask?.cancel()
+        isUserMinimized = false
         showingWorkout = false
 
         livePresentationRetryTask =
@@ -542,6 +546,7 @@ final class IPhoneWorkoutStore:
 
                 guard let self,
                       self.active != nil,
+                      !self.isUserMinimized,
                       !Task.isCancelled
                 else {
                     return
@@ -554,6 +559,7 @@ final class IPhoneWorkoutStore:
                 )
 
                 guard self.active != nil,
+                      !self.isUserMinimized,
                       !self.liveViewIsVisible,
                       !Task.isCancelled
                 else {
@@ -569,16 +575,19 @@ final class IPhoneWorkoutStore:
     func presentWorkout() {
         guard active != nil else { return }
         livePresentationRetryTask?.cancel()
+        isUserMinimized = false
         showingWorkout = true
     }
 
     func minimizeWorkout() {
         livePresentationRetryTask?.cancel()
+        isUserMinimized = true
         showingWorkout = false
     }
 
     func liveViewDidAppear() {
         liveViewIsVisible = true
+        isUserMinimized = false
         livePresentationRetryTask?.cancel()
     }
 
@@ -839,6 +848,10 @@ final class IPhoneWorkoutStore:
 
         history.insert(workout, at: 0)
         active = nil
+        showingWorkout = false
+        liveViewIsVisible = false
+        isUserMinimized = false
+        livePresentationRetryTask?.cancel()
         automaticPauseActive = false
         autoPauseDetector.reset(enabled: false)
         manager.distanceFilter = 5
