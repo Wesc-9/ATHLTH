@@ -2371,7 +2371,12 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         guard var workout = activeWorkout else { return }
 
-        workout.endedAt = Date()
+        workout.endedAt =
+            max(
+                recoveredCheckpointSavedAt ??
+                    Date(),
+                workout.startedAt
+            )
 
         let existingMetrics = workout.healthMetrics
         workout.healthMetrics = LinkedHealthWorkoutMetrics(
@@ -2402,6 +2407,17 @@ final class StrengthWorkoutStore: ObservableObject {
         draftRPE = 8
         draftRIR = 2
         draftWarmUp = false
+        persistCheckpointNow()
+    }
+
+    func acknowledgeRecoveredWorkout() {
+        guard activeWorkout != nil,
+              recoveredCheckpointSavedAt != nil
+        else {
+            return
+        }
+
+        recoveredCheckpointSavedAt = nil
         persistCheckpointNow()
     }
 
