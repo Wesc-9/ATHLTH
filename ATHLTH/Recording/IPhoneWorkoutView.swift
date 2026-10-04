@@ -231,32 +231,86 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                             ? $0
                             : $0 * 1.609344
                     }
+            let isTreadmill =
+                workout.runEnvironment ==
+                .treadmill
 
-            VStack(spacing: 11) {
-                LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .flexible(),
-                            spacing: 0
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .flexible(),
+                        spacing: 0
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 0
+                    )
+                ],
+                spacing: 0
+            ) {
+                primaryMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "TIME",
+                            norwegian: "TID"
                         ),
-                        GridItem(
-                            .flexible(),
-                            spacing: 0
-                        )
-                    ],
-                    spacing: 0
-                ) {
+                    value:
+                        elapsedText(elapsed),
+                    unit: nil
+                )
+
+                if isTreadmill {
                     primaryMetric(
                         title:
                             ATHLTHLocalization.choose(
-                                english: "TIME",
-                                norwegian: "TID"
+                                english: "INCLINE",
+                                norwegian: "STIGNING"
                             ),
                         value:
-                            elapsedText(elapsed),
-                        unit: nil
+                            String(
+                                format: "%.1f",
+                                workout
+                                    .treadmillInclinePercent ??
+                                0
+                            ),
+                        unit: "%"
                     )
 
+                    if workout.distanceMeters >= 50 {
+                        primaryMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "DISTANCE",
+                                    norwegian: "DISTANSE"
+                                ),
+                            value:
+                                String(
+                                    format: "%.2f",
+                                    distance
+                                ),
+                            unit:
+                                isMetric
+                                    ? "km"
+                                    : "mi"
+                        )
+
+                        primaryMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "AVG PACE",
+                                    norwegian: "SNITTEMPO"
+                                ),
+                            value:
+                                paceValue(
+                                    averagePace
+                                ),
+                            unit:
+                                isMetric
+                                    ? "/km"
+                                    : "/mi"
+                        )
+                    }
+                } else {
                     primaryMetric(
                         title:
                             ATHLTHLocalization.choose(
@@ -294,7 +348,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                         title:
                             ATHLTHLocalization.choose(
                                 english: "AVG PACE",
-                                norwegian: "SNITT"
+                                norwegian: "SNITTEMPO"
                             ),
                         value:
                             paceValue(
@@ -306,52 +360,32 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                                 : "/mi"
                     )
                 }
-                .background(
-                    Color.white.opacity(0.94),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 24,
-                            style: .continuous
-                        )
-                )
-                .overlay {
+            }
+            .background(
+                Color.white.opacity(0.96),
+                in:
                     RoundedRectangle(
-                        cornerRadius: 24,
+                        cornerRadius: 26,
                         style: .continuous
                     )
-                    .stroke(
-                        Color.black.opacity(
-                            0.045
-                        ),
-                        lineWidth: 0.8
-                    )
-                }
-                .shadow(
-                    color:
-                        ATHLTHTheme.accentDeep
-                            .opacity(0.06),
-                    radius: 15,
-                    y: 6
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
                 )
-
-                secondaryMetrics
-
-                if !routeMetrics.splits.isEmpty {
-                    splitsCard
-                }
+                .stroke(
+                    Color.black.opacity(0.045),
+                    lineWidth: 0.8
+                )
             }
-        }
-        .task(
-            id:
-                "\(workout.points.count)-\(Int(splitMeters.rounded()))"
-        ) {
-            routeMetrics =
-                IPhoneWorkoutLiveRouteMetrics
-                    .calculate(
-                        workout: workout,
-                        splitMeters:
-                            splitMeters
-                    )
+            .shadow(
+                color:
+                    ATHLTHTheme.accentDeep
+                        .opacity(0.07),
+                radius: 16,
+                y: 6
+            )
         }
     }
 
@@ -367,8 +401,8 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             Text(title)
                 .font(
                     .system(
-                        size: 10,
-                        weight: .semibold
+                        size: 11,
+                        weight: .bold
                     )
                 )
                 .tracking(1.25)
@@ -383,7 +417,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 Text(value)
                     .font(
                         .system(
-                            size: 35,
+                            size: 52,
                             weight: .bold,
                             design: .rounded
                         )
@@ -409,7 +443,7 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 102,
+            minHeight: 138,
             alignment: .leading
         )
         .padding(.horizontal, 15)
@@ -1445,9 +1479,11 @@ struct IPhoneWorkoutView: View {
             }
         }
         .onAppear {
+            recorder.liveViewDidAppear()
             updateScreenAwakeState()
         }
         .onDisappear {
+            recorder.liveViewDidDisappear()
             ATHLTHWorkoutScreenAwake.set(
                 false,
                 reason: "iphone-live-workout"
@@ -1549,11 +1585,12 @@ struct IPhoneWorkoutView: View {
         ) {
             HStack {
                 Button {
+                    recorder.minimizeWorkout()
                     dismiss()
                 } label: {
                     Image(
                         systemName:
-                            "chevron.left"
+                            "chevron.down"
                     )
                     .font(
                         .system(
@@ -1590,35 +1627,37 @@ struct IPhoneWorkoutView: View {
                 Spacer()
 
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(
-                            workout.points
-                                .last == nil
-                                ? Color.orange
-                                : ATHLTHTheme
-                                    .vitality
-                        )
-                        .frame(
-                            width: 7,
-                            height: 7
-                        )
+                    Image(
+                        systemName:
+                            workout.runEnvironment ==
+                            .treadmill
+                                ? "figure.run.treadmill"
+                                : "location.fill"
+                    )
 
                     Text(
-                        workout.points.last == nil
-                            ? ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "GPS waiting",
-                                    norwegian:
-                                        "Venter på GPS"
-                                )
-                            : ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "GPS on",
-                                    norwegian:
-                                        "GPS på"
-                                )
+                        workout.runEnvironment ==
+                            .treadmill
+                            ? ATHLTHLocalization.format(
+                                english:
+                                    "Treadmill · %.1f%%",
+                                norwegian:
+                                    "Tredemølle · %.1f%%",
+                                workout
+                                    .treadmillInclinePercent ??
+                                0
+                            )
+                            : (
+                                workout.points.last == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "GPS waiting",
+                                        norwegian: "Venter på GPS"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "GPS on",
+                                        norwegian: "GPS på"
+                                    )
+                            )
                     )
                     .font(
                         .caption.weight(
@@ -1627,10 +1666,11 @@ struct IPhoneWorkoutView: View {
                     )
                 }
                 .foregroundStyle(
-                    workout.points.last == nil
-                        ? Color.orange
-                        : ATHLTHTheme
-                            .vitality
+                    workout.runEnvironment == .treadmill
+                        ? ATHLTHTheme.accentDeep
+                        : workout.points.last == nil
+                            ? Color.orange
+                            : ATHLTHTheme.vitality
                 )
                 .padding(.horizontal, 11)
                 .frame(height: 34)
@@ -1641,9 +1681,7 @@ struct IPhoneWorkoutView: View {
                 .overlay {
                     Capsule()
                         .stroke(
-                            Color.black.opacity(
-                                0.04
-                            ),
+                            Color.black.opacity(0.04),
                             lineWidth: 0.7
                         )
                 }
@@ -1673,12 +1711,19 @@ struct IPhoneWorkoutView: View {
                 )
 
                 Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Tracking with iPhone",
-                        norwegian:
-                            "Registreres med iPhone"
-                    )
+                    workout.runEnvironment == .treadmill
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Indoor run · recorded with iPhone",
+                            norwegian:
+                                "Innendørs · registreres med iPhone"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Outdoor run · recorded with iPhone",
+                            norwegian:
+                                "Utendørs · registreres med iPhone"
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(
