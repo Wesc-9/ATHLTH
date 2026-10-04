@@ -1299,10 +1299,8 @@ struct PerformanceStatsView: View {
                         .firstTextBaseline
                 ) {
                     Text(
-                        kind.displayValue(
-                            healthRecords:
-                                resolvedHealthRecords,
-                            stats: stats
+                        recordValue(
+                            for: kind
                         )
                     )
                     .font(
@@ -2408,8 +2406,8 @@ struct PerformanceStatsView: View {
                         .accentDeep
                 )
                 .frame(
-                    width: 40,
-                    height: 40
+                    width: 34,
+                    height: 34
                 )
                 .background(
                     ATHLTHTheme
@@ -7536,6 +7534,8 @@ struct ProfileRecordShowcasePickerView:
 
     @EnvironmentObject private var health:
         HealthKitManager
+    @EnvironmentObject private var strengthWorkout:
+        StrengthWorkoutStore
     @State private var fetchedHealthRecords:
         [HealthPersonalRecord] = []
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
@@ -7559,16 +7559,39 @@ struct ProfileRecordShowcasePickerView:
 
     private var candidates:
         [ProfileFeaturedRecordKind] {
-        ProfileFeaturedRecordKind
-            .allCases
-            .filter { kind in
-                selection.contains(kind) ||
-                kind.displayValue(
-                    healthRecords:
-                        resolvedHealthRecords,
-                    stats: stats
-                ) != "—"
-            }
+        ProfileFeaturedRecordKind.allCases
+    }
+
+    private func candidates(
+        for group: ProfileRecordGroup
+    ) -> [ProfileFeaturedRecordKind] {
+        candidates.filter {
+            $0.group == group
+        }
+    }
+
+    private func recordValue(
+        for kind:
+            ProfileFeaturedRecordKind
+    ) -> String {
+        kind.displayValue(
+            healthRecords:
+                resolvedHealthRecords,
+            stats: stats,
+            strengthRecords:
+                strengthWorkout
+                    .personalRecords,
+            strengthRepRecords:
+                strengthWorkout
+                    .repPersonalRecords
+        )
+    }
+
+    private func isAvailable(
+        _ kind:
+            ProfileFeaturedRecordKind
+    ) -> Bool {
+        recordValue(for: kind) != "—"
     }
 
     var body: some View {
@@ -7706,86 +7729,50 @@ struct ProfileRecordShowcasePickerView:
                         )
                     }
 
-                    if candidates.isEmpty {
-                        ContentUnavailableView(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "No records yet",
-                                norwegian:
-                                    "Ingen rekorder ennå"
-                            ),
-                            systemImage:
-                                "chart.bar.xaxis",
-                            description: Text(
+                    VStack(
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
+                        HStack {
+                            Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Complete workouts to build records you can feature here.",
+                                        "Available records",
                                     norwegian:
-                                        "Fullfør økter for å bygge rekorder du kan vise frem her."
+                                        "Tilgjengelige rekorder"
                                 )
                             )
-                        )
-                        .padding(.top, 22)
-                    } else {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            HStack {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Available records",
-                                        norwegian:
-                                            "Tilgjengelige rekorder"
-                                    )
-                                )
-                                .font(
-                                    .headline
-                                        .weight(
-                                            .bold
-                                        )
-                                )
+                            .font(
+                                .headline
+                                    .weight(.bold)
+                            )
 
-                                Spacer()
+                            Spacer()
 
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Tap to add or remove",
-                                        norwegian:
-                                            "Trykk for å velge"
-                                    )
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Tap to choose",
+                                    norwegian:
+                                        "Trykk for å velge"
                                 )
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                            }
-
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(
-                                        .flexible(),
-                                        spacing: 10
-                                    ),
-                                    GridItem(
-                                        .flexible(),
-                                        spacing: 10
-                                    )
-                                ],
-                                spacing: 10
-                            ) {
-                                ForEach(
-                                    candidates
-                                ) { kind in
-                                    showcaseCard(
-                                        kind
-                                    )
-                                }
-                            }
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
                         }
+
+                        recordGroupSection(
+                            .running
+                        )
+                        recordGroupSection(
+                            .strength
+                        )
+                        recordGroupSection(
+                            .appleHealth
+                        )
                     }
                 }
                 .padding(
@@ -7999,10 +7986,8 @@ struct ProfileRecordShowcasePickerView:
                     }
 
                     Text(
-                        kind.displayValue(
-                            healthRecords:
-                                resolvedHealthRecords,
-                            stats: stats
+                        recordValue(
+                            for: kind
                         )
                     )
                     .font(
@@ -8148,6 +8133,113 @@ struct ProfileRecordShowcasePickerView:
     }
 
 
+    private func recordGroupSection(
+        _ group: ProfileRecordGroup
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        group.icon
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+
+                Text(group.title)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                Spacer()
+
+                if group ==
+                    .strength {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "ATHLTH",
+                            norwegian: "ATHLTH"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                } else {
+                    Text("Apple Health")
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                }
+            }
+
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .flexible(),
+                        spacing: 8
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 8
+                    )
+                ],
+                spacing: 8
+            ) {
+                ForEach(
+                    candidates(
+                        for: group
+                    )
+                ) { kind in
+                    showcaseCard(kind)
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            Color.white.opacity(0.88),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border
+                    .opacity(0.55),
+                lineWidth: 0.8
+            )
+        }
+    }
+
     private func showcaseCard(
         _ kind:
             ProfileFeaturedRecordKind
@@ -8158,6 +8250,8 @@ struct ProfileRecordShowcasePickerView:
             selection.count >=
                 ProfileFeaturedRecordKind
                     .showcaseLimit
+        let available =
+            isAvailable(kind)
 
         return Button {
             toggle(kind)
@@ -8261,10 +8355,8 @@ struct ProfileRecordShowcasePickerView:
                     )
 
                 Text(
-                    kind.displayValue(
-                        healthRecords:
-                            resolvedHealthRecords,
-                        stats: stats
+                    recordValue(
+                        for: kind
                     )
                 )
                 .font(
@@ -8387,14 +8479,21 @@ struct ProfileRecordShowcasePickerView:
         }
         .buttonStyle(.plain)
         .disabled(
-            !isSelected &&
-            selectionIsFull
+            !available ||
+            (
+                !isSelected &&
+                selectionIsFull
+            )
         )
         .opacity(
-            !isSelected &&
-            selectionIsFull
+            !available
                 ? 0.42
-                : 1
+                : (
+                    !isSelected &&
+                    selectionIsFull
+                        ? 0.42
+                        : 1
+                )
         )
     }
 
