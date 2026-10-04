@@ -7810,16 +7810,108 @@ struct ChallengeDetailView: View {
         }
     }
 
-    private func ruleRow(_ title: String, _ value: String) -> some View {
-        HStack {
+    private func challengeSectionHeader(
+        title: String,
+        trailing: String?,
+        trailingIcon: String? = nil
+    ) -> some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(
+                cornerRadius: 2,
+                style: .continuous
+            )
+            .fill(
+                ATHLTHTheme
+                    .vitality
+            )
+            .frame(
+                width: 4,
+                height: 30
+            )
+
             Text(title)
-                .foregroundStyle(.secondary)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
             Spacer()
+
+            if let trailing {
+                if let trailingIcon {
+                    Label(
+                        trailing,
+                        systemImage:
+                            trailingIcon
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                } else {
+                    Text(trailing)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                }
+            }
+        }
+    }
+
+    private func ruleRow(
+        _ title: String,
+        _ value: String
+    ) -> some View {
+        HStack(
+            alignment: .firstTextBaseline,
+            spacing: 14
+        ) {
+            Text(title)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+            Spacer(minLength: 18)
+
             Text(value)
-                .font(.subheadline.weight(.semibold))
-                .multilineTextAlignment(.trailing)
+                .font(
+                    .subheadline
+                        .weight(.medium)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .multilineTextAlignment(
+                    .trailing
+                )
         }
         .font(.subheadline)
+        .padding(
+            .vertical,
+            9
+        )
+        .overlay(
+            alignment: .bottom
+        ) {
+            Rectangle()
+                .fill(
+                    Color.primary
+                        .opacity(0.055)
+                )
+                .frame(height: 0.7)
+        }
     }
 
     private func timeText(_ challenge: ATHLTHChallenge) -> String {
