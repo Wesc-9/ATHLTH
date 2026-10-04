@@ -321,6 +321,102 @@ struct Exercise: Identifiable, Codable, Hashable {
     }
 }
 
+enum StrengthExerciseTargetKind: String, CaseIterable, Identifiable, Codable, Hashable {
+    case reps
+    case time
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .reps:
+            return ATHLTHLocalization.choose(
+                english: "Target reps",
+                norwegian: "Målreps"
+            )
+        case .time:
+            return ATHLTHLocalization.choose(
+                english: "Duration",
+                norwegian: "Varighet"
+            )
+        }
+    }
+}
+
+extension ExerciseSnapshot {
+    var defaultStrengthTargetKind: StrengthExerciseTargetKind {
+        let normalized =
+            ([name] + equipment)
+                .joined(separator: " ")
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: .current
+                )
+                .lowercased()
+
+        let timeBasedKeywords = [
+            "rowing machine",
+            "rower",
+            "concept2 row",
+            "ski erg",
+            "skierg",
+            "treadmill",
+            "stationary bike",
+            "exercise bike",
+            "air bike",
+            "assault bike",
+            "elliptical",
+            "stair climber",
+            "stairmaster",
+            "battle rope",
+            "plank",
+            "wall sit",
+            "dead hang",
+            "hollow hold",
+            "isometric hold"
+        ]
+
+        return timeBasedKeywords.contains {
+            normalized.contains($0)
+        }
+            ? .time
+            : .reps
+    }
+
+    var defaultStrengthTargetDurationSeconds: Int {
+        let normalized =
+            ([name] + equipment)
+                .joined(separator: " ")
+                .folding(
+                    options: [.diacriticInsensitive, .caseInsensitive],
+                    locale: .current
+                )
+                .lowercased()
+
+        let cardioMachineKeywords = [
+            "rowing machine",
+            "rower",
+            "concept2 row",
+            "ski erg",
+            "skierg",
+            "treadmill",
+            "stationary bike",
+            "exercise bike",
+            "air bike",
+            "assault bike",
+            "elliptical",
+            "stair climber",
+            "stairmaster"
+        ]
+
+        return cardioMachineKeywords.contains {
+            normalized.contains($0)
+        }
+            ? 300
+            : 60
+    }
+}
+
 struct PlannedExercise: Identifiable, Codable, Hashable {
     let id: UUID
     var exerciseID: UUID?
@@ -334,6 +430,36 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     var targetRIR: Double? = nil
     var supersetGroupID: UUID? = nil
     var progression: StrengthProgressionRule? = nil
+
+    // Optional keeps plans created before target-type support decodable.
+    // nil means use the exercise's normal default (reps for most exercises,
+    // time for common timed/cardio exercises).
+    var targetKind: StrengthExerciseTargetKind? = nil
+    var targetDurationSeconds: Int? = nil
+
+    var resolvedTargetKind: StrengthExerciseTargetKind {
+        targetKind ??
+            embeddedExercise.defaultStrengthTargetKind
+    }
+
+    var resolvedTargetDurationSeconds: Int? {
+        guard resolvedTargetKind == .time else {
+            return nil
+        }
+
+        return max(
+            targetDurationSeconds ??
+                embeddedExercise
+                    .defaultStrengthTargetDurationSeconds,
+            15
+        )
+    }
+
+    var resolvedTargetReps: Int? {
+        resolvedTargetKind == .reps
+            ? reps
+            : nil
+    }
 }
 
 struct PlannedSession: Identifiable, Codable, Hashable {
