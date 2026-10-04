@@ -1540,7 +1540,6 @@ struct FriendProfileView: View {
                     ProgressView("Loading profile…")
                         .padding(.top, 70)
                 } else if let profile {
-                    remoteProfileStats(profile)
                     actionBar(profile)
 
                     if profile.card.isPrivateProfile &&
@@ -1586,7 +1585,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, 34)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1719,123 +1718,156 @@ struct FriendProfileView: View {
         _ profile: SocialFriendProfile
     ) -> some View {
         GeometryReader { proxy in
-            ZStack {
+            ZStack(alignment: .bottom) {
                 Image("ProfileHero")
                     .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
                     .scaledToFill()
                     .frame(
                         width: proxy.size.width,
-                        height: proxy.size.height,
-                        alignment: .leading
+                        height: proxy.size.height
                     )
                     .clipped()
 
                 LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.92),
-                        ATHLTHTheme.cardWarm.opacity(0.74),
-                        ATHLTHTheme.cardWarm.opacity(0.28)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        ATHLTHTheme.canvasBottom.opacity(0.38)
+                    stops: [
+                        .init(
+                            color:
+                                Color.black.opacity(0.04),
+                            location: 0
+                        ),
+                        .init(
+                            color:
+                                Color.black.opacity(0.10),
+                            location: 0.42
+                        ),
+                        .init(
+                            color:
+                                Color.black.opacity(0.76),
+                            location: 1
+                        )
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
-                HStack(alignment: .center, spacing: 16) {
-                    SocialAvatar(
-                        profile: profile.card,
-                        size: 96
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                Color.white.opacity(0.95),
-                                lineWidth: 3
-                            )
-                    }
-                    .shadow(
-                        color: .black.opacity(0.08),
-                        radius: 10,
-                        x: 0,
-                        y: 5
-                    )
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    Spacer()
 
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("PROFILE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.6)
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep.opacity(0.62)
-                            )
-
-                        Text(profile.card.resolvedName)
-                            .font(.system(size: 27, weight: .bold))
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.76)
-
-                        if !profile.card.usernameLabel.isEmpty {
-                            Text(profile.card.usernameLabel)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
+                    HStack(
+                        alignment: .bottom,
+                        spacing: 14
+                    ) {
+                        SocialAvatar(
+                            profile: profile.card,
+                            size: 92
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white.opacity(0.96),
+                                    lineWidth: 3
                                 )
                         }
+                        .shadow(
+                            color:
+                                Color.black.opacity(0.20),
+                            radius: 9,
+                            y: 4
+                        )
 
-                        HStack(spacing: 6) {
-                            if social.isMutualFollow(userID) {
-                                relationshipPill(
-                                    "Mutual follow",
-                                    systemImage: "person.2.fill"
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+                            Text(
+                                profile.card
+                                    .resolvedName
+                            )
+                            .font(
+                                .system(
+                                    size: 27,
+                                    weight: .bold,
+                                    design: .rounded
                                 )
-                            } else if social.isFollowedBy(userID) {
-                                relationshipPill(
-                                    "Follows you",
-                                    systemImage: "person.fill.checkmark"
+                            )
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.70)
+
+                            if !profile.card
+                                .usernameLabel
+                                .isEmpty {
+                                Text(
+                                    profile.card
+                                        .usernameLabel
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.medium)
+                                )
+                                .foregroundStyle(
+                                    .white.opacity(0.86)
                                 )
                             }
 
-                            if let focus = profile.trainingFocus {
-                                relationshipPill(
-                                    focus.title,
-                                    systemImage: focus.systemImage
-                                )
+                            if let focus =
+                                    profile
+                                        .trainingFocus {
+                                Text(focus.title)
+                                    .font(
+                                        .caption
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        .white.opacity(
+                                            0.92
+                                        )
+                                    )
+                            }
+
+                            if let bio =
+                                    profile.card.bio?
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
+                                        ),
+                               !bio.isEmpty {
+                                Text(bio)
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .white.opacity(
+                                            0.88
+                                        )
+                                    )
+                                    .lineLimit(2)
                             }
                         }
 
-                        if let bio = profile.card.bio?
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            ),
-                           !bio.isEmpty {
-                            Text(bio)
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText.opacity(0.72)
-                                )
-                                .lineLimit(2)
-                                .padding(.top, 1)
-                        }
+                        Spacer(minLength: 0)
                     }
 
-                    Spacer(minLength: 6)
+                    remoteProfileStats(
+                        profile
+                    )
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 72)
+                .padding(.horizontal, 18)
                 .padding(.bottom, 24)
+                .shadow(
+                    color:
+                        Color.black.opacity(0.24),
+                    radius: 12,
+                    y: 5
+                )
             }
         }
-        .frame(height: 264)
+        .frame(height: 306)
         .clipped()
     }
 
@@ -1939,7 +1971,7 @@ struct FriendProfileView: View {
                     )
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.62)
             }
 
             Text(title)
@@ -1950,15 +1982,14 @@ struct FriendProfileView: View {
                     )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(0.62)
         }
-        .foregroundStyle(
-            ATHLTHTheme.primaryText
-        )
+        .foregroundStyle(.white)
+        .padding(.horizontal, 4)
         .frame(maxWidth: .infinity)
-        .frame(height: 58)
+        .frame(height: 52)
         .background(
-            Color.white.opacity(0.78),
+            Color.black.opacity(0.43),
             in: RoundedRectangle(
                 cornerRadius: 18,
                 style: .continuous
@@ -1970,9 +2001,7 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .premiumGold
-                    .opacity(0.10),
+                Color.white.opacity(0.14),
                 lineWidth: 0.7
             )
         }
@@ -2147,9 +2176,10 @@ struct FriendProfileView: View {
                             english: "Message",
                             norwegian: "Melding"
                         ),
-                    icon: "message.fill",
-                    tint: ATHLTHTheme.accentDeep,
-                    emphasized: true
+                    icon: "message",
+                    tint:
+                        ATHLTHTheme.accentDeep,
+                    emphasized: false
                 )
             }
             .buttonStyle(.plain)
@@ -2158,39 +2188,20 @@ struct FriendProfileView: View {
                 showingChallenge = true
             } label: {
                 profileActionLabel(
-                    title: "Challenge",
-                    icon: "bolt.fill",
-                    tint: ATHLTHTheme.premiumGold,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Challenge",
+                            norwegian: "Utfordre"
+                        ),
+                    icon: "trophy.fill",
+                    tint:
+                        ATHLTHTheme
+                            .premiumGold,
                     emphasized: false
                 )
             }
             .buttonStyle(.plain)
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Send this athlete a challenge request",
-                    norwegian:
-                        "Send denne utøveren en challenge"
-                )
-            )
         }
-        .padding(6)
-        .background(
-            .ultraThinMaterial,
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(
-                    Color.white.opacity(0.70),
-                    lineWidth: 0.8
-                )
-        }
-        .shadow(
-            color: Color.black.opacity(0.045),
-            radius: 14,
-            y: 6
-        )
     }
 
     private func profileActionLabel(
@@ -2199,11 +2210,11 @@ struct FriendProfileView: View {
         tint: Color,
         emphasized: Bool
     ) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             Image(systemName: icon)
                 .font(
                     .system(
-                        size: 12,
+                        size: 13,
                         weight: .semibold
                     )
                 )
@@ -2216,31 +2227,46 @@ struct FriendProfileView: View {
                     )
                 )
                 .lineLimit(1)
-                .minimumScaleFactor(0.76)
+                .minimumScaleFactor(0.72)
         }
         .foregroundStyle(
             emphasized
                 ? Color.white
-                : ATHLTHTheme.primaryText
+                : ATHLTHTheme
+                    .primaryText
         )
         .frame(maxWidth: .infinity)
-        .frame(height: 38)
-        .padding(.horizontal, 8)
+        .frame(height: 48)
         .background(
             emphasized
-                ? ATHLTHTheme.accentDeep
-                : tint.opacity(0.10),
-            in: Capsule()
+                ? ATHLTHTheme
+                    .accentDeep
+                : Color.white
+                    .opacity(0.90),
+            in: RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
         )
         .overlay {
-            Capsule()
-                .stroke(
-                    emphasized
-                        ? Color.white.opacity(0.10)
-                        : tint.opacity(0.16),
-                    lineWidth: 0.8
-                )
+            RoundedRectangle(
+                cornerRadius: 17,
+                style: .continuous
+            )
+            .stroke(
+                emphasized
+                    ? Color.white
+                        .opacity(0.10)
+                    : tint.opacity(0.14),
+                lineWidth: 0.8
+            )
         }
+        .shadow(
+            color:
+                Color.black.opacity(0.035),
+            radius: 8,
+            y: 3
+        )
     }
 
     @ViewBuilder
@@ -2281,7 +2307,7 @@ struct FriendProfileView: View {
                         ),
                     icon: "person.fill.checkmark",
                     tint: ATHLTHTheme.accentDeep,
-                    emphasized: false
+                    emphasized: true
                 )
             }
             .buttonStyle(.plain)
@@ -2340,7 +2366,7 @@ struct FriendProfileView: View {
                             ),
                     icon: "person.badge.plus",
                     tint: ATHLTHTheme.accentDeep,
-                    emphasized: false
+                    emphasized: true
                 )
             }
             .buttonStyle(.plain)
@@ -2379,7 +2405,7 @@ struct FriendProfileView: View {
                             ),
                     icon: "person.badge.plus",
                     tint: ATHLTHTheme.accentDeep,
-                    emphasized: false
+                    emphasized: true
                 )
             }
             .buttonStyle(.plain)
