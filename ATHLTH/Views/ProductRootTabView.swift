@@ -4269,7 +4269,9 @@ struct ATHLTHTrainView: View {
                                     spotify:
                                         spotifyPlayback,
                                     ghostRace:
-                                        ghostRace
+                                        ghostRace,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
@@ -4455,7 +4457,9 @@ struct ATHLTHTrainView: View {
                                     spotify:
                                         spotifyPlayback,
                                     ghostRace:
-                                        ghostRace
+                                        ghostRace,
+                                    workoutMirroring:
+                                        workoutMirroring
                                 )
                             _ = await social
                                 .confirmCurrentJoinedWorkoutStarted()
