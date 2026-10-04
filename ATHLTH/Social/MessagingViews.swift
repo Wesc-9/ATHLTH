@@ -45,125 +45,68 @@ struct MessageInboxView: View {
                     inboxErrorCard(error)
                 }
 
-                if filteredRequestCount > 0 {
+                if !displayedPersonItems.isEmpty {
                     inboxSectionLabel(
-                        "REQUESTS",
-                        count: filteredRequestCount
+                        normalizedSearch.isEmpty
+                            ? "CONVERSATIONS"
+                            : "RESULTS",
+                        count: displayedPersonItems.count
                     )
 
-                    ForEach(
-                        filteredChallengeRequests
-                    ) { challenge in
-                        ChallengeInboxRequestRow(
-                            challenge: challenge,
-                            creator:
-                                challengeCreatorProfile(
-                                    challenge
-                                ),
-                            onAccept: {
-                                respondToChallenge(
-                                    challenge,
-                                    accept: true
-                                )
-                            },
-                            onDecline: {
-                                respondToChallenge(
-                                    challenge,
-                                    accept: false
-                                )
-                            }
-                        )
-                    }
-
-                    ForEach(filteredIncomingRequestItems) { item in
-                        MessageRequestRow(
-                            friend: item.friend,
-                            message: item.lastMessage,
-                            direction: .incoming,
-                            onAccept: {
-                                Task {
-                                    _ = await messaging
-                                        .respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: true
+                    LazyVStack(spacing: 10) {
+                        ForEach(displayedPersonItems) { item in
+                            Group {
+                                if item.conversation != nil {
+                                    NavigationLink {
+                                        DirectMessageThreadView(
+                                            friend: item.friend
                                         )
+                                    } label: {
+                                        MessagePersonRow(
+                                            item: item
+                                        )
+                                    }
+                                } else if let firstChallenge =
+                                            item.pendingChallenges.first {
+                                    NavigationLink {
+                                        ChallengeDetailView(
+                                            challengeID:
+                                                firstChallenge.id
+                                        )
+                                    } label: {
+                                        MessagePersonRow(
+                                            item: item
+                                        )
+                                    }
                                 }
-                            },
-                            onDecline: {
-                                Task {
-                                    _ = await messaging
-                                        .respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: false
-                                        )
-                                }
-                            },
-                            onBlock: {
-                                Task {
-                                    _ = await messaging
-                                        .respondToMessageRequest(
-                                            item.conversation.id,
-                                            accept: false
-                                        )
-                                    await social.block(
-                                        item.friend.userID
-                                    )
-                                    await messaging.refresh()
-                                }
-                            }
-                        )
-                    }
-                }
-
-                if !displayedActiveConversations.isEmpty {
-                    LazyVStack(spacing: 9) {
-                        ForEach(displayedActiveConversations) { item in
-                            NavigationLink {
-                                DirectMessageThreadView(
-                                    friend: item.friend
-                                )
-                            } label: {
-                                MessageConversationRow(
-                                    friend: item.friend,
-                                    lastMessage: item.lastMessage,
-                                    unreadCount:
-                                        messaging.unreadCount(
-                                            for: item.conversation.id
-                                        ),
-                                    requestLabel:
-                                        conversationRequestLabel(
-                                            item.conversation
-                                        ),
-                                    isPinned:
-                                        messaging.isPinned(
-                                            item.conversation.id
-                                        )
-                                )
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
-                                Button {
-                                    withAnimation(
-                                        .easeInOut(duration: 0.18)
-                                    ) {
-                                        messaging.togglePinned(
-                                            item.conversation.id
+                                if let conversation =
+                                        item.conversation {
+                                    Button {
+                                        withAnimation(
+                                            .easeInOut(duration: 0.18)
+                                        ) {
+                                            messaging.togglePinned(
+                                                conversation.id
+                                            )
+                                        }
+                                    } label: {
+                                        Label(
+                                            messaging.isPinned(
+                                                conversation.id
+                                            )
+                                                ? "Unpin conversation"
+                                                : "Pin conversation",
+                                            systemImage:
+                                                messaging.isPinned(
+                                                    conversation.id
+                                                )
+                                                    ? "pin.slash"
+                                                    : "pin.fill"
                                         )
                                     }
-                                } label: {
-                                    Label(
-                                        messaging.isPinned(
-                                            item.conversation.id
-                                        )
-                                            ? "Unpin conversation"
-                                            : "Pin conversation",
-                                        systemImage:
-                                            messaging.isPinned(
-                                                item.conversation.id
-                                            )
-                                                ? "pin.slash"
-                                                : "pin.fill"
-                                    )
                                 }
                             }
                         }
@@ -498,66 +441,43 @@ struct MessageInboxView: View {
             .lowercased()
     }
 
-    private var displayedActiveConversations:
-        [MessageConversationItem] {
-        let matching = activeConversations.filter { item in
-            guard !normalizedSearch.isEmpty else {
-                return true
-            }
+    private var displayedPersonItems:
+        [MessagePersonInboxItem] {
+        let matching =
+            personInboxItems.filter { item in
+                guard !normalizedSearch.isEmpty else {
+                    return true
+                }
 
-            return item.friend.resolvedName.lowercased()
-                .contains(normalizedSearch) ||
-            item.friend.usernameLabel.lowercased()
-                .contains(normalizedSearch) ||
-            (item.lastMessage?.body?.lowercased()
-                .contains(normalizedSearch) ?? false) ||
-            (item.lastMessage?.attachmentTitle?
-                .lowercased()
-                .contains(normalizedSearch) ?? false)
-        }
+                return item.friend.resolvedName.lowercased()
+                    .contains(normalizedSearch) ||
+                    item.friend.usernameLabel.lowercased()
+                        .contains(normalizedSearch) ||
+                    (item.lastMessage?.body?.lowercased()
+                        .contains(normalizedSearch) ?? false) ||
+                    (item.lastMessage?.attachmentTitle?
+                        .lowercased()
+                        .contains(normalizedSearch) ?? false) ||
+                    item.pendingChallenges.contains {
+                        $0.title.lowercased()
+                            .contains(normalizedSearch) ||
+                        $0.sport.title.lowercased()
+                            .contains(normalizedSearch)
+                    }
+            }
 
         return matching.sorted { lhs, rhs in
-            let lhsPinned = messaging.isPinned(
-                lhs.conversation.id
-            )
-            let rhsPinned = messaging.isPinned(
-                rhs.conversation.id
-            )
-
-            if lhsPinned != rhsPinned {
-                return lhsPinned && !rhsPinned
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned && !rhs.isPinned
             }
 
-            return (
-                lhs.conversation.lastMessageAt ??
-                    lhs.conversation.createdAt
-            ) > (
-                rhs.conversation.lastMessageAt ??
-                    rhs.conversation.createdAt
-            )
-        }
-    }
-
-    private var filteredIncomingRequestItems:
-        [MessageConversationItem] {
-        guard !normalizedSearch.isEmpty else {
-            return incomingRequestItems
-        }
-
-        return incomingRequestItems.filter { item in
-            item.friend.resolvedName.lowercased()
-                .contains(normalizedSearch) ||
-            item.friend.usernameLabel.lowercased()
-                .contains(normalizedSearch) ||
-            (item.lastMessage?.body?.lowercased()
-                .contains(normalizedSearch) ?? false)
+            return lhs.latestActivityAt >
+                rhs.latestActivityAt
         }
     }
 
     private var shouldShowEmptyState: Bool {
-        displayedActiveConversations.isEmpty &&
-            filteredIncomingRequestItems.isEmpty &&
-            filteredChallengeRequests.isEmpty
+        displayedPersonItems.isEmpty
     }
 
     private var incomingChallengeRequests:
@@ -567,97 +487,88 @@ struct MessageInboxView: View {
         )
     }
 
-    private var filteredChallengeRequests:
-        [ATHLTHChallenge] {
-        guard !normalizedSearch.isEmpty else {
-            return incomingChallengeRequests
-        }
-
-        return incomingChallengeRequests.filter {
-            challenge in
-            let creator =
-                challengeCreatorProfile(
-                    challenge
-                )
-
-            return challenge.title.lowercased()
-                .contains(normalizedSearch) ||
-                challenge.sport.title.lowercased()
-                    .contains(normalizedSearch) ||
-                (creator?.resolvedName.lowercased()
-                    .contains(normalizedSearch) ?? false) ||
-                (creator?.usernameLabel.lowercased()
-                    .contains(normalizedSearch) ?? false)
-        }
-    }
-
     private var filteredRequestCount: Int {
-        filteredIncomingRequestItems.count +
-            filteredChallengeRequests.count
+        displayedPersonItems.filter(
+            \.needsResponse
+        ).count
     }
 
     private var totalRequestCount: Int {
-        incomingRequestItems.count +
-            incomingChallengeRequests.count
+        personInboxItems.filter(
+            \.needsResponse
+        ).count
+    }
+
+    private var personInboxItems:
+        [MessagePersonInboxItem] {
+        var grouped:
+            [UUID: MessagePersonInboxItem] = [:]
+
+        for item in activeConversations +
+            incomingRequestItems {
+            let userID = item.friend.userID
+            var current =
+                grouped[userID] ??
+                MessagePersonInboxItem(
+                    friend: item.friend
+                )
+
+            current.merge(
+                conversation: item.conversation,
+                lastMessage: item.lastMessage,
+                unreadCount:
+                    messaging.unreadCount(
+                        for: item.conversation.id
+                    ),
+                isPinned:
+                    messaging.isPinned(
+                        item.conversation.id
+                    ),
+                isIncomingMessageRequest:
+                    item.conversation.requestStatus ==
+                        .pending &&
+                    item.conversation.requestedBy !=
+                        messaging.currentUserID,
+                isOutgoingMessageRequest:
+                    item.conversation.requestStatus ==
+                        .pending &&
+                    item.conversation.requestedBy ==
+                        messaging.currentUserID
+            )
+
+            grouped[userID] = current
+        }
+
+        for challenge in incomingChallengeRequests {
+            guard
+                let friend =
+                    challengeCreatorProfile(
+                        challenge
+                    )
+            else {
+                continue
+            }
+
+            var current =
+                grouped[friend.userID] ??
+                MessagePersonInboxItem(
+                    friend: friend
+                )
+
+            current.pendingChallenges
+                .append(challenge)
+            grouped[friend.userID] = current
+        }
+
+        return Array(
+            grouped.values
+        )
     }
 
     private func challengeCreatorProfile(
         _ challenge: ATHLTHChallenge
     ) -> SocialProfileCard? {
         profile(for: challenge.creatorID)
-    }
-
-    private func respondToChallenge(
-        _ challenge: ATHLTHChallenge,
-        accept: Bool
-    ) {
-        guard let participant =
-                challenges.invitationParticipant(
-                    in: challenge,
-                    userID:
-                        session.profile.userID
-                )
-        else {
-            return
-        }
-
-        challenges.setParticipantState(
-            challengeID: challenge.id,
-            participantID: participant.id,
-            state:
-                accept
-                    ? .accepted
-                    : .declined
-        )
-
-        guard let updated =
-                challenges.challenge(
-                    id: challenge.id
-                )
-        else {
-            return
-        }
-
-        Task {
-            let synced =
-                await social.syncChallenge(
-                    updated
-                )
-
-            if !synced {
-                challenges.setParticipantState(
-                    challengeID:
-                        challenge.id,
-                    participantID:
-                        participant.id,
-                    state: .invited
-                )
-            } else {
-                await social.markChallengeInviteRead(
-                    challengeID: challenge.id
-                )
-            }
-        }
     }
 
     private var activeConversations:
@@ -721,18 +632,6 @@ struct MessageInboxView: View {
         }
     }
 
-    private func conversationRequestLabel(
-        _ conversation: DirectConversationRecord
-    ) -> String? {
-        guard conversation.requestStatus == .pending else {
-            return nil
-        }
-
-        return conversation.requestedBy == messaging.currentUserID
-            ? "Pending"
-            : "Request"
-    }
-
     private func profile(
         for userID: UUID
     ) -> SocialProfileCard? {
@@ -746,6 +645,7 @@ struct MessageInboxView: View {
             $0.userID == userID
         }
     }
+
 }
 
 private struct ChallengeInboxRequestRow: View {
