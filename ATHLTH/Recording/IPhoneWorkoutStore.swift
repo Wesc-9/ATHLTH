@@ -906,7 +906,13 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        workout.end = Date()
+        let recoveryEnd =
+            recoveredWorkoutLastCheckpoint
+        workout.end =
+            max(
+                recoveryEnd ?? Date(),
+                workout.start
+            )
         let completion =
             routeCompletionSummary(
                 for: workout
