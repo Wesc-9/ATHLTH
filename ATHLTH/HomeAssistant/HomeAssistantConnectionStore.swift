@@ -214,6 +214,23 @@ enum HomeAssistantJSONValue: Codable, Hashable, Sendable {
     }
 }
 
+func homeAssistantRecoveryStateValue(
+    _ state: RecoveryReadinessState
+) -> String {
+    switch state {
+    case .buildingBaseline:
+        return "building_baseline"
+    case .ready:
+        return "ready"
+    case .balanced:
+        return "balanced"
+    case .takeItEasy:
+        return "take_it_easy"
+    case .recover:
+        return "recover"
+    }
+}
+
 @MainActor
 final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var connectionState: HomeAssistantConnectionState
