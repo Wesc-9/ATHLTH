@@ -1579,7 +1579,7 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 116)
+            .padding(.top, 142)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -1861,7 +1861,7 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .frame(height: 282)
+        .frame(height: 300)
         .clipped()
     }
 
@@ -1884,7 +1884,7 @@ struct FriendProfileView: View {
     private func remoteProfileStats(
         _ profile: SocialFriendProfile
     ) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             remoteHeroStat(
                 value:
                     followOverview
@@ -1949,16 +1949,16 @@ struct FriendProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 11,
+                            size: 9.5,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 14)
+                    .frame(width: 12)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 12,
+                            size: 11,
                             weight: .bold,
                             design: .rounded
                         )
@@ -1971,7 +1971,7 @@ struct FriendProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 7.5,
+                        size: 6.8,
                         weight: .medium
                     )
                 )
@@ -1979,13 +1979,13 @@ struct FriendProfileView: View {
                 .minimumScaleFactor(0.58)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 3)
+        .padding(.horizontal, 2)
         .frame(maxWidth: .infinity)
-        .frame(height: 38)
+        .frame(height: 34)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 13,
+                cornerRadius: 12,
                 style: .continuous
             )
         )
@@ -1995,8 +1995,8 @@ struct FriendProfileView: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.14),
-                lineWidth: 0.7
+                Color.white.opacity(0.12),
+                lineWidth: 0.6
             )
         }
     }
@@ -2458,7 +2458,7 @@ struct FriendProfileView: View {
                         "shoeprints.fill"
                 )
                 .font(
-                    .title3.weight(.bold)
+                    .headline.weight(.bold)
                 )
 
                 Spacer()
@@ -2566,7 +2566,7 @@ struct FriendProfileView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(13)
         .background(
             Color.white.opacity(0.91),
             in: RoundedRectangle(
@@ -2988,7 +2988,23 @@ struct FriendProfileView: View {
                 )
             }
 
-            HStack(spacing: 8) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Running",
+                        norwegian: "Løping"
+                    ),
+                    systemImage: "figure.run"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Spacer()
+            }
+
+            HStack(spacing: 6) {
                 remoteRecordTile(
                     title:
                         ATHLTHLocalization.choose(
@@ -3255,14 +3271,14 @@ struct FriendProfileView: View {
                                     )
                             }
                             .frame(
-                                width: 22,
-                                height: 25
+                                width: 16,
+                                height: 18
                             )
 
                             Text(item.title)
                                 .font(
                                     .system(
-                                        size: 7.4,
+                                        size: 6.6,
                                         weight: .bold
                                     )
                                 )
@@ -3289,8 +3305,8 @@ struct FriendProfileView: View {
                                         )
                                 )
                                 .frame(
-                                    width: 26,
-                                    height: 30
+                                    width: 17,
+                                    height: 19
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
@@ -3316,7 +3332,7 @@ struct FriendProfileView: View {
                             Text("—")
                                 .font(
                                     .system(
-                                        size: 8,
+                                        size: 6.8,
                                         weight:
                                             .semibold
                                     )
