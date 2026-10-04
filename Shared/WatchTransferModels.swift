@@ -1124,6 +1124,26 @@ struct WatchSpotifyPlaybackState: Codable, Hashable {
     )
 }
 
+struct WatchHomeAssistantConfiguration: Codable, Hashable {
+    var enabled: Bool
+    var clientID: String?
+    var webhookURL: URL?
+    var fallbackWebhookURL: URL?
+    var sharedSecret: String?
+    var updatedAt: Date
+
+    static var disabled: WatchHomeAssistantConfiguration {
+        WatchHomeAssistantConfiguration(
+            enabled: false,
+            clientID: nil,
+            webhookURL: nil,
+            fallbackWebhookURL: nil,
+            sharedSecret: nil,
+            updatedAt: Date()
+        )
+    }
+}
+
 enum WatchTransferKind: String {
     case route
     case workoutResult
@@ -1141,6 +1161,7 @@ enum WatchTransferKind: String {
     case spotifyCommand
     case spotifyPlaybackState
     case spotifyCredentials
+    case homeAssistantConfiguration
     case connectivityProbe
     case connectivityAck
 }
