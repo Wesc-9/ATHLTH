@@ -13339,11 +13339,24 @@ struct CommunityGroupSettingsView: View {
         }
     }
 
-    private func compactActionChip(
+    nonisolated private func compactActionChip(
         title: String,
         icon: String
     ) -> some View {
-        Label(
+        let forest =
+            Color(
+                red: 0.025,
+                green: 0.30,
+                blue: 0.21
+            )
+        let mint =
+            Color(
+                red: 0.90,
+                green: 0.96,
+                blue: 0.92
+            )
+
+        return Label(
             title,
             systemImage: icon
         )
@@ -13354,7 +13367,7 @@ struct CommunityGroupSettingsView: View {
                 )
         )
         .foregroundStyle(
-            clubForest
+            forest
         )
         .padding(
             .horizontal,
@@ -13362,7 +13375,7 @@ struct CommunityGroupSettingsView: View {
         )
         .frame(height: 34)
         .background(
-            clubMint,
+            mint,
             in: Capsule()
         )
     }
