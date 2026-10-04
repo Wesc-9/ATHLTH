@@ -115,6 +115,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         WatchAudioCoachConfiguration = .disabled
     @Published private(set) var structuredRunningWorkout:
         WatchRunningWorkoutTransfer?
+    @Published private(set) var treadmillInclinePercent:
+        Double?
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
@@ -307,6 +309,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         publish {
             self.structuredRunningWorkout =
                 workout.steps.isEmpty ? nil : workout
+            self.treadmillInclinePercent =
+                workout.treadmillInclinePercent
             self.structuredStepIndex = 0
 
             if let routeAlerts = workout.routeAlerts {
@@ -1793,6 +1797,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         publish {
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
+            self.treadmillInclinePercent = nil
             self.structuredStepIndex = 0
             self.plannedRoute = nil
             self.routeProgressPercent = nil
@@ -1928,6 +1933,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.plannedRoute = nil
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
+            self.treadmillInclinePercent = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
             self.strengthActionPending = false
@@ -4157,6 +4163,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 kind.title,
             currentPaceSecondsPerKilometer:
                 currentPaceSecondsPerKilometer,
+            treadmillInclinePercent:
+                treadmillInclinePercent,
             routeRemainingMeters:
                 routeRemainingMeters,
             routeDeviationMeters:
