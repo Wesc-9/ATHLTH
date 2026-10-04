@@ -69,6 +69,22 @@ struct ATHLTHApp: App {
                     return
                 }
 
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistantStore
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await healthStore
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
+                }
+
                 await homeAssistantStore
                     .syncBackgroundHealthSnapshot(
                         workouts:
@@ -88,7 +104,9 @@ struct ATHLTHApp: App {
                                 healthStore
                                     .recovery
                                     .state
-                            )
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
                     )
             }
 
@@ -108,6 +126,22 @@ struct ATHLTHApp: App {
                     maxAge: 5 * 60
                 )
 
+                let backgroundTrainingLoad:
+                    Double?
+                if homeAssistantStore
+                    .shareTrainingLoad {
+                    backgroundTrainingLoad =
+                        await healthStore
+                            .recoveryTrendSnapshot(
+                                days: 28
+                            )
+                            .trainingLoad
+                            .ratio
+                } else {
+                    backgroundTrainingLoad =
+                        nil
+                }
+
                 await homeAssistantStore
                     .syncBackgroundHealthSnapshot(
                         workouts: healthStore.workouts,
@@ -121,7 +155,9 @@ struct ATHLTHApp: App {
                                 healthStore
                                     .recovery
                                     .state
-                            )
+                            ),
+                        trainingLoad:
+                            backgroundTrainingLoad
                     )
 
                 return true
