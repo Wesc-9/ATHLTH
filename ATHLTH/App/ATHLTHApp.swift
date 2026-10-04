@@ -524,14 +524,16 @@ struct AppRootView: View {
                     calendarRefresh
                 )
 
-                await realtimeSocial
-                    .configureOnlinePresence(
-                        appIsActive: true,
-                        enabled:
-                            social.privacy?
-                                .showOnlineStatus ??
-                            true
-                    )
+                if ATHLTHDeviceRole.isIPhone {
+                    await realtimeSocial
+                        .configureOnlinePresence(
+                            appIsActive: true,
+                            enabled:
+                                social.privacy?
+                                    .showOnlineStatus ??
+                                true
+                        )
+                }
                 await realtimeSocial
                     .refreshVisibleLiveSessions()
             }
@@ -674,7 +676,8 @@ struct AppRootView: View {
                 appSession.checkpointTrainingContent()
             }
 
-            if appSession.signedIn {
+            if appSession.signedIn,
+               ATHLTHDeviceRole.isIPhone {
                 Task {
                     await realtimeSocial
                         .configureOnlinePresence(
@@ -689,7 +692,8 @@ struct AppRootView: View {
             }
 
             if phase != .active,
-               appSession.signedIn {
+               appSession.signedIn,
+               ATHLTHDeviceRole.isIPhone {
                 let userID = appSession.profile.userID
                 Task {
                     await trainingBackups.backUp(
@@ -799,9 +803,11 @@ struct AppRootView: View {
         }
         .onChange(of: health.recovery.score) { _, score in
             Task {
-                await homeAssistant.sendRecovery(
-                    score: score
-                )
+                if ATHLTHDeviceRole.isIPhone {
+                    await homeAssistant.sendRecovery(
+                        score: score
+                    )
+                }
                 await syncHomeAssistantSnapshot()
             }
         }
@@ -996,6 +1002,10 @@ struct AppRootView: View {
             }
 
             Task {
+                guard ATHLTHDeviceRole.isIPhone else {
+                    return
+                }
+
                 if presence.state == .training,
                    previous.state != .training {
                     await homeAssistant.sendWorkoutStarted(
@@ -2313,7 +2323,8 @@ struct AppRootView: View {
 
     @MainActor
     private func syncHomeAssistantSnapshot() async {
-        guard appSession.signedIn,
+        guard ATHLTHDeviceRole.isIPhone,
+              appSession.signedIn,
               homeAssistant.isConnected
         else {
             return
