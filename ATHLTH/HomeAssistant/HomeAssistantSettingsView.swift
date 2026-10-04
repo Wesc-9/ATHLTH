@@ -54,6 +54,18 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareTrainingLoad) { _, _ in
             clearDisabledValues()
         }
+        .onChange(of: homeAssistant.shareSleep) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareHRV) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareRestingHeartRate) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareRespiratoryRate) { _, _ in
+            clearDisabledValues()
+        }
         .onChange(of: homeAssistant.shareWeeklyProgress) { _, _ in
             clearDisabledValues()
         }
@@ -267,9 +279,9 @@ struct HomeAssistantSettingsView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Choose exactly which ATHLTH data is sent to your Home Assistant. Recovery and training load stay off until you enable them.",
+                            "Choose exactly which ATHLTH data is sent to your Home Assistant. Health-derived metrics stay off until you enable them.",
                         norwegian:
-                            "Velg nøyaktig hvilke ATHLTH-data som sendes til Home Assistant. Recovery og belastning er av til du selv slår dem på."
+                            "Velg nøyaktig hvilke ATHLTH-data som sendes til Home Assistant. Helsedata er av til du selv slår dem på."
                     )
                 )
                 .font(.caption)
@@ -338,14 +350,71 @@ struct HomeAssistantSettingsView: View {
 
             sharingToggle(
                 title: ATHLTHLocalization.choose(
+                    english: "Sleep duration",
+                    norwegian: "Søvnvarighet"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the latest sleep duration from Apple Health. Off by default.",
+                    norwegian:
+                        "Deler siste søvnvarighet fra Apple Health. Av som standard."
+                ),
+                icon: "bed.double.fill",
+                isOn: $homeAssistant.shareSleep
+            )
+
+            sharingToggle(
+                title: "HRV",
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the latest heart-rate variability value in milliseconds. Off by default.",
+                    norwegian:
+                        "Deler siste HRV-verdi i millisekunder. Av som standard."
+                ),
+                icon: "waveform.path.ecg",
+                isOn: $homeAssistant.shareHRV
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Resting heart rate",
+                    norwegian: "Hvilepuls"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the latest resting heart-rate value. Off by default.",
+                    norwegian:
+                        "Deler siste registrerte hvilepuls. Av som standard."
+                ),
+                icon: "heart.fill",
+                isOn: $homeAssistant.shareRestingHeartRate
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Respiratory rate",
+                    norwegian: "Respirasjon"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the latest respiratory-rate value. Off by default.",
+                    norwegian:
+                        "Deler siste registrerte respirasjonsfrekvens. Av som standard."
+                ),
+                icon: "lungs.fill",
+                isOn: $homeAssistant.shareRespiratoryRate
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
                     english: "Weekly progress",
                     norwegian: "Ukens fremdrift"
                 ),
                 detail: ATHLTHLocalization.choose(
                     english:
-                        "Shares completion progress for the current training week.",
+                        "Shares progress, training minutes and distance for the current training week.",
                     norwegian:
-                        "Deler fremdriften for inneværende treningsuke."
+                        "Deler fremdrift, treningsminutter og distanse for inneværende treningsuke."
                 ),
                 icon: "calendar.badge.checkmark",
                 isOn: $homeAssistant.shareWeeklyProgress
@@ -358,9 +427,9 @@ struct HomeAssistantSettingsView: View {
                 ),
                 detail: ATHLTHLocalization.choose(
                     english:
-                        "Shares the title of the next planned workout.",
+                        "Shares the title and scheduled time of the next planned workout.",
                     norwegian:
-                        "Deler navnet på den neste planlagte økten."
+                        "Deler navn og tidspunkt for den neste planlagte økten."
                 ),
                 icon: "calendar.badge.clock",
                 isOn: $homeAssistant.shareNextWorkout
