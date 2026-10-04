@@ -5574,6 +5574,12 @@ struct ATHLTHTrainView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 16) {
+                // Standalone workouts must remain available even when the
+                // athlete does not currently have an active training plan.
+                AdvancedPlannerView(
+                    showsEmptyState: false
+                )
+
                 TrainingPlanManagerView()
 
                 Button {
