@@ -120,6 +120,31 @@ final class ChallengeStore: ObservableObject {
         persist()
     }
 
+    func removeParticipant(
+        challengeID: UUID,
+        participantID: UUID
+    ) {
+        guard
+            let challengeIndex =
+                challenges.firstIndex(
+                    where: {
+                        $0.id == challengeID
+                    }
+                )
+        else {
+            return
+        }
+
+        challenges[challengeIndex]
+            .participants
+            .removeAll {
+                $0.id == participantID
+            }
+
+        refreshStatuses()
+        persist()
+    }
+
     func setParticipantState(
         challengeID: UUID,
         participantID: UUID,
