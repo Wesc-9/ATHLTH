@@ -532,44 +532,11 @@ final class IPhoneWorkoutStore:
     private func requestLiveWorkoutPresentationAfterLaunch() {
         livePresentationRetryTask?.cancel()
         isUserMinimized = false
-        showingWorkout = false
 
-        livePresentationRetryTask =
-            Task { @MainActor [weak self] in
-                // The quick-start sheet and the live full-screen cover can
-                // overlap during SwiftUI's dismissal transaction. Request
-                // presentation once after dismissal, then make one controlled
-                // retry only if the live view never actually appeared.
-                try? await Task.sleep(
-                    for: .milliseconds(500)
-                )
-
-                guard let self,
-                      self.active != nil,
-                      !self.isUserMinimized,
-                      !Task.isCancelled
-                else {
-                    return
-                }
-
-                self.showingWorkout = true
-
-                try? await Task.sleep(
-                    for: .milliseconds(900)
-                )
-
-                guard self.active != nil,
-                      !self.isUserMinimized,
-                      !self.liveViewIsVisible,
-                      !Task.isCancelled
-                else {
-                    return
-                }
-
-                self.showingWorkout = false
-                await Task.yield()
-                self.showingWorkout = true
-            }
+        // The live workout is rendered as a root overlay rather than a second
+        // modal presentation. It can therefore become visible immediately
+        // even while the quick-start sheet is finishing its dismissal.
+        showingWorkout = true
     }
 
     func presentWorkout() {
