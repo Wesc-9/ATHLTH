@@ -126,6 +126,267 @@ struct ATHLTHSectionHeader: View {
     }
 }
 
+struct ATHLTHPremiumFormSection<Content: View>: View {
+    let title: String
+    let icon: String
+    var tint: Color = ATHLTHTheme.vitality
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack(spacing: 9) {
+                    Capsule()
+                        .fill(tint)
+                        .frame(
+                            width: 3,
+                            height: 20
+                        )
+
+                    Image(systemName: icon)
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(tint)
+
+                    Text(title)
+                        .font(
+                            .title3
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer(minLength: 0)
+                }
+
+                content
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+    }
+}
+
+struct ATHLTHPremiumSelectionRow: View {
+    let title: String
+    let value: String
+    let icon: String
+    var subtitle: String? = nil
+    var tint: Color = ATHLTHTheme.vitality
+
+    var body: some View {
+        HStack(
+            alignment: subtitle == nil
+                ? .center
+                : .top,
+            spacing: 12
+        ) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                if let subtitle,
+                   !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .multilineTextAlignment(.trailing)
+                    .frame(
+                        maxWidth: 148,
+                        alignment: .trailing
+                    )
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .contentShape(Rectangle())
+    }
+}
+
+struct ATHLTHPremiumChoiceRow: View {
+    let title: String
+    let icon: String
+    var subtitle: String? = nil
+    var selected: Bool = false
+    var tint: Color = ATHLTHTheme.vitality
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(tint)
+                .frame(
+                    width: 40,
+                    height: 40
+                )
+                .background(
+                    tint.opacity(0.10),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                if let subtitle,
+                   !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .fixedSize(
+                            horizontal: false,
+                            vertical: true
+                        )
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Image(
+                systemName:
+                    selected
+                        ? "checkmark.circle.fill"
+                        : "circle"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                selected
+                    ? tint
+                    : ATHLTHTheme
+                        .mutedText
+                        .opacity(0.45)
+            )
+        }
+        .padding(12)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            selected
+                ? tint.opacity(0.075)
+                : Color.white.opacity(0.42),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                selected
+                    ? tint.opacity(0.18)
+                    : ATHLTHTheme
+                        .border,
+                lineWidth: 0.8
+            )
+        }
+    }
+}
+
 struct ATHLTHMetric: View {
     let title: String
     let value: String
