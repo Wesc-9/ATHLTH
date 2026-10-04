@@ -2204,7 +2204,21 @@ struct FriendProfileView: View {
             .buttonStyle(.plain)
 
             Button {
-                showingChallenge = true
+                if social.mutualFollows.contains(
+                    where: {
+                        $0.userID == userID
+                    }
+                ) {
+                    showingChallenge = true
+                } else {
+                    followActionError =
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Follow each other before sending a challenge.",
+                            norwegian:
+                                "Dere må følge hverandre før du kan sende en utfordring."
+                        )
+                }
             } label: {
                 profileActionLabel(
                     title:
