@@ -674,6 +674,7 @@ struct ChallengeCreationView: View {
     @State private var attemptLimit = 0
     @State private var allowTreadmill = false
     @State private var allowTargetGhost = true
+    @State private var allowLiveGhost = true
     @State private var advancedRules = false
 
     @State private var heartRateZone = 5
@@ -1019,6 +1020,8 @@ struct ChallengeCreationView: View {
                     allowTreadmill =
                         false
                     allowTargetGhost =
+                        true
+                    allowLiveGhost =
                         true
                 } else {
                     selectedRouteID =
@@ -2772,10 +2775,32 @@ struct ChallengeCreationView: View {
                             isOn:
                                 $allowTargetGhost
                         )
+
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Allow Live Ghost",
+                                norwegian:
+                                    "Tillat Live Ghost"
+                            ),
+                            isOn:
+                                $allowLiveGhost
+                        )
                     }
                 }
 
                 if !usesSpecificRoute {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Allow Live Ghost",
+                            norwegian:
+                                "Tillat Live Ghost"
+                        ),
+                        isOn:
+                            $allowLiveGhost
+                    )
+
                     Toggle(
                         ATHLTHLocalization.choose(
                             english:
@@ -4797,6 +4822,21 @@ struct ChallengeCreationView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                        Divider()
+
+                        Toggle(
+                            "Allow Live Ghost",
+                            isOn: $allowLiveGhost
+                        )
+
+                        Text(
+                            allowLiveGhost
+                                ? "Participants can use another active participant as a Live Ghost."
+                                : "Live Ghost is disabled for this challenge."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                     .padding()
                     .challengeCard()
@@ -4804,6 +4844,21 @@ struct ChallengeCreationView: View {
 
                 if !usesSpecificRoute {
                     VStack(alignment: .leading, spacing: 7) {
+                        Toggle(
+                            "Allow Live Ghost",
+                            isOn: $allowLiveGhost
+                        )
+
+                        Text(
+                            allowLiveGhost
+                                ? "Participants can use another active participant as a Live Ghost. Distance comparison is used when no route is available."
+                                : "Live Ghost is disabled for this challenge."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        Divider()
+
                         Toggle(
                             "Allow treadmill",
                             isOn: $allowTreadmill
@@ -6164,6 +6219,10 @@ struct ChallengeCreationView: View {
                 usesSpecificRoute
                     ? allowTargetGhost
                     : nil,
+            allowLiveGhost:
+                sport == .running
+                    ? allowLiveGhost
+                    : nil,
             exerciseName: sport == .strength && scoring != .workoutVolume
                 ? exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
                 : nil,
@@ -6352,6 +6411,8 @@ struct ChallengeCreationView: View {
         attemptPolicy = .best
         attemptLimit = 0
         allowTreadmill = false
+        allowTargetGhost = true
+        allowLiveGhost = true
 
         if usesSpecificRoute {
             gpsRequired = true
@@ -7196,6 +7257,8 @@ struct ChallengeDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime:
+        ATHLTHRealtimeSocialStore
     @StateObject private var locationStore = ChallengeLocationStore()
 
     let challengeID: UUID
@@ -7242,14 +7305,16 @@ struct ChallengeDetailView: View {
                         rulesCard(challenge)
 
                         if challenge.sport == .running,
-                           challenge.rules.route != nil,
-                           challenge.rules.targetGhostAllowed,
                            challenge.status == .active,
                            (
                                currentParticipant?.state == .creator ||
                                currentParticipant?.state == .accepted
-                           ) {
-                            targetGhostCard(challenge)
+                           ),
+                           challenge.rules.targetGhostAllowed ||
+                           challenge.rules.liveGhostAllowed {
+                            challengeGhostRaceCard(
+                                challenge
+                            )
                         }
 
                         if let meetup = challenge.rules.meetup {
@@ -7322,6 +7387,13 @@ struct ChallengeDetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .task {
                     challenges.refreshStatuses()
+
+                    if challenge.sport == .running {
+                        await realtime
+                            .refreshVisibleLiveSessions(
+                                force: true
+                            )
+                    }
 
                     if challenge.sport == .heartRate,
                        let maxHR =
