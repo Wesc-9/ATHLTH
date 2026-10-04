@@ -569,13 +569,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                         ) ||
                         fallbackStatus == 409
                     else {
-                        throw HomeAssistantConnectionError
-                            .webhookRejected
+                        throw Self.webhookError(
+                            for: fallbackStatus
+                        )
                     }
                     return
                 }
 
-                throw HomeAssistantConnectionError.webhookRejected
+                throw Self.webhookError(
+                    for: status
+                )
             }
         } catch let error as HomeAssistantConnectionError {
             throw error
@@ -601,7 +604,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             guard (200..<300).contains(fallbackStatus) ||
                     fallbackStatus == 409
             else {
-                throw HomeAssistantConnectionError.webhookRejected
+                throw Self.webhookError(
+                    for: fallbackStatus
+                )
             }
         }
     }
@@ -639,6 +644,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             try await sendPendingDelivery(
                 delivery
             )
+        } catch let error as HomeAssistantConnectionError {
+            switch error {
+            case .notConnected,
+                 .webhookRejected:
+                return
+            default:
+                enqueuePendingDelivery(
+                    delivery
+                )
+            }
         } catch {
             enqueuePendingDelivery(
                 delivery
@@ -1948,6 +1963,18 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         return httpResponse.statusCode
     }
 
+    private static func webhookError(
+        for statusCode: Int
+    ) -> HomeAssistantConnectionError {
+        if statusCode == 408 ||
+            statusCode == 429 ||
+            statusCode >= 500 {
+            return .webhookUnavailable
+        }
+
+        return .webhookRejected
+    }
+
     private static func shouldTryWebhookFallback(
         after statusCode: Int
     ) -> Bool {
@@ -2135,6 +2162,7 @@ private enum HomeAssistantConnectionError: LocalizedError {
     case unsupportedSignatureAlgorithm(String)
     case invalidPairingResponse
     case secureStorageFailed
+    case webhookUnavailable
     case webhookRejected
 
     var errorDescription: String? {
@@ -2203,6 +2231,13 @@ private enum HomeAssistantConnectionError: LocalizedError {
                     "ATHLTH could not store the Home Assistant connection securely.",
                 norwegian:
                     "ATHLTH kunne ikke lagre Home Assistant-tilkoblingen sikkert."
+            )
+        case .webhookUnavailable:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant is temporarily unavailable. ATHLTH will retry important updates.",
+                norwegian:
+                    "Home Assistant er midlertidig utilgjengelig. ATHLTH prøver viktige oppdateringer på nytt."
             )
         case .webhookRejected:
             return ATHLTHLocalization.choose(
