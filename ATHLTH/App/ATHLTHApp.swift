@@ -63,7 +63,8 @@ struct ATHLTHApp: App {
                 [weak homeAssistantStore,
                  weak healthStore] in
 
-                guard let homeAssistantStore,
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistantStore,
                       let healthStore
                 else {
                     return
@@ -115,7 +116,8 @@ struct ATHLTHApp: App {
                 [weak homeAssistantStore,
                  weak healthStore] in
 
-                guard let homeAssistantStore,
+                guard ATHLTHDeviceRole.isIPhone,
+                      let homeAssistantStore,
                       let healthStore,
                       homeAssistantStore.isConnected
                 else {
