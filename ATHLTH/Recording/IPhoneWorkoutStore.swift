@@ -170,8 +170,35 @@ final class IPhoneWorkoutStore:
     @Published private(set) var automaticPauseActive = false
     @Published private(set) var completionStartedWorkout: PhoneWorkout?
     @Published private(set) var lastCompletedWorkout: PhoneWorkout?
+    @Published private(set) var recoveredWorkoutLastCheckpoint:
+        Date?
     @Published private(set)
     var lastRouteCompletion: PhoneRouteCompletionSummary?
+
+    private let staleRecoveryInterval:
+        TimeInterval = 12 * 60 * 60
+
+    var hasRecoveredActiveWorkout: Bool {
+        active != nil &&
+        recoveredWorkoutLastCheckpoint != nil
+    }
+
+    var recoveredActiveWorkoutNeedsReview: Bool {
+        guard active != nil,
+              let recoveredWorkoutLastCheckpoint
+        else {
+            return false
+        }
+
+        return Date()
+            .timeIntervalSince(
+                recoveredWorkoutLastCheckpoint
+            ) >= staleRecoveryInterval
+    }
+
+    var recoveredActiveWorkoutReferenceDate: Date? {
+        recoveredWorkoutLastCheckpoint
+    }
     private var accountID: UUID?
     private var pendingWalking: Bool?
     private var pendingRunEnvironment: RunEnvironment = .outdoor
@@ -266,7 +293,16 @@ final class IPhoneWorkoutStore:
             active = workout
         }
         history = userID.flatMap { AccountLocalStorage.read([PhoneWorkout].self, name: "phoneHistory", userID: $0) } ?? []
-        if let active, history.contains(where: { $0.id == active.id }) { self.active = nil }
+        if let active,
+           active.end != nil ||
+            history.contains(
+                where: { $0.id == active.id }
+            ) {
+            self.active = nil
+        }
+
+        recoveredWorkoutLastCheckpoint =
+            active?.lastCheckpoint
 
         if let active {
             restoreRouteGeometry(
@@ -329,8 +365,25 @@ final class IPhoneWorkoutStore:
             }
 
         showingWorkout = false
-        isUserMinimized = false
-        message = active == nil ? nil : "Recovered workout paused at the last saved checkpoint. Resume when you are ready."
+        isUserMinimized = active != nil
+        if let active {
+            message =
+                recoveredActiveWorkoutNeedsReview
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "An unfinished \(active.walking ? "walk" : "run") was recovered. Review it before starting another workout.",
+                        norwegian:
+                            "En uferdig \(active.walking ? "gåtur" : "løpeøkt") ble gjenopprettet. Se gjennom den før du starter en ny økt."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Recovered workout paused at the last saved checkpoint. Resume when you are ready.",
+                        norwegian:
+                            "En uferdig økt ble gjenopprettet og satt på pause. Fortsett når du er klar."
+                    )
+        } else {
+            message = nil
+        }
         lastActiveCheckpointWriteAt = nil
     }
 
@@ -445,6 +498,7 @@ final class IPhoneWorkoutStore:
         guidancePriorityGate.reset()
 
         let now = Date()
+        recoveredWorkoutLastCheckpoint = nil
         active = PhoneWorkout(
             walking: walking,
             start: now,
@@ -550,6 +604,31 @@ final class IPhoneWorkoutStore:
         livePresentationRetryTask?.cancel()
         isUserMinimized = true
         showingWorkout = false
+    }
+
+    func discardActiveWorkout() {
+        guard active != nil else {
+            return
+        }
+
+        pause()
+        manager.stopUpdatingLocation()
+        manager.allowsBackgroundLocationUpdates = false
+        manager.distanceFilter = 5
+        active = nil
+        recoveredWorkoutLastCheckpoint = nil
+        showingWorkout = false
+        liveViewIsVisible = false
+        isUserMinimized = false
+        livePresentationRetryTask?.cancel()
+        automaticPauseActive = false
+        autoPauseDetector.reset(enabled: false)
+        resetRouteRuntime()
+        message = ATHLTHLocalization.choose(
+            english: "Unfinished workout discarded.",
+            norwegian: "Uferdig økt forkastet."
+        )
+        persistActiveCheckpoint(force: true)
     }
 
     func setTreadmillInclinePercent(
@@ -709,6 +788,7 @@ final class IPhoneWorkoutStore:
 
         workout.resumedAt = now
         workout.lastCheckpoint = now
+        recoveredWorkoutLastCheckpoint = nil
         active = workout
         automaticPauseActive = false
         autoPauseDetector.reset(
@@ -851,6 +931,7 @@ final class IPhoneWorkoutStore:
 
         history.insert(workout, at: 0)
         active = nil
+        recoveredWorkoutLastCheckpoint = nil
         showingWorkout = false
         liveViewIsVisible = false
         isUserMinimized = false
