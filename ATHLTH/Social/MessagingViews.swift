@@ -149,182 +149,137 @@ struct MessageInboxView: View {
     }
 
     private var messagesHeader: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 16
+        ATHLTHPremiumScreenHeader(
+            eyebrow:
+                ATHLTHLocalization.choose(
+                    english: "Messages",
+                    norwegian: "Meldinger"
+                ),
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Your conversations",
+                    norwegian: "Dine samtaler"
+                ),
+            subtitle:
+                inboxSummaryText,
+            icon:
+                "bubble.left.and.bubble.right.fill",
+            tint:
+                ATHLTHTheme.vitality
         ) {
-            HStack(spacing: 10) {
-                Label(
-                    "SOCIAL",
-                    systemImage:
-                        "bubble.left.and.bubble.right.fill"
-                )
-                .font(
-                    .caption2
-                        .weight(.bold)
-                )
-                .tracking(1.4)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .accentDeep
-                )
-                .padding(
-                    .horizontal,
-                    10
-                )
-                .padding(
-                    .vertical,
-                    6
-                )
-                .background(
-                    Color.white
-                        .opacity(0.58),
-                    in: Capsule()
-                )
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    inboxMetric(
+                        value:
+                            personInboxItems.count,
+                        label:
+                            ATHLTHLocalization.choose(
+                                english: "People",
+                                norwegian: "Personer"
+                            )
+                    )
 
-                Spacer()
+                    inboxMetric(
+                        value:
+                            messaging.unreadCount,
+                        label:
+                            ATHLTHLocalization.choose(
+                                english: "Unread",
+                                norwegian: "Ulest"
+                            )
+                    )
 
-                headerAction(
-                    systemImage:
-                        showingSearch
-                            ? "xmark"
-                            : "magnifyingglass",
-                    accessibilityLabel:
-                        showingSearch
-                            ? "Close message search"
-                            : "Search messages"
-                ) {
-                    withAnimation(
-                        .easeInOut(
-                            duration: 0.20
-                        )
-                    ) {
-                        showingSearch
-                            .toggle()
-                        if !showingSearch {
-                            searchText = ""
-                        }
-                    }
+                    inboxMetric(
+                        value:
+                            totalRequestCount,
+                        label:
+                            ATHLTHLocalization.choose(
+                                english: "Needs reply",
+                                norwegian: "Venter svar"
+                            )
+                    )
                 }
 
-                headerAction(
-                    systemImage:
-                        "square.and.pencil",
-                    accessibilityLabel:
-                        "New message",
-                    action:
-                        onNewMessage
-                )
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Text("Messages")
-                    .font(
-                        .system(
-                            size: 36,
-                            weight: .bold,
-                            design: .rounded
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.20
+                            )
+                        ) {
+                            showingSearch.toggle()
+                            if !showingSearch {
+                                searchText = ""
+                            }
+                        }
+                    } label: {
+                        Label(
+                            showingSearch
+                                ? ATHLTHLocalization.choose(
+                                    english: "Close search",
+                                    norwegian: "Lukk søk"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Search",
+                                    norwegian: "Søk"
+                                ),
+                            systemImage:
+                                showingSearch
+                                    ? "xmark"
+                                    : "magnifyingglass"
                         )
-                    )
-                    .foregroundStyle(
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            11
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(
                         ATHLTHTheme
-                            .primaryText
+                            .vitality
                     )
 
-                Text(
-                    inboxSummaryText
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-            }
-
-            HStack(spacing: 8) {
-                inboxMetric(
-                    value:
-                        personInboxItems
-                            .count,
-                    label:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "People",
-                                norwegian:
-                                    "Personer"
-                            )
-                )
-
-                inboxMetric(
-                    value:
-                        messaging
-                            .unreadCount,
-                    label:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Unread",
-                                norwegian:
-                                    "Ulest"
-                            )
-                )
-
-                inboxMetric(
-                    value:
-                        totalRequestCount,
-                    label:
-                        ATHLTHLocalization
-                            .choose(
-                                english:
-                                    "Needs reply",
-                                norwegian:
-                                    "Venter svar"
-                            )
-                )
+                    Button(
+                        action:
+                            onNewMessage
+                    ) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "New message",
+                                norwegian: "Ny melding"
+                            ),
+                            systemImage:
+                                "square.and.pencil"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .frame(
+                            maxWidth: .infinity
+                        )
+                        .padding(
+                            .vertical,
+                            11
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .tint(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                }
             }
         }
-        .padding(18)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.92),
-                    ATHLTHTheme
-                        .cardWarm
-                        .opacity(0.88)
-                ],
-                startPoint: .topLeading,
-                endPoint:
-                    .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .stroke(
-                Color.white
-                    .opacity(0.94),
-                lineWidth: 0.9
-            )
-        }
-        .shadow(
-            color:
-                ATHLTHTheme
-                    .accentDeep
-                    .opacity(0.05),
-            radius: 18,
-            y: 7
-        )
     }
 
     private func inboxMetric(
@@ -1092,7 +1047,7 @@ private struct MessagePersonRow: View {
                                 )
                                 .foregroundStyle(
                                     ATHLTHTheme
-                                        .accentDeep
+                                        .vitality
                                 )
                                 .padding(
                                     .horizontal,
@@ -1104,7 +1059,7 @@ private struct MessagePersonRow: View {
                                 )
                                 .background(
                                     ATHLTHTheme
-                                        .accentSoft,
+                                        .vitalitySoft,
                                     in: Capsule()
                                 )
                         }
@@ -1155,7 +1110,7 @@ private struct MessagePersonRow: View {
                     )
                     .background(
                         ATHLTHTheme
-                            .accentDeep,
+                            .vitality,
                         in: Capsule()
                     )
                 } else {
@@ -3218,7 +3173,7 @@ private struct ThreadChallengeLifecycleEventRow: View {
             )
             .foregroundStyle(
                 ATHLTHTheme
-                    .accentDeep
+                    .vitality
             )
             .frame(
                 width: 30,
