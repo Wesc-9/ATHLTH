@@ -156,12 +156,7 @@ final class StrengthAudioCoachSpeaker:
     }
 
     private func deactivateAudioSession() {
-        try? AVAudioSession
-            .sharedInstance()
-            .setActive(
-                false,
-                options:
-                    .notifyOthersOnDeactivation
-            )
+        ATHLTHSpokenAudioSession
+            .deactivate()
     }
 }

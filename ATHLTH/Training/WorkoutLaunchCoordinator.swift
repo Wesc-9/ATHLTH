@@ -379,7 +379,9 @@ enum WorkoutLaunchCoordinator {
         phoneWorkout: IPhoneWorkoutStore,
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore,
-        ghostRace: GhostRaceStore? = nil
+        ghostRace: GhostRaceStore? = nil,
+        workoutMirroring:
+            WorkoutMirroringStore? = nil
     ) async throws {
         if ATHLTHDeviceRole.isIPad {
             let envelope =
@@ -405,6 +407,11 @@ enum WorkoutLaunchCoordinator {
                     ghostUpdates:
                         configuration
                             .ghostUpdates,
+                    runEnvironment:
+                        configuration.environment,
+                    treadmillInclinePercent:
+                        configuration
+                            .treadmillInclinePercent,
                     spotifyPlaylist:
                         configuration
                             .spotifyPlaylist,
@@ -496,6 +503,8 @@ enum WorkoutLaunchCoordinator {
             }
 
         if configuration.captureDevice == .iPhone {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
@@ -503,6 +512,11 @@ enum WorkoutLaunchCoordinator {
                 walking: false,
                 route: selectedRoute,
                 title: configuration.title,
+                environment:
+                    configuration.environment,
+                treadmillInclinePercent:
+                    configuration
+                        .treadmillInclinePercent,
                 audioCoach:
                     resolvedAudioCoach,
                 structuredWorkout:
@@ -568,7 +582,7 @@ enum WorkoutLaunchCoordinator {
                 .sendGhostRace(transfer)
         }
 
-        let watchRunningWorkout =
+        var watchRunningWorkout =
             structuredWorkout ??
             WatchRunningWorkoutTransfer(
                 title: "",
@@ -581,20 +595,67 @@ enum WorkoutLaunchCoordinator {
                         .autoPauseEnabled
             )
 
+        watchRunningWorkout
+            .treadmillInclinePercent =
+                configuration.environment ==
+                    .treadmill
+                    ? min(
+                        max(
+                            configuration
+                                .treadmillInclinePercent ??
+                            0,
+                            0
+                        ),
+                        20
+                    )
+                    : nil
+
+        // When this Watch workout was launched from iPhone, keep spoken
+        // guidance on iPhone while it remains reachable. This preserves the
+        // user's Spotify/AirPods route. The same configuration remains on
+        // Watch, which becomes the automatic voice fallback out of range.
+        var watchAudioCoach =
+            resolvedAudioCoach
+
+        if workoutMirroring != nil,
+           resolvedAudioCoach.enabled {
+            watchAudioCoach
+                .preferIPhoneAudioWhenReachable =
+                    true
+            workoutMirroring?
+                .prepareIPhoneAudioCoach(
+                    watchAudioCoach
+                )
+        } else {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
+        }
+
         // Deliver ATHLTH-specific run state before asking HealthKit to launch
         // the Watch. This avoids a launch race where the workout session starts
-        // before intervals, alerts or Audio Coach have arrived.
+        // before intervals or alerts have arrived.
         watchConnection
             .sendAudioCoachConfiguration(
-                resolvedAudioCoach
+                watchAudioCoach
             )
         watchConnection
             .sendRunningWorkout(
                 watchRunningWorkout
             )
 
-        try await watchConnection
-            .startWorkoutOnWatch(.running)
+        do {
+            try await watchConnection
+                .startWorkoutOnWatch(
+                    .running,
+                    indoor:
+                        configuration.environment ==
+                        .treadmill
+                )
+        } catch {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
+            throw error
+        }
 
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
@@ -613,7 +674,7 @@ enum WorkoutLaunchCoordinator {
         // durable fallback if the immediate message cannot be delivered.
         watchConnection
             .sendAudioCoachConfiguration(
-                resolvedAudioCoach
+                watchAudioCoach
             )
         watchConnection
             .sendRunningWorkout(
@@ -637,7 +698,9 @@ enum WorkoutLaunchCoordinator {
         gear: ProfileGearStore,
         phoneWorkout: IPhoneWorkoutStore,
         watchConnection: AppleWatchConnectionStore,
-        spotify: SpotifyPlaybackStore
+        spotify: SpotifyPlaybackStore,
+        workoutMirroring:
+            WorkoutMirroringStore? = nil
     ) async throws {
         if ATHLTHDeviceRole.isIPad {
             let envelope =
@@ -676,6 +739,8 @@ enum WorkoutLaunchCoordinator {
         }
 
         if configuration.captureDevice == .iPhone {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
@@ -727,17 +792,43 @@ enum WorkoutLaunchCoordinator {
 
         watchConnection
             .sendWorkoutRouteSelection(nil)
+
+        var watchAudioCoach =
+            configuration.audioCoach
+
+        if workoutMirroring != nil,
+           configuration.audioCoach.enabled {
+            watchAudioCoach
+                .preferIPhoneAudioWhenReachable =
+                    true
+            workoutMirroring?
+                .prepareIPhoneAudioCoach(
+                    watchAudioCoach
+                )
+        } else {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
+        }
+
         watchConnection
             .sendAudioCoachConfiguration(
-                configuration.audioCoach
+                watchAudioCoach
             )
         watchConnection
             .sendRunningWorkout(
                 watchWorkout
             )
 
-        try await watchConnection
-            .startWorkoutOnWatch(.walking)
+        do {
+            try await watchConnection
+                .startWorkoutOnWatch(
+                    .walking
+                )
+        } catch {
+            workoutMirroring?
+                .clearIPhoneAudioCoach()
+            throw error
+        }
 
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
@@ -753,7 +844,7 @@ enum WorkoutLaunchCoordinator {
 
         watchConnection
             .sendAudioCoachConfiguration(
-                configuration.audioCoach
+                watchAudioCoach
             )
         watchConnection
             .sendRunningWorkout(

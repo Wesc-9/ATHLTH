@@ -103,7 +103,24 @@ enum AthleteLoadEngine {
 
 enum AthleteStrengthProgression {
     static func suggestion(sets: [StrengthSetLog], targetReps: Int) -> StrengthProgressionSuggestion? {
-        let working = sets.filter { $0.countsTowardTrainingLoad && ($0.completedReps ?? 0) > 0 && ($0.completedWeightKilograms ?? 0) > 0 }
+        let working = sets.compactMap { set -> StrengthSetLog? in
+            guard set.countsTowardTrainingLoad, set.resolvedTargetKind != .time,
+                  set.resolvedLoadKind == .weightKilograms else { return nil }
+            var result = set
+            if let segments = set.effortSegments, !segments.isEmpty {
+                // A lighter drop-set segment cannot complete the rep target at
+                // the heavier load. Use the strongest segment's own reps.
+                let valid = segments.filter { ($0.reps ?? 0) > 0 && ($0.weightKilograms ?? 0) > 0 }
+                guard let strongest = valid.max(by: { lhs, rhs in
+                    if lhs.weightKilograms == rhs.weightKilograms { return (lhs.reps ?? 0) < (rhs.reps ?? 0) }
+                    return (lhs.weightKilograms ?? 0) < (rhs.weightKilograms ?? 0)
+                }) else { return nil }
+                result.completedReps = strongest.reps
+                result.completedWeightKilograms = strongest.weightKilograms
+            }
+            guard (result.completedReps ?? 0) > 0, (result.completedWeightKilograms ?? 0) > 0 else { return nil }
+            return result
+        }
         guard targetReps > 0, let last = working.last, let weight = last.completedWeightKilograms,
               weight.isFinite, let reps = last.completedReps else { return nil }
         let metTarget = working.allSatisfy { ($0.completedReps ?? 0) >= targetReps }

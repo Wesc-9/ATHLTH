@@ -213,16 +213,9 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 workout.elapsed(
                     at: context.date
                 )
-            let distanceUnitMeters =
-                splitMeters
             let distance =
                 workout.distanceMeters /
-                distanceUnitMeters
-            let averagePace =
-                workout.distanceMeters >= 50
-                    ? elapsed /
-                        max(distance, 0.001)
-                    : nil
+                splitMeters
             let currentPace =
                 workout
                     .currentPaceSecondsPerKilometer
@@ -231,131 +224,193 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                             ? $0
                             : $0 * 1.609344
                     }
+            let isTreadmill =
+                workout.runEnvironment ==
+                .treadmill
 
-            VStack(spacing: 11) {
-                LazyVGrid(
-                    columns: [
-                        GridItem(
-                            .flexible(),
-                            spacing: 0
+            VStack(spacing: 0) {
+                heroMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "TIME",
+                            norwegian: "TID"
                         ),
-                        GridItem(
-                            .flexible(),
-                            spacing: 0
-                        )
-                    ],
-                    spacing: 0
-                ) {
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "TIME",
-                                norwegian: "TID"
-                            ),
-                        value:
-                            elapsedText(elapsed),
-                        unit: nil
-                    )
-
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "DISTANCE",
-                                norwegian: "DISTANSE"
-                            ),
-                        value:
-                            String(
-                                format: "%.2f",
-                                distance
-                            ),
-                        unit:
-                            isMetric
-                                ? "km"
-                                : "mi"
-                    )
-
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "PACE",
-                                norwegian: "TEMPO"
-                            ),
-                        value:
-                            paceValue(
-                                currentPace
-                            ),
-                        unit:
-                            isMetric
-                                ? "/km"
-                                : "/mi"
-                    )
-
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "AVG PACE",
-                                norwegian: "SNITT"
-                            ),
-                        value:
-                            paceValue(
-                                averagePace
-                            ),
-                        unit:
-                            isMetric
-                                ? "/km"
-                                : "/mi"
-                    )
-                }
-                .background(
-                    Color.white.opacity(0.94),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 24,
-                            style: .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-                    .stroke(
-                        Color.black.opacity(
-                            0.045
-                        ),
-                        lineWidth: 0.8
-                    )
-                }
-                .shadow(
-                    color:
-                        ATHLTHTheme.accentDeep
-                            .opacity(0.06),
-                    radius: 15,
-                    y: 6
+                    value:
+                        elapsedText(elapsed),
+                    unit: nil
                 )
 
-                secondaryMetrics
+                Divider()
+                    .opacity(0.55)
 
-                if !routeMetrics.splits.isEmpty {
-                    splitsCard
+                if isTreadmill {
+                    HStack(spacing: 0) {
+                        focusedMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "INCLINE",
+                                    norwegian: "STIGNING"
+                                ),
+                            value:
+                                String(
+                                    format: "%.1f",
+                                    workout
+                                        .treadmillInclinePercent ??
+                                    0
+                                ),
+                            unit: "%"
+                        )
+
+                        if workout.distanceMeters >= 50 {
+                            focusedDivider
+
+                            focusedMetric(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "DISTANCE",
+                                        norwegian: "DISTANSE"
+                                    ),
+                                value:
+                                    String(
+                                        format: "%.2f",
+                                        distance
+                                    ),
+                                unit:
+                                    isMetric
+                                        ? "km"
+                                        : "mi"
+                            )
+                        }
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        focusedMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "DISTANCE",
+                                    norwegian: "DISTANSE"
+                                ),
+                            value:
+                                String(
+                                    format: "%.2f",
+                                    distance
+                                ),
+                            unit:
+                                isMetric
+                                    ? "km"
+                                    : "mi"
+                        )
+
+                        focusedDivider
+
+                        focusedMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "PACE",
+                                    norwegian: "TEMPO"
+                                ),
+                            value:
+                                paceValue(
+                                    currentPace
+                                ),
+                            unit:
+                                isMetric
+                                    ? "/km"
+                                    : "/mi"
+                        )
+                    }
                 }
             }
-        }
-        .task(
-            id:
-                "\(workout.points.count)-\(Int(splitMeters.rounded()))"
-        ) {
-            routeMetrics =
-                IPhoneWorkoutLiveRouteMetrics
-                    .calculate(
-                        workout: workout,
-                        splitMeters:
-                            splitMeters
+            .background(
+                Color.white.opacity(0.97),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
                     )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 28,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.black.opacity(0.045),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    ATHLTHTheme.accentDeep
+                        .opacity(0.07),
+                radius: 16,
+                y: 6
+            )
         }
     }
 
-    private func primaryMetric(
+    private func heroMetric(
+        title: String,
+        value: String,
+        unit: String?
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(title)
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.5)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            HStack(
+                alignment: .lastTextBaseline,
+                spacing: 5
+            ) {
+                Text(value)
+                    .font(
+                        .system(
+                            size: 74,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .minimumScaleFactor(0.62)
+                    .lineLimit(1)
+
+                if let unit {
+                    Text(unit)
+                        .font(
+                            .title3
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 172,
+            alignment: .leading
+        )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+    }
+
+    private func focusedMetric(
         title: String,
         value: String,
         unit: String?
@@ -368,22 +423,22 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 .font(
                     .system(
                         size: 10,
-                        weight: .semibold
+                        weight: .bold
                     )
                 )
-                .tracking(1.25)
+                .tracking(1.05)
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
                 )
 
             HStack(
                 alignment: .lastTextBaseline,
-                spacing: 4
+                spacing: 3
             ) {
                 Text(value)
                     .font(
                         .system(
-                            size: 35,
+                            size: 43,
                             weight: .bold,
                             design: .rounded
                         )
@@ -392,14 +447,14 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
-                    .minimumScaleFactor(0.70)
+                    .minimumScaleFactor(0.56)
                     .lineLimit(1)
 
                 if let unit {
                     Text(unit)
                         .font(
-                            .subheadline
-                                .weight(.medium)
+                            .caption
+                                .weight(.semibold)
                         )
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
@@ -409,24 +464,21 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 102,
+            minHeight: 142,
             alignment: .leading
         )
-        .padding(.horizontal, 15)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(
-                    Color.black.opacity(0.05)
-                )
-                .frame(width: 0.7)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(
-                    Color.black.opacity(0.05)
-                )
-                .frame(height: 0.7)
-        }
+        .padding(.horizontal, 12)
+    }
+
+    private var focusedDivider: some View {
+        Rectangle()
+            .fill(
+                Color.black.opacity(0.055)
+            )
+            .frame(
+                width: 0.7,
+                height: 94
+            )
     }
 
     private var secondaryMetrics: some View {
@@ -830,6 +882,8 @@ struct IPhoneWorkoutView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var confirmFinish = false
     @State private var followMe = true
+    @State private var showingTreadmillInclineEditor = false
+    @State private var treadmillInclineDraft = 0.0
     @State private var routeCamera:
         MapCameraPosition = .automatic
 
@@ -1225,10 +1279,11 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
-                    if workout
-                        .plannedRouteCoordinates?
-                        .count ?? 0 >= 2 ||
-                        workout.points.last != nil {
+                    if (
+                        workout
+                            .plannedRouteCoordinates?
+                            .count ?? 0
+                    ) >= 2 {
                         premiumWorkoutMap(
                             workout
                         )
@@ -1416,6 +1471,22 @@ struct IPhoneWorkoutView: View {
                     )
                 }
             }
+            .sheet(
+                isPresented:
+                    $showingTreadmillInclineEditor
+            ) {
+                TreadmillInclineEditorView(
+                    initialValue:
+                        treadmillInclineDraft
+                ) { value in
+                    recorder
+                        .setTreadmillInclinePercent(
+                            value
+                        )
+                    treadmillInclineDraft =
+                        value
+                }
+            }
             .confirmationDialog(
                 "Finish this workout?",
                 isPresented: $confirmFinish,
@@ -1445,9 +1516,11 @@ struct IPhoneWorkoutView: View {
             }
         }
         .onAppear {
+            recorder.liveViewDidAppear()
             updateScreenAwakeState()
         }
         .onDisappear {
+            recorder.liveViewDidDisappear()
             ATHLTHWorkoutScreenAwake.set(
                 false,
                 reason: "iphone-live-workout"
@@ -1549,11 +1622,12 @@ struct IPhoneWorkoutView: View {
         ) {
             HStack {
                 Button {
+                    recorder.minimizeWorkout()
                     dismiss()
                 } label: {
                     Image(
                         systemName:
-                            "chevron.left"
+                            "chevron.down"
                     )
                     .font(
                         .system(
@@ -1589,64 +1663,91 @@ struct IPhoneWorkoutView: View {
 
                 Spacer()
 
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(
-                            workout.points
-                                .last == nil
-                                ? Color.orange
-                                : ATHLTHTheme
-                                    .vitality
-                        )
-                        .frame(
-                            width: 7,
-                            height: 7
+                Button {
+                    guard workout.runEnvironment ==
+                            .treadmill
+                    else {
+                        return
+                    }
+
+                    treadmillInclineDraft =
+                        workout
+                            .treadmillInclinePercent ??
+                        0
+                    showingTreadmillInclineEditor =
+                        true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(
+                            systemName:
+                                workout.runEnvironment ==
+                                .treadmill
+                                    ? "figure.run.treadmill"
+                                    : "location.fill"
                         )
 
-                    Text(
-                        workout.points.last == nil
-                            ? ATHLTHLocalization
-                                .choose(
+                        Text(
+                            workout.runEnvironment ==
+                                .treadmill
+                                ? ATHLTHLocalization.format(
                                     english:
-                                        "GPS waiting",
+                                        "Treadmill · %.1f%%",
                                     norwegian:
-                                        "Venter på GPS"
+                                        "Tredemølle · %.1f%%",
+                                    workout
+                                        .treadmillInclinePercent ??
+                                    0
                                 )
-                            : ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "GPS on",
-                                    norwegian:
-                                        "GPS på"
+                                : (
+                                    workout.points.last == nil
+                                        ? ATHLTHLocalization.choose(
+                                            english: "GPS waiting",
+                                            norwegian: "Venter på GPS"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "GPS on",
+                                            norwegian: "GPS på"
+                                        )
                                 )
-                    )
-                    .font(
-                        .caption.weight(
-                            .semibold
                         )
-                    )
-                }
-                .foregroundStyle(
-                    workout.points.last == nil
-                        ? Color.orange
-                        : ATHLTHTheme
-                            .vitality
-                )
-                .padding(.horizontal, 11)
-                .frame(height: 34)
-                .background(
-                    Color.white.opacity(0.88),
-                    in: Capsule()
-                )
-                .overlay {
-                    Capsule()
-                        .stroke(
-                            Color.black.opacity(
-                                0.04
-                            ),
-                            lineWidth: 0.7
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
                         )
+
+                        if workout.runEnvironment ==
+                            .treadmill {
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(.caption2)
+                        }
+                    }
+                    .foregroundStyle(
+                        workout.runEnvironment == .treadmill
+                            ? ATHLTHTheme.accentDeep
+                            : workout.points.last == nil
+                                ? Color.orange
+                                : ATHLTHTheme.vitality
+                    )
+                    .padding(.horizontal, 11)
+                    .frame(height: 34)
+                    .background(
+                        Color.white.opacity(0.88),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black.opacity(0.04),
+                                lineWidth: 0.7
+                            )
+                    }
                 }
+                .buttonStyle(.plain)
+                ATHLTHAudioRouteControl()
             }
 
             Text(workout.title)
@@ -1673,12 +1774,19 @@ struct IPhoneWorkoutView: View {
                 )
 
                 Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Tracking with iPhone",
-                        norwegian:
-                            "Registreres med iPhone"
-                    )
+                    workout.runEnvironment == .treadmill
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Indoor run · recorded with iPhone",
+                            norwegian:
+                                "Innendørs · registreres med iPhone"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Outdoor run · recorded with iPhone",
+                            norwegian:
+                                "Utendørs · registreres med iPhone"
+                        )
                 )
                 .font(.caption)
                 .foregroundStyle(
@@ -2740,5 +2848,123 @@ struct IPhoneWorkoutView: View {
                 workout
                     .plannedRouteTitle
         )
+    }
+}
+
+
+private struct TreadmillInclineEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (Double) -> Void
+    @State private var value: Double
+
+    init(
+        initialValue: Double,
+        onSave: @escaping (Double) -> Void
+    ) {
+        self.onSave = onSave
+        _value = State(
+            initialValue:
+                min(
+                    max(initialValue, 0),
+                    20
+                )
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Treadmill",
+                        norwegian: "Tredemølle"
+                    )
+                ) {
+                    Stepper(
+                        value: $value,
+                        in: 0...20,
+                        step: 0.5
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Incline",
+                                    norwegian: "Stigning"
+                                )
+                            )
+
+                            Spacer()
+
+                            Text(
+                                String(
+                                    format:
+                                        "%.1f%%",
+                                    value
+                                )
+                            )
+                            .monospacedDigit()
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+
+                    Slider(
+                        value: $value,
+                        in: 0...20,
+                        step: 0.5
+                    )
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "You can change incline while the workout is running. The current value is stored with the workout.",
+                            norwegian:
+                                "Du kan endre stigning mens økten pågår. Gjeldende verdi lagres med økten."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Incline",
+                    norwegian: "Stigning"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        onSave(value)
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }

@@ -18,9 +18,18 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         )
     @Published private(set) var errorMessage: String?
     @Published var isPresentationRequested = false
+    @Published private(set) var isUserMinimized = false
+    @Published private(set) var liveViewIsVisible = false
+    @Published private(set) var presentationGeneration = 0
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
+    private let iPhoneAudioCoach =
+        MirroredWorkoutAudioCoach()
+    private var iPhoneAudioCoachPreparedAt:
+        Date?
+    private var iPhoneAudioCoachAttached =
+        false
 
     override init() {
         super.init()
@@ -36,6 +45,32 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 self?.attach(session)
             }
         }
+    }
+
+    func prepareIPhoneAudioCoach(
+        _ configuration:
+            WatchAudioCoachConfiguration
+    ) {
+        guard configuration.enabled else {
+            iPhoneAudioCoach.stop()
+            iPhoneAudioCoachPreparedAt = nil
+            iPhoneAudioCoachAttached = false
+            return
+        }
+
+        iPhoneAudioCoach.prepare(
+            configuration
+        )
+        iPhoneAudioCoachPreparedAt =
+            Date()
+        iPhoneAudioCoachAttached =
+            false
+    }
+
+    func clearIPhoneAudioCoach() {
+        iPhoneAudioCoach.stop()
+        iPhoneAudioCoachPreparedAt = nil
+        iPhoneAudioCoachAttached = false
     }
 
     var hasActiveMirroredWorkout: Bool {
@@ -88,13 +123,44 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    func liveViewDidAppear() {
+        liveViewIsVisible = true
+    }
+
+    func liveViewDidDisappear() {
+        liveViewIsVisible = false
+    }
+
+    func presentWorkout() {
+        guard snapshot != nil else {
+            return
+        }
+
+        isUserMinimized = false
+        presentationGeneration &+= 1
+        isPresentationRequested = true
+    }
+
+    func minimizeWorkout() {
+        guard hasActiveMirroredWorkout else {
+            return
+        }
+
+        isUserMinimized = true
+        isPresentationRequested = false
+        liveViewIsVisible = false
+    }
+
     func dismissSummary() {
         guard !hasActiveMirroredWorkout else { return }
 
         ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
+        clearIPhoneAudioCoach()
 
         publish {
             self.isPresentationRequested = false
+            self.isUserMinimized = false
+            self.liveViewIsVisible = false
             self.snapshot = nil
             self.errorMessage = nil
             self.connectionText =
@@ -125,14 +191,31 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             routePointCount: snapshot?.routePointCount ?? 0
         )
 
+        if let preparedAt =
+                iPhoneAudioCoachPreparedAt,
+           Date()
+                .timeIntervalSince(
+                    preparedAt
+                ) <= 90 {
+            iPhoneAudioCoachAttached =
+                true
+            iPhoneAudioCoach.handle(
+                initialSnapshot
+            )
+        } else {
+            clearIPhoneAudioCoach()
+        }
+
         publish {
             self.snapshot = initialSnapshot
+            self.isUserMinimized = false
             self.connectionText =
                 ATHLTHLocalization.choose(
                     english: "Live from Apple Watch",
                     norwegian: "Direkte fra Apple Watch"
                 )
             self.errorMessage = nil
+            self.presentationGeneration &+= 1
             self.isPresentationRequested = true
         }
     }
@@ -150,6 +233,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         guard let latestSnapshot else { return }
+
+        if iPhoneAudioCoachAttached {
+            iPhoneAudioCoach.handle(
+                latestSnapshot
+            )
+        }
 
         publish {
             self.snapshot = latestSnapshot
@@ -174,7 +263,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                             norwegian:
                                 "Direkte fra Apple Watch"
                         )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
         }
 
         if latestSnapshot.state == .completed ||
@@ -234,6 +325,16 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 result.routePointCount,
                 snapshot.routePointCount
             )
+
+        if iPhoneAudioCoachAttached {
+            iPhoneAudioCoach.handle(
+                snapshot
+            )
+            iPhoneAudioCoachAttached =
+                false
+            iPhoneAudioCoachPreparedAt =
+                nil
+        }
 
         self.snapshot = snapshot
         mirroredSession = nil
@@ -339,6 +440,13 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             }
 
             self.snapshot = snapshot
+
+            if self.iPhoneAudioCoachAttached {
+                self.iPhoneAudioCoach.handle(
+                    snapshot
+                )
+            }
+
             self.connectionText =
                 newState == .completed
                     ? ATHLTHLocalization.choose(
@@ -349,7 +457,9 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                         english: "Live from Apple Watch",
                         norwegian: "Direkte fra Apple Watch"
                     )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
 
             if newState == .completed {
                 self.mirroredSession = nil
@@ -379,7 +489,10 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                     english: "Mirroring error",
                     norwegian: "Feil ved speiling"
                 )
-            self.isPresentationRequested = true
+            if !self.isUserMinimized {
+                self.isPresentationRequested = true
+            }
+            self.clearIPhoneAudioCoach()
             ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive = false
         }
     }

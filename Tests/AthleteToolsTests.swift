@@ -56,6 +56,22 @@ final class AthleteToolsTests: XCTestCase {
         rule.baselineKM = 600
         XCTAssertEqual(rule.remaining(at: 650), 450)
     }
+    func testDropSetDoesNotCountLighterRepsAtHeavierLoad() throws {
+        var completed = set(reps: 10, rpe: 8)
+        completed.effortSegments = [StrengthSetEffortSegment(reps: 8, weightKilograms: 50), StrengthSetEffortSegment(reps: 2, weightKilograms: 40)]
+        let suggestion = try XCTUnwrap(AthleteStrengthProgression.suggestion(sets: [completed], targetReps: 10))
+        XCTAssertEqual(suggestion.previousReps, 8)
+        XCTAssertEqual(suggestion.previousWeightKilograms, 50)
+        XCTAssertEqual(suggestion.suggestedWeightKilograms, 50)
+    }
+    func testTimedAndResistanceLevelSetsDoNotSuggestKilograms() {
+        var completed = set(reps: 10, rpe: 7)
+        completed.targetKind = .time
+        XCTAssertNil(AthleteStrengthProgression.suggestion(sets: [completed], targetReps: 10))
+        completed.targetKind = nil
+        completed.loadKind = .resistanceLevel
+        XCTAssertNil(AthleteStrengthProgression.suggestion(sets: [completed], targetReps: 10))
+    }
     private func set(reps: Int, rpe: Double? = nil, rir: Double? = nil, warmUp: Bool = false) -> StrengthSetLog {
         StrengthSetLog(id: UUID(), setNumber: 1, plannedReps: 10, plannedWeightKilograms: 50, completedReps: reps, completedWeightKilograms: 50,
                        rpe: rpe, completedAt: Date(), restSeconds: nil, rir: rir, isWarmUp: warmUp)

@@ -378,6 +378,16 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
 
+    // When a workout was launched from iPhone, iPhone owns spoken guidance
+    // while WatchConnectivity remains reachable so Spotify/AirPods can stay on
+    // the phone. Watch automatically becomes the voice fallback if the phone
+    // leaves range. Optional keeps older payloads fully compatible.
+    var preferIPhoneAudioWhenReachable: Bool? = nil
+
+    var shouldPreferIPhoneAudioWhenReachable: Bool {
+        preferIPhoneAudioWhenReachable ?? false
+    }
+
     // Strength-specific Audio Coach cues. Optional fields keep older queued
     // Watch payloads and persisted configurations backwards compatible.
     var announceStrengthSetComplete: Bool? = nil
@@ -776,6 +786,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var steps: [WatchRunningWorkoutStep]
     var routeAlerts: WatchRouteAlertConfiguration? = nil
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
+    // Non-nil means this is an indoor treadmill run, including a valid 0%.
+    // Optional keeps transfers from older builds decodable.
+    var treadmillInclinePercent: Double? = nil
     // Optional keeps payloads from older builds decodable. The sender resolves
     // app default vs per-workout override before launch.
     var autoPauseEnabled: Bool? = nil
@@ -970,6 +983,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // Optional presentation fields for Dynamic Island, Lock Screen and Watch.
     // Defaults keep older mirrored snapshots backwards compatible.
     var currentPaceSecondsPerKilometer: TimeInterval? = nil
+    // Non-nil identifies a treadmill run and carries the user-selected incline.
+    var treadmillInclinePercent: Double? = nil
     var routeRemainingMeters: Double? = nil
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil

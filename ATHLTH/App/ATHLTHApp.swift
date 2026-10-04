@@ -392,6 +392,12 @@ struct AppRootView: View {
                     route: payload.route,
                     workout: runningWorkout,
                     captureDevice: captureDevice,
+                    environment:
+                        envelope.runEnvironment ??
+                        .outdoor,
+                    treadmillInclinePercent:
+                        envelope
+                            .treadmillInclinePercent,
                     audioCoach:
                         envelope.watchAudioCoach ??
                         payload.workout
@@ -434,7 +440,9 @@ struct AppRootView: View {
                     spotify:
                         spotifyPlayback,
                     ghostRace:
-                        ghostRace
+                        ghostRace,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .walk:
@@ -472,7 +480,9 @@ struct AppRootView: View {
                     watchConnection:
                         watchConnection,
                     spotify:
-                        spotifyPlayback
+                        spotifyPlayback,
+                    workoutMirroring:
+                        workoutMirroring
                 )
 
         case .strength:
@@ -712,9 +722,29 @@ struct AppRootView: View {
 
             lastFullLifecycleRefreshAt = Date()
         }
-        .fullScreenCover(isPresented: $phoneWorkout.showingWorkout) {
-            IPhoneWorkoutView()
+        .overlay {
+            if phoneWorkout.showingWorkout,
+               phoneWorkout.active != nil {
+                IPhoneWorkoutView()
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity
+                    )
+                    .background(
+                        Color(.systemGroupedBackground)
+                            .ignoresSafeArea()
+                    )
+                    .transition(
+                        .move(edge: .bottom)
+                            .combined(with: .opacity)
+                    )
+                    .zIndex(100)
+            }
         }
+        .animation(
+            .easeInOut(duration: 0.20),
+            value: phoneWorkout.showingWorkout
+        )
         .fullScreenCover(
             isPresented:
                 $showingRelayedStrengthWorkout
@@ -742,11 +772,66 @@ struct AppRootView: View {
             syncSpotifyPlaybackToWatch()
         }
         .overlay(alignment: .top) {
-            if appSession.signedIn, phoneWorkout.active != nil {
-                Button { phoneWorkout.showingWorkout = true } label: {
-                    Label("Return to iPhone workout", systemImage: "figure.run")
-                        .padding(10).background(.regularMaterial, in: Capsule())
-                }.padding(.top, 4)
+            if appSession.signedIn,
+               phoneWorkout.active != nil,
+               phoneWorkout.isUserMinimized {
+                Button {
+                    phoneWorkout.presentWorkout()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "figure.run")
+                            .font(
+                                .system(
+                                    size: 20,
+                                    weight: .semibold
+                                )
+                            )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Return to iPhone workout",
+                                norwegian:
+                                    "Tilbake til iPhone-økt"
+                            )
+                        )
+                        .font(
+                            .headline
+                                .weight(.semibold)
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .padding(.horizontal, 22)
+                    .frame(height: 58)
+                    .background(
+                        .regularMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black.opacity(
+                                    0.05
+                                ),
+                                lineWidth: 0.8
+                            )
+                    }
+                    .shadow(
+                        color: Color.black.opacity(0.10),
+                        radius: 14,
+                        y: 6
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 10)
+                .padding(.horizontal, 18)
+                .transition(
+                    .move(edge: .top)
+                        .combined(with: .opacity)
+                )
+                .zIndex(60)
             }
         }
         .overlay(alignment: .top) {
