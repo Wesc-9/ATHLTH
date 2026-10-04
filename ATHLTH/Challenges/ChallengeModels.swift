@@ -315,8 +315,9 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var allowTreadmill: Bool? = nil
 
     // Optional for backwards compatibility. Existing route challenges
-    // created before Target Ghost support default to allowing the pacing aid.
+    // created before Ghost support default to allowing these pacing tools.
     var allowTargetGhost: Bool? = nil
+    var allowLiveGhost: Bool? = nil
 
     var exerciseName: String?
     var fixedWeightKilograms: Double?
@@ -341,6 +342,10 @@ struct ATHLTHChallengeRules: Codable, Hashable {
 
     var targetGhostAllowed: Bool {
         allowTargetGhost ?? true
+    }
+
+    var liveGhostAllowed: Bool {
+        allowLiveGhost ?? true
     }
 }
 
