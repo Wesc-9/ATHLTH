@@ -213,11 +213,9 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 workout.elapsed(
                     at: context.date
                 )
-            let distanceUnitMeters =
-                splitMeters
             let distance =
                 workout.distanceMeters /
-                distanceUnitMeters
+                splitMeters
             let averagePace =
                 workout.distanceMeters >= 50
                     ? elapsed /
@@ -235,20 +233,8 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                 workout.runEnvironment ==
                 .treadmill
 
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .flexible(),
-                        spacing: 0
-                    ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 0
-                    )
-                ],
-                spacing: 0
-            ) {
-                primaryMetric(
+            VStack(spacing: 0) {
+                heroMetric(
                     title:
                         ATHLTHLocalization.choose(
                             english: "TIME",
@@ -259,25 +245,51 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     unit: nil
                 )
 
-                if isTreadmill {
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "INCLINE",
-                                norwegian: "STIGNING"
-                            ),
-                        value:
-                            String(
-                                format: "%.1f",
-                                workout
-                                    .treadmillInclinePercent ??
-                                0
-                            ),
-                        unit: "%"
-                    )
+                Divider()
+                    .opacity(0.55)
 
-                    if workout.distanceMeters >= 50 {
-                        primaryMetric(
+                if isTreadmill {
+                    HStack(spacing: 0) {
+                        focusedMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "INCLINE",
+                                    norwegian: "STIGNING"
+                                ),
+                            value:
+                                String(
+                                    format: "%.1f",
+                                    workout
+                                        .treadmillInclinePercent ??
+                                    0
+                                ),
+                            unit: "%"
+                        )
+
+                        if workout.distanceMeters >= 50 {
+                            focusedDivider
+
+                            focusedMetric(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "DISTANCE",
+                                        norwegian: "DISTANSE"
+                                    ),
+                                value:
+                                    String(
+                                        format: "%.2f",
+                                        distance
+                                    ),
+                                unit:
+                                    isMetric
+                                        ? "km"
+                                        : "mi"
+                            )
+                        }
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        focusedMetric(
                             title:
                                 ATHLTHLocalization.choose(
                                     english: "DISTANCE",
@@ -294,11 +306,31 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                                     : "mi"
                         )
 
-                        primaryMetric(
+                        focusedDivider
+
+                        focusedMetric(
                             title:
                                 ATHLTHLocalization.choose(
-                                    english: "AVG PACE",
-                                    norwegian: "SNITTEMPO"
+                                    english: "PACE",
+                                    norwegian: "TEMPO"
+                                ),
+                            value:
+                                paceValue(
+                                    currentPace
+                                ),
+                            unit:
+                                isMetric
+                                    ? "/km"
+                                    : "/mi"
+                        )
+
+                        focusedDivider
+
+                        focusedMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "AVG",
+                                    norwegian: "SNITT"
                                 ),
                             value:
                                 paceValue(
@@ -310,68 +342,19 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                                     : "/mi"
                         )
                     }
-                } else {
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "DISTANCE",
-                                norwegian: "DISTANSE"
-                            ),
-                        value:
-                            String(
-                                format: "%.2f",
-                                distance
-                            ),
-                        unit:
-                            isMetric
-                                ? "km"
-                                : "mi"
-                    )
-
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "PACE",
-                                norwegian: "TEMPO"
-                            ),
-                        value:
-                            paceValue(
-                                currentPace
-                            ),
-                        unit:
-                            isMetric
-                                ? "/km"
-                                : "/mi"
-                    )
-
-                    primaryMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "AVG PACE",
-                                norwegian: "SNITTEMPO"
-                            ),
-                        value:
-                            paceValue(
-                                averagePace
-                            ),
-                        unit:
-                            isMetric
-                                ? "/km"
-                                : "/mi"
-                    )
                 }
             }
             .background(
-                Color.white.opacity(0.96),
+                Color.white.opacity(0.97),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 26,
+                        cornerRadius: 28,
                         style: .continuous
                     )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 26,
+                    cornerRadius: 28,
                     style: .continuous
                 )
                 .stroke(
@@ -389,7 +372,68 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
     }
 
-    private func primaryMetric(
+    private func heroMetric(
+        title: String,
+        value: String,
+        unit: String?
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Text(title)
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.5)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            HStack(
+                alignment: .lastTextBaseline,
+                spacing: 5
+            ) {
+                Text(value)
+                    .font(
+                        .system(
+                            size: 74,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .minimumScaleFactor(0.62)
+                    .lineLimit(1)
+
+                if let unit {
+                    Text(unit)
+                        .font(
+                            .title3
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                }
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 150,
+            alignment: .leading
+        )
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+    }
+
+    private func focusedMetric(
         title: String,
         value: String,
         unit: String?
@@ -401,23 +445,23 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             Text(title)
                 .font(
                     .system(
-                        size: 11,
+                        size: 10,
                         weight: .bold
                     )
                 )
-                .tracking(1.25)
+                .tracking(1.05)
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
                 )
 
             HStack(
                 alignment: .lastTextBaseline,
-                spacing: 4
+                spacing: 3
             ) {
                 Text(value)
                     .font(
                         .system(
-                            size: 52,
+                            size: 43,
                             weight: .bold,
                             design: .rounded
                         )
@@ -426,14 +470,14 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
-                    .minimumScaleFactor(0.70)
+                    .minimumScaleFactor(0.56)
                     .lineLimit(1)
 
                 if let unit {
                     Text(unit)
                         .font(
-                            .subheadline
-                                .weight(.medium)
+                            .caption
+                                .weight(.semibold)
                         )
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
@@ -443,24 +487,21 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 138,
+            minHeight: 118,
             alignment: .leading
         )
-        .padding(.horizontal, 15)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(
-                    Color.black.opacity(0.05)
-                )
-                .frame(width: 0.7)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(
-                    Color.black.opacity(0.05)
-                )
-                .frame(height: 0.7)
-        }
+        .padding(.horizontal, 12)
+    }
+
+    private var focusedDivider: some View {
+        Rectangle()
+            .fill(
+                Color.black.opacity(0.055)
+            )
+            .frame(
+                width: 0.7,
+                height: 78
+            )
     }
 
     private var secondaryMetrics: some View {
