@@ -30,6 +30,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
 
 struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
 
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
@@ -131,6 +132,89 @@ struct ProductRootTabView: View {
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
+        }
+        .overlay(alignment: .top) {
+            if workoutMirroring
+                    .hasActiveMirroredWorkout,
+               workoutMirroring
+                    .isUserMinimized {
+                Button {
+                    workoutMirroring
+                        .presentWorkout()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(
+                            systemName:
+                                "figure.run"
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight:
+                                    .semibold
+                            )
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Return to Apple Watch workout",
+                                norwegian:
+                                    "Tilbake til Apple Watch-økt"
+                            )
+                        )
+                        .font(
+                            .headline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .padding(
+                        .horizontal,
+                        22
+                    )
+                    .frame(height: 58)
+                    .background(
+                        .regularMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black
+                                    .opacity(
+                                        0.05
+                                    ),
+                                lineWidth:
+                                    0.8
+                            )
+                    }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(
+                                    0.10
+                                ),
+                        radius: 14,
+                        y: 6
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 8)
+                .transition(
+                    .move(edge: .top)
+                        .combined(
+                            with:
+                                .opacity
+                        )
+                )
+                .zIndex(50)
+            }
         }
         .fullScreenCover(
             isPresented: Binding(
