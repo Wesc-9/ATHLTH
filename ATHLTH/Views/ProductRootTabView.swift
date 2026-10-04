@@ -2994,9 +2994,7 @@ struct ATHLTHHomeView: View {
             isWarmUp:
                 firstPlan.isWarmUp,
             effortMetricRaw:
-                settings
-                    .defaultStrengthEffortMetric?
-                    .rawValue,
+                "rpe",
             exerciseQueue:
                 queue,
             startedAt: nil,
