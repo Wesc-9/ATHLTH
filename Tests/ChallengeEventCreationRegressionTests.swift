@@ -155,4 +155,42 @@ final class ChallengeEventCreationRegressionTests:
             "GoalMountain"
         )
     }
+
+
+    func testLegacyChallengeRulesAllowGhostToolsByDefault() {
+        let rules =
+            ATHLTHChallengeRules(
+                scoring:
+                    .fastestDistance,
+                verificationPolicy:
+                    .verifiedRequired,
+                targetDistanceMeters:
+                    5_000,
+                targetDurationSeconds:
+                    nil,
+                timeBasis:
+                    .elapsed,
+                route: nil,
+                gpsRequired: true,
+                minimumRouteMatchPercent:
+                    nil,
+                exerciseName: nil,
+                fixedWeightKilograms:
+                    nil,
+                startsAt: Date(),
+                endsAt: nil,
+                allowMultipleAttempts:
+                    true,
+                lockRulesAtStart:
+                    true,
+                meetup: nil
+            )
+
+        XCTAssertTrue(
+            rules.targetGhostAllowed
+        )
+        XCTAssertTrue(
+            rules.liveGhostAllowed
+        )
+    }
 }
