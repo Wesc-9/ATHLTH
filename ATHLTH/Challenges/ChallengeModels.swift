@@ -247,6 +247,7 @@ enum ChallengeParticipantState: String, Codable, Hashable {
     case invited
     case accepted
     case declined
+    case withdrawn
 }
 
 struct ChallengeParticipant: Identifiable, Codable, Hashable {
