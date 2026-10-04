@@ -694,6 +694,12 @@ final class StrengthWorkoutStore: ObservableObject {
             draftReps: draftReps,
             draftWeightKilograms: draftWeightKilograms,
             draftRestSeconds: draftRestSeconds,
+            draftDurationSeconds: draftDurationSeconds,
+            draftResistanceLevel: draftResistanceLevel,
+            targetKindRaw:
+                set?.resolvedTargetKind.rawValue,
+            loadKindRaw:
+                set?.resolvedLoadKind.rawValue,
             isResting: isResting,
             restEndsAt: restEndsAt,
             currentExerciseComplete:
@@ -729,10 +735,391 @@ final class StrengthWorkoutStore: ObservableObject {
                                 item.exercise
                                     .primaryMuscles,
                             setCount:
-                                item.sets.count
+                                item.sets.count,
+                            instructions:
+                                item.exercise
+                                    .instructions,
+                            secondaryMuscles:
+                                item.exercise
+                                    .secondaryMuscles,
+                            equipment:
+                                item.exercise
+                                    .equipment,
+                            setPlans:
+                                item.sets.map {
+                                    set in
+
+                                    WatchStrengthSetPlan(
+                                        setNumber:
+                                            set.setNumber,
+                                        reps:
+                                            set.plannedReps,
+                                        durationSeconds:
+                                            set.plannedDurationSeconds,
+                                        weightKilograms:
+                                            set.plannedWeightKilograms,
+                                        resistanceLevel:
+                                            set.plannedResistanceLevel,
+                                        restSeconds:
+                                            set.restSeconds,
+                                        isWarmUp:
+                                            set.isWarmUp
+                                    )
+                                }
+                        )
+                    },
+            startedAt:
+                workout.startedAt,
+            plannedSessionID:
+                workout.plannedSessionID,
+            allowsLiveExerciseBuilding:
+                workout
+                    .allowsLiveExerciseBuilding
+        )
+    }
+
+    func startFromWatchSnapshot(
+        _ snapshot:
+            WatchStrengthSessionSnapshot,
+        watchSessionID: UUID? = nil
+    ) {
+        var configuration =
+            StrengthAdvancedConfiguration
+                .savedDefaults()
+        configuration.inputMode =
+            snapshot.inputMode ??
+            .appleWatch
+
+        let exerciseLogs =
+            (snapshot.exerciseQueue ?? [])
+                .sorted {
+                    $0.index < $1.index
+                }
+                .map {
+                    item in
+
+                    let plans =
+                        item.setPlans ??
+                        (1...max(item.setCount, 1))
+                            .map {
+                                WatchStrengthSetPlan(
+                                    setNumber: $0,
+                                    reps:
+                                        snapshot.draftReps,
+                                    weightKilograms:
+                                        snapshot
+                                            .draftWeightKilograms,
+                                    restSeconds:
+                                        snapshot
+                                            .draftRestSeconds
+                                )
+                            }
+
+                    let exerciseSnapshot =
+                        ExerciseSnapshot(
+                            name: item.name,
+                            instructions:
+                                item.instructions ?? [],
+                            primaryMuscles:
+                                item.primaryMuscles,
+                            secondaryMuscles:
+                                item.secondaryMuscles ??
+                                [],
+                            equipment:
+                                item.equipment ?? [],
+                            imageURL: nil,
+                            videoURL: nil
+                        )
+
+                    return StrengthExerciseLog(
+                        id: UUID(),
+                        plannedExerciseID: nil,
+                        exercise:
+                            exerciseSnapshot,
+                        sets:
+                            plans.map {
+                                plan in
+
+                                let targetKind:
+                                    StrengthExerciseTargetKind =
+                                    plan.durationSeconds != nil
+                                        ? .time
+                                        : .reps
+                                let loadKind:
+                                    StrengthExerciseLoadKind =
+                                    plan.resistanceLevel != nil
+                                        ? .resistanceLevel
+                                        : .weightKilograms
+
+                                return StrengthSetLog(
+                                    id: UUID(),
+                                    setNumber:
+                                        plan.setNumber,
+                                    plannedReps:
+                                        targetKind == .reps
+                                            ? plan.reps
+                                            : nil,
+                                    plannedWeightKilograms:
+                                        loadKind ==
+                                            .weightKilograms
+                                            ? plan
+                                                .weightKilograms
+                                            : nil,
+                                    completedReps: nil,
+                                    completedWeightKilograms:
+                                        nil,
+                                    rpe: nil,
+                                    completedAt: nil,
+                                    restSeconds:
+                                        plan.restSeconds,
+                                    isWarmUp:
+                                        plan.isWarmUp,
+                                    targetKind:
+                                        targetKind,
+                                    plannedDurationSeconds:
+                                        targetKind == .time
+                                            ? plan
+                                                .durationSeconds
+                                            : nil,
+                                    loadKind:
+                                        loadKind,
+                                    plannedResistanceLevel:
+                                        loadKind ==
+                                            .resistanceLevel
+                                            ? plan
+                                                .resistanceLevel
+                                            : nil
+                                )
+                            },
+                        completedAt: nil
+                    )
+                }
+
+        activeWorkout =
+            StrengthWorkoutLog(
+                id: snapshot.workoutID,
+                plannedSessionID:
+                    snapshot.plannedSessionID,
+                watchSessionID:
+                    watchSessionID,
+                captureDevice:
+                    .appleWatch,
+                trackingMode:
+                    .advanced,
+                title:
+                    snapshot.title,
+                startedAt:
+                    snapshot.startedAt ??
+                    Date(),
+                endedAt: nil,
+                exercises:
+                    exerciseLogs,
+                healthMetrics:
+                    LinkedHealthWorkoutMetrics(
+                        healthKitWorkoutUUID:
+                            nil,
+                        duration: nil,
+                        activeCalories: nil,
+                        averageHeartRate: nil,
+                        maxHeartRate: nil
+                    ),
+                advancedConfiguration:
+                    configuration,
+                allowsLiveExerciseBuilding:
+                    snapshot
+                        .allowsLiveExerciseBuilding ??
+                    exerciseLogs.isEmpty
+            )
+
+        currentExerciseIndex = 0
+        currentSetIndex = 0
+        restEndsAt = nil
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+    }
+
+    func replayOfflineWatchCommands(
+        _ commands:
+            [WatchStrengthCommand]
+    ) {
+        for command in commands
+            .sorted(by: {
+                $0.sentAt < $1.sentAt
+            }) {
+            guard let workout =
+                    activeWorkout
+            else {
+                return
+            }
+
+            if let workoutID =
+                    command.workoutID,
+               workoutID != workout.id {
+                continue
+            }
+
+            switch command.kind {
+            case .requestSnapshot:
+                continue
+
+            case .updateDraft:
+                guard
+                    command.exerciseIndex == nil ||
+                    command.exerciseIndex ==
+                        currentExerciseIndex,
+                    command.setIndex == nil ||
+                    command.setIndex ==
+                        currentSetIndex
+                else {
+                    continue
+                }
+
+                setDraft(
+                    reps: command.reps,
+                    durationSeconds:
+                        command
+                            .durationSeconds,
+                    weightKilograms:
+                        command
+                            .weightKilograms,
+                    resistanceLevel:
+                        command
+                            .resistanceLevel,
+                    restSeconds:
+                        command.restSeconds,
+                    rpe: command.rpe,
+                    rir: command.rir,
+                    warmUp:
+                        command.isWarmUp,
+                    origin: .watch
+                )
+
+            case .completeSet:
+                guard
+                    command.exerciseIndex == nil ||
+                    command.exerciseIndex ==
+                        currentExerciseIndex,
+                    command.setIndex == nil ||
+                    command.setIndex ==
+                        currentSetIndex
+                else {
+                    continue
+                }
+
+                if currentSet?.isCompleted ==
+                    true {
+                    continue
+                }
+
+                setDraft(
+                    reps: command.reps,
+                    durationSeconds:
+                        command
+                            .durationSeconds,
+                    weightKilograms:
+                        command
+                            .weightKilograms,
+                    resistanceLevel:
+                        command
+                            .resistanceLevel,
+                    restSeconds:
+                        command.restSeconds,
+                    rpe: command.rpe,
+                    rir: command.rir,
+                    warmUp:
+                        command.isWarmUp,
+                    origin: .watch
+                )
+                completeCurrentSet(
+                    reps:
+                        currentSet?
+                            .resolvedTargetKind ==
+                            .reps
+                            ? draftReps
+                            : nil,
+                    durationSeconds:
+                        currentSet?
+                            .resolvedTargetKind ==
+                            .time
+                            ? draftDurationSeconds
+                            : nil,
+                    weightKilograms:
+                        currentSet?
+                            .resolvedLoadKind ==
+                            .weightKilograms
+                            ? draftWeightKilograms
+                            : nil,
+                    resistanceLevel:
+                        currentSet?
+                            .resolvedLoadKind ==
+                            .resistanceLevel
+                            ? draftResistanceLevel
+                            : nil,
+                    distanceMeters:
+                        command
+                            .distanceMeters,
+                    rpe: draftRPE,
+                    rir: draftRIR,
+                    isWarmUp:
+                        draftWarmUp,
+                    restSeconds:
+                        draftRestSeconds
+                )
+
+            case .completeSetWithoutDetails:
+                guard
+                    command.exerciseIndex == nil ||
+                    command.exerciseIndex ==
+                        currentExerciseIndex,
+                    command.setIndex == nil ||
+                    command.setIndex ==
+                        currentSetIndex
+                else {
+                    continue
+                }
+
+                if currentSet?.isCompleted !=
+                    true {
+                    if let rest =
+                            command.restSeconds {
+                        setDraft(
+                            restSeconds: rest,
+                            origin: .watch
                         )
                     }
-        )
+                    completeCurrentSetWithoutDetails(
+                        restSeconds:
+                            draftRestSeconds
+                    )
+                }
+
+            case .skipRest:
+                skipRest()
+
+            case .addRest:
+                addRest(
+                    seconds:
+                        command
+                            .addRestSeconds ??
+                        30
+                )
+
+            case .nextExercise:
+                if let index =
+                        command
+                            .exerciseIndex,
+                   index !=
+                    currentExerciseIndex {
+                    continue
+                }
+
+                if hasNextExercise {
+                    moveToNextExercise()
+                }
+            }
+        }
+
+        persistCheckpointNow()
     }
 
     func startFreestyle(
