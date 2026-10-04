@@ -8541,7 +8541,10 @@ struct ProfileRecordShowcasePickerView:
         }
         .buttonStyle(.plain)
         .disabled(
-            !available ||
+            (
+                !available &&
+                !isSelected
+            ) ||
             (
                 !isSelected &&
                 selectionIsFull
