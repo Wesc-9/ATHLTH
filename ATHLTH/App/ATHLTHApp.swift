@@ -730,6 +730,24 @@ struct AppRootView: View {
         }
         .onReceive(
             NotificationCenter.default.publisher(
+                for:
+                    .athlthHomeAssistantCommandReceived
+            )
+        ) { notification in
+            guard let command =
+                    notification.object
+                        as? HomeAssistantInboundCommand,
+                  command.type == "sync_now"
+            else {
+                return
+            }
+
+            Task {
+                await syncHomeAssistantSnapshot()
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationReceived
             )
         ) { _ in
