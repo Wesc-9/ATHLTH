@@ -2116,6 +2116,8 @@ struct DirectMessageThreadView: View {
             )
         let challenges =
             pendingChallengesFromFriend
+        let outgoingChallenges =
+            outgoingChallengesToFriend
 
         ScrollViewReader { proxy in
             ScrollView {
@@ -2197,8 +2199,73 @@ struct DirectMessageThreadView: View {
                         }
                     }
 
+                    if !outgoingChallenges.isEmpty {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "SENT",
+                                        norwegian:
+                                            "SENDT"
+                                    )
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(1.5)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Text(
+                                "\(outgoingChallenges.count)"
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .padding(
+                                .horizontal,
+                                7
+                            )
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                            .background(
+                                ATHLTHTheme
+                                    .accentSoft,
+                                in: Capsule()
+                            )
+
+                            Spacer()
+                        }
+
+                        ForEach(
+                            outgoingChallenges
+                        ) { challenge in
+                            ThreadOutgoingChallengeCard(
+                                challenge:
+                                    challenge,
+                                onCancel: {
+                                    withdrawThreadChallenge(
+                                        challenge
+                                    )
+                                }
+                            )
+                        }
+                    }
+
                     if messages.isEmpty &&
-                        challenges.isEmpty {
+                        challenges.isEmpty &&
+                        outgoingChallenges.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization
                                 .choose(
@@ -2269,7 +2336,8 @@ struct DirectMessageThreadView: View {
             .task {
                 if let last =
                         messages.last,
-                   challenges.isEmpty {
+                   challenges.isEmpty &&
+                   outgoingChallenges.isEmpty {
                     proxy.scrollTo(
                         last.id,
                         anchor:
@@ -2291,6 +2359,30 @@ struct DirectMessageThreadView: View {
             .filter {
                 $0.creatorID ==
                     friend.userID
+            }
+            .sorted {
+                $0.createdAt >
+                    $1.createdAt
+            }
+    }
+
+    private var outgoingChallengesToFriend:
+        [ATHLTHChallenge] {
+        challengeStore.visibleChallenges
+            .filter { challenge in
+                challenge.creatorID ==
+                    session.profile.userID &&
+                challenge.status !=
+                    .completed &&
+                challenge.status !=
+                    .cancelled &&
+                challenge.participants
+                    .contains {
+                        $0.userID ==
+                            friend.userID &&
+                        $0.state ==
+                            .invited
+                    }
             }
             .sorted {
                 $0.createdAt >
@@ -2667,6 +2759,51 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private func withdrawThreadChallenge(
+        _ challenge: ATHLTHChallenge
+    ) {
+        guard
+            let participant =
+                challenge.participants
+                    .first(
+                        where: {
+                            $0.userID ==
+                                friend.userID &&
+                            $0.state ==
+                                .invited
+                        }
+                    )
+        else {
+            return
+        }
+
+        Task {
+            let withdrawn =
+                await social
+                    .withdrawChallengeInvite(
+                        participantID:
+                            participant.id
+                    )
+
+            guard withdrawn else {
+                return
+            }
+
+            challengeStore
+                .removeParticipant(
+                    challengeID:
+                        challenge.id,
+                    participantID:
+                        participant.id
+                )
+
+            await social.refresh(
+                challengeStore:
+                    challengeStore
+            )
+        }
+    }
+
     private func send() async {
         guard let conversationID, canSend else { return }
 
@@ -2739,6 +2876,175 @@ struct DirectMessageThreadView: View {
 
         case .none:
             break
+        }
+    }
+}
+
+private struct ThreadOutgoingChallengeCard: View {
+    let challenge: ATHLTHChallenge
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack(spacing: 12) {
+                Image(
+                    systemName:
+                        "paperplane.fill"
+                )
+                .font(
+                    .system(
+                        size: 16,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Sent · waiting for response",
+                                norwegian:
+                                    "Sendt · venter på svar"
+                            )
+                    )
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                    )
+                    .tracking(0.6)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Text(
+                        challenge.title
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                    Text(
+                        challenge.sport.title +
+                        " · " +
+                        challenge.rules
+                            .scoring.title
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 9) {
+                NavigationLink {
+                    ChallengeDetailView(
+                        challengeID:
+                            challenge.id
+                    )
+                } label: {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "View",
+                                norwegian:
+                                    "Vis"
+                            )
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
+
+                Button(
+                    role: .destructive,
+                    action: onCancel
+                ) {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Cancel invite",
+                                norwegian:
+                                    "Avlys invitasjon"
+                            )
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.98),
+                    ATHLTHTheme
+                        .cardWarm
+                        .opacity(0.88)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.12),
+                lineWidth: 0.9
+            )
         }
     }
 }
