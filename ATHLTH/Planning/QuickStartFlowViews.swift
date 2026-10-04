@@ -1019,6 +1019,8 @@ struct RunQuickStartSheet: View {
 
                     selectionCard
 
+                    quickRunGuidanceCard
+
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
                             WorkoutGearSelectionCard(
@@ -1042,91 +1044,6 @@ struct RunQuickStartSheet: View {
                             ) {
                                 showingSpotifyPicker = true
                             }
-
-                            NavigationLink {
-                                RunGuidanceSetupView(
-                                    audioCoach:
-                                        $audioCoachDraft,
-                                    routeGuardian:
-                                        $routeGuardianDraft,
-                                    ghost:
-                                        $ghostDraft,
-                                    route:
-                                        guidanceRoute,
-                                    structuredWorkout:
-                                        mode == .structured
-                                            ? selectedWorkout
-                                            : nil
-                                )
-                            } label: {
-                                ATHLTHCard {
-                                    HStack(spacing: 12) {
-                                        Image(
-                                            systemName:
-                                                "waveform.and.mic"
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .premiumGold
-                                        )
-                                        .frame(
-                                            width: 40,
-                                            height: 40
-                                        )
-                                        .background(
-                                            ATHLTHTheme
-                                                .premiumGoldSoft,
-                                            in:
-                                                RoundedRectangle(
-                                                    cornerRadius:
-                                                        12
-                                                )
-                                        )
-
-                                        VStack(
-                                            alignment: .leading,
-                                            spacing: 3
-                                        ) {
-                                            Text(
-                                                ATHLTHLocalization.choose(
-                                                    english:
-                                                        "Guidance & Alerts",
-                                                    norwegian:
-                                                        "Veiledning og varsler"
-                                                )
-                                            )
-                                            .font(
-                                                .subheadline
-                                                    .weight(
-                                                        .semibold
-                                                    )
-                                            )
-
-                                            Text(
-                                                guidanceSummary
-                                            )
-                                            .font(.caption)
-                                            .foregroundStyle(
-                                                .secondary
-                                            )
-                                            .multilineTextAlignment(
-                                                .leading
-                                            )
-                                        }
-
-                                        Spacer()
-
-                                        Image(
-                                            systemName:
-                                                "chevron.right"
-                                        )
-                                        .foregroundStyle(
-                                            .secondary
-                                        )
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
 
                             ATHLTHCard {
                                 WorkoutFriendPicker(
@@ -2166,6 +2083,232 @@ struct RunQuickStartSheet: View {
                 norwegian: "Start treningsøkt på Watch"
             )
         }
+    }
+
+    private var quickRunGuidanceCard:
+        some View {
+        NavigationLink {
+            RunGuidanceSetupView(
+                audioCoach:
+                    $audioCoachDraft,
+                routeGuardian:
+                    $routeGuardianDraft,
+                ghost:
+                    $ghostDraft,
+                route:
+                    guidanceRoute,
+                structuredWorkout:
+                    mode == .structured
+                        ? selectedWorkout
+                        : nil
+            )
+        } label: {
+            ATHLTHCard {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "waveform.and.mic"
+                        )
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                        .frame(
+                            width: 44,
+                            height: 44
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .premiumGoldSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 13,
+                                style: .continuous
+                            )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Run guidance",
+                                    norwegian:
+                                        "Løpeveiledning"
+                                )
+                            )
+                            .font(
+                                .headline
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Coach, Ghost and live alerts for this run",
+                                    norwegian:
+                                        "Coach, Ghost og live-varsler for denne økten"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .multilineTextAlignment(
+                                .leading
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    HStack(spacing: 8) {
+                        runGuidanceFeaturePill(
+                            title: "Audio Coach",
+                            icon:
+                                "waveform.and.person.filled",
+                            active:
+                                audioCoachDraft.enabled,
+                            unavailable: false
+                        )
+
+                        runGuidanceFeaturePill(
+                            title: "Ghost",
+                            icon:
+                                "figure.run.circle.fill",
+                            active:
+                                ghostDraft.enabled &&
+                                guidanceRoute != nil,
+                            unavailable:
+                                guidanceRoute == nil
+                        )
+
+                        runGuidanceFeaturePill(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Route",
+                                    norwegian: "Rute"
+                                ),
+                            icon:
+                                "location.fill",
+                            active:
+                                routeGuardianDraft.enabled &&
+                                guidanceRoute != nil,
+                            unavailable:
+                                guidanceRoute == nil
+                        )
+                    }
+
+                    Text(
+                        guidanceRoute == nil
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Audio Coach works on every run. Choose a route to unlock Ghost and Route Guardian.",
+                                norwegian:
+                                    "Audio Coach fungerer på alle økter. Velg en rute for å bruke Ghost og Route Guardian."
+                            )
+                            : guidanceSummary
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func runGuidanceFeaturePill(
+        title: String,
+        icon: String,
+        active: Bool,
+        unavailable: Bool
+    ) -> some View {
+        HStack(spacing: 5) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 10,
+                    weight: .semibold
+                )
+            )
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 10,
+                        weight: .semibold
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.72
+                )
+        }
+        .foregroundStyle(
+            unavailable
+                ? ATHLTHTheme
+                    .mutedText
+                    .opacity(0.65)
+                : (
+                    active
+                        ? ATHLTHTheme
+                            .vitality
+                        : ATHLTHTheme
+                            .primaryText
+                )
+        )
+        .frame(
+            maxWidth: .infinity
+        )
+        .frame(height: 34)
+        .background(
+            (
+                active
+                    ? ATHLTHTheme
+                        .vitalitySoft
+                    : Color.primary
+                        .opacity(0.04)
+            ),
+            in: Capsule()
+        )
     }
 
     private var guidanceRoute:
