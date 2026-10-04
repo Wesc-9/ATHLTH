@@ -124,6 +124,57 @@ struct WorkoutStartOptionsView: View {
         )
     }
 
+    private var appleWatchSelectable: Bool {
+        ATHLTHDeviceRole.isIPad ||
+            watchConnected
+    }
+
+    private var workoutDeviceCaption: String {
+        if ATHLTHDeviceRole.isIPad {
+            return ATHLTHLocalization.choose(
+                english:
+                    "iPad sends the start request to your signed-in iPhone. Apple Watch starts through the paired iPhone.",
+                norwegian:
+                    "iPad sender startforespørselen til iPhonen du er logget inn på. Apple Watch startes via den parede iPhonen."
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "This choice applies only to this workout.",
+            norwegian:
+                "Valget gjelder bare denne økten."
+        )
+    }
+
+    private var startButtonTitle: String {
+        if ATHLTHDeviceRole.isIPad {
+            return captureDevice == .appleWatch
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "Start Apple Watch via iPhone",
+                    norwegian:
+                        "Start Apple Watch via iPhone"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Start on iPhone",
+                    norwegian: "Start på iPhone"
+                )
+        }
+
+        return captureDevice == .appleWatch
+            ? ATHLTHLocalization.choose(
+                english:
+                    "Start with Apple Watch",
+                norwegian:
+                    "Start med Apple Watch"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Start on iPhone",
+                norwegian: "Start på iPhone"
+            )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -192,7 +243,7 @@ struct WorkoutStartOptionsView: View {
                                 icon: "applewatch",
                                 selected:
                                     captureDevice == .appleWatch,
-                                disabled: !watchConnected
+                                disabled: !appleWatchSelectable
                             ) {
                                 captureDevice =
                                     .appleWatch
@@ -201,12 +252,7 @@ struct WorkoutStartOptionsView: View {
                         .padding(.top, 10)
 
                         Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "This choice applies only to this workout.",
-                                norwegian:
-                                    "Valget gjelder bare denne økten."
-                            )
+                            workoutDeviceCaption
                         )
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -499,7 +545,8 @@ struct WorkoutStartOptionsView: View {
                     effortMetric:
                         $effortMetric,
                     watchAvailable:
-                        captureDevice == .appleWatch
+                        captureDevice == .appleWatch &&
+                        !ATHLTHDeviceRole.isIPad
                 )
             }
             .toolbar {
@@ -605,19 +652,7 @@ struct WorkoutStartOptionsView: View {
             dismiss()
         } label: {
             Label(
-                captureDevice == .appleWatch
-                    ? ATHLTHLocalization.choose(
-                        english:
-                            "Start with Apple Watch",
-                        norwegian:
-                            "Start med Apple Watch"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english:
-                            "Start on iPhone",
-                        norwegian:
-                            "Start på iPhone"
-                    ),
+                startButtonTitle,
                 systemImage:
                     captureDevice ==
                     .appleWatch
