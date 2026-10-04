@@ -1517,6 +1517,72 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         liveTrails[currentUserID] = nil
     }
 
+    func finishCurrentLiveGhostRace(
+        elapsedSeconds: TimeInterval
+    ) async {
+        guard
+            let session = currentSession,
+            let challengeID =
+                session.ghostChallengeID,
+            let currentUserID
+        else {
+            return
+        }
+
+        struct FinishWrite: Encodable {
+            let finishedAt: Date
+            let elapsedSeconds:
+                TimeInterval
+            let updatedAt: Date
+
+            enum CodingKeys:
+                String,
+                CodingKey
+            {
+                case finishedAt =
+                    "finished_at"
+                case elapsedSeconds =
+                    "elapsed_seconds"
+                case updatedAt =
+                    "updated_at"
+            }
+        }
+
+        do {
+            try await client
+                .from(
+                    "live_ghost_race_participants"
+                )
+                .update(
+                    FinishWrite(
+                        finishedAt: Date(),
+                        elapsedSeconds:
+                            max(
+                                elapsedSeconds,
+                                0
+                            ),
+                        updatedAt: Date()
+                    )
+                )
+                .eq(
+                    "challenge_id",
+                    value:
+                        challengeID
+                )
+                .eq(
+                    "user_id",
+                    value:
+                        currentUserID
+                )
+                .execute()
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
     func leaveCurrentLiveWorkout() async {
         guard let session = currentSession,
               let currentUserID
