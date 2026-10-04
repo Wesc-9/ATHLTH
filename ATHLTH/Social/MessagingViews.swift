@@ -668,6 +668,12 @@ struct MessageInboxView: View {
                             .contains(normalizedSearch) ||
                         $0.sport.title.lowercased()
                             .contains(normalizedSearch)
+                    } ||
+                    item.outgoingChallenges.contains {
+                        $0.title.lowercased()
+                            .contains(normalizedSearch) ||
+                        $0.sport.title.lowercased()
+                            .contains(normalizedSearch)
                     }
             }
 
@@ -690,6 +696,20 @@ struct MessageInboxView: View {
         challenges.incomingInvitations(
             for: session.profile.userID
         )
+    }
+
+    private var outgoingChallengeRequests:
+        [ATHLTHChallenge] {
+        challenges.visibleChallenges.filter { challenge in
+            challenge.creatorID ==
+                session.profile.userID &&
+            challenge.status != .completed &&
+            challenge.status != .cancelled &&
+            challenge.participants.contains {
+                $0.state == .invited &&
+                $0.userID != session.profile.userID
+            }
+        }
     }
 
     private var filteredRequestCount: Int {
@@ -763,6 +783,29 @@ struct MessageInboxView: View {
             current.pendingChallenges
                 .append(challenge)
             grouped[friend.userID] = current
+        }
+
+        for challenge in outgoingChallengeRequests {
+            for participant in challenge.participants
+            where participant.state == .invited {
+                guard
+                    let userID = participant.userID,
+                    userID != session.profile.userID,
+                    let friend = profile(for: userID)
+                else {
+                    continue
+                }
+
+                var current =
+                    grouped[userID] ??
+                    MessagePersonInboxItem(
+                        friend: friend
+                    )
+
+                current.outgoingChallenges
+                    .append(challenge)
+                grouped[userID] = current
+            }
         }
 
         return Array(
@@ -864,6 +907,7 @@ private struct MessagePersonInboxItem: Identifiable {
     var isIncomingMessageRequest = false
     var isOutgoingMessageRequest = false
     var pendingChallenges: [ATHLTHChallenge] = []
+    var outgoingChallenges: [ATHLTHChallenge] = []
 
     init(friend: SocialProfileCard) {
         self.friend = friend
@@ -928,6 +972,12 @@ private struct MessagePersonInboxItem: Identifiable {
         dates.append(
             contentsOf:
                 pendingChallenges.map(
+                    \.createdAt
+                )
+        )
+        dates.append(
+            contentsOf:
+                outgoingChallenges.map(
                     \.createdAt
                 )
         )
@@ -1188,6 +1238,27 @@ private struct MessagePersonRow: View {
             return challenge.title
         }
 
+        if item.outgoingChallenges.count > 1 {
+            return
+                ATHLTHLocalization.choose(
+                    english:
+                        "\(item.outgoingChallenges.count) challenges sent · waiting",
+                    norwegian:
+                        "\(item.outgoingChallenges.count) utfordringer sendt · venter"
+                )
+        }
+
+        if let challenge =
+                item.outgoingChallenges.first {
+            return
+                ATHLTHLocalization.choose(
+                    english:
+                        "Sent · \(challenge.title)",
+                    norwegian:
+                        "Sendt · \(challenge.title)"
+                )
+        }
+
         if let body =
                 item.lastMessage?.body,
            !body.isEmpty {
@@ -1250,6 +1321,21 @@ private struct MessagePersonRow: View {
                                 ? "Utfordring"
                                 : "\(item.pendingChallenges.count) utfordringer"
                     )
+            )
+        }
+
+        if !item.outgoingChallenges.isEmpty {
+            values.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        item.outgoingChallenges.count == 1
+                            ? "Sent · waiting"
+                            : "\(item.outgoingChallenges.count) sent",
+                    norwegian:
+                        item.outgoingChallenges.count == 1
+                            ? "Sendt · venter"
+                            : "\(item.outgoingChallenges.count) sendt"
+                )
             )
         }
 
