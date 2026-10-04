@@ -69,6 +69,59 @@ final class StrengthMuscleProfileTests: XCTestCase {
         }
     }
 
+    func testExerciseNameFallbackCoversRowingMachine() {
+        let regions =
+            Set(
+                StrengthMuscleResolver
+                    .fallbackRegions(
+                        forExerciseName:
+                            "Rowing Machine"
+                    )
+            )
+
+        XCTAssertTrue(
+            regions.contains(.lats)
+        )
+        XCTAssertTrue(
+            regions.contains(.upperBack)
+        )
+        XCTAssertTrue(
+            regions.contains(.biceps)
+        )
+        XCTAssertTrue(
+            regions.contains(.quads)
+        )
+        XCTAssertTrue(
+            regions.contains(.hamstrings)
+        )
+    }
+
+    func testExerciseNameFallbackCoversCommonStrengthPatterns() {
+        XCTAssertEqual(
+            Set(
+                StrengthMuscleResolver
+                    .fallbackRegions(
+                        forExerciseName:
+                            "Bench Press"
+                    )
+            ),
+            Set([
+                .chest,
+                .frontDelts,
+                .triceps
+            ])
+        )
+
+        XCTAssertTrue(
+            StrengthMuscleResolver
+                .fallbackRegions(
+                    forExerciseName:
+                        "Back Squat"
+                )
+                .contains(.glutes)
+        )
+    }
+
     func testRepDBBodyPartFallbackAlwaysProducesVisualRegions() {
         let supported = [
             "Chest",
