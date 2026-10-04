@@ -20,6 +20,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @Published var isPresentationRequested = false
     @Published private(set) var isUserMinimized = false
     @Published private(set) var liveViewIsVisible = false
+    @Published private(set) var presentationGeneration = 0
 
     private let healthStore = HKHealthStore()
     private var mirroredSession: HKWorkoutSession?
@@ -136,6 +137,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         isUserMinimized = false
+        presentationGeneration &+= 1
         isPresentationRequested = true
     }
 
@@ -213,6 +215,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                     norwegian: "Direkte fra Apple Watch"
                 )
             self.errorMessage = nil
+            self.presentationGeneration &+= 1
             self.isPresentationRequested = true
         }
     }
