@@ -1884,6 +1884,36 @@ final class SocialStore: ObservableObject {
             muscleGroups.append(value)
         }
 
+        if muscleGroups.isEmpty {
+            for exercise in performedExercises {
+                for region in
+                    StrengthMuscleResolver
+                        .fallbackRegions(
+                            forExerciseName:
+                                exercise
+                                    .exercise
+                                    .name
+                        ) {
+                    let value =
+                        region.title
+
+                    if !muscleGroups
+                        .contains(
+                            where: {
+                                $0.caseInsensitiveCompare(
+                                    value
+                                ) ==
+                                    .orderedSame
+                            }
+                        ) {
+                        muscleGroups.append(
+                            value
+                        )
+                    }
+                }
+            }
+        }
+
         var metadata: [String: String] = [
             "workout_id": workout.id.uuidString,
             "kind": "strength",
