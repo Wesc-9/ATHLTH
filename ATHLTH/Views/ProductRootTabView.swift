@@ -10015,16 +10015,16 @@ struct ATHLTHProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 8.8,
+                            size: 10.5,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 11)
+                    .frame(width: 13)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 10.2,
+                            size: 12,
                             weight: .bold,
                             design: .rounded
                         )
@@ -10041,7 +10041,7 @@ struct ATHLTHProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 6.3,
+                        size: 7.4,
                         weight: .medium
                     )
                 )
@@ -10056,11 +10056,11 @@ struct ATHLTHProfileView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 1)
         .frame(maxWidth: .infinity)
-        .frame(height: 30)
+        .frame(height: 36)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 11,
+                cornerRadius: 13,
                 style: .continuous
             )
         )
@@ -10125,7 +10125,7 @@ struct ATHLTHProfileView: View {
                                 ATHLTHTrophyCoreView(
                                     trophy:
                                         trophy,
-                                    size: 12
+                                    size: 28
                                 )
 
                                 Text(
@@ -10133,7 +10133,7 @@ struct ATHLTHProfileView: View {
                                 )
                                 .font(
                                     .system(
-                                        size: 6.2,
+                                        size: 8.0,
                                         weight: .bold
                                     )
                                 )
@@ -10176,7 +10176,7 @@ struct ATHLTHProfileView: View {
                                     )
                                     .font(
                                         .system(
-                                            size: 8,
+                                            size: 13,
                                             weight: .medium
                                         )
                                     )
@@ -10189,8 +10189,8 @@ struct ATHLTHProfileView: View {
                                     )
                                 }
                                 .frame(
-                                    width: 13,
-                                    height: 15
+                                    width: 28,
+                                    height: 32
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
@@ -10222,7 +10222,7 @@ struct ATHLTHProfileView: View {
                                 )
                                 .font(
                                     .system(
-                                        size: 6.8,
+                                        size: 8.5,
                                         weight:
                                             .semibold
                                     )
