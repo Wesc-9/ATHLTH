@@ -5502,7 +5502,16 @@ struct ATHLTHTrainView: View {
                 ? "iPhone / Watch · Free Walk"
                 : "iPhone · Free Walk"
         case .strength:
-            return "Choose device at start"
+            if strengthWorkout.activeWorkout != nil {
+                return ATHLTHLocalization.choose(
+                    english: "Continue workout",
+                    norwegian: "Fortsett økt"
+                )
+            }
+            return ATHLTHLocalization.choose(
+                english: "Choose device at start",
+                norwegian: "Velg enhet ved start"
+            )
         case .mobility, .recovery, .custom:
             return kind.title
         }
@@ -5515,7 +5524,9 @@ struct ATHLTHTrainView: View {
         case .running, .walking:
             return true
         case .strength:
-            return strengthWorkout.activeWorkout == nil
+            // An unfinished strength checkpoint is a resumable workout,
+            // not a reason to disable the Strength quick-start tile.
+            return true
         case .mobility, .recovery, .custom:
             return false
         }
@@ -5528,7 +5539,11 @@ struct ATHLTHTrainView: View {
         case .walking:
             showingWalkQuickStart = true
         case .strength:
-            showingStrengthQuickStart = true
+            if strengthWorkout.activeWorkout != nil {
+                showingStrengthWorkout = true
+            } else {
+                showingStrengthQuickStart = true
+            }
         case .mobility, .recovery, .custom:
             break
         }
