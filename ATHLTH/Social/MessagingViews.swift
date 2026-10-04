@@ -2121,6 +2121,8 @@ struct DirectMessageThreadView: View {
             pendingChallengesFromFriend
         let outgoingChallenges =
             outgoingChallengesToFriend
+        let lifecycleEvents =
+            challengeLifecycleEventsWithFriend
 
         ScrollViewReader { proxy in
             ScrollView {
@@ -2266,9 +2268,20 @@ struct DirectMessageThreadView: View {
                         }
                     }
 
+                    if !lifecycleEvents.isEmpty {
+                        ForEach(
+                            lifecycleEvents
+                        ) { event in
+                            ThreadChallengeLifecycleEventRow(
+                                event: event
+                            )
+                        }
+                    }
+
                     if messages.isEmpty &&
                         challenges.isEmpty &&
-                        outgoingChallenges.isEmpty {
+                        outgoingChallenges.isEmpty &&
+                        lifecycleEvents.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization
                                 .choose(
@@ -2391,6 +2404,179 @@ struct DirectMessageThreadView: View {
                 $0.createdAt >
                     $1.createdAt
             }
+    }
+
+    private var challengeLifecycleEventsWithFriend:
+        [ThreadChallengeLifecycleEvent] {
+        var events:
+            [ThreadChallengeLifecycleEvent] = []
+        let now = Date()
+
+        for challenge in
+            challengeStore.visibleChallenges {
+            let isCreator =
+                challenge.creatorID ==
+                    session.profile.userID
+            let isFriendCreator =
+                challenge.creatorID ==
+                    friend.userID
+
+            guard
+                isCreator ||
+                isFriendCreator
+            else {
+                continue
+            }
+
+            let participantUserID =
+                isCreator
+                    ? friend.userID
+                    : session.profile.userID
+
+            guard
+                let participant =
+                    challenge.participants
+                        .first(
+                            where: {
+                                $0.userID ==
+                                    participantUserID
+                            }
+                        )
+            else {
+                continue
+            }
+
+            let kind:
+                ThreadChallengeLifecycleKind
+            let eventDate: Date
+
+            switch participant.state {
+            case .accepted:
+                kind = .accepted
+                eventDate =
+                    participant.respondedAt ??
+                    participant.invitedAt
+
+            case .declined:
+                kind = .declined
+                eventDate =
+                    participant.respondedAt ??
+                    participant.invitedAt
+
+            case .withdrawn:
+                kind = .withdrawn
+                eventDate =
+                    participant.respondedAt ??
+                    participant.invitedAt
+
+            case .invited:
+                guard
+                    let endsAt =
+                        challenge.rules.endsAt,
+                    endsAt <= now
+                else {
+                    continue
+                }
+
+                kind = .expired
+                eventDate = endsAt
+
+            case .creator:
+                continue
+            }
+
+            events.append(
+                ThreadChallengeLifecycleEvent(
+                    challengeID:
+                        challenge.id,
+                    participantID:
+                        participant.id,
+                    challengeTitle:
+                        challenge.title,
+                    kind: kind,
+                    message:
+                        lifecycleMessage(
+                            kind: kind,
+                            creatorIsCurrentUser:
+                                isCreator
+                        ),
+                    createdAt:
+                        eventDate
+                )
+            )
+        }
+
+        return events.sorted {
+            $0.createdAt >
+                $1.createdAt
+        }
+    }
+
+    private func lifecycleMessage(
+        kind: ThreadChallengeLifecycleKind,
+        creatorIsCurrentUser: Bool
+    ) -> String {
+        switch kind {
+        case .accepted:
+            return creatorIsCurrentUser
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "\(friend.resolvedName) accepted the challenge.",
+                    norwegian:
+                        "\(friend.resolvedName) godtok utfordringen."
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "You accepted the challenge.",
+                    norwegian:
+                        "Du godtok utfordringen."
+                )
+
+        case .declined:
+            return creatorIsCurrentUser
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "\(friend.resolvedName) declined the challenge.",
+                    norwegian:
+                        "\(friend.resolvedName) avslo utfordringen."
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "You declined the challenge.",
+                    norwegian:
+                        "Du avslo utfordringen."
+                )
+
+        case .withdrawn:
+            return creatorIsCurrentUser
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "You withdrew the invite to \(friend.resolvedName).",
+                    norwegian:
+                        "Du trakk tilbake invitasjonen til \(friend.resolvedName)."
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "\(friend.resolvedName) withdrew the challenge invite.",
+                    norwegian:
+                        "\(friend.resolvedName) trakk tilbake challenge-invitasjonen."
+                )
+
+        case .expired:
+            return creatorIsCurrentUser
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "The invite expired without a response from \(friend.resolvedName).",
+                    norwegian:
+                        "Invitasjonen utløp uten svar fra \(friend.resolvedName)."
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "The challenge expired before you responded.",
+                    norwegian:
+                        "Utfordringen utløp før du svarte."
+                )
+        }
     }
 
     private var currentConversation: DirectConversationRecord? {
@@ -2909,6 +3095,124 @@ struct DirectMessageThreadView: View {
     }
 }
 
+private enum ThreadChallengeLifecycleKind: String {
+    case accepted
+    case declined
+    case withdrawn
+    case expired
+
+    var systemImage: String {
+        switch self {
+        case .accepted:
+            return "checkmark.circle.fill"
+        case .declined:
+            return "xmark.circle.fill"
+        case .withdrawn:
+            return "arrow.uturn.backward.circle.fill"
+        case .expired:
+            return "clock.badge.xmark"
+        }
+    }
+}
+
+private struct ThreadChallengeLifecycleEvent: Identifiable {
+    var id: String {
+        challengeID.uuidString +
+        ":" +
+        participantID.uuidString +
+        ":" +
+        kind.rawValue
+    }
+
+    let challengeID: UUID
+    let participantID: UUID
+    let challengeTitle: String
+    let kind: ThreadChallengeLifecycleKind
+    let message: String
+    let createdAt: Date
+}
+
+private struct ThreadChallengeLifecycleEventRow: View {
+    let event: ThreadChallengeLifecycleEvent
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    event.kind
+                        .systemImage
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+            )
+            .frame(
+                width: 30,
+                height: 30
+            )
+            .background(
+                ATHLTHTheme
+                    .accentSoft,
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(event.message)
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Text(
+                    event.challengeTitle +
+                    " · " +
+                    event.createdAt.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            Color.white
+                .opacity(0.64),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+}
+
 private struct ThreadOutgoingChallengeCard: View {
     let challenge: ATHLTHChallenge
     let onCancel: () -> Void
@@ -3304,6 +3608,8 @@ private struct ThreadChallengeRequestCard: View {
 }
 
 private struct MessageBubble: View {
+    @EnvironmentObject private var challengeStore: ChallengeStore
+
     let message: DirectMessageRecord
     let friend: SocialProfileCard
     let currentUserID: UUID?
@@ -3326,6 +3632,135 @@ private struct MessageBubble: View {
         }
 
         return isMine ? "Shared by you" : "Shared by \(friend.resolvedName)"
+    }
+
+    private var challengeStatusText: String? {
+        guard
+            message.attachmentKind ==
+                .challenge,
+            let challengeID =
+                message.sourceObjectID,
+            let challenge =
+                challengeStore.challenge(
+                    id: challengeID
+                )
+        else {
+            return nil
+        }
+
+        if challenge.status == .cancelled {
+            return ATHLTHLocalization.choose(
+                english: "Cancelled",
+                norwegian: "Avlyst"
+            )
+        }
+
+        let participantUserID =
+            challenge.creatorID ==
+                currentUserID
+                ? friend.userID
+                : currentUserID
+
+        guard
+            let participant =
+                challenge.participants
+                    .first(
+                        where: {
+                            $0.userID ==
+                                participantUserID
+                        }
+                    )
+        else {
+            return nil
+        }
+
+        switch participant.state {
+        case .creator:
+            return nil
+
+        case .invited:
+            if let endsAt =
+                    challenge.rules.endsAt,
+               endsAt <= Date() {
+                return ATHLTHLocalization.choose(
+                    english: "Expired",
+                    norwegian: "Utløpt"
+                )
+            }
+
+            return challenge.creatorID ==
+                currentUserID
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "Sent · waiting",
+                    norwegian:
+                        "Sendt · venter"
+                )
+                : ATHLTHLocalization.choose(
+                    english:
+                        "Waiting for response",
+                    norwegian:
+                        "Venter på svar"
+                )
+
+        case .accepted:
+            return ATHLTHLocalization.choose(
+                english: "Accepted",
+                norwegian: "Godtatt"
+            )
+
+        case .declined:
+            return ATHLTHLocalization.choose(
+                english: "Declined",
+                norwegian: "Avslått"
+            )
+
+        case .withdrawn:
+            return ATHLTHLocalization.choose(
+                english: "Withdrawn",
+                norwegian:
+                    "Trukket tilbake"
+            )
+        }
+    }
+
+    private var challengeStatusSystemImage: String {
+        guard
+            message.attachmentKind ==
+                .challenge
+        else {
+            return "bolt.fill"
+        }
+
+        switch challengeStatusText {
+        case ATHLTHLocalization.choose(
+            english: "Accepted",
+            norwegian: "Godtatt"
+        ):
+            return "checkmark.circle.fill"
+
+        case ATHLTHLocalization.choose(
+            english: "Declined",
+            norwegian: "Avslått"
+        ):
+            return "xmark.circle.fill"
+
+        case ATHLTHLocalization.choose(
+            english: "Withdrawn",
+            norwegian:
+                "Trukket tilbake"
+        ):
+            return "arrow.uturn.backward.circle.fill"
+
+        case ATHLTHLocalization.choose(
+            english: "Expired",
+            norwegian: "Utløpt"
+        ):
+            return "clock.badge.xmark"
+
+        default:
+            return "clock.fill"
+        }
     }
 
     var body: some View {
@@ -3356,6 +3791,35 @@ private struct MessageBubble: View {
                             Text(subtitle)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+
+                        if let challengeStatusText {
+                            Label(
+                                challengeStatusText,
+                                systemImage:
+                                    challengeStatusSystemImage
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .padding(
+                                .horizontal,
+                                8
+                            )
+                            .padding(
+                                .vertical,
+                                5
+                            )
+                            .background(
+                                ATHLTHTheme
+                                    .accentSoft,
+                                in: Capsule()
+                            )
                         }
 
                         Text(provenanceText)
