@@ -1248,6 +1248,25 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func withdrawChallengeInvite(
+        participantID: UUID
+    ) async throws {
+        guard currentUserID != nil else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        _ = try await client
+            .rpc(
+                "withdraw_social_challenge_invite",
+                params:
+                    WithdrawChallengeInviteParams(
+                        participantID:
+                            participantID
+                    )
+            )
+            .execute()
+    }
+
     func syncChallenge(_ challenge: ATHLTHChallenge) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -1782,6 +1801,14 @@ private struct JoinPublicChallengeParams: Encodable {
 
     enum CodingKeys: String, CodingKey {
         case challengeID = "p_challenge_id"
+    }
+}
+
+private struct WithdrawChallengeInviteParams: Encodable {
+    let participantID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case participantID = "p_participant_id"
     }
 }
 
