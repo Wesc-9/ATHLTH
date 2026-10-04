@@ -5,16 +5,48 @@ struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
 
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingAIInsight = false
+    @State private var editingSetResult:
+        StrengthSetResultEditTarget?
+
+    private var resolvedStrengthWorkout:
+        StrengthWorkoutLog? {
+        guard let strengthWorkout else {
+            return nil
+        }
+
+        return strength.workoutHistory.first(
+            where: {
+                $0.id == strengthWorkout.id
+            }
+        ) ??
+        strengthWorkout
+    }
+
+    private var editableStrengthWorkout:
+        StrengthWorkoutLog? {
+        guard let strengthWorkout else {
+            return nil
+        }
+
+        return strength.workoutHistory.first(
+            where: {
+                $0.id == strengthWorkout.id
+            }
+        )
+    }
 
     private var muscleSummary:
         StrengthMuscleSessionSummary {
-        guard let strengthWorkout else {
+        guard let strengthWorkout =
+                resolvedStrengthWorkout
+        else {
             return .empty
         }
 
@@ -83,6 +115,10 @@ struct HomeActivityStrengthDetailView: View {
 
                 exercisesCard
 
+                if editableStrengthWorkout != nil {
+                    setResultsCard
+                }
+
                 coachCard
             }
             .padding(.horizontal, 16)
@@ -108,6 +144,37 @@ struct HomeActivityStrengthDetailView: View {
         )
         .task(id: workout.id) {
             await loadCoachInsight()
+        }
+        .sheet(
+            item: $editingSetResult
+        ) { target in
+            StrengthSetResultEditorView(
+                target: target
+            ) {
+                segments,
+                distanceMeters,
+                resistanceLevel in
+
+                guard let workout =
+                        editableStrengthWorkout
+                else {
+                    return
+                }
+
+                strength.updateCompletedSetResult(
+                    workoutID: workout.id,
+                    exerciseID:
+                        target.exerciseID,
+                    setID: target.set.id,
+                    segments: segments,
+                    distanceMeters:
+                        distanceMeters,
+                    resistanceLevel:
+                        resistanceLevel
+                )
+                editingSetResult = nil
+                aiInsight = nil
+            }
         }
     }
 
@@ -153,7 +220,7 @@ struct HomeActivityStrengthDetailView: View {
                 Spacer()
 
                 if let source =
-                    strengthWorkout?
+                    resolvedStrengthWorkout?
                         .captureDevice
                         .title {
                     Text(source)
@@ -596,6 +663,305 @@ struct HomeActivityStrengthDetailView: View {
         }
     }
 
+    private var setResultsCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Set details",
+                            norwegian: "Settdetaljer"
+                        )
+                    )
+                    .font(.headline.weight(.semibold))
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Tap a completed set to correct reps, load or machine result.",
+                            norwegian:
+                                "Trykk på et fullført sett for å rette repetisjoner, belastning eller maskinresultat."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+
+            if let strengthWorkout =
+                    editableStrengthWorkout {
+                ForEach(
+                    Array(
+                        strengthWorkout
+                            .exercises
+                            .enumerated()
+                    ),
+                    id: \.element.id
+                ) {
+                    exerciseIndex,
+                    exercise in
+
+                    if exerciseIndex > 0 {
+                        Divider()
+                            .opacity(0.55)
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        Text(
+                            exercise.exercise.name
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                        ForEach(
+                            exercise.sets.filter(
+                                \.isCompleted
+                            )
+                        ) { set in
+                            Button {
+                                editingSetResult =
+                                    StrengthSetResultEditTarget(
+                                        exerciseID:
+                                            exercise.id,
+                                        exerciseName:
+                                            exercise
+                                                .exercise
+                                                .name,
+                                        exercise:
+                                            exercise.exercise,
+                                        set: set
+                                    )
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(
+                                        "\(set.setNumber)"
+                                    )
+                                    .font(
+                                        .caption
+                                            .weight(.bold)
+                                    )
+                                    .frame(
+                                        width: 26,
+                                        height: 26
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .accentSoft,
+                                        in: Circle()
+                                    )
+
+                                    Text(
+                                        historySetSummary(
+                                            set
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "pencil"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                    )
+                                }
+                                .padding(.vertical, 3)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            ATHLTHTheme.card,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 1
+            )
+        }
+    }
+
+    private func historySetSummary(
+        _ set: StrengthSetLog
+    ) -> String {
+        if let segments =
+                set.effortSegments,
+           segments.count > 1 {
+            let parts =
+                segments.compactMap {
+                    segment -> String? in
+
+                    if let reps =
+                            segment.reps,
+                       let weight =
+                            segment.weightKilograms {
+                        return String(
+                            format:
+                                "%d × %.1f kg",
+                            reps,
+                            weight
+                        )
+                    }
+
+                    if let reps =
+                            segment.reps,
+                       let resistance =
+                            segment.resistanceLevel {
+                        return
+                            "\(reps) × " +
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "level \(resistance)",
+                                norwegian:
+                                    "steg \(resistance)"
+                            )
+                    }
+
+                    if let duration =
+                            segment.durationSeconds {
+                        return
+                            durationText(
+                                seconds:
+                                    TimeInterval(
+                                        duration
+                                    )
+                            )
+                    }
+
+                    return nil
+                }
+
+            if !parts.isEmpty {
+                return parts.joined(
+                    separator: " + "
+                )
+            }
+        }
+
+        var parts: [String] = []
+
+        if let duration =
+                set.resolvedCompletedDurationSeconds {
+            parts.append(
+                durationText(
+                    seconds:
+                        TimeInterval(duration)
+                )
+            )
+        } else if let reps =
+                    set.resolvedCompletedReps {
+            parts.append("\(reps) reps")
+        }
+
+        if set.resolvedLoadKind ==
+            .resistanceLevel,
+           let level =
+                set.completedResistanceLevel {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "level \(level)",
+                    norwegian:
+                        "steg \(level)"
+                )
+            )
+        } else if let weight =
+                    set.completedWeightKilograms {
+            parts.append(
+                String(
+                    format:
+                        "%.1f kg",
+                    weight
+                )
+            )
+        }
+
+        if let distance =
+                set.resolvedCompletedDistanceMeters,
+           distance > 0 {
+            parts.append(
+                String(
+                    format:
+                        "%.0f m",
+                    distance
+                )
+            )
+        }
+
+        return parts.isEmpty
+            ? ATHLTHLocalization.choose(
+                english: "Completed",
+                norwegian: "Fullført"
+            )
+            : parts.joined(
+                separator: " · "
+            )
+    }
+
+    private func durationText(
+        seconds: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+
+        if total >= 3_600 {
+            return String(
+                format:
+                    "%d:%02d:%02d",
+                total / 3_600,
+                (total % 3_600) / 60,
+                total % 60
+            )
+        }
+
+        return String(
+            format:
+                "%02d:%02d",
+            total / 60,
+            total % 60
+        )
+    }
+
     private var coachCard: some View {
         VStack(
             alignment: .leading,
@@ -717,7 +1083,7 @@ struct HomeActivityStrengthDetailView: View {
               session.hasPaidAccess,
               session
                 .aiHealthDataSharingEnabled,
-              strengthWorkout != nil
+              resolvedStrengthWorkout != nil
         else {
             return
         }
@@ -737,11 +1103,11 @@ struct HomeActivityStrengthDetailView: View {
                     workout
                         .activeEnergyKilocalories,
                 averageHeartRateBPM:
-                    strengthWorkout?
+                    resolvedStrengthWorkout?
                         .healthMetrics
                         .averageHeartRate,
                 maxHeartRateBPM:
-                    strengthWorkout?
+                    resolvedStrengthWorkout?
                         .healthMetrics
                         .maxHeartRate,
                 personalMaximumHeartRateBPM:
@@ -1204,7 +1570,7 @@ struct HomeActivityStrengthDetailView: View {
                 "Enable Coach health-data sharing in Settings to analyze this workout."
         }
 
-        if strengthWorkout == nil {
+        if resolvedStrengthWorkout == nil {
             return
                 "Detailed strength data is not available for this workout."
         }
