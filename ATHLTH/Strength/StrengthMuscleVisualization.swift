@@ -229,8 +229,10 @@ enum StrengthMuscleProfileBuilder {
             let meaningfulSets =
                 log.sets.filter {
                     $0.isCompleted ||
-                    $0.completedReps != nil ||
-                    $0.completedWeightKilograms != nil
+                    $0.resolvedCompletedReps != nil ||
+                    $0.completedWeightKilograms != nil ||
+                    $0.completedResistanceLevel != nil ||
+                    $0.resolvedCompletedDistanceMeters != nil
                 }
 
             let setCount: Int
@@ -314,7 +316,7 @@ enum StrengthMuscleProfileBuilder {
                     set in
                     partial +
                         (
-                            set.completedReps ??
+                            set.resolvedCompletedReps ??
                             set.plannedReps ??
                             0
                         )
@@ -326,14 +328,16 @@ enum StrengthMuscleProfileBuilder {
                 ) {
                     partial,
                     set in
+
+                    if set.isCompleted {
+                        return partial +
+                            set.volumeKilograms
+                    }
+
                     let reps =
-                        set.completedReps ??
-                        set.plannedReps ??
-                        0
+                        set.plannedReps ?? 0
                     let weight =
-                        set.completedWeightKilograms ??
-                        set.plannedWeightKilograms ??
-                        0
+                        set.plannedWeightKilograms ?? 0
 
                     guard reps > 0,
                           weight > 0
@@ -413,8 +417,10 @@ enum StrengthMuscleProfileBuilder {
                     $0.sets.contains(
                         where: {
                             $0.isCompleted ||
-                            $0.completedReps != nil ||
-                            $0.completedWeightKilograms != nil
+                            $0.resolvedCompletedReps != nil ||
+                            $0.completedWeightKilograms != nil ||
+                            $0.completedResistanceLevel != nil ||
+                            $0.resolvedCompletedDistanceMeters != nil
                         }
                     )
                 }
