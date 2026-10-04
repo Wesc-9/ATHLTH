@@ -5,6 +5,7 @@ struct HomeAssistantSettingsView: View {
         HomeAssistantConnectionStore
 
     @State private var manualAddress = ""
+    @State private var pairingCode = ""
     @State private var showingDisconnectConfirmation = false
 
     var body: some View {
@@ -578,6 +579,62 @@ struct HomeAssistantSettingsView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 10) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Pairing code",
+                        norwegian: "Paringskode"
+                    )
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "In Home Assistant, open Settings → Devices & services → ATHLTH → Configure. Enter the 6-digit code shown there.",
+                        norwegian:
+                            "I Home Assistant åpner du Innstillinger → Enheter og tjenester → ATHLTH → Konfigurer. Skriv inn den 6-sifrede koden som vises der."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                TextField(
+                    "000 000",
+                    text: $pairingCode
+                )
+                .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
+                .multilineTextAlignment(.center)
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .tracking(5)
+                .onChange(of: pairingCode) { _, value in
+                    let digits =
+                        value.filter(\.isNumber)
+                    pairingCode =
+                        String(
+                            digits.prefix(6)
+                        )
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 52)
+                .background(
+                    ATHLTHTheme.canvasTop,
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+            }
+
             if homeAssistant.discoveredInstances.isEmpty {
                 HStack(spacing: 11) {
                     Image(systemName: "dot.radiowaves.left.and.right")
@@ -605,7 +662,10 @@ struct HomeAssistantSettingsView: View {
                         id: \.element.id
                     ) { index, instance in
                         Button {
-                            homeAssistant.connect(to: instance)
+                            homeAssistant.pairLocally(
+                                to: instance,
+                                pairingCode: pairingCode
+                            )
                         } label: {
                             HStack(spacing: 13) {
                                 ZStack {
@@ -668,6 +728,10 @@ struct HomeAssistantSettingsView: View {
                             .padding(.vertical, 12)
                         }
                         .buttonStyle(.plain)
+                        .disabled(
+                            pairingCode.filter(\.isNumber).count != 6 ||
+                            homeAssistant.connectionState == .pairing
+                        )
 
                         if index <
                             homeAssistant.discoveredInstances.count - 1 {
@@ -678,19 +742,17 @@ struct HomeAssistantSettingsView: View {
                 }
             }
 
-            if !homeAssistant.isOAuthClientConfigured {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "OAuth client metadata must be published before sign-in can be enabled in a release build.",
-                        norwegian:
-                            "OAuth-klientmetadata må publiseres før innlogging kan aktiveres i en release-build."
-                    ),
-                    systemImage: "info.circle"
-                )
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-            }
+            Label(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Code pairing stays on your local network. Home Assistant sign-in is kept only as a fallback.",
+                    norwegian:
+                        "Kodeparing skjer på lokalnettet. Home Assistant-innlogging beholdes kun som reserve."
+                ),
+                systemImage: "lock.shield"
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .padding(18)
         .background(
@@ -713,9 +775,9 @@ struct HomeAssistantSettingsView: View {
             Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "Use this only if your Home Assistant instance is not discovered automatically.",
+                        "Use this only if your Home Assistant instance is not discovered automatically. The same 6-digit pairing code above is used.",
                     norwegian:
-                        "Bruk dette kun dersom Home Assistant ikke blir funnet automatisk."
+                        "Bruk dette kun dersom Home Assistant ikke blir funnet automatisk. Den samme 6-sifrede paringskoden over brukes."
                 )
             )
             .font(.caption)
@@ -739,14 +801,15 @@ struct HomeAssistantSettingsView: View {
             )
 
             Button {
-                homeAssistant.connectManually(
-                    address: manualAddress
+                homeAssistant.pairLocallyManually(
+                    address: manualAddress,
+                    pairingCode: pairingCode
                 )
             } label: {
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Continue",
-                        norwegian: "Fortsett"
+                        english: "Pair with code",
+                        norwegian: "Par med kode"
                     )
                 )
                 .font(.subheadline.weight(.semibold))
@@ -757,7 +820,36 @@ struct HomeAssistantSettingsView: View {
                 manualAddress.trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
-                .isEmpty
+                .isEmpty ||
+                pairingCode.filter(\.isNumber).count != 6 ||
+                homeAssistant.connectionState == .pairing
+            )
+
+            Button {
+                homeAssistant.connectManually(
+                    address: manualAddress
+                )
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Use Home Assistant sign-in instead",
+                        norwegian:
+                            "Bruk Home Assistant-innlogging i stedet"
+                    ),
+                    systemImage:
+                        "person.crop.circle.badge.checkmark"
+                )
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderless)
+            .disabled(
+                manualAddress.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty ||
+                !homeAssistant.isOAuthClientConfigured
             )
         }
         .padding(18)
@@ -782,9 +874,9 @@ struct HomeAssistantSettingsView: View {
             Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "You approve ATHLTH once in Home Assistant. The temporary OAuth token is used only to create the pairing and is then revoked. Normal updates use a signed webhook with a random secret stored in iOS Keychain.",
+                        "Home Assistant generates a one-time 6-digit code that expires after five minutes. ATHLTH exchanges it locally for a random per-device signing secret stored in iOS Keychain. The code is never used again. OAuth sign-in remains available as a fallback.",
                     norwegian:
-                        "Du godkjenner ATHLTH én gang i Home Assistant. Det midlertidige OAuth-tokenet brukes kun til å opprette paringen og blir deretter tilbakekalt. Vanlige oppdateringer sendes via en signert webhook med en tilfeldig nøkkel lagret i iOS Keychain."
+                        "Home Assistant genererer en 6-sifret engangskode som utløper etter fem minutter. ATHLTH bytter den lokalt mot en tilfeldig signeringsnøkkel for denne enheten som lagres i iOS Keychain. Koden brukes aldri igjen. OAuth-innlogging beholdes som reserve."
                 )
             )
             .font(.subheadline)
