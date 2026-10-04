@@ -127,7 +127,21 @@ struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
     let type: String
     let title: String?
     let message: String?
-    let data: [String: HomeAssistantJSONValue]? = nil
+    let data: [String: HomeAssistantJSONValue]?
+
+    init(
+        id: String,
+        type: String,
+        title: String? = nil,
+        message: String? = nil,
+        data: [String: HomeAssistantJSONValue]? = nil
+    ) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.message = message
+        self.data = data
+    }
 }
 
 private struct HomeAssistantWebhookResponse: Decodable {
