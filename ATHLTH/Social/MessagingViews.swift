@@ -1941,29 +1941,134 @@ struct DirectMessageThreadView: View {
 
     @ViewBuilder
     private func messagesView(_ conversationID: UUID) -> some View {
-        let messages = messaging.messages(in: conversationID)
+        let messages =
+            messaging.messages(
+                in: conversationID
+            )
+        let challenges =
+            pendingChallengesFromFriend
 
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    if messages.isEmpty {
-                        ContentUnavailableView(
-                            "Start the conversation",
-                            systemImage: "message",
-                            description: Text("Send a message or share a workout, plan, route or challenge.")
+                    if !challenges.isEmpty {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "REQUESTS",
+                                        norwegian:
+                                            "FORESPØRSLER"
+                                    )
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(1.5)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Text(
+                                "\(challenges.count)"
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .padding(
+                                .horizontal,
+                                7
+                            )
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                            .background(
+                                ATHLTHTheme
+                                    .accentSoft,
+                                in: Capsule()
+                            )
+
+                            Spacer()
+                        }
+                        .padding(
+                            .top,
+                            4
                         )
-                        .padding(.top, 80)
+
+                        ForEach(
+                            challenges
+                        ) { challenge in
+                            ThreadChallengeRequestCard(
+                                challenge:
+                                    challenge,
+                                onAccept: {
+                                    respondToThreadChallenge(
+                                        challenge,
+                                        accept:
+                                            true
+                                    )
+                                },
+                                onDecline: {
+                                    respondToThreadChallenge(
+                                        challenge,
+                                        accept:
+                                            false
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    if messages.isEmpty &&
+                        challenges.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Start the conversation",
+                                    norwegian:
+                                        "Start samtalen"
+                                ),
+                            systemImage:
+                                "message",
+                            description: Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Send a message or share a workout, plan, route or challenge.",
+                                        norwegian:
+                                            "Send en melding eller del en økt, plan, rute eller utfordring."
+                                    )
+                            )
+                        )
+                        .padding(
+                            .top,
+                            80
+                        )
                     }
 
                     ForEach(messages) { message in
                         MessageBubble(
                             message: message,
                             friend: friend,
-                            currentUserID: messaging.currentUserID,
+                            currentUserID:
+                                messaging
+                                    .currentUserID,
                             currentUserProfile:
                                 currentUserProfileCard,
                             onSaveAttachment: {
-                                saveAttachment(message)
+                                saveAttachment(
+                                    message
+                                )
                             }
                         )
                         .id(message.id)
@@ -1973,19 +2078,55 @@ struct DirectMessageThreadView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 8)
             }
-            .onChange(of: messages.count) { _, _ in
-                if let last = messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(last.id, anchor: .bottom)
+            .onChange(
+                of: messages.count
+            ) { _, _ in
+                if let last =
+                        messages.last {
+                    withAnimation(
+                        .easeOut(
+                            duration:
+                                0.2
+                        )
+                    ) {
+                        proxy.scrollTo(
+                            last.id,
+                            anchor:
+                                .bottom
+                        )
                     }
                 }
             }
             .task {
-                if let last = messages.last {
-                    proxy.scrollTo(last.id, anchor: .bottom)
+                if let last =
+                        messages.last,
+                   challenges.isEmpty {
+                    proxy.scrollTo(
+                        last.id,
+                        anchor:
+                            .bottom
+                    )
                 }
             }
         }
+    }
+
+    private var pendingChallengesFromFriend:
+        [ATHLTHChallenge] {
+        challengeStore
+            .incomingInvitations(
+                for:
+                    session.profile
+                        .userID
+            )
+            .filter {
+                $0.creatorID ==
+                    friend.userID
+            }
+            .sorted {
+                $0.createdAt >
+                    $1.createdAt
+            }
     }
 
     private var currentConversation: DirectConversationRecord? {
@@ -2292,6 +2433,71 @@ struct DirectMessageThreadView: View {
         }
     }
 
+    private func respondToThreadChallenge(
+        _ challenge: ATHLTHChallenge,
+        accept: Bool
+    ) {
+        guard
+            let participant =
+                challengeStore
+                    .invitationParticipant(
+                        in: challenge,
+                        userID:
+                            session.profile
+                                .userID
+                    )
+        else {
+            return
+        }
+
+        challengeStore
+            .setParticipantState(
+                challengeID:
+                    challenge.id,
+                participantID:
+                    participant.id,
+                state:
+                    accept
+                        ? .accepted
+                        : .declined
+            )
+
+        guard
+            let updated =
+                challengeStore.challenge(
+                    id:
+                        challenge.id
+                )
+        else {
+            return
+        }
+
+        Task {
+            let synced =
+                await social.syncChallenge(
+                    updated
+                )
+
+            if !synced {
+                challengeStore
+                    .setParticipantState(
+                        challengeID:
+                            challenge.id,
+                        participantID:
+                            participant.id,
+                        state:
+                            .invited
+                    )
+            } else {
+                await social
+                    .markChallengeInviteRead(
+                        challengeID:
+                            challenge.id
+                    )
+            }
+        }
+    }
+
     private func send() async {
         guard let conversationID, canSend else { return }
 
@@ -2364,6 +2570,196 @@ struct DirectMessageThreadView: View {
 
         case .none:
             break
+        }
+    }
+}
+
+private struct ThreadChallengeRequestCard: View {
+    let challenge: ATHLTHChallenge
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            NavigationLink {
+                ChallengeDetailView(
+                    challengeID:
+                        challenge.id
+                )
+            } label: {
+                HStack(spacing: 12) {
+                    Image(
+                        systemName:
+                            challenge.sport
+                                .systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 13,
+                            style:
+                                .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Challenge",
+                                    norwegian:
+                                        "Utfordring"
+                                )
+                        )
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .tracking(1)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(
+                            challenge.title
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .lineLimit(1)
+
+                        Text(
+                            challenge.sport
+                                .title +
+                            " · " +
+                            challenge.rules
+                                .scoring.title
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .caption.bold()
+                    )
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 9) {
+                Button(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Decline",
+                            norwegian:
+                                "Avslå"
+                        ),
+                    action:
+                        onDecline
+                )
+                .buttonStyle(.bordered)
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+
+                Button(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Accept",
+                            norwegian:
+                                "Godta"
+                        ),
+                    action:
+                        onAccept
+                )
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.98),
+                    ATHLTHTheme
+                        .cardWarm
+                        .opacity(0.92)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .premiumGold
+                    .opacity(0.18),
+                lineWidth: 0.9
+            )
         }
     }
 }
