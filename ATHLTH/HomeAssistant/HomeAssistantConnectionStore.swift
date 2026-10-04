@@ -357,7 +357,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
-    func disconnect() {
+    func disconnect() async {
+        if isConnected {
+            try? await send(event: "unpair")
+        }
+
         webAuthenticationSession?.cancel()
         webAuthenticationSession = nil
         browser?.cancel()
