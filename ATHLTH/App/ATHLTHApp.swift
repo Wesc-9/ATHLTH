@@ -832,8 +832,7 @@ struct AppRootView: View {
             }
 
             if phase != .active,
-               appSession.signedIn,
-               ATHLTHDeviceRole.isIPhone {
+               appSession.signedIn {
                 let userID = appSession.profile.userID
                 Task {
                     await trainingBackups.backUp(
@@ -1223,8 +1222,7 @@ struct AppRootView: View {
             runningWorkoutLibrary.switchAccount(userID)
         }
         .task(id: signedInUserID) {
-            guard ATHLTHDeviceRole.isIPhone,
-                  let userID =
+            guard let userID =
                     signedInUserID
             else {
                 return
