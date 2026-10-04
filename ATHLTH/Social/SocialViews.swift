@@ -2300,36 +2300,91 @@ struct FriendProfileView: View {
             social.isFollowedBy(userID)
 
         if social.isFollowing(userID) {
-            Button {
-                Task {
-                    followActionInProgress = true
-                    await social.unfollow(userID)
+            Menu {
+                Button(role: .destructive) {
+                    Task {
+                        followActionInProgress = true
+                        await social.unfollow(userID)
 
-                    if let error = social.errorMessage {
-                        followActionError = error
-                    } else {
-                        followOverview =
-                            await social
-                                .loadFollowOverview(
-                                    for: userID
-                                )
+                        if let error = social.errorMessage {
+                            followActionError = error
+                        } else {
+                            followOverview =
+                                await social
+                                    .loadFollowOverview(
+                                        for: userID
+                                    )
+                        }
+
+                        followActionInProgress = false
                     }
-
-                    followActionInProgress = false
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Unfollow",
+                            norwegian: "Slutt å følge"
+                        ),
+                        systemImage: "person.fill.xmark"
+                    )
                 }
             } label: {
-                profileActionLabel(
-                    title:
+                HStack(spacing: 7) {
+                    Image(systemName: "checkmark")
+                        .font(
+                            .system(
+                                size: 13,
+                                weight: .bold
+                            )
+                        )
+
+                    Text(
                         ATHLTHLocalization.choose(
-                            english: "Remove",
-                            norwegian: "Fjern"
-                        ),
-                    icon: "person.fill.xmark",
-                    tint: ATHLTHTheme.accentDeep,
-                    emphasized: true
+                            english: "Following",
+                            norwegian: "Følger"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .semibold
+                        )
+                    )
+                    .lineLimit(1)
+
+                    Image(systemName: "chevron.down")
+                        .font(
+                            .system(
+                                size: 9,
+                                weight: .bold
+                            )
+                        )
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(
+                    ATHLTHTheme.accentDeep,
+                    in: RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 17,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.10),
+                        lineWidth: 0.8
+                    )
+                }
+                .shadow(
+                    color: Color.black.opacity(0.035),
+                    radius: 8,
+                    y: 3
                 )
             }
-            .buttonStyle(.plain)
             .disabled(followActionInProgress)
         } else if relationship == .outgoingPending {
             profileActionLabel(
