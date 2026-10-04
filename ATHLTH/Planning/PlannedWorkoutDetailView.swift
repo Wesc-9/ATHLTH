@@ -52,6 +52,11 @@ struct PlannedWorkoutDetailView: View {
                     header
                     overviewCard
 
+                    if currentWorkout.kind == .running ||
+                        currentWorkout.kind == .walking {
+                        runGuidanceCard
+                    }
+
                     if !currentWorkout.exercises.isEmpty {
                         strengthCard
                     }
@@ -249,6 +254,298 @@ struct PlannedWorkoutDetailView: View {
                 }
             }
         }
+    }
+
+    private var runGuidanceCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack(spacing: 11) {
+                    Image(
+                        systemName:
+                            "waveform.and.mic"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .frame(
+                        width: 40,
+                        height: 40
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .premiumGoldSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Run guidance",
+                                norwegian:
+                                    "Løpeveiledning"
+                            )
+                        )
+                        .font(
+                            .headline
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "What will help you during this workout",
+                                norwegian:
+                                    "Hjelpen som følger deg gjennom økten"
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Edit",
+                            norwegian: "Rediger"
+                        )
+                    ) {
+                        showingEditor = true
+                    }
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .buttonStyle(.plain)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    plannedGuidanceTile(
+                        title: "Audio Coach",
+                        subtitle:
+                            currentWorkout
+                                .audioCoachConfiguration?
+                                .enabled ??
+                            settings
+                                .audioCoachEnabledByDefault
+                                ? ATHLTHLocalization.choose(
+                                    english: "On",
+                                    norwegian: "På"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Off",
+                                    norwegian: "Av"
+                                ),
+                        icon:
+                            "waveform.and.person.filled",
+                        active:
+                            currentWorkout
+                                .audioCoachConfiguration?
+                                .enabled ??
+                            settings
+                                .audioCoachEnabledByDefault
+                    )
+
+                    if currentWorkout.kind ==
+                        .running {
+                        plannedGuidanceTile(
+                            title: "Ghost",
+                            subtitle:
+                                ghostDetailText,
+                            icon:
+                                "figure.run.circle.fill",
+                            active:
+                                currentWorkout
+                                    .ghostTargetDurationSeconds != nil
+                        )
+
+                        plannedGuidanceTile(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english: "Route",
+                                    norwegian: "Rute"
+                                ),
+                            subtitle:
+                                routeGuardianDetailText,
+                            icon:
+                                "location.fill",
+                            active:
+                                (
+                                    currentWorkout
+                                        .routeAlertConfiguration ??
+                                    settings
+                                        .routeAlertConfiguration
+                                )
+                                .enabled &&
+                                currentWorkout
+                                    .routeID != nil
+                        )
+                    }
+                }
+
+                if let target =
+                        currentWorkout
+                            .targetAlertConfiguration,
+                   target.heartRateEnabled ||
+                    target.paceAlertsEnabled {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Live target alerts are configured",
+                            norwegian:
+                                "Live-mål og varsler er satt opp"
+                        ),
+                        systemImage:
+                            "scope"
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        .orange
+                    )
+                }
+            }
+        }
+    }
+
+    private var ghostDetailText:
+        String {
+        guard let seconds =
+                currentWorkout
+                    .ghostTargetDurationSeconds
+        else {
+            return ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+        }
+
+        return GhostTargetTimeFormatter
+            .string(seconds)
+    }
+
+    private var routeGuardianDetailText:
+        String {
+        guard currentWorkout.routeID != nil
+        else {
+            return ATHLTHLocalization.choose(
+                english: "No route",
+                norwegian: "Ingen rute"
+            )
+        }
+
+        let configuration =
+            currentWorkout
+                .routeAlertConfiguration ??
+            settings
+                .routeAlertConfiguration
+
+        return configuration.enabled
+            ? ATHLTHLocalization.format(
+                english: "%.0f m",
+                norwegian: "%.0f m",
+                configuration
+                    .deviationMeters
+            )
+            : ATHLTHLocalization.choose(
+                english: "Off",
+                norwegian: "Av"
+            )
+    }
+
+    private func plannedGuidanceTile(
+        title: String,
+        subtitle: String,
+        icon: String,
+        active: Bool
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 6
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                active
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .mutedText
+            )
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .semibold
+                    )
+                )
+                .lineLimit(1)
+
+            Text(subtitle)
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 72,
+            alignment: .leading
+        )
+        .padding(10)
+        .background(
+            active
+                ? ATHLTHTheme
+                    .vitalitySoft
+                    .opacity(0.70)
+                : Color.primary
+                    .opacity(0.035),
+            in: RoundedRectangle(
+                cornerRadius: 14,
+                style: .continuous
+            )
+        )
     }
 
     private var strengthCard: some View {
