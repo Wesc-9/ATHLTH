@@ -1135,152 +1135,336 @@ struct ChallengeCreationView: View {
     }
 
     private var creationHero: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let data =
-                        selectedCoverImageData,
-                   let image =
-                        UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ChallengeCoverArtworkView(
-                        sport: sport,
-                        artworkName:
-                            selectedCoverArtworkName,
-                        remoteURL: nil
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 15
+            ) {
+                HStack(
+                    alignment: .top,
+                    spacing: 14
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 6
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "CREATE CHALLENGE",
+                                norwegian:
+                                    "OPPRETT CHALLENGE"
+                            )
+                        )
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .tracking(2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Build the challenge.",
+                                norwegian:
+                                    "Bygg utfordringen."
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 29,
+                                weight: .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(
+                        systemName:
+                            sport.systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 27,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 62,
+                        height: 62
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitality,
+                        in: Circle()
                     )
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 160)
-            .clipped()
 
-            LinearGradient(
-                colors: [
-                    .clear,
-                    .clear,
-                    .black.opacity(0.34)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Choose activity, rules, participants and timing. ATHLTH keeps the setup compact and easy to review.",
+                        norwegian:
+                            "Velg aktivitet, regler, deltakere og tidspunkt. ATHLTH holder oppsettet kompakt og enkelt å kontrollere."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
 
-            Label(
-                creationHeroLabel,
-                systemImage:
-                    sport.systemImage
-            )
-            .font(
-                .caption.weight(.semibold)
-            )
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                .ultraThinMaterial,
-                in: Capsule()
-            )
-            .padding(14)
-        }
-        .frame(height: 160)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.32),
-                lineWidth: 0.8
-            )
-        }
-        .overlay(
-            alignment: .topTrailing
-        ) {
-            HStack(spacing: 8) {
-                Menu {
-                    ForEach(
-                        challengeCoverArtworkOptions,
-                        id: \.self
-                    ) { artwork in
-                        Button {
-                            selectedCoverArtworkName =
-                                artwork
-                            selectedCoverImageData =
-                                nil
-                            selectedCoverPhoto =
-                                nil
-                            coverWasManuallySelected =
-                                true
-                        } label: {
-                            Label(
-                                artwork
-                                    .replacingOccurrences(
-                                        of: "Goal",
-                                        with: ""
-                                    ),
-                                systemImage:
-                                    selectedCoverArtworkName ==
-                                        artwork &&
-                                    selectedCoverImageData ==
-                                        nil
-                                        ? "checkmark.circle.fill"
-                                        : "photo"
+                HStack(spacing: 8) {
+                    creationHeroChip(
+                        title: sport.title,
+                        icon:
+                            sport.systemImage
+                    )
+
+                    creationHeroChip(
+                        title:
+                            effectiveScoring
+                                .title,
+                        icon:
+                            scoringIcon(
+                                effectiveScoring
+                            )
+                    )
+
+                    creationHeroChip(
+                        title:
+                            hasEnd
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Timed",
+                                    norwegian:
+                                        "Tidsbestemt"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Open",
+                                    norwegian:
+                                        "Åpen"
+                                ),
+                        icon:
+                            "calendar"
+                    )
+                }
+
+                ZStack(
+                    alignment:
+                        .bottomLeading
+                ) {
+                    Group {
+                        if let data =
+                                selectedCoverImageData,
+                           let image =
+                                UIImage(
+                                    data: data
+                                ) {
+                            Image(
+                                uiImage: image
+                            )
+                            .resizable()
+                            .scaledToFill()
+                        } else {
+                            ChallengeCoverArtworkView(
+                                sport: sport,
+                                artworkName:
+                                    selectedCoverArtworkName,
+                                remoteURL: nil
                             )
                         }
                     }
-                } label: {
-                    Image(
-                        systemName:
-                            "photo.stack.fill"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.white)
                     .frame(
-                        width: 36,
-                        height: 36
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 112)
+                    .clipped()
+
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            .black
+                                .opacity(0.44)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    Label(
+                        creationHeroLabel,
+                        systemImage:
+                            "photo.fill"
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(.white)
+                    .padding(
+                        .horizontal,
+                        10
+                    )
+                    .padding(
+                        .vertical,
+                        7
                     )
                     .background(
                         .ultraThinMaterial,
-                        in: Circle()
+                        in: Capsule()
+                    )
+                    .padding(10)
+                }
+                .frame(height: 112)
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white
+                            .opacity(0.52),
+                        lineWidth: 0.8
                     )
                 }
-
-                PhotosPicker(
-                    selection:
-                        $selectedCoverPhoto,
-                    matching: .images
+                .overlay(
+                    alignment:
+                        .topTrailing
                 ) {
-                    Image(
-                        systemName:
-                            "photo.badge.plus"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 36,
-                        height: 36
-                    )
-                    .background(
-                        .ultraThinMaterial,
-                        in: Circle()
-                    )
+                    HStack(spacing: 7) {
+                        Menu {
+                            ForEach(
+                                challengeCoverArtworkOptions,
+                                id: \.self
+                            ) { artwork in
+                                Button {
+                                    selectedCoverArtworkName =
+                                        artwork
+                                    selectedCoverImageData =
+                                        nil
+                                    selectedCoverPhoto =
+                                        nil
+                                    coverWasManuallySelected =
+                                        true
+                                } label: {
+                                    Label(
+                                        artwork
+                                            .replacingOccurrences(
+                                                of:
+                                                    "Goal",
+                                                with:
+                                                    ""
+                                            ),
+                                        systemImage:
+                                            selectedCoverArtworkName ==
+                                                artwork &&
+                                            selectedCoverImageData ==
+                                                nil
+                                                ? "checkmark.circle.fill"
+                                                : "photo"
+                                    )
+                                }
+                            }
+                        } label: {
+                            Image(
+                                systemName:
+                                    "photo.stack.fill"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .frame(
+                                width: 34,
+                                height: 34
+                            )
+                            .background(
+                                .ultraThinMaterial,
+                                in: Circle()
+                            )
+                        }
+
+                        PhotosPicker(
+                            selection:
+                                $selectedCoverPhoto,
+                            matching: .images
+                        ) {
+                            Image(
+                                systemName:
+                                    "photo.badge.plus"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .frame(
+                                width: 34,
+                                height: 34
+                            )
+                            .background(
+                                .ultraThinMaterial,
+                                in: Circle()
+                            )
+                        }
+                    }
+                    .padding(9)
                 }
             }
-            .padding(12)
         }
-        .shadow(
-            color:
-                Color.black.opacity(0.06),
-            radius: 12,
-            y: 5
+    }
+
+    private func creationHeroChip(
+        title: String,
+        icon: String
+    ) -> some View {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .caption
+                .weight(.semibold)
+        )
+        .foregroundStyle(
+            ATHLTHTheme
+                .primaryText
+        )
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .frame(
+            maxWidth: .infinity
+        )
+        .padding(
+            .horizontal,
+            8
+        )
+        .padding(
+            .vertical,
+            9
+        )
+        .background(
+            ATHLTHTheme
+                .surfaceSage
+                .opacity(0.72),
+            in: Capsule()
         )
     }
 
