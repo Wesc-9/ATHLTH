@@ -7286,19 +7286,36 @@ struct ChallengeDetailView: View {
         )
     }
 
-    private func rulesCard(_ challenge: ATHLTHChallenge) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Text("Rules")
-                    .font(.headline)
-                Spacer()
-                Label(
-                    challenge.rulesAreLocked ? "Locked" : "Locks at start",
-                    systemImage: challenge.rulesAreLocked ? "lock.fill" : "lock.open.fill"
+    private func rulesCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 0
+            ) {
+                challengeSectionHeader(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Rules",
+                            norwegian: "Regler"
+                        ),
+                    trailing:
+                        challenge.rulesAreLocked
+                            ? ATHLTHLocalization.choose(
+                                english: "Locked",
+                                norwegian: "Låst"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Locks at start",
+                                norwegian: "Låses ved start"
+                            ),
+                    trailingIcon:
+                        challenge.rulesAreLocked
+                            ? "lock.fill"
+                            : "lock.open.fill"
                 )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-            }
+                .padding(.bottom, 8)
 
             ruleRow("Scoring", challenge.rules.scoring.title)
             ruleRow("Verification", challenge.rules.verificationPolicy.title)
@@ -7432,9 +7449,8 @@ struct ChallengeDetailView: View {
             if let endsAt = challenge.rules.endsAt {
                 ruleRow("Ends", endsAt.formatted(date: .abbreviated, time: .shortened))
             }
+            }
         }
-        .padding()
-        .challengeCard()
     }
 
     private func meetupCard(
