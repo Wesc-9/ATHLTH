@@ -9623,7 +9623,7 @@ struct ATHLTHProfileView: View {
             // The pinned/immersive transition visually overlaps the content
             // with the hero, so this needs a little more breathing room than
             // the standard section spacing.
-            .padding(.top, 38)
+            .padding(.top, 56)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -10056,7 +10056,7 @@ struct ATHLTHProfileView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 5)
         .frame(maxWidth: .infinity)
-        .frame(height: 58)
+        .frame(height: 52)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
@@ -10125,7 +10125,7 @@ struct ATHLTHProfileView: View {
                                 ATHLTHTrophyCoreView(
                                     trophy:
                                         trophy,
-                                    size: 68
+                                    size: 46
                                 )
 
                                 Text(
@@ -10189,8 +10189,8 @@ struct ATHLTHProfileView: View {
                                     )
                                 }
                                 .frame(
-                                    width: 60,
-                                    height: 66
+                                    width: 44,
+                                    height: 50
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
@@ -10289,6 +10289,9 @@ struct ATHLTHProfileView: View {
                                     performanceStats,
                                 healthRecords:
                                     personalRecords
+                            )
+                            .environmentObject(
+                                strengthWorkout
                             )
                         } label: {
                             emptyRecordShowcaseCard
@@ -10690,7 +10693,11 @@ struct ATHLTHProfileView: View {
                     healthRecords:
                         personalRecords,
                     stats:
-                        performanceStats
+                        performanceStats,
+                    strengthRecords:
+                        strengthWorkout.personalRecords,
+                    strengthRepRecords:
+                        strengthWorkout.repPersonalRecords
                 )
             )
             .font(
