@@ -1,5 +1,48 @@
 import SwiftUI
 
+enum ProfileRecordGroup:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case running
+    case strength
+    case appleHealth
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .appleHealth:
+            return ATHLTHLocalization.choose(
+                english: "Other Apple Health",
+                norwegian: "Andre Apple Health"
+            )
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .running:
+            return "figure.run"
+        case .strength:
+            return "dumbbell.fill"
+        case .appleHealth:
+            return "heart.fill"
+        }
+    }
+}
+
 enum ProfileFeaturedRecordKind:
     String,
     CaseIterable,
@@ -13,6 +56,12 @@ enum ProfileFeaturedRecordKind:
     case fastestHalfMarathon
     case fastestMarathon
     case longestRun
+
+    case strengthHeaviestSet
+    case strengthEstimatedOneRM
+    case strengthWorkoutVolume
+    case strengthBestRepPR
+
     case longestRide
     case longestWalkOrHike
     case longestWorkout
@@ -32,7 +81,32 @@ enum ProfileFeaturedRecordKind:
 
     var id: String { rawValue }
 
-    var healthKind: HealthPersonalRecordKind {
+    var group: ProfileRecordGroup {
+        switch self {
+        case .fastest1K,
+             .fastestMile,
+             .fastest5K,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .fastestMarathon,
+             .longestRun:
+            return .running
+
+        case .strengthHeaviestSet,
+             .strengthEstimatedOneRM,
+             .strengthWorkoutVolume,
+             .strengthBestRepPR:
+            return .strength
+
+        case .longestRide,
+             .longestWalkOrHike,
+             .longestWorkout,
+             .mostActiveCalories:
+            return .appleHealth
+        }
+    }
+
+    var healthKind: HealthPersonalRecordKind? {
         switch self {
         case .fastest1K:
             return .fastest1K
@@ -56,6 +130,11 @@ enum ProfileFeaturedRecordKind:
             return .longestWorkout
         case .mostActiveCalories:
             return .mostActiveCalories
+        case .strengthHeaviestSet,
+             .strengthEstimatedOneRM,
+             .strengthWorkoutVolume,
+             .strengthBestRepPR:
+            return nil
         }
     }
 
@@ -95,6 +174,26 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Longest run",
                 norwegian: "Lengste løpetur"
+            )
+        case .strengthHeaviestSet:
+            return ATHLTHLocalization.choose(
+                english: "Heaviest set",
+                norwegian: "Tyngste sett"
+            )
+        case .strengthEstimatedOneRM:
+            return ATHLTHLocalization.choose(
+                english: "Estimated 1RM",
+                norwegian: "Estimert 1RM"
+            )
+        case .strengthWorkoutVolume:
+            return ATHLTHLocalization.choose(
+                english: "Best workout volume",
+                norwegian: "Høyeste øktvolum"
+            )
+        case .strengthBestRepPR:
+            return ATHLTHLocalization.choose(
+                english: "Best rep PR",
+                norwegian: "Beste repetisjons-PR"
             )
         case .longestRide:
             return ATHLTHLocalization.choose(
@@ -147,6 +246,23 @@ enum ProfileFeaturedRecordKind:
                 english: "Run",
                 norwegian: "Løp"
             )
+        case .strengthHeaviestSet:
+            return ATHLTHLocalization.choose(
+                english: "Heaviest",
+                norwegian: "Tyngst"
+            )
+        case .strengthEstimatedOneRM:
+            return "1RM"
+        case .strengthWorkoutVolume:
+            return ATHLTHLocalization.choose(
+                english: "Volume",
+                norwegian: "Volum"
+            )
+        case .strengthBestRepPR:
+            return ATHLTHLocalization.choose(
+                english: "Rep PR",
+                norwegian: "Rep-PR"
+            )
         case .longestRide:
             return ATHLTHLocalization.choose(
                 english: "Ride",
@@ -186,6 +302,14 @@ enum ProfileFeaturedRecordKind:
             return "flag.checkered"
         case .longestRun:
             return "point.topleft.down.to.point.bottomright.curvepath"
+        case .strengthHeaviestSet:
+            return "dumbbell.fill"
+        case .strengthEstimatedOneRM:
+            return "bolt.fill"
+        case .strengthWorkoutVolume:
+            return "chart.bar.fill"
+        case .strengthBestRepPR:
+            return "repeat"
         case .longestRide:
             return "figure.outdoor.cycle"
         case .longestWalkOrHike:
@@ -208,11 +332,19 @@ enum ProfileFeaturedRecordKind:
         case .fastest10K:
             return .orange
         case .fastestHalfMarathon:
-            return .indigo
+            return .pink
         case .fastestMarathon:
-            return ATHLTHTheme.premiumGold
+            return .indigo
         case .longestRun:
             return .purple
+        case .strengthHeaviestSet:
+            return .blue
+        case .strengthEstimatedOneRM:
+            return .green
+        case .strengthWorkoutVolume:
+            return .indigo
+        case .strengthBestRepPR:
+            return .orange
         case .longestRide:
             return .green
         case .longestWalkOrHike:
@@ -226,11 +358,14 @@ enum ProfileFeaturedRecordKind:
 
     func displayValue(
         healthRecords: [HealthPersonalRecord],
-        stats: ProfilePerformanceStats?
+        stats: ProfilePerformanceStats?,
+        strengthRecords: [StrengthPersonalRecord] = [],
+        strengthRepRecords: [StrengthRepPersonalRecord] = []
     ) -> String {
-        if let record = healthRecords.first(
-            where: { $0.kind == healthKind }
-        ) {
+        if let healthKind,
+           let record = healthRecords.first(
+                where: { $0.kind == healthKind }
+           ) {
             return record.formattedValue
         }
 
@@ -268,7 +403,57 @@ enum ProfileFeaturedRecordKind:
                     format: "%.2f km",
                     kilometers
                 )
-        default:
+
+        case .strengthHeaviestSet:
+            return strengthRecords
+                .filter {
+                    $0.kind == .heaviestSet
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .value ?? "—"
+
+        case .strengthEstimatedOneRM:
+            return strengthRecords
+                .filter {
+                    $0.kind ==
+                        .estimatedOneRepMax
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .value ?? "—"
+
+        case .strengthWorkoutVolume:
+            return strengthRecords
+                .filter {
+                    $0.kind == .workoutVolume
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .value ?? "—"
+
+        case .strengthBestRepPR:
+            return strengthRepRecords
+                .max {
+                    if $0.weightKilograms ==
+                        $1.weightKilograms {
+                        return $0.reps < $1.reps
+                    }
+                    return $0.weightKilograms <
+                        $1.weightKilograms
+                }?
+                .value ?? "—"
+
+        case .fastestMile,
+             .fastest10K,
+             .fastestHalfMarathon,
+             .longestRide,
+             .longestWalkOrHike,
+             .longestWorkout,
+             .mostActiveCalories:
             return "—"
         }
     }
@@ -289,14 +474,10 @@ enum ProfileFeaturedRecordKind:
                     )
                 }
 
-        // Keep the profile empty until the user explicitly chooses
-        // which personal records should be featured.
-        let source = decoded
-
         var seen:
             Set<ProfileFeaturedRecordKind> = []
         return Array(
-            source
+            decoded
                 .filter {
                     seen.insert($0).inserted
                 }
