@@ -9612,18 +9612,17 @@ struct ATHLTHProfileView: View {
         ) {
             profileHero
         } content: {
-            LazyVStack(spacing: 18) {
+            LazyVStack(spacing: 12) {
                 trophyCabinetSection
                 personalRecordsSection
                 gearSection
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            // Keep the first profile card clear of the four hero stat cells.
-            // The pinned/immersive transition visually overlaps the content
-            // with the hero, so this needs a little more breathing room than
-            // the standard section spacing.
-            .padding(.top, 168)
+            // The rounded content sheet starts 38 pt into the hero. Keep only
+            // enough breathing room to clear the four stat cells so the first
+            // section sits directly beneath the hero, matching the profile spec.
+            .padding(.top, 50)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -9886,12 +9885,12 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
-        .frame(height: 300)
+        .frame(height: 236)
         .clipped()
     }
 
     private var heroStatRow: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 6) {
             NavigationLink {
                 ProfileFollowListView(
                     mode: .followers
@@ -10015,16 +10014,16 @@ struct ATHLTHProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 10.5,
+                            size: 11.5,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 13)
+                    .frame(width: 14)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 12,
+                            size: 14,
                             weight: .bold,
                             design: .rounded
                         )
@@ -10041,7 +10040,7 @@ struct ATHLTHProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 7.4,
+                        size: 9,
                         weight: .medium
                     )
                 )
@@ -10054,19 +10053,19 @@ struct ATHLTHProfileView: View {
                 )
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 1)
+        .padding(.horizontal, 2)
         .frame(maxWidth: .infinity)
-        .frame(height: 36)
+        .frame(height: 46)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 13,
+                cornerRadius: 16,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 12,
+                cornerRadius: 16,
                 style: .continuous
             )
             .stroke(
@@ -10659,34 +10658,40 @@ struct ATHLTHProfileView: View {
             alignment: .leading,
             spacing: 4
         ) {
-            HStack(spacing: 4) {
-                Image(
-                    systemName: kind.icon
+            Image(
+                systemName: kind.icon
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight: .semibold
                 )
+            )
+            .foregroundStyle(kind.tint)
+            .frame(
+                width: 24,
+                height: 24
+            )
+            .background(
+                kind.tint.opacity(0.11),
+                in: RoundedRectangle(
+                    cornerRadius: 8,
+                    style: .continuous
+                )
+            )
+
+            Text(kind.title)
                 .font(
                     .system(
-                        size: 11,
+                        size: 8.2,
                         weight: .semibold
                     )
                 )
-                .foregroundStyle(kind.tint)
-
-                Text(kind.shortTitle)
-                    .font(
-                        .system(
-                            size: 8.5,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.65
-                    )
-            }
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
 
             Text(
                 kind.displayValue(
@@ -10702,7 +10707,7 @@ struct ATHLTHProfileView: View {
             )
             .font(
                 .system(
-                    size: 13,
+                    size: 13.5,
                     weight: .bold,
                     design: .rounded
                 )
@@ -10712,25 +10717,18 @@ struct ATHLTHProfileView: View {
                 ATHLTHTheme.primaryText
             )
             .lineLimit(1)
-            .minimumScaleFactor(0.62)
+            .minimumScaleFactor(0.58)
         }
-        .padding(7)
+        .padding(8)
         .frame(
             maxWidth: .infinity,
-            minHeight: 58,
-            alignment: .leading
+            minHeight: 72,
+            alignment: .topLeading
         )
         .background(
-            LinearGradient(
-                colors: [
-                    kind.tint.opacity(0.065),
-                    Color.white.opacity(0.72)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
+            Color.black.opacity(0.018),
             in: RoundedRectangle(
-                cornerRadius: 14,
+                cornerRadius: 16,
                 style: .continuous
             )
         )
@@ -10741,7 +10739,7 @@ struct ATHLTHProfileView: View {
             )
             .stroke(
                 kind.tint.opacity(0.09),
-                lineWidth: 1
+                lineWidth: 0.8
             )
         }
     }
