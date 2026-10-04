@@ -5653,6 +5653,12 @@ struct ChallengeCreationView: View {
                                 ? "Allowed"
                                 : "Disabled"
                         )
+                        reviewRow(
+                            "Live Ghost",
+                            allowLiveGhost
+                                ? "Allowed"
+                                : "Disabled"
+                        )
                     }
                 } else {
                     reviewRow("Course", "Run Anywhere")
@@ -9043,8 +9049,20 @@ struct ChallengeDetailView: View {
                         ? "Allowed"
                         : "Disabled by creator"
                 )
+                ruleRow(
+                    "Live Ghost",
+                    challenge.rules.liveGhostAllowed
+                        ? "Allowed"
+                        : "Disabled by creator"
+                )
             } else if challenge.sport == .running {
                 ruleRow("Course", "Run Anywhere")
+                ruleRow(
+                    "Live Ghost",
+                    challenge.rules.liveGhostAllowed
+                        ? "Allowed"
+                        : "Disabled by creator"
+                )
 
                 if let tolerance =
                     challenge.rules.distanceTolerancePercent,
