@@ -648,6 +648,389 @@ struct MessageInboxView: View {
 
 }
 
+private struct MessagePersonInboxItem: Identifiable {
+    var id: UUID { friend.userID }
+
+    let friend: SocialProfileCard
+    var conversation: DirectConversationRecord?
+    var lastMessage: DirectMessageRecord?
+    var unreadCount = 0
+    var isPinned = false
+    var isIncomingMessageRequest = false
+    var isOutgoingMessageRequest = false
+    var pendingChallenges: [ATHLTHChallenge] = []
+
+    init(friend: SocialProfileCard) {
+        self.friend = friend
+    }
+
+    mutating func merge(
+        conversation: DirectConversationRecord,
+        lastMessage: DirectMessageRecord?,
+        unreadCount: Int,
+        isPinned: Bool,
+        isIncomingMessageRequest: Bool,
+        isOutgoingMessageRequest: Bool
+    ) {
+        let currentDate =
+            self.conversation?.lastMessageAt ??
+            self.conversation?.createdAt ??
+            .distantPast
+        let candidateDate =
+            conversation.lastMessageAt ??
+            conversation.createdAt
+
+        if self.conversation == nil ||
+            candidateDate >= currentDate {
+            self.conversation = conversation
+            self.lastMessage = lastMessage
+        }
+
+        self.unreadCount =
+            max(
+                self.unreadCount,
+                unreadCount
+            )
+        self.isPinned =
+            self.isPinned || isPinned
+        self.isIncomingMessageRequest =
+            self.isIncomingMessageRequest ||
+            isIncomingMessageRequest
+        self.isOutgoingMessageRequest =
+            self.isOutgoingMessageRequest ||
+            isOutgoingMessageRequest
+    }
+
+    var needsResponse: Bool {
+        isIncomingMessageRequest ||
+            !pendingChallenges.isEmpty
+    }
+
+    var latestActivityAt: Date {
+        var dates: [Date] = []
+
+        if let lastMessage {
+            dates.append(
+                lastMessage.createdAt
+            )
+        } else if let conversation {
+            dates.append(
+                conversation.lastMessageAt ??
+                conversation.createdAt
+            )
+        }
+
+        dates.append(
+            contentsOf:
+                pendingChallenges.map(
+                    \.createdAt
+                )
+        )
+
+        return dates.max() ??
+            .distantPast
+    }
+}
+
+private struct MessagePersonRow: View {
+    let item: MessagePersonInboxItem
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack(alignment: .bottomTrailing) {
+                SocialAvatar(
+                    profile: item.friend,
+                    size: 58
+                )
+
+                if item.unreadCount > 0 ||
+                    item.needsResponse {
+                    Circle()
+                        .fill(
+                            item.needsResponse
+                                ? ATHLTHTheme
+                                    .premiumGold
+                                : ATHLTHTheme
+                                    .accentDeep
+                        )
+                        .frame(
+                            width: 12,
+                            height: 12
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                }
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                HStack(spacing: 7) {
+                    Text(
+                        item.friend
+                            .resolvedName
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                    if item.isPinned {
+                        Image(
+                            systemName:
+                                "pin.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                    }
+
+                    Spacer()
+                }
+
+                Text(previewText)
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(2)
+
+                if !statusChips.isEmpty {
+                    HStack(
+                        spacing: 6
+                    ) {
+                        ForEach(
+                            statusChips,
+                            id: \.self
+                        ) { chip in
+                            Text(chip)
+                                .font(
+                                    .system(
+                                        size: 10,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+                                .padding(
+                                    .horizontal,
+                                    8
+                                )
+                                .padding(
+                                    .vertical,
+                                    4
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .accentSoft,
+                                    in: Capsule()
+                                )
+                        }
+                    }
+                }
+            }
+
+            VStack(
+                alignment: .trailing,
+                spacing: 10
+            ) {
+                if item.latestActivityAt >
+                    .distantPast {
+                    Text(
+                        inboxTimestamp(
+                            item.latestActivityAt
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                if item.unreadCount > 0 {
+                    Text(
+                        item.unreadCount > 99
+                            ? "99+"
+                            : "\(item.unreadCount)"
+                    )
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                            .monospacedDigit()
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                    .frame(
+                        minWidth: 24,
+                        minHeight: 24
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .accentDeep,
+                        in: Capsule()
+                    )
+                } else {
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 12,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                            .opacity(0.65)
+                    )
+                }
+            }
+        }
+        .padding(15)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.96),
+                    ATHLTHTheme.cardWarm
+                        .opacity(
+                            item.needsResponse
+                                ? 0.96
+                                : 0.80
+                        )
+                ],
+                startPoint: .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                item.needsResponse
+                    ? ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.22)
+                    : Color.white
+                        .opacity(0.92),
+                lineWidth: 0.9
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.045),
+            radius: 14,
+            y: 6
+        )
+    }
+
+    private var previewText: String {
+        if item.pendingChallenges.count > 1 {
+            return
+                "\(item.pendingChallenges.count) utfordringer venter"
+        }
+
+        if let challenge =
+                item.pendingChallenges.first {
+            return challenge.title
+        }
+
+        if let body =
+                item.lastMessage?.body,
+           !body.isEmpty {
+            return body
+        }
+
+        if let title =
+                item.lastMessage?
+                    .attachmentTitle,
+           !title.isEmpty {
+            return title
+        }
+
+        if item.isIncomingMessageRequest {
+            return "Meldingsforespørsel"
+        }
+
+        if item.isOutgoingMessageRequest {
+            return "Venter på svar"
+        }
+
+        return "Start en samtale"
+    }
+
+    private var statusChips: [String] {
+        var values: [String] = []
+
+        if !item
+            .pendingChallenges
+            .isEmpty {
+            values.append(
+                item.pendingChallenges
+                    .count == 1
+                    ? "Utfordring"
+                    : "\(item.pendingChallenges.count) utfordringer"
+            )
+        }
+
+        if item
+            .isIncomingMessageRequest {
+            values.append(
+                "Meldingsforespørsel"
+            )
+        } else if item
+            .isOutgoingMessageRequest {
+            values.append(
+                "Venter"
+            )
+        }
+
+        return values
+    }
+}
+
 private struct ChallengeInboxRequestRow: View {
     let challenge: ATHLTHChallenge
     let creator: SocialProfileCard?
