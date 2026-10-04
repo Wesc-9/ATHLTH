@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 type InboxEvent = {
   id: string;
   recipient_id: string;
+  actor_id: string | null;
   kind: string;
   title: string;
   message: string;
@@ -135,16 +136,36 @@ function preferenceAllows(
 }
 
 function threadID(event: InboxEvent): string {
+  if (event.actor_id) {
+    return `person:${event.actor_id}`;
+  }
+
   if (event.entity_type && event.entity_id) {
     return `${event.entity_type}:${event.entity_id}`;
   }
+
   return event.kind;
 }
 
 function localizedAlert(
   event: InboxEvent,
   languageCode: string | null | undefined,
+  actorName?: string | null,
+  actorUnreadCount = 1,
 ): { title: string; body: string } {
+  if (actorName && actorUnreadCount > 1) {
+    if (languageCode === "nb") {
+      return {
+        title: actorName,
+        body: `${actorName} sendte deg ${actorUnreadCount} nye ting.`,
+      };
+    }
+
+    return {
+      title: actorName,
+      body: `${actorName} sent you ${actorUnreadCount} new items.`,
+    };
+  }
   if (languageCode !== "nb") {
     return {
       title: event.title,
@@ -190,6 +211,30 @@ function localizedAlert(
       body = body.replace(
         " challenged you: ",
         " utfordret deg: ",
+      );
+      break;
+
+    case "challenge_accepted":
+      title = "Challenge godtatt";
+      body = body.replace(
+        " accepted ",
+        " godtok ",
+      );
+      break;
+
+    case "challenge_declined":
+      title = "Challenge avslått";
+      body = body.replace(
+        " declined ",
+        " avslo ",
+      );
+      break;
+
+    case "challenge_withdrawn":
+      title = "Challenge trukket tilbake";
+      body = body.replace(
+        " withdrew ",
+        " trakk tilbake ",
       );
       break;
 
@@ -371,6 +416,8 @@ async function sendToDevice(
   event: InboxEvent,
   unreadCount: number,
   authToken: string,
+  actorName?: string | null,
+  actorUnreadCount = 1,
 ): Promise<{
   deviceID: string;
   ok: boolean;
@@ -385,6 +432,8 @@ async function sendToDevice(
   const alert = localizedAlert(
     event,
     device.language_code,
+    actorName,
+    actorUnreadCount,
   );
 
   const payload = {
@@ -411,7 +460,7 @@ async function sendToDevice(
         "apns-push-type": "alert",
         "apns-priority": "10",
         "apns-expiration": "0",
-        "apns-collapse-id": event.id,
+        "apns-collapse-id": event.actor_id ?? event.id,
         "content-type": "application/json",
       },
       body: JSON.stringify(payload),
@@ -492,7 +541,7 @@ Deno.serve(async (req: Request) => {
   const { data: event, error: eventError } = await admin
     .from("social_inbox_events")
     .select(
-      "id,recipient_id,kind,title,message,entity_type,entity_id,push_notified_at",
+      "id,recipient_id,actor_id,kind,title,message,entity_type,entity_id,push_notified_at",
     )
     .eq("id", eventID)
     .maybeSingle<InboxEvent>();
@@ -525,6 +574,32 @@ Deno.serve(async (req: Request) => {
       .eq("id", event.id);
 
     return json({ ok: true, skipped: "user_preference" });
+  }
+
+  let actorUnreadCount = 1;
+  let actorName: string | null = null;
+
+  if (event.actor_id) {
+    const [{ count: sameActorCount }, { data: actorProfile }] =
+      await Promise.all([
+        admin
+          .from("social_inbox_events")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_id", event.recipient_id)
+          .eq("actor_id", event.actor_id)
+          .is("read_at", null),
+        admin
+          .from("social_profile_cards")
+          .select("display_name,username")
+          .eq("user_id", event.actor_id)
+          .maybeSingle<{ display_name: string | null; username: string | null }>(),
+      ]);
+
+    actorUnreadCount = Math.max(sameActorCount ?? 1, 1);
+    actorName =
+      actorProfile?.display_name?.trim() ||
+      actorProfile?.username?.trim() ||
+      null;
   }
 
   const { data: devices, error: deviceError } = await admin
@@ -567,6 +642,8 @@ Deno.serve(async (req: Request) => {
         event,
         Math.max(count ?? 1, 1),
         token,
+        actorName,
+        actorUnreadCount,
       )
     ),
   );
