@@ -886,6 +886,9 @@ struct HomePersonalRecentActivitySection:
 
 private struct HomePersonalHorizontalWorkoutCard:
     View {
+    @EnvironmentObject private var exerciseLibrary:
+        ExerciseLibraryStore
+
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
@@ -961,8 +964,43 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
                     .lineLimit(1)
 
-                if let exerciseNames,
-                   !exerciseNames.isEmpty {
+                if let muscleFocusText {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "figure.strengthtraining.traditional"
+                        )
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .semibold
+                            )
+                        )
+
+                        Text(muscleFocusText)
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight: .semibold
+                                )
+                            )
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(
+                        strengthAccent
+                    )
+                    .padding(
+                        .horizontal,
+                        7
+                    )
+                    .frame(height: 22)
+                    .background(
+                        strengthAccent
+                            .opacity(0.09),
+                        in: Capsule()
+                    )
+                } else if let exerciseNames,
+                          !exerciseNames.isEmpty {
                     Text(exerciseNames)
                         .font(
                             .system(
@@ -1008,18 +1046,126 @@ private struct HomePersonalHorizontalWorkoutCard:
         }
     }
 
-    private var detailText: String {
-        if workout.activity == .strength,
-           let strengthWorkout {
-            let count =
-                strengthWorkout.exercises
-                    .filter {
-                        $0.isCompleted ||
-                        $0.sets.contains {
-                            $0.isCompleted
+    private var strengthSummary:
+        StrengthMuscleSessionSummary {
+        guard let strengthWorkout else {
+            return .empty
+        }
+
+        return StrengthMuscleProfileBuilder
+            .make(
+                workout:
+                    strengthWorkout,
+                library:
+                    exerciseLibrary
+                        .allExercises
+            )
+    }
+
+    private var strengthAccent:
+        Color {
+        Color(
+            red: 0.91,
+            green: 0.33,
+            blue: 0.22
+        )
+    }
+
+    private var muscleFocusText:
+        String? {
+        var titles: [String] = []
+
+        for activation in
+            strengthSummary
+                .profile
+                .topActivations {
+            let title =
+                activation
+                    .region
+                    .activityDisplayTitle
+
+            guard !titles.contains(
+                title
+            )
+            else {
+                continue
+            }
+
+            titles.append(title)
+
+            if titles.count == 3 {
+                break
+            }
+        }
+
+        if titles.isEmpty,
+           let rawGroups =
+                workout
+                    .strengthMuscleGroups {
+            for raw in rawGroups {
+                let regions =
+                    StrengthMuscleResolver
+                        .regions(
+                            for: raw
+                        )
+
+                if regions.isEmpty {
+                    let clean =
+                        raw.trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                    if !clean.isEmpty,
+                       !titles.contains(clean) {
+                        titles.append(clean)
+                    }
+                } else {
+                    for region in regions {
+                        let title =
+                            region
+                                .activityDisplayTitle
+
+                        if !titles.contains(
+                            title
+                        ) {
+                            titles.append(
+                                title
+                            )
+                        }
+
+                        if titles.count == 3 {
+                            break
                         }
                     }
-                    .count
+                }
+
+                if titles.count == 3 {
+                    break
+                }
+            }
+        }
+
+        guard !titles.isEmpty else {
+            return nil
+        }
+
+        return titles.joined(
+            separator: " · "
+        )
+    }
+
+    private var detailText: String {
+        if workout.activity == .strength {
+            let count =
+                max(
+                    strengthSummary
+                        .exercises
+                        .count,
+                    workout
+                        .strengthExerciseCount ??
+                    0
+                )
 
             if count > 0 {
                 return ATHLTHLocalization.format(
