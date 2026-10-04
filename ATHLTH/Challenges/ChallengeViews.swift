@@ -6304,7 +6304,7 @@ struct ChallengeDetailView: View {
         Group {
             if let challenge {
                 ScrollView {
-                    VStack(spacing: 18) {
+                    LazyVStack(spacing: 18) {
                         detailHero(challenge)
 
                         if currentParticipant?.state == .invited {
@@ -6349,25 +6349,52 @@ struct ChallengeDetailView: View {
                             Button {
                                 showingManualStrengthAttempt = true
                             } label: {
-                                Label("Submit Manual Strength Result", systemImage: "hand.tap.fill")
-                                    .frame(maxWidth: .infinity)
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Submit Manual Strength Result",
+                                        norwegian: "Registrer styrkeresultat"
+                                    ),
+                                    systemImage: "hand.tap.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.accent)
+                            .tint(ATHLTHTheme.vitality)
+                            .controlSize(.large)
                         }
 
                         if challenge.creatorID == session.profile.userID &&
                            challenge.status != .completed &&
                            challenge.status != .cancelled {
-                            Button("Cancel Challenge", role: .destructive) {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english: "Cancel Challenge",
+                                    norwegian: "Avlys challenge"
+                                ),
+                                role: .destructive
+                            ) {
                                 showingCancel = true
                             }
                             .font(.caption.weight(.semibold))
                         }
                     }
                     .padding()
+                    .padding(.bottom, 36)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
                 }
-                .background(Color(.systemGroupedBackground).ignoresSafeArea())
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.canvasTop,
+                            ATHLTHTheme.canvasBottom
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                )
                 .navigationTitle("Challenge")
                 .navigationBarTitleDisplayMode(.inline)
                 .task {
