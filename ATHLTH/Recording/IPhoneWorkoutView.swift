@@ -1685,6 +1685,8 @@ struct IPhoneWorkoutView: View {
                             lineWidth: 0.7
                         )
                 }
+
+                ATHLTHAudioRouteControl()
             }
 
             Text(workout.title)
