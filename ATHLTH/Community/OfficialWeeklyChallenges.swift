@@ -181,6 +181,14 @@ private struct OfficialWeeklyChallengeShiftParams: Encodable {
     }
 }
 
+private struct OfficialWeeklyChallengeHorizonParams: Encodable {
+    let weeksAhead: Int
+
+    enum CodingKeys: String, CodingKey {
+        case weeksAhead = "p_weeks_ahead"
+    }
+}
+
 private struct OfficialWeeklyChallengeCompletionUpdate: Encodable {
     let completedAt: Date?
     let completionValue: Double
@@ -226,7 +234,10 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             .sorted { $0.startsAt < $1.startsAt }
     }
 
-    func refresh(force: Bool = false) async {
+    func refresh(
+        force: Bool = false,
+        ensureYearAheadSchedule: Bool = true
+    ) async {
         guard client.auth.currentUser != nil else {
             challenges = []
             participants = []
@@ -244,6 +255,10 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
 
         isLoading = true
         defer { isLoading = false }
+
+        if ensureYearAheadSchedule {
+            await maintainYearAheadSchedule()
+        }
 
         do {
             async let challengeQuery: [OfficialWeeklyChallenge] = client
@@ -273,6 +288,27 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         } catch {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func maintainYearAheadSchedule() async {
+        guard client.auth.currentUser != nil else {
+            return
+        }
+
+        do {
+            try await client
+                .rpc(
+                    "ensure_official_weekly_challenge_horizon",
+                    params:
+                        OfficialWeeklyChallengeHorizonParams(
+                            weeksAhead: 52
+                        )
+                )
+                .execute()
+        } catch {
+            // The challenge list itself remains usable if the maintenance
+            // RPC is temporarily unavailable. A later refresh retries it.
         }
     }
 
@@ -556,7 +592,10 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
                 .eq("id", value: challenge.id)
                 .execute()
 
-            await refresh(force: true)
+            await refresh(
+                force: true,
+                ensureYearAheadSchedule: false
+            )
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -3511,8 +3550,10 @@ struct OfficialWeeklyChallengeAdminListView: View {
                     } footer: {
                         Text(
                             ATHLTHLocalization.choose(
-                                english: "Ready-made ideas for seasons, holidays and special weeks.",
-                                norwegian: "Ferdige ideer for årstider, høytider og spesielle uker."
+                                english:
+                                    "ATHLTH automatically keeps 52 weeks scheduled ahead. The rotation repeats every year, while manual or AI challenges can replace individual weeks.",
+                                norwegian:
+                                    "ATHLTH holder automatisk 52 uker planlagt fremover. Rotasjonen gjentas hvert år, mens manuelle eller AI-lagde challenges kan erstatte enkeltuker."
                             )
                         )
                     }
@@ -3612,7 +3653,13 @@ struct OfficialWeeklyChallengeAdminListView: View {
                         deleteAndShiftForward()
                     }
 
-                    Button("Delete and leave gap", role: .destructive) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Delete & use annual rotation",
+                            norwegian: "Slett og bruk årsrotasjon"
+                        ),
+                        role: .destructive
+                    ) {
                         deleteOnly()
                     }
 
@@ -3738,7 +3785,15 @@ struct OfficialWeeklyChallengeAdminListView: View {
         isWorking = true
 
         Task {
-            _ = await store.delete(challenge)
+            if await store.delete(challenge) {
+                await store
+                    .maintainYearAheadSchedule()
+                await store.refresh(
+                    force: true,
+                    ensureYearAheadSchedule:
+                        false
+                )
+            }
             isWorking = false
         }
     }
