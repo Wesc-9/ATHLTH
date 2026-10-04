@@ -8486,9 +8486,9 @@ struct ProfileRecordShowcasePickerView:
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 8
+            spacing: 6
         ) {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(
                     systemName:
                         group.icon
@@ -8524,7 +8524,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 8,
+                        size: 7.2,
                         weight: .bold
                     )
                 )
@@ -8538,8 +8538,8 @@ struct ProfileRecordShowcasePickerView:
                 columns: [
                     GridItem(
                         .adaptive(
-                            minimum: 78,
-                            maximum: 98
+                            minimum: 70,
+                            maximum: 86
                         ),
                         spacing: 5
                     )
@@ -8603,7 +8603,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 10,
+                            size: 9,
                             weight:
                                 .semibold
                         )
@@ -8612,8 +8612,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 22,
-                        height: 22
+                        width: 19,
+                        height: 19
                     )
                     .background(
                         kind.tint
@@ -8641,8 +8641,8 @@ struct ProfileRecordShowcasePickerView:
                                     : 1.2
                             )
                             .frame(
-                                width: 18,
-                                height: 18
+                                width: 16,
+                                height: 16
                             )
 
                         if isSelected {
@@ -8652,8 +8652,8 @@ struct ProfileRecordShowcasePickerView:
                                         .accentDeep
                                 )
                                 .frame(
-                                    width: 22,
-                                    height: 22
+                                    width: 19,
+                                    height: 19
                                 )
 
                             Image(
@@ -8662,7 +8662,7 @@ struct ProfileRecordShowcasePickerView:
                             )
                             .font(
                                 .system(
-                                    size: 10,
+                                    size: 8,
                                     weight:
                                         .bold
                                 )
@@ -8677,7 +8677,7 @@ struct ProfileRecordShowcasePickerView:
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 7.8,
+                            size: 7.1,
                             weight: .semibold
                         )
                     )
@@ -8697,7 +8697,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 13,
+                        size: 12,
                         weight: .bold,
                         design: .rounded
                     )
@@ -8735,7 +8735,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 7.1,
+                        size: 6.5,
                         weight: .medium
                     )
                 )
@@ -8747,10 +8747,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(6)
+            .padding(5)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 72,
+                minHeight: 62,
                 alignment: .topLeading
             )
             .background(
@@ -8775,14 +8775,14 @@ struct ProfileRecordShowcasePickerView:
                 ),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 15,
+                        cornerRadius: 13,
                         style:
                             .continuous
                     )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 15,
+                    cornerRadius: 13,
                     style:
                         .continuous
                 )
