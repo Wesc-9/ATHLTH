@@ -2862,6 +2862,9 @@ struct DirectMessageThreadView: View {
                 challengeStore:
                     challengeStore
             )
+            await social.markChallengeEventsRead(
+                from: friend.userID
+            )
             conversationID = id
             markLocalMessageNotificationsRead(conversationID: id)
 
