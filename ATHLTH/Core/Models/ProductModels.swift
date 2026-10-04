@@ -653,10 +653,18 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var spotifyPlaylist: SpotifyPlaylistReference? = nil
     var spotifyAutoplayOnStart: Bool? = nil
 
-    // Optional per-workout live target alerts. Route-deviation alerts stay
-    // global in Settings; heart-rate / pace targets belong to the workout.
+    // Optional per-workout live target alerts.
     var targetAlertConfiguration:
         WatchWorkoutTargetAlertConfiguration? = nil
+
+    // Optional per-workout running guidance. Nil keeps backwards-compatible
+    // inheritance from global Workout Guidance settings.
+    var routeAlertConfiguration:
+        WatchRouteAlertConfiguration? = nil
+    var ghostTargetDurationSeconds:
+        TimeInterval? = nil
+    var ghostUpdates:
+        WatchGhostRaceAudioConfiguration? = nil
 
     // Unified workout hierarchy. Optional so all existing plans and saved
     // workouts continue to decode unchanged.
