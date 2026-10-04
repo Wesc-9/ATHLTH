@@ -2793,11 +2793,12 @@ struct DirectMessageThreadView: View {
             }
 
             challengeStore
-                .removeParticipant(
+                .setParticipantState(
                     challengeID:
                         challenge.id,
                     participantID:
-                        participant.id
+                        participant.id,
+                    state: .withdrawn
                 )
 
             await social.refresh(
