@@ -2702,6 +2702,9 @@ struct ActiveStrengthWorkoutView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                if let reason = suggestion.reason {
+                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -4188,7 +4191,6 @@ struct StrengthSetResultEditTarget: Identifiable {
     var id: UUID {
         return self.set.id
     }
-
     let exerciseID: UUID
     let exerciseName: String
     let exercise: ExerciseSnapshot

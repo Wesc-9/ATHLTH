@@ -4615,6 +4615,11 @@ private struct HomeFollowingWorkoutDetailView:
                         }
                     }
 
+                    let sharedRoute = WorkoutRouteSharing.decode(item.activity.metadata?["route_preview"])
+                    if !sharedRoute.isEmpty {
+                        WorkoutRouteSharePreview(coordinates: sharedRoute)
+                    }
+
                     NavigationLink {
                         FriendProfileView(
                             userID:

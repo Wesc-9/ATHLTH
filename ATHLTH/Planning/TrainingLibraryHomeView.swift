@@ -44,6 +44,12 @@ struct TrainingLibraryHomeView: View {
                 }
             }
 
+            NavigationLink {
+                AthleteToolsView()
+            } label: {
+                LibraryDestinationTile(title: "Athlete Tools", subtitle: "Races, load, offline packs, fuel and sharing", icon: "figure.run.circle", tint: ATHLTHTheme.accent)
+            }
+
             if !recents.items.isEmpty {
                 recentSection
             }

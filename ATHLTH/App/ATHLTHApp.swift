@@ -1419,6 +1419,7 @@ struct AppRootView: View {
                 ATHLTHGhostRuntimeObserver()
                 ATHLTHStrengthWatchSyncObserver()
                 ATHLTHBackupDirtyObserver()
+                AthleteToolsRuntimeObserver()
             }
         }
     }

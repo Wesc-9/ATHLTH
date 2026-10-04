@@ -39,6 +39,7 @@ jobs:
         run: |
           supabase db reset --local --no-seed
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/v160_audit.sql
+          docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/athlete_tools.sql
           python3 scripts/test_ai_budget_concurrency.py
       - name: Stop local Supabase
         if: always()

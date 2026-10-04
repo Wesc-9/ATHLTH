@@ -1713,7 +1713,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 .lowercased()
 
         guard !name.isEmpty,
-              exercise.sets.first?.resolvedTargetKind != .time
+              exercise.sets.first?.resolvedTargetKind != .time,
+              exercise.sets.first?.resolvedLoadKind != .resistanceLevel
         else {
             return nil
         }
@@ -1726,85 +1727,15 @@ final class StrengthWorkoutStore: ObservableObject {
                 .plannedReps ??
             draftReps
 
-        let previousSet =
-            workoutHistory
-                .filter(\.isFinished)
-                .sorted {
-                    $0.startedAt >
-                    $1.startedAt
-                }
-                .lazy
-                .flatMap(\.exercises)
-                .filter {
-                    $0.exercise.name
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .lowercased() ==
-                    name
-                }
-                .flatMap(\.sets)
-                .first {
-                    $0.countsTowardTrainingLoad &&
-                    !Self.repWeightEfforts(
-                        in: $0,
-                        includeBodyweight: false
-                    )
-                    .isEmpty
-                }
-
-        guard let previousSet,
-              let previousEffort =
-                Self.repWeightEfforts(
-                    in: previousSet,
-                    includeBodyweight: false
-                )
-                .max(
-                    by: {
-                        lhs,
-                        rhs in
-
-                        if lhs.weight ==
-                            rhs.weight {
-                            return lhs.reps <
-                                rhs.reps
-                        }
-
-                        return lhs.weight <
-                            rhs.weight
-                    }
-                )
-        else {
-            return nil
-        }
-
-        let previousWeight =
-            previousEffort.weight
-        let previousReps =
-            previousEffort.reps
-
-        let increment =
-            previousWeight >= 100
-                ? 5.0
-                : 2.5
-        let metOrExceededTarget =
-            previousReps >= targetReps
-        let suggestedWeight =
-            metOrExceededTarget
-                ? previousWeight + increment
-                : previousWeight
-
-        return StrengthProgressionSuggestion(
-            previousWeightKilograms:
-                previousWeight,
-            previousReps:
-                previousReps,
-            suggestedWeightKilograms:
-                suggestedWeight,
-            suggestedReps:
-                targetReps
-        )
+        let previousExercise = workoutHistory
+            .filter(\.isFinished)
+            .sorted { $0.startedAt > $1.startedAt }
+            .lazy
+            .flatMap(\.exercises)
+            .first { $0.exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name
+                && $0.sets.contains { $0.countsTowardTrainingLoad } }
+        guard let previousExercise else { return nil }
+        return AthleteStrengthProgression.suggestion(sets: previousExercise.sets, targetReps: targetReps)
     }
 
     private func advanceGroupedSetIfNeeded(

@@ -30,6 +30,13 @@ struct ATHLTHSettingsView: View {
                     header
                         .padding(.bottom, 24)
 
+                    NavigationLink {
+                        AthleteToolsView()
+                    } label: {
+                        Label("Athlete Tools", systemImage: "figure.run.circle")
+                            .font(.headline).padding(.bottom, 20)
+                    }
+
                     settingsSection("App") {
                         PremiumSettingsCard {
                             Menu {

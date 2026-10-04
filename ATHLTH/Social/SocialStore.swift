@@ -1553,7 +1553,9 @@ final class SocialStore: ObservableObject {
     func publishWorkout(
         _ workout: SocialPublishableWorkout,
         visibility: ProfileVisibility,
-        caption: String? = nil
+        caption: String? = nil,
+        routePreview: [RouteCoordinate] = [],
+        hideRouteStartAndEnd: Bool = true
     ) async -> Bool {
         errorMessage = nil
 
@@ -1583,6 +1585,10 @@ final class SocialStore: ObservableObject {
                 &metadata,
                 workout: workout
             )
+            metadata["hide_route_start_end"] = String(hideRouteStartAndEnd)
+            if let preview = WorkoutRouteSharing.encode(routePreview) {
+                metadata["route_preview"] = preview
+            }
 
             if !acceptedPartners.isEmpty {
                 metadata["with_names"] = acceptedPartners
