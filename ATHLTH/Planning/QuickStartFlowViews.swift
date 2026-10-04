@@ -2970,7 +2970,7 @@ struct StrengthQuickBuilderView: View {
         _ exercise: PlannedExercise
     ) -> String {
         var parts = [
-            "\(exercise.sets) × \(exercise.reps ?? 0)"
+            exercise.compactTargetSummary
         ]
 
         if let weight = exercise.targetWeightKilograms {
