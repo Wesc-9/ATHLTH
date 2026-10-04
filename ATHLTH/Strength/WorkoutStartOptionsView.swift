@@ -1070,7 +1070,7 @@ struct WorkoutStartOptionsView: View {
             PlannedExercise
     ) -> String {
         var parts = [
-            "\(exercise.sets) × \(exercise.reps ?? 0)"
+            exercise.compactTargetSummary
         ]
 
         if let weight =
