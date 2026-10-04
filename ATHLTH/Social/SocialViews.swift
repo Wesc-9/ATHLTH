@@ -613,104 +613,112 @@ struct SocialHubView: View {
                             }
                         }
 
-                        HStack(spacing: 12) {
-                            Image(
-                                systemName:
-                                    "person.3.fill"
+                        NavigationLink {
+                            TrainTogetherMarketplaceView()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "person.2.wave.2.fill"
+                                )
+                                .font(.title3)
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                                .frame(
+                                    width: 46,
+                                    height: 46
+                                )
+                                .background(
+                                    clubMint,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                14,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 3
+                                ) {
+                                    Text("Train Together")
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .bold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Post a workout or find someone who wants to train.",
+                                            norwegian:
+                                                "Legg ut en økt eller finn noen som ønsker å trene."
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                    .multilineTextAlignment(
+                                        .leading
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .caption.bold()
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                            }
+                            .contentShape(
+                                Rectangle()
                             )
-                            .font(.title3)
-                            .foregroundStyle(
-                                clubForest
-                            )
-                            .frame(
-                                width: 46,
-                                height: 46
-                            )
+                            .padding(14)
                             .background(
-                                clubMint,
+                                LinearGradient(
+                                    colors: [
+                                        Color.white
+                                            .opacity(
+                                                0.96
+                                            ),
+                                        clubMint
+                                            .opacity(
+                                                0.72
+                                            )
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                ),
                                 in:
                                     RoundedRectangle(
                                         cornerRadius:
-                                            14,
+                                            20,
                                         style:
                                             .continuous
                                     )
                             )
-
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing: 3
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Connect with the community",
-                                        norwegian:
-                                            "Koble deg med fellesskapet"
-                                    )
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(
-                                            .bold
-                                        )
-                                )
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Find friends, Clubs and challenges around you.",
-                                        norwegian:
-                                            "Finn venner, Clubs og utfordringer rundt deg."
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "chevron.right"
-                            )
-                            .font(
-                                .caption.bold()
-                            )
-                            .foregroundStyle(
-                                clubForest
-                            )
                         }
-                        .padding(14)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    Color.white
-                                        .opacity(
-                                            0.96
-                                        ),
-                                    clubMint
-                                        .opacity(
-                                            0.72
-                                        )
-                                ],
-                                startPoint:
-                                    .topLeading,
-                                endPoint:
-                                    .bottomTrailing
-                            ),
-                            in:
-                                RoundedRectangle(
-                                    cornerRadius:
-                                        20,
-                                    style:
-                                        .continuous
-                                )
-                        )
+                        .buttonStyle(.plain)
                     } else {
                         VStack(spacing: 12) {
                             Image(
@@ -4085,7 +4093,7 @@ private extension View {
 }
 
 
-private struct WorkoutInviteLaunchSheet: View {
+struct WorkoutInviteLaunchSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @EnvironmentObject private var session:
