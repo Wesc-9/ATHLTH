@@ -20,24 +20,34 @@ enum ATHLTHHomeAssistantBackgroundRefresh {
             BGTaskScheduler.shared.register(
                 forTaskWithIdentifier:
                     identifier,
-                using: nil
-            ) { task in
-                guard let refreshTask =
-                        task as?
-                            BGAppRefreshTask
-                else {
-                    task.setTaskCompleted(
-                        success: false
-                    )
-                    return
-                }
+                using: nil,
+                launchHandler:
+                    launchTask
+            )
+    }
 
-                Task { @MainActor in
-                    await handle(
-                        refreshTask
-                    )
-                }
-            }
+    // BGTaskScheduler invokes its launch handler on its own private queue.
+    // Keep the system callback itself nonisolated, then hop explicitly to
+    // MainActor before touching app stores. Creating this callback inside a
+    // MainActor-isolated closure causes Swift 6's executor precondition to
+    // trap before the Task hop can run.
+    nonisolated private static func launchTask(
+        _ task: BGTask
+    ) {
+        guard let refreshTask =
+                task as? BGAppRefreshTask
+        else {
+            task.setTaskCompleted(
+                success: false
+            )
+            return
+        }
+
+        Task { @MainActor in
+            await handle(
+                refreshTask
+            )
+        }
     }
 
     static func schedule() {
@@ -88,9 +98,10 @@ enum ATHLTHHomeAssistantBackgroundRefresh {
                 return await refreshHandler()
             }
 
-        task.expirationHandler = {
-            work.cancel()
-        }
+        installExpirationHandler(
+            on: task,
+            work: work
+        )
 
         let success =
             await work.value &&
@@ -99,5 +110,18 @@ enum ATHLTHHomeAssistantBackgroundRefresh {
         task.setTaskCompleted(
             success: success
         )
+    }
+
+    // BGTaskScheduler may invoke the expiration callback off-main as well.
+    // Build that callback from a nonisolated context so it never inherits
+    // MainActor isolation and can safely do the one thread-safe operation
+    // it needs: cancel the Task that owns the refresh work.
+    nonisolated private static func installExpirationHandler(
+        on task: BGTask,
+        work: Task<Bool, Never>
+    ) {
+        task.expirationHandler = {
+            work.cancel()
+        }
     }
 }
