@@ -110,11 +110,11 @@ final class MessagingStore: ObservableObject {
                     ) ?? []
             archivedConversationIDs =
                 Set(
-                    archivedIDs.compactMap(
-                        UUID.init(
-                            uuidString:
+                    archivedIDs.compactMap {
+                        UUID(
+                            uuidString: $0
                         )
-                    )
+                    }
                 )
         } else {
             archivedConversationIDs = []
