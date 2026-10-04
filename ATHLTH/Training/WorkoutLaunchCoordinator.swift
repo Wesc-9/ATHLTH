@@ -610,29 +610,14 @@ enum WorkoutLaunchCoordinator {
                     )
                     : nil
 
-        // A Watch-owned workout launched from iPhone still uses iPhone as the
-        // Audio Coach owner. This keeps spoken guidance on the same system
-        // route as Spotify/AirPods while Watch remains authoritative for
-        // workout capture. Direct Watch-started workouts keep Watch audio.
-        let iPhoneOwnsAudioCoach =
-            workoutMirroring != nil &&
-            resolvedAudioCoach.enabled
+        // Apple Watch owns Audio Coach whenever Apple Watch owns the workout.
+        // The iPhone may be left behind immediately after launch, so spoken
+        // guidance must never depend on the mirrored iPhone session.
+        workoutMirroring?
+            .clearIPhoneAudioCoach()
 
-        if iPhoneOwnsAudioCoach {
-            workoutMirroring?
-                .prepareIPhoneAudioCoach(
-                    resolvedAudioCoach
-                )
-        } else {
-            workoutMirroring?
-                .clearIPhoneAudioCoach()
-        }
-
-        let watchAudioCoach:
-            WatchAudioCoachConfiguration =
-                iPhoneOwnsAudioCoach
-                    ? .disabled
-                    : resolvedAudioCoach
+        let watchAudioCoach =
+            resolvedAudioCoach
 
         // Deliver ATHLTH-specific run state before asking HealthKit to launch
         // the Watch. This avoids a launch race where the workout session starts
@@ -796,25 +781,14 @@ enum WorkoutLaunchCoordinator {
         watchConnection
             .sendWorkoutRouteSelection(nil)
 
-        let iPhoneOwnsAudioCoach =
-            workoutMirroring != nil &&
-            configuration.audioCoach.enabled
+        // Keep Watch-owned walks independent from the iPhone as well.
+        // Audio Coach continues locally on Watch after Bluetooth/Wi-Fi range
+        // is lost.
+        workoutMirroring?
+            .clearIPhoneAudioCoach()
 
-        if iPhoneOwnsAudioCoach {
-            workoutMirroring?
-                .prepareIPhoneAudioCoach(
-                    configuration.audioCoach
-                )
-        } else {
-            workoutMirroring?
-                .clearIPhoneAudioCoach()
-        }
-
-        let watchAudioCoach:
-            WatchAudioCoachConfiguration =
-                iPhoneOwnsAudioCoach
-                    ? .disabled
-                    : configuration.audioCoach
+        let watchAudioCoach =
+            configuration.audioCoach
 
         watchConnection
             .sendAudioCoachConfiguration(
