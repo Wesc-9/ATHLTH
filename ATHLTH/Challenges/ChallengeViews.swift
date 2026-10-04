@@ -605,6 +605,18 @@ struct ChallengeCoverArtworkView: View {
     }
 }
 
+private enum ChallengeCreationSelectionSheet:
+    String,
+    Identifiable {
+    case sport
+    case scoring
+    case course
+    case verification
+    case visibility
+
+    var id: String { rawValue }
+}
+
 struct ChallengeCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
@@ -685,6 +697,10 @@ struct ChallengeCreationView: View {
     @State private var meetupAt = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var meetupCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition: MapCameraPosition = .automatic
+    @StateObject private var meetupSearch =
+        MeetupLocationSearchStore()
+    @State private var activeSelectionSheet:
+        ChallengeCreationSelectionSheet?
 
     @State private var visibility: ProfileVisibility = .friends
     @State private var shareToCommunity = true
@@ -693,15 +709,15 @@ struct ChallengeCreationView: View {
     @State private var showingInvitePicker = false
 
     private var clubForest: Color {
-        Color(red: 0.20, green: 0.26, blue: 0.36)
+        ATHLTHTheme.primaryText
     }
 
     private var clubEmerald: Color {
-        Color(red: 0.34, green: 0.43, blue: 0.57)
+        ATHLTHTheme.vitality
     }
 
     private var clubMint: Color {
-        Color(red: 0.91, green: 0.94, blue: 0.98)
+        ATHLTHTheme.vitalitySoft
     }
 
     var body: some View {
@@ -1071,6 +1087,21 @@ struct ChallengeCreationView: View {
                     $showingInvitePicker
             ) {
                 creationInvitePicker
+            }
+            .sheet(
+                item:
+                    $activeSelectionSheet
+            ) { sheet in
+                creationSelectionSheet(
+                    sheet
+                )
+                .presentationDetents([
+                    .medium,
+                    .large
+                ])
+                .presentationDragIndicator(
+                    .visible
+                )
             }
             .alert(
                 ATHLTHLocalization.choose(
