@@ -5270,6 +5270,91 @@ struct ChallengeCreationView: View {
         creatingChallenge = true
         createError = nil
 
+        let inviteeIDs =
+            Set(
+                invitees.compactMap(
+                    \.userID
+                )
+            )
+
+        if !inviteeIDs.isEmpty,
+           let duplicate =
+                challenges.visibleChallenges.first(
+                    where: { existing in
+                        existing.creatorID ==
+                            session.profile.userID &&
+                        existing.status != .completed &&
+                        existing.status != .cancelled &&
+                        existing.title
+                            .localizedCaseInsensitiveCompare(
+                                resolvedTitle
+                            ) == .orderedSame &&
+                        existing.sport == sport &&
+                        existing.rules.scoring ==
+                            effectiveScoring &&
+                        abs(
+                            existing.rules.startsAt
+                                .timeIntervalSince(
+                                    startsAt
+                                )
+                        ) <= 900 &&
+                        existing.participants
+                            .contains {
+                                guard
+                                    let userID =
+                                        $0.userID
+                                else {
+                                    return false
+                                }
+
+                                return inviteeIDs
+                                    .contains(
+                                        userID
+                                    ) &&
+                                    $0.state ==
+                                        .invited
+                            }
+                    }
+                ) {
+            creatingChallenge = false
+
+            let waitingName =
+                duplicate.participants
+                    .first(
+                        where: {
+                            guard
+                                let userID =
+                                    $0.userID
+                            else {
+                                return false
+                            }
+
+                            return inviteeIDs
+                                .contains(
+                                    userID
+                                ) &&
+                                $0.state ==
+                                    .invited
+                        }
+                    )?
+                    .displayName
+
+            createError =
+                ATHLTHLocalization.choose(
+                    english:
+                        waitingName.map {
+                            "A matching challenge invite to \($0) is already waiting for a response."
+                        } ??
+                        "A matching challenge invite is already waiting for a response.",
+                    norwegian:
+                        waitingName.map {
+                            "En tilsvarende challenge til \($0) venter allerede på svar."
+                        } ??
+                        "En tilsvarende challenge venter allerede på svar."
+                )
+            return
+        }
+
         let challengeID = UUID()
         var uploadedCoverURL: String?
 
