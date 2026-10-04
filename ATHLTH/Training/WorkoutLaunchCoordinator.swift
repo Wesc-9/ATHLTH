@@ -503,6 +503,11 @@ enum WorkoutLaunchCoordinator {
                 walking: false,
                 route: selectedRoute,
                 title: configuration.title,
+                environment:
+                    configuration.environment,
+                treadmillInclinePercent:
+                    configuration
+                        .treadmillInclinePercent,
                 audioCoach:
                     resolvedAudioCoach,
                 structuredWorkout:
@@ -594,7 +599,12 @@ enum WorkoutLaunchCoordinator {
             )
 
         try await watchConnection
-            .startWorkoutOnWatch(.running)
+            .startWorkoutOnWatch(
+                .running,
+                indoor:
+                    configuration.environment ==
+                    .treadmill
+            )
 
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
