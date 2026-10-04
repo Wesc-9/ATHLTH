@@ -1662,13 +1662,36 @@ final class SocialStore: ObservableObject {
     }
 
     func syncChallenges(_ challengeStore: ChallengeStore) async {
-        guard service.currentUserID != nil else { return }
+        guard let currentUserID =
+                service.currentUserID
+        else {
+            return
+        }
 
+        // Builds before the dedicated delete flow could leave creator-owned
+        // challenges locally marked as cancelled while the backend row stayed
+        // alive. Convert those legacy tombstones into real deletions instead
+        // of re-uploading them and resurrecting the challenge on other devices.
         for challenge in challengeStore.challenges {
             do {
-                try await service.syncChallenge(challenge)
+                if challenge.creatorID == currentUserID,
+                   challenge.status == .cancelled {
+                    try await service.deleteChallenge(
+                        challengeID:
+                            challenge.id
+                    )
+                    challengeStore.remove(
+                        challenge.id
+                    )
+                    continue
+                }
+
+                try await service.syncChallenge(
+                    challenge
+                )
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage =
+                    error.localizedDescription
             }
         }
     }
