@@ -2672,13 +2672,38 @@ struct DirectMessageThreadView: View {
             // a stale "message request" composer after a pending conversation
             // has already been promoted to accepted.
             await messaging.refreshConversation(id)
+            await social.refreshChallenges(
+                challengeStore:
+                    challengeStore
+            )
             conversationID = id
             markLocalMessageNotificationsRead(conversationID: id)
 
+            var pollTick = 0
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                if Task.isCancelled { break }
-                await messaging.refreshConversation(id)
+                try? await Task.sleep(
+                    nanoseconds:
+                        4_000_000_000
+                )
+                if Task.isCancelled {
+                    break
+                }
+
+                await messaging
+                    .refreshConversation(
+                        id
+                    )
+
+                pollTick += 1
+                if pollTick.isMultiple(
+                    of: 2
+                ) {
+                    await social
+                        .refreshChallenges(
+                            challengeStore:
+                                challengeStore
+                        )
+                }
             }
         } catch {
             loadError = error.localizedDescription
