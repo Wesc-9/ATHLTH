@@ -6937,93 +6937,257 @@ struct ChallengeDetailView: View {
         )
     }
 
-    private func leaderboardCard(_ challenge: ATHLTHChallenge) -> some View {
-        let board = challenges.leaderboard(for: challenge.id)
+    private func leaderboardCard(
+        _ challenge: ATHLTHChallenge
+    ) -> some View {
+        let board =
+            challenges.leaderboard(
+                for: challenge.id
+            )
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Leaderboard")
-                    .font(.title3.bold())
-                Spacer()
-                Text(
-                                ATHLTHLocalization.counted(
-                                    board.count,
-                                    englishSingular: "competitor",
-                                    englishPlural: "competitors",
-                                    norwegianSingular: "deltaker",
-                                    norwegianPlural: "deltakere"
+        return ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                challengeSectionHeader(
+                    title: "Leaderboard",
+                    trailing:
+                        ATHLTHLocalization.counted(
+                            board.count,
+                            englishSingular:
+                                "participant",
+                            englishPlural:
+                                "participants",
+                            norwegianSingular:
+                                "deltaker",
+                            norwegianPlural:
+                                "deltakere"
+                        )
+                )
+
+                if board.isEmpty {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No participants yet.",
+                            norwegian:
+                                "Ingen deltakere enda."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(
+                        .vertical,
+                        8
+                    )
+                } else {
+                    VStack(spacing: 9) {
+                        ForEach(board) { entry in
+                            HStack(spacing: 12) {
+                                Text(
+                                    entry.rank.map {
+                                        "\($0)"
+                                    } ?? "—"
                                 )
-                            )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(board) { entry in
-                HStack(spacing: 12) {
-                    Text(entry.rank.map { "#\($0)" } ?? "—")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(entry.rank == 1 ? ATHLTHTheme.accent : .secondary)
-                        .frame(width: 34)
-
-                    Circle()
-                        .fill(ATHLTHTheme.accent.opacity(0.10))
-                        .frame(width: 38, height: 38)
-                        .overlay {
-                            Text(entry.participant.displayName.prefix(1).uppercased())
-                                .font(.caption.bold())
-                                .foregroundStyle(ATHLTHTheme.accent)
-                        }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.participant.displayName)
-                            .font(.subheadline.weight(.semibold))
-
-                        if let attempt = entry.bestAttempt {
-                            HStack(spacing: 5) {
-                                Label(
-                                    attempt.verification.title,
-                                    systemImage: attempt.verification.systemImage
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                        .monospacedDigit()
                                 )
-                                if entry.attemptCount > 1 {
-                                    Text(
-                                            "· " +
-                                            ATHLTHLocalization.counted(
-                                                entry.attemptCount,
-                                                englishSingular: "attempt",
-                                                englishPlural: "attempts",
-                                                norwegianSingular: "forsøk",
-                                                norwegianPlural: "forsøk"
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .frame(width: 24)
+
+                                Circle()
+                                    .fill(
+                                        ATHLTHTheme
+                                            .cardWarm
+                                    )
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                                    .overlay {
+                                        Text(
+                                            challengeInitials(
+                                                entry.participant
+                                                    .displayName
                                             )
                                         )
+                                        .font(
+                                            .caption
+                                                .weight(.semibold)
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                    }
+
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        entry.participant
+                                            .displayName
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(.semibold)
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    if let attempt =
+                                            entry.bestAttempt {
+                                        HStack(spacing: 5) {
+                                            Label(
+                                                attempt
+                                                    .verification
+                                                    .title,
+                                                systemImage:
+                                                    attempt
+                                                        .verification
+                                                        .systemImage
+                                            )
+
+                                            if entry.attemptCount >
+                                                1 {
+                                                Text(
+                                                    "· " +
+                                                    ATHLTHLocalization
+                                                        .counted(
+                                                            entry.attemptCount,
+                                                            englishSingular:
+                                                                "attempt",
+                                                            englishPlural:
+                                                                "attempts",
+                                                            norwegianSingular:
+                                                                "forsøk",
+                                                            norwegianPlural:
+                                                                "forsøk"
+                                                        )
+                                                )
+                                            }
+                                        }
+                                        .font(.caption2)
+                                        .foregroundStyle(
+                                            attempt
+                                                .verification ==
+                                                .manual
+                                                ? Color.orange
+                                                : ATHLTHTheme
+                                                    .vitality
+                                        )
+                                    } else {
+                                        Text(
+                                            ATHLTHLocalization
+                                                .choose(
+                                                    english:
+                                                        "No result yet",
+                                                    norwegian:
+                                                        "Ingen resultat enda"
+                                                )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                    }
                                 }
+
+                                Spacer()
+
+                                Text(
+                                    leaderboardValue(
+                                        entry,
+                                        challenge:
+                                            challenge
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                        .monospacedDigit()
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
                             }
-                            .font(.caption2)
-                            .foregroundStyle(
-                                attempt.verification == .manual
-                                    ? .orange
-                                    : ATHLTHTheme.accent
+                            .padding(
+                                .horizontal,
+                                12
                             )
-                        } else {
-                            Text("No result yet")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            .padding(
+                                .vertical,
+                                11
+                            )
+                            .background(
+                                Color.white
+                                    .opacity(0.58),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            18,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                            .overlay {
+                                RoundedRectangle(
+                                    cornerRadius: 18,
+                                    style:
+                                        .continuous
+                                )
+                                .stroke(
+                                    Color.primary
+                                        .opacity(0.05),
+                                    lineWidth:
+                                        0.7
+                                )
+                            }
                         }
                     }
-
-                    Spacer()
-
-                    Text(leaderboardValue(entry, challenge: challenge))
-                        .font(.headline.monospacedDigit())
-                }
-                .padding(.vertical, 4)
-
-                if entry.id != board.last?.id {
-                    Divider().opacity(0.45)
                 }
             }
         }
-        .padding()
-        .challengeCard()
+    }
+
+    private func challengeInitials(
+        _ name: String
+    ) -> String {
+        let parts =
+            name
+                .split(separator: " ")
+                .prefix(2)
+
+        let initials =
+            parts.compactMap {
+                $0.first
+            }
+
+        if initials.isEmpty {
+            return "A"
+        }
+
+        return String(initials)
+            .uppercased()
     }
 
     private func targetGhostCard(
