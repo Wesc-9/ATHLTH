@@ -460,6 +460,47 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
             ? reps
             : nil
     }
+
+    var compactTargetSummary: String {
+        switch resolvedTargetKind {
+        case .reps:
+            return
+                "\(sets) × \(reps ?? 0)"
+
+        case .time:
+            let totalSeconds =
+                max(
+                    resolvedTargetDurationSeconds ??
+                        embeddedExercise
+                            .defaultStrengthTargetDurationSeconds,
+                    0
+                )
+            let hours =
+                totalSeconds / 3_600
+            let minutes =
+                (totalSeconds % 3_600) / 60
+            let seconds =
+                totalSeconds % 60
+            let duration =
+                hours > 0
+                    ? String(
+                        format:
+                            "%d:%02d:%02d",
+                        hours,
+                        minutes,
+                        seconds
+                    )
+                    : String(
+                        format:
+                            "%02d:%02d",
+                        minutes,
+                        seconds
+                    )
+
+            return
+                "\(sets) × \(duration)"
+        }
+    }
 }
 
 struct PlannedSession: Identifiable, Codable, Hashable {
