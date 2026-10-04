@@ -1445,6 +1445,55 @@ private struct MessagePersonInboxItem: Identifiable {
             !pendingChallenges.isEmpty
     }
 
+    var hasGroupLikeActivity:
+        Bool {
+        !pendingChallenges.isEmpty ||
+        !outgoingChallenges.isEmpty
+    }
+
+    var isVoiceNote: Bool {
+        let raw =
+            [
+                lastMessage?
+                    .attachmentKindRaw,
+                lastMessage?
+                    .attachmentTitle,
+                lastMessage?
+                    .body
+            ]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+
+        return
+            raw.contains("voice") ||
+            raw.contains("audio") ||
+            raw.contains("lydnotat") ||
+            raw.contains("talemelding")
+    }
+
+    var priorityRank: Int {
+        var value = 0
+
+        if isPinned {
+            value += 4
+        }
+
+        if needsResponse {
+            value += 3
+        }
+
+        if unreadCount > 0 {
+            value += 2
+        }
+
+        if isVoiceNote {
+            value += 1
+        }
+
+        return value
+    }
+
     var latestActivityAt: Date {
         var dates: [Date] = []
 
@@ -1479,6 +1528,7 @@ private struct MessagePersonInboxItem: Identifiable {
 
 private struct MessagePersonRow: View {
     let item: MessagePersonInboxItem
+    let isOnline: Bool
 
     var body: some View {
         HStack(spacing: 14) {
@@ -1488,15 +1538,19 @@ private struct MessagePersonRow: View {
                     size: 58
                 )
 
-                if item.unreadCount > 0 ||
+                if isOnline ||
+                    item.unreadCount > 0 ||
                     item.needsResponse {
                     Circle()
                         .fill(
-                            item.needsResponse
-                                ? ATHLTHTheme
-                                    .premiumGold
-                                : ATHLTHTheme
-                                    .accentDeep
+                            isOnline
+                                ? Color.green
+                                : (
+                                    item.needsResponse
+                                        ? ATHLTHTheme
+                                            .premiumGold
+                                        : Color.orange
+                                )
                         )
                         .frame(
                             width: 12,
@@ -1517,6 +1571,36 @@ private struct MessagePersonRow: View {
                 spacing: 6
             ) {
                 HStack(spacing: 7) {
+                    if item.isPinned {
+                        Image(
+                            systemName:
+                                "pin.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.orange
+                        )
+                    } else if item.needsResponse {
+                        Image(
+                            systemName:
+                                "star.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.orange
+                        )
+                    }
+
                     Text(
                         item.friend
                             .resolvedName
@@ -1533,33 +1617,70 @@ private struct MessagePersonRow: View {
                     )
                     .lineLimit(1)
 
-                    if item.isPinned {
+                    Spacer()
+                }
+
+                if item.isVoiceNote {
+                    HStack(spacing: 7) {
                         Image(
                             systemName:
-                                "pin.fill"
+                                "play.fill"
                         )
                         .font(
                             .system(
-                                size: 10,
+                                size: 9,
                                 weight: .bold
                             )
                         )
                         .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(
+                            width: 24,
+                            height: 24
+                        )
+                        .background(
                             ATHLTHTheme
-                                .accentDeep
+                                .accentSoft,
+                            in: Circle()
+                        )
+
+                        Image(
+                            systemName:
+                                "waveform"
+                        )
+                        .font(
+                            .system(
+                                size: 15,
+                                weight: .medium
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Voice note",
+                                norwegian: "Lydnotat"
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
                         )
                     }
-
-                    Spacer()
+                } else {
+                    Text(previewText)
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
                 }
-
-                Text(previewText)
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .lineLimit(2)
 
                 if !statusChips.isEmpty {
                     HStack(
@@ -1641,8 +1762,7 @@ private struct MessagePersonRow: View {
                         minHeight: 24
                     )
                     .background(
-                        ATHLTHTheme
-                            .vitality,
+                        Color.orange,
                         in: Capsule()
                     )
                 } else {
@@ -1664,50 +1784,43 @@ private struct MessagePersonRow: View {
                 }
             }
         }
-        .padding(15)
+        .padding(
+            .horizontal,
+            14
+        )
+        .padding(
+            .vertical,
+            12
+        )
         .background(
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.96),
-                    ATHLTHTheme.cardWarm
-                        .opacity(
-                            item.needsResponse
-                                ? 0.96
-                                : 0.80
-                        )
-                ],
-                startPoint: .topLeading,
-                endPoint:
-                    .bottomTrailing
+            Color.white.opacity(
+                0.88
             ),
             in: RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: 22,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: 22,
                 style: .continuous
             )
             .stroke(
                 item.needsResponse
-                    ? ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.22)
-                    : Color.white
-                        .opacity(0.92),
-                lineWidth: 0.9
+                    ? Color.orange
+                        .opacity(0.13)
+                    : Color.black
+                        .opacity(0.025),
+                lineWidth: 0.8
             )
         }
         .shadow(
             color:
-                ATHLTHTheme
-                    .accentDeep
-                    .opacity(0.045),
-            radius: 14,
-            y: 6
+                Color.black
+                    .opacity(0.035),
+            radius: 10,
+            y: 4
         )
     }
 
