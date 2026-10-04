@@ -773,7 +773,20 @@ final class AppSessionStore: ObservableObject {
                             exerciseLog.sets
                             .filter(\.isCompleted)
                             .allSatisfy {
-                                ($0.completedReps ?? 0) >= maximum
+                                set in
+
+                                if let targetWeight =
+                                        planned
+                                            .targetWeightKilograms {
+                                    return set.completedReps(
+                                        atOrAboveWeightKilograms:
+                                            targetWeight
+                                    ) >= maximum
+                                }
+
+                                return
+                                    (set.resolvedCompletedReps ?? 0) >=
+                                    maximum
                             }
 
                         if achievedMaximum,
@@ -809,29 +822,55 @@ final class AppSessionStore: ObservableObject {
         planned: PlannedExercise,
         completed: StrengthExerciseLog
     ) -> Bool {
-        let completedSets = completed.sets.filter(\.isCompleted)
-
-        guard completedSets.count >= max(planned.sets, 1),
-              completedSets.allSatisfy({ $0.completedReps != nil })
+        // Time- and resistance-based machine work is deliberately excluded
+        // from the existing kg/repetition progression engine.
+        guard planned.resolvedTargetKind == .reps,
+              planned.resolvedLoadKind ==
+                .weightKilograms
         else {
             return false
         }
 
+        let completedSets =
+            completed.sets.filter(\.isCompleted)
+
+        guard completedSets.count >=
+                max(planned.sets, 1)
+        else {
+            return false
+        }
+
+        if let targetWeight =
+                planned.targetWeightKilograms,
+           let targetReps =
+                planned.reps {
+            // A split set only qualifies if the planned number of reps was
+            // actually completed at or above the planned load. For example,
+            // 8 x 10 kg + 2 x 8 kg does not count as 10 x 10 kg.
+            return completedSets.allSatisfy {
+                $0.completedReps(
+                    atOrAboveWeightKilograms:
+                        targetWeight
+                ) >= targetReps
+            }
+        }
+
         if let targetReps = planned.reps {
             guard completedSets.allSatisfy({
-                ($0.completedReps ?? 0) >= targetReps
+                ($0.resolvedCompletedReps ?? 0) >=
+                    targetReps
             }) else {
                 return false
             }
         }
 
-        if let targetWeight = planned.targetWeightKilograms {
+        if let targetWeight =
+                planned.targetWeightKilograms {
             guard completedSets.allSatisfy({
-                guard let completedWeight = $0.completedWeightKilograms else {
-                    return false
-                }
-
-                return completedWeight + 0.01 >= targetWeight
+                $0.completedReps(
+                    atOrAboveWeightKilograms:
+                        targetWeight
+                ) > 0
             }) else {
                 return false
             }
