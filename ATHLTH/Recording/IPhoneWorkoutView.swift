@@ -1302,10 +1302,11 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
-                    if workout
-                        .plannedRouteCoordinates?
-                        .count ?? 0 >= 2 ||
-                        workout.points.last != nil {
+                    if (
+                        workout
+                            .plannedRouteCoordinates?
+                            .count ?? 0
+                    ) >= 2 {
                         premiumWorkoutMap(
                             workout
                         )
