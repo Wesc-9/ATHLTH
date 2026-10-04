@@ -51,6 +51,101 @@ enum StrengthMuscleRegion: String, CaseIterable, Identifiable {
         case .calves: return "Calves"
         case .shins: return "Shins"
         }
+    var activityDisplayTitle: String {
+        switch self {
+        case .chest:
+            return ATHLTHLocalization.choose(
+                english: "Chest",
+                norwegian: "Bryst"
+            )
+        case .frontDelts,
+             .sideDelts,
+             .rearDelts:
+            return ATHLTHLocalization.choose(
+                english: "Shoulders",
+                norwegian: "Skuldre"
+            )
+        case .biceps:
+            return "Biceps"
+        case .triceps:
+            return "Triceps"
+        case .forearms:
+            return ATHLTHLocalization.choose(
+                english: "Forearms",
+                norwegian: "Underarmer"
+            )
+        case .traps:
+            return ATHLTHLocalization.choose(
+                english: "Traps",
+                norwegian: "Trapezius"
+            )
+        case .lats:
+            return "Lats"
+        case .upperBack:
+            return ATHLTHLocalization.choose(
+                english: "Upper back",
+                norwegian: "Øvre rygg"
+            )
+        case .lowerBack:
+            return ATHLTHLocalization.choose(
+                english: "Lower back",
+                norwegian: "Nedre rygg"
+            )
+        case .abs:
+            return ATHLTHLocalization.choose(
+                english: "Abs",
+                norwegian: "Mage"
+            )
+        case .obliques:
+            return ATHLTHLocalization.choose(
+                english: "Obliques",
+                norwegian: "Skrå mage"
+            )
+        case .serratus:
+            return "Serratus"
+        case .glutes:
+            return ATHLTHLocalization.choose(
+                english: "Glutes",
+                norwegian: "Sete"
+            )
+        case .outerHip:
+            return ATHLTHLocalization.choose(
+                english: "Outer hip",
+                norwegian: "Ytre hofte"
+            )
+        case .innerThigh:
+            return ATHLTHLocalization.choose(
+                english: "Inner thigh",
+                norwegian: "Innside lår"
+            )
+        case .hipFlexors:
+            return ATHLTHLocalization.choose(
+                english: "Hip flexors",
+                norwegian: "Hoftebøyere"
+            )
+        case .quads:
+            return ATHLTHLocalization.choose(
+                english: "Quads",
+                norwegian: "Forside lår"
+            )
+        case .hamstrings:
+            return ATHLTHLocalization.choose(
+                english: "Hamstrings",
+                norwegian: "Bakside lår"
+            )
+        case .calves:
+            return ATHLTHLocalization.choose(
+                english: "Calves",
+                norwegian: "Legger"
+            )
+        case .shins:
+            return ATHLTHLocalization.choose(
+                english: "Shins",
+                norwegian: "Skinnebein"
+            )
+        }
+    }
+
     }
 }
 
