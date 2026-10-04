@@ -7201,6 +7201,11 @@ struct ChallengeDetailView: View {
         case .invited: return "Invited"
         case .accepted: return "Accepted"
         case .declined: return "Declined"
+        case .withdrawn:
+            return ATHLTHLocalization.choose(
+                english: "Withdrawn",
+                norwegian: "Trukket tilbake"
+            )
         }
     }
 }
