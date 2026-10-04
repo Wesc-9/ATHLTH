@@ -1298,12 +1298,48 @@ private struct HomeFollowingHorizontalWorkoutCard:
                         .strengthDetailText(
                             for: item
                         ) {
-                    Text(detail)
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "figure.strengthtraining.traditional"
                         )
-                        .lineLimit(2)
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .semibold
+                            )
+                        )
+
+                        Text(detail)
+                            .font(
+                                .system(
+                                    size: 8.5,
+                                    weight: .semibold
+                                )
+                            )
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(
+                        Color(
+                            red: 0.91,
+                            green: 0.33,
+                            blue: 0.22
+                        )
+                    )
+                    .padding(
+                        .horizontal,
+                        7
+                    )
+                    .frame(height: 22)
+                    .background(
+                        Color(
+                            red: 0.91,
+                            green: 0.33,
+                            blue: 0.22
+                        )
+                        .opacity(0.09),
+                        in: Capsule()
+                    )
                 } else if let subtitle =
                             item.activity.subtitle,
                           !subtitle.isEmpty {
