@@ -72,6 +72,12 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareNextWorkout) { _, _ in
             clearDisabledValues()
         }
+        .onChange(of: homeAssistant.shareTrainingCalendar) { _, _ in
+            clearDisabledValues()
+        }
+        .onChange(of: homeAssistant.shareGoals) { _, _ in
+            clearDisabledValues()
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Disconnect Home Assistant?",
@@ -433,6 +439,38 @@ struct HomeAssistantSettingsView: View {
                 ),
                 icon: "calendar.badge.clock",
                 isOn: $homeAssistant.shareNextWorkout
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Training calendar",
+                    norwegian: "Treningskalender"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares upcoming planned workouts with the Home Assistant calendar. Off by default.",
+                    norwegian:
+                        "Deler kommende planlagte økter med Home Assistant-kalenderen. Av som standard."
+                ),
+                icon: "calendar",
+                isOn:
+                    $homeAssistant
+                        .shareTrainingCalendar
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Active goal",
+                    norwegian: "Aktivt mål"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the active goal, progress and days remaining. Off by default.",
+                    norwegian:
+                        "Deler aktivt mål, fremdrift og dager igjen. Av som standard."
+                ),
+                icon: "target",
+                isOn: $homeAssistant.shareGoals
             )
 
             Text(
