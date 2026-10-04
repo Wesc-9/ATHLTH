@@ -8428,13 +8428,13 @@ struct ProfileRecordShowcasePickerView:
                 columns: [
                     GridItem(
                         .adaptive(
-                            minimum: 92,
-                            maximum: 118
+                            minimum: 78,
+                            maximum: 98
                         ),
-                        spacing: 6
+                        spacing: 5
                     )
                 ],
-                spacing: 6
+                spacing: 5
             ) {
                 ForEach(
                     candidates(
@@ -8493,7 +8493,7 @@ struct ProfileRecordShowcasePickerView:
                     )
                     .font(
                         .system(
-                            size: 11,
+                            size: 10,
                             weight:
                                 .semibold
                         )
@@ -8502,8 +8502,8 @@ struct ProfileRecordShowcasePickerView:
                         kind.tint
                     )
                     .frame(
-                        width: 24,
-                        height: 24
+                        width: 22,
+                        height: 22
                     )
                     .background(
                         kind.tint
@@ -8567,7 +8567,7 @@ struct ProfileRecordShowcasePickerView:
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 8.3,
+                            size: 7.8,
                             weight: .semibold
                         )
                     )
@@ -8586,8 +8586,11 @@ struct ProfileRecordShowcasePickerView:
                     )
                 )
                 .font(
-                    .headline
-                        .weight(.bold)
+                    .system(
+                        size: 13,
+                        weight: .bold,
+                        design: .rounded
+                    )
                 )
                 .monospacedDigit()
                 .foregroundStyle(
@@ -8622,7 +8625,7 @@ struct ProfileRecordShowcasePickerView:
                 )
                 .font(
                     .system(
-                        size: 7.8,
+                        size: 7.1,
                         weight: .medium
                     )
                 )
@@ -8634,10 +8637,10 @@ struct ProfileRecordShowcasePickerView:
                             .mutedText
                 )
             }
-            .padding(7)
+            .padding(6)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 82,
+                minHeight: 72,
                 alignment: .topLeading
             )
             .background(
@@ -8662,14 +8665,14 @@ struct ProfileRecordShowcasePickerView:
                 ),
                 in:
                     RoundedRectangle(
-                        cornerRadius: 17,
+                        cornerRadius: 15,
                         style:
                             .continuous
                     )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 17,
+                    cornerRadius: 15,
                     style:
                         .continuous
                 )
