@@ -498,6 +498,15 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        async let workoutMediaTask: [WorkoutMediaRecord] = client
+            .from("workout_media")
+            .select()
+            .eq("user_id", value: userID)
+            .order("created_at", ascending: false)
+            .limit(12)
+            .execute()
+            .value
+
         async let activitiesTask: [SocialActivityRecord] = client
             .from("social_activities")
             .select()
@@ -530,6 +539,7 @@ final class SupabaseSocialService: Sendable {
             trophyRows,
             goalRows,
             gearRows,
+            workoutMedia,
             activities,
             reactions,
             comments
@@ -540,6 +550,7 @@ final class SupabaseSocialService: Sendable {
             trophyRowsTask,
             goalRowsTask,
             gearRowsTask,
+            workoutMediaTask,
             activitiesTask,
             reactionsTask,
             commentsTask
@@ -564,6 +575,7 @@ final class SupabaseSocialService: Sendable {
             trophies: trophyRows.first?.items ?? [],
             goals: goalRows,
             gear: gearRows,
+            workoutMedia: workoutMedia,
             recentActivities: feed
         )
     }
