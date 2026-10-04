@@ -120,6 +120,30 @@ private struct HomeAssistantWebhookEnvelope: Encodable {
     let payload: [String: HomeAssistantJSONValue]
 }
 
+
+struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
+    let id: String
+    let type: String
+    let title: String?
+    let message: String?
+}
+
+private struct HomeAssistantWebhookResponse: Decodable {
+    let commands: [HomeAssistantInboundCommand]?
+}
+
+private struct HomeAssistantWebhookHTTPResult {
+    let statusCode: Int
+    let data: Data
+}
+
+extension Notification.Name {
+    static let athlthHomeAssistantCommandReceived =
+        Notification.Name(
+            "athlth.homeAssistant.commandReceived"
+        )
+}
+
 private struct HomeAssistantPendingDelivery: Codable, Identifiable {
     let id: UUID
     let pairingWebhookID: String
@@ -301,6 +325,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareWeeklyProgress"
     private static let shareNextWorkoutKey =
         "athlth.homeAssistant.shareNextWorkout"
+    private static let processedCommandIDsKey =
+        "athlth.homeAssistant.processedCommandIDs"
 
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
@@ -622,7 +648,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
 
         do {
-            let status = try await Self.sendWebhookRequest(
+            let result = try await Self.sendWebhookRequest(
                 to: pairing.webhookURL,
                 body: body,
                 timestamp: timestamp,
@@ -631,16 +657,16 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 clientID: pairing.clientID
             )
 
-            guard (200..<300).contains(status) else {
+            guard (200..<300).contains(result.statusCode) else {
                 if Self.shouldTryWebhookFallback(
-                    after: status
+                    after: result.statusCode
                 ),
                    let fallback =
                     Self.fallbackWebhookURL(
                         for: pairing
                     ),
                    fallback != pairing.webhookURL {
-                    let fallbackStatus =
+                    let fallbackResult =
                         try await Self.sendWebhookRequest(
                             to: fallback,
                             body: body,
@@ -652,21 +678,30 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
                     guard (200..<300)
                         .contains(
-                            fallbackStatus
+                            fallbackResult.statusCode
                         ) ||
-                        fallbackStatus == 409
+                        fallbackResult.statusCode == 409
                     else {
                         throw Self.webhookError(
-                            for: fallbackStatus
+                            for: fallbackResult.statusCode
                         )
                     }
+                    await handleWebhookResponse(
+                        fallbackResult.data,
+                        sourceEvent: event
+                    )
                     return
                 }
 
                 throw Self.webhookError(
-                    for: status
+                    for: result.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                result.data,
+                sourceEvent: event
+            )
         } catch let error as HomeAssistantConnectionError {
             throw error
         } catch {
@@ -679,7 +714,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 throw error
             }
 
-            let fallbackStatus =
+            let fallbackResult =
                 try await Self.sendWebhookRequest(
                     to: fallback,
                     body: body,
@@ -689,14 +724,78 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     clientID: pairing.clientID
                 )
 
-            guard (200..<300).contains(fallbackStatus) ||
-                    fallbackStatus == 409
+            guard (200..<300).contains(fallbackResult.statusCode) ||
+                    fallbackResult.statusCode == 409
             else {
                 throw Self.webhookError(
-                    for: fallbackStatus
+                    for: fallbackResult.statusCode
                 )
             }
+
+            await handleWebhookResponse(
+                fallbackResult.data,
+                sourceEvent: event
+            )
         }
+    }
+
+    private func handleWebhookResponse(
+        _ data: Data,
+        sourceEvent: String
+    ) async {
+        guard sourceEvent != "command_ack",
+              let response =
+                try? JSONDecoder().decode(
+                    HomeAssistantWebhookResponse.self,
+                    from: data
+                ),
+              let commands = response.commands,
+              !commands.isEmpty
+        else {
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        var processed = Set(
+            defaults.stringArray(
+                forKey:
+                    Self.processedCommandIDsKey
+            ) ?? []
+        )
+
+        let fresh = commands.filter {
+            !processed.contains($0.id)
+        }
+
+        for command in fresh {
+            processed.insert(command.id)
+            NotificationCenter.default.post(
+                name:
+                    .athlthHomeAssistantCommandReceived,
+                object: command
+            )
+        }
+
+        let trimmed =
+            Array(processed.suffix(64))
+        defaults.set(
+            trimmed,
+            forKey:
+                Self.processedCommandIDsKey
+        )
+
+        let ids = commands.map {
+            HomeAssistantJSONValue.string(
+                $0.id
+            )
+        }
+
+        try? await send(
+            event: "command_ack",
+            payload: [
+                "ids": .array(ids)
+            ]
+        )
     }
 
     private func sendReliably(
@@ -2370,7 +2469,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         nonce: String,
         signature: String,
         clientID: String
-    ) async throws -> Int {
+    ) async throws -> HomeAssistantWebhookHTTPResult {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.httpMethod = "POST"
@@ -2396,7 +2495,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             forHTTPHeaderField: "X-ATHLTH-Signature"
         )
 
-        let (_, response) =
+        let (data, response) =
             try await URLSession.shared.data(
                 for: request
             )
@@ -2408,7 +2507,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 .invalidResponse
         }
 
-        return httpResponse.statusCode
+        return HomeAssistantWebhookHTTPResult(
+            statusCode:
+                httpResponse.statusCode,
+            data: data
+        )
     }
 
     private static func webhookError(
