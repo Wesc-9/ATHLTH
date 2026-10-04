@@ -7191,6 +7191,9 @@ private struct PerformanceMilestonesDetailView:
     let healthRecords:
         [HealthPersonalRecord]
 
+    @EnvironmentObject private var strengthWorkout:
+        StrengthWorkoutStore
+
     private var records:
         [ProfileFeaturedRecordKind] {
         ProfileFeaturedRecordKind
@@ -7199,7 +7202,13 @@ private struct PerformanceMilestonesDetailView:
                 $0.displayValue(
                     healthRecords:
                         healthRecords,
-                    stats: stats
+                    stats: stats,
+                    strengthRecords:
+                        strengthWorkout
+                            .personalRecords,
+                    strengthRepRecords:
+                        strengthWorkout
+                            .repPersonalRecords
                 ) != "—"
             }
             .sorted {
