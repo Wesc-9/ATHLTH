@@ -3296,6 +3296,52 @@ struct ATHLTHHomeView: View {
             return
         }
 
+        if let ghostTarget =
+                workout
+                    .ghostTargetDurationSeconds {
+            guard let selectedRoute else {
+                homeWatchTransferError =
+                    ATHLTHLocalization.choose(
+                        english:
+                            "This planned Ghost workout needs a route.",
+                        norwegian:
+                            "Denne planlagte Ghost-økten trenger en rute."
+                    )
+                return
+            }
+
+            do {
+                try ghostRace.prepareTarget(
+                    route: selectedRoute,
+                    targetDurationSeconds:
+                        ghostTarget
+                )
+
+                if let transfer =
+                        GhostRaceStartService
+                            .preparedTransfer(
+                                ghostRace:
+                                    ghostRace,
+                                audio:
+                                    workout
+                                        .ghostUpdates ??
+                                    .disabled
+                            ) {
+                    watchConnection
+                        .sendGhostRace(
+                            transfer
+                        )
+                }
+            } catch {
+                homeWatchTransferError =
+                    error.localizedDescription
+                return
+            }
+        } else {
+            ghostRace.cancel()
+            watchConnection.clearGhostRace()
+        }
+
         homeDirectStartInProgress = true
         homeWatchTransferError = nil
 
