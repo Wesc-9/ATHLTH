@@ -502,6 +502,15 @@ struct AppRootView: View {
                 await syncHomeAssistantSnapshot()
             }
         }
+        .onChange(of: health.sleep) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: health.heart) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: health.training) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
         .onChange(of: subscriptionStore.activeEntitlement) { _, entitlement in
             appSession.applyStoreKitEntitlement(entitlement)
 
@@ -817,6 +826,18 @@ struct AppRootView: View {
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: homeAssistant.shareTrainingLoad) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareSleep) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareHRV) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareRestingHeartRate) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareRespiratoryRate) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: homeAssistant.shareWeeklyProgress) { _, _ in
@@ -2000,6 +2021,10 @@ struct AppRootView: View {
 
         let presence =
             appSession.profile.presence
+        let nextWorkout =
+            homeAssistantNextWorkoutOccurrence()
+        let weeklyMetrics =
+            homeAssistantWeeklyTrainingMetrics()
 
         await homeAssistant.syncSnapshot(
             workoutActive:
@@ -2007,6 +2032,10 @@ struct AppRootView: View {
             activeWorkout:
                 presence.state == .training
                     ? presence.workoutTitle
+                    : nil,
+            activeWorkoutStartedAt:
+                presence.state == .training
+                    ? presence.startedAt
                     : nil,
             lastWorkout:
                 latestWorkout?
@@ -2016,10 +2045,26 @@ struct AppRootView: View {
                 health.recovery.score,
             trainingLoad:
                 trainingLoad,
+            sleepDurationMinutes:
+                health.sleep.totalAsleep > 0
+                    ? health.sleep.totalAsleep / 60
+                    : nil,
+            hrvMilliseconds:
+                health.heart.hrvMilliseconds,
+            restingHeartRate:
+                health.heart.restingHeartRate,
+            respiratoryRate:
+                health.training.respiratoryRate,
             weeklyProgress:
                 homeAssistantWeeklyProgress(),
+            weeklyTrainingMinutes:
+                weeklyMetrics.minutes,
+            weeklyDistanceKilometers:
+                weeklyMetrics.distanceKilometers,
             nextWorkout:
-                homeAssistantNextWorkoutTitle()
+                nextWorkout?.title,
+            nextWorkoutTime:
+                nextWorkout?.time
         )
     }
 
@@ -2079,63 +2124,108 @@ struct AppRootView: View {
         return occurrences
     }
 
-    private func homeAssistantNextWorkoutTitle()
-        -> String? {
+    private func homeAssistantNextWorkoutOccurrence()
+        -> (title: String, time: Date)? {
         let now = Date()
 
-        return homeAssistantPlannedOccurrences()
-            .filter { occurrence in
-                guard let start =
-                        occurrence
-                            .session
-                            .scheduledStart,
-                      start >= now
-                else {
-                    return false
-                }
-
-                if let planID =
-                        occurrence.planID {
-                    if appSession
-                        .isPlanSessionSkipped(
-                            planID: planID,
-                            sessionID:
+        guard let occurrence =
+                homeAssistantPlannedOccurrences()
+                    .filter { occurrence in
+                        guard let start =
                                 occurrence
                                     .session
-                                    .id
-                        ) {
-                        return false
-                    }
+                                    .scheduledStart,
+                              start >= now
+                        else {
+                            return false
+                        }
 
-                    if appSession
-                        .isPlanSessionManuallyCompleted(
-                            planID: planID,
-                            sessionID:
-                                occurrence
-                                    .session
-                                    .id
-                        ) {
-                        return false
-                    }
-                }
+                        if let planID =
+                                occurrence.planID {
+                            if appSession
+                                .isPlanSessionSkipped(
+                                    planID: planID,
+                                    sessionID:
+                                        occurrence
+                                            .session
+                                            .id
+                                ) {
+                                return false
+                            }
 
-                return true
-            }
-            .sorted {
-                (
-                    $0.session
-                        .scheduledStart ??
-                    .distantFuture
-                ) <
-                (
-                    $1.session
-                        .scheduledStart ??
-                    .distantFuture
+                            if appSession
+                                .isPlanSessionManuallyCompleted(
+                                    planID: planID,
+                                    sessionID:
+                                        occurrence
+                                            .session
+                                            .id
+                                ) {
+                                return false
+                            }
+                        }
+
+                        return true
+                    }
+                    .sorted {
+                        (
+                            $0.session
+                                .scheduledStart ??
+                            .distantFuture
+                        ) <
+                        (
+                            $1.session
+                                .scheduledStart ??
+                            .distantFuture
+                        )
+                    }
+                    .first,
+              let start =
+                    occurrence
+                        .session
+                        .scheduledStart
+        else {
+            return nil
+        }
+
+        return (
+            title: occurrence.session.title,
+            time: start
+        )
+    }
+
+    private func homeAssistantWeeklyTrainingMetrics()
+        -> (minutes: Double, distanceKilometers: Double) {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+
+        guard let week =
+                calendar.dateInterval(
+                    of: .weekOfYear,
+                    for: Date()
                 )
+        else {
+            return (0, 0)
+        }
+
+        let workouts =
+            health.workouts.filter {
+                week.contains($0.startDate)
             }
-            .first?
-            .session
-            .title
+
+        let totalSeconds =
+            workouts.reduce(0.0) {
+                $0 + max($1.duration, 0)
+            }
+        let totalMeters =
+            workouts.reduce(0.0) {
+                $0 + max($1.distanceMeters ?? 0, 0)
+            }
+
+        return (
+            minutes: totalSeconds / 60,
+            distanceKilometers: totalMeters / 1_000
+        )
     }
 
     private func homeAssistantWeeklyProgress()
