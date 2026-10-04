@@ -2679,10 +2679,15 @@ final class HealthKitManager: ObservableObject {
         }
 
         let timedRunningTargets: [(HealthPersonalRecordKind, Double)] = [
+            (.fastest400M, 400),
+            (.fastest800M, 800),
             (.fastest1K, 1_000),
             (.fastestMile, 1_609.344),
+            (.fastest3K, 3_000),
             (.fastest5K, 5_000),
             (.fastest10K, 10_000),
+            (.fastest15K, 15_000),
+            (.fastest10Mile, 16_093.44),
             (.fastestHalfMarathon, 21_097.5),
             (.fastestMarathon, 42_195)
         ]
@@ -2692,7 +2697,7 @@ final class HealthKitManager: ObservableObject {
 
         let runningWorkouts = workouts.filter {
             $0.workoutActivityType == .running &&
-            ($0.athlthDistanceMeters ?? 0) >= 1_000
+            ($0.athlthDistanceMeters ?? 0) >= 400
         }
 
         let runningPerformance =
@@ -4013,10 +4018,15 @@ final class HealthKitManager: ObservableObject {
         let reportedDistanceMeters: Double
         let analyzedAt: Date
         let routeAvailable: Bool
+        let fastestFourHundredM: TimeInterval?
+        let fastestEightHundredM: TimeInterval?
         let fastestOneK: TimeInterval?
         let fastestMile: TimeInterval?
+        let fastestThreeK: TimeInterval?
         let fastestFiveK: TimeInterval?
         let fastestTenK: TimeInterval?
+        let fastestFifteenK: TimeInterval?
+        let fastestTenMile: TimeInterval?
         let fastestHalfMarathon: TimeInterval?
         let fastestMarathon: TimeInterval?
 
@@ -4024,14 +4034,24 @@ final class HealthKitManager: ObservableObject {
             for kind: HealthPersonalRecordKind
         ) -> TimeInterval? {
             switch kind {
+            case .fastest400M:
+                return fastestFourHundredM
+            case .fastest800M:
+                return fastestEightHundredM
             case .fastest1K:
                 return fastestOneK
             case .fastestMile:
                 return fastestMile
+            case .fastest3K:
+                return fastestThreeK
             case .fastest5K:
                 return fastestFiveK
             case .fastest10K:
                 return fastestTenK
+            case .fastest15K:
+                return fastestFifteenK
+            case .fastest10Mile:
+                return fastestTenMile
             case .fastestHalfMarathon:
                 return fastestHalfMarathon
             case .fastestMarathon:
@@ -4116,7 +4136,7 @@ final class HealthKitManager: ObservableObject {
             let distance =
                 workout.athlthDistanceMeters ?? 0
 
-            guard distance >= 1_000 else {
+            guard distance >= 400 else {
                 continue
             }
 
@@ -4177,10 +4197,15 @@ final class HealthKitManager: ObservableObject {
                 reportedDistanceMeters: distance,
                 analyzedAt: Date(),
                 routeAvailable: hasRoute,
+                fastestFourHundredM: segment(400),
+                fastestEightHundredM: segment(800),
                 fastestOneK: segment(1_000),
                 fastestMile: segment(1_609.344),
+                fastestThreeK: segment(3_000),
                 fastestFiveK: segment(5_000),
                 fastestTenK: segment(10_000),
+                fastestFifteenK: segment(15_000),
+                fastestTenMile: segment(16_093.44),
                 fastestHalfMarathon: segment(21_097.5),
                 fastestMarathon: segment(42_195)
             )
