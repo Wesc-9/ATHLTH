@@ -159,6 +159,30 @@ struct ATHLTHLiveWorkoutMapView: View {
 
                 Spacer()
 
+                if session.ghostChallengeID != nil {
+                    liveConnectionBadge
+                }
+
+                if ATHLTHDeviceRole.isIPad {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "SPECTATOR",
+                            norwegian: "TILSKUER"
+                        )
+                    )
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+                    .padding(.horizontal, 7)
+                    .frame(height: 22)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: Capsule()
+                    )
+                }
+
                 Text(
                     session.startedAt.formatted(
                         date: .omitted,
@@ -267,37 +291,284 @@ struct ATHLTHLiveWorkoutMapView: View {
 
             if session.ghostChallengeID != nil,
                realtime.liveLocations.count >= 2 {
-                let ordered =
-                    realtime.liveLocations
-                        .sorted {
-                            $0.distanceMeters >
-                            $1.distanceMeters
-                        }
+                Divider()
 
-                if let leader = ordered.first,
-                   let second = ordered.dropFirst().first {
-                    let delta =
-                        max(
-                            leader.distanceMeters -
-                            second.distanceMeters,
-                            0
+                if let summary =
+                        liveRaceSummary {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        Label(
+                            summary.headline,
+                            systemImage:
+                                "flag.checkered"
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
                         )
 
-                    Label(
-                        String(
-                            format:
-                                "%@ is %.0f m ahead",
-                            displayName(leader.userID),
-                            delta
-                        ),
-                        systemImage:
-                            "flag.checkered"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                        HStack(spacing: 10) {
+                            raceMetric(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Gap",
+                                        norwegian: "Avstand"
+                                    ),
+                                value:
+                                    summary.distanceText
+                            )
+
+                            raceMetric(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Time",
+                                        norwegian: "Tid"
+                                    ),
+                                value:
+                                    summary.timeText
+                            )
+
+                            raceMetric(
+                                title:
+                                    ATHLTHLocalization.choose(
+                                        english: "Mode",
+                                        norwegian: "Modus"
+                                    ),
+                                value:
+                                    summary.modeText
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var liveConnectionBadge:
+        some View {
+        switch realtime
+            .liveGhostConnectionState {
+        case .live:
+            Label(
+                "LIVE",
+                systemImage:
+                    "dot.radiowaves.left.and.right"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+
+        case .delayed(let seconds):
+            Text(
+                ATHLTHLocalization.format(
+                    english: "%d s delay",
+                    norwegian: "%d s forsinket",
+                    seconds
+                )
+            )
+            .foregroundStyle(.orange)
+
+        case .reconnecting(let seconds):
+            Text(
+                ATHLTHLocalization.format(
+                    english: "Reconnect · %d s",
+                    norwegian: "Kobler til · %d s",
+                    seconds
+                )
+            )
+            .foregroundStyle(.orange)
+
+        case .waiting:
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "WAITING",
+                    norwegian: "VENTER"
+                )
+            )
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private struct LiveRaceSummary {
+        let headline: String
+        let distanceText: String
+        let timeText: String
+        let modeText: String
+    }
+
+    private var liveRaceSummary:
+        LiveRaceSummary? {
+        guard
+            realtime.liveLocations.count >=
+                2
+        else {
+            return nil
+        }
+
+        let participants =
+            realtime.liveLocations
+                .filter {
+                    $0.sessionID ==
+                        session.id
+                }
+
+        guard participants.count >= 2
+        else {
+            return nil
+        }
+
+        let routeAware =
+            participants.allSatisfy {
+                $0.routeProgressPercent !=
+                    nil
+            } &&
+            (session.routeDistanceMeters ??
+                0) >= 250
+
+        let sorted:
+            [ATHLTHLiveWorkoutLocation]
+
+        if routeAware {
+            sorted =
+                participants.sorted {
+                    ($0.routeProgressPercent ??
+                        0) >
+                    ($1.routeProgressPercent ??
+                        0)
+                }
+        } else {
+            sorted =
+                participants.sorted {
+                    $0.distanceMeters >
+                        $1.distanceMeters
+                }
+        }
+
+        guard
+            let leader = sorted.first,
+            let second =
+                sorted.dropFirst().first
+        else {
+            return nil
+        }
+
+        let distanceGap:
+            Double
+
+        if routeAware,
+           let routeDistance =
+                session.routeDistanceMeters {
+            let progressGap =
+                max(
+                    (leader.routeProgressPercent ??
+                        0) -
+                    (second.routeProgressPercent ??
+                        0),
+                    0
+                ) /
+                100
+            distanceGap =
+                progressGap *
+                routeDistance
+        } else {
+            distanceGap =
+                max(
+                    leader.distanceMeters -
+                        second.distanceMeters,
+                    0
+                )
+        }
+
+        let leaderSpeed:
+            Double? = {
+            guard
+                leader.elapsedSeconds > 10,
+                leader.distanceMeters > 20
+            else {
+                return nil
+            }
+
+            let speed =
+                leader.distanceMeters /
+                leader.elapsedSeconds
+
+            return speed > 0.35 &&
+                speed.isFinite
+                ? speed
+                : nil
+        }()
+
+        let timeGap =
+            leaderSpeed.map {
+                distanceGap / $0
+            }
+
+        return LiveRaceSummary(
+            headline:
+                ATHLTHLocalization.format(
+                    english:
+                        "%@ leads",
+                    norwegian:
+                        "%@ leder",
+                    displayName(
+                        leader.userID
+                    )
+                ),
+            distanceText:
+                String(
+                    format:
+                        "%.0f m",
+                    distanceGap
+                ),
+            timeText:
+                timeGap.map {
+                    String(
+                        format:
+                            "%.1f s",
+                        $0
+                    )
+                } ?? "—",
+            modeText:
+                routeAware
+                    ? ATHLTHLocalization.choose(
+                        english: "Route",
+                        norwegian: "Rute"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Distance",
+                        norwegian: "Distanse"
+                    )
+        )
+    }
+
+    private func raceMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 2
+        ) {
+            Text(value)
+                .font(
+                    .caption.weight(.bold)
+                )
+                .monospacedDigit()
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
     }
 
     private var currentUserIsParticipant: Bool {
