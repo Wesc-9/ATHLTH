@@ -82,7 +82,13 @@ struct ATHLTHApp: App {
                         recoveryScore:
                             healthStore
                                 .recovery
-                                .score
+                                .score,
+                        recoveryState:
+                            homeAssistantRecoveryStateValue(
+                                healthStore
+                                    .recovery
+                                    .state
+                            )
                     )
             }
 
@@ -799,6 +805,9 @@ struct AppRootView: View {
                 await syncHomeAssistantSnapshot()
             }
         }
+        .onChange(of: health.recovery.state) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
         .onChange(of: health.sleep) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
@@ -959,6 +968,7 @@ struct AppRootView: View {
                 }
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
+                await syncHomeAssistantSnapshot()
             }
         }
         .onChange(of: appSession.activePlan) { _, plan in
@@ -1141,6 +1151,12 @@ struct AppRootView: View {
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: homeAssistant.shareNextWorkout) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareTrainingCalendar) { _, _ in
+            Task { await syncHomeAssistantSnapshot() }
+        }
+        .onChange(of: homeAssistant.shareGoals) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
         .onChange(of: appSession.onboardingCompleted) { _, completed in
@@ -2327,6 +2343,13 @@ struct AppRootView: View {
             homeAssistantNextWorkoutOccurrence()
         let weeklyMetrics =
             homeAssistantWeeklyTrainingMetrics()
+        let primaryGoal =
+            goals.primaryGoal ??
+            goals.activeGoals.first
+        let goalDaysRemaining =
+            homeAssistantGoalDaysRemaining(
+                primaryGoal
+            )
 
         await homeAssistant.syncSnapshot(
             workoutActive:
@@ -2357,16 +2380,34 @@ struct AppRootView: View {
                 health.heart.restingHeartRate,
             respiratoryRate:
                 health.training.respiratoryRate,
+            recoveryState:
+                homeAssistantRecoveryStateValue(
+                    health.recovery.state
+                ),
             weeklyProgress:
                 homeAssistantWeeklyProgress(),
             weeklyTrainingMinutes:
                 weeklyMetrics.minutes,
             weeklyDistanceKilometers:
                 weeklyMetrics.distanceKilometers,
+            weeklyWorkoutCount:
+                weeklyMetrics.workoutCount,
+            trainingStreak:
+                homeAssistantTrainingStreak(),
             nextWorkout:
                 nextWorkout?.title,
             nextWorkoutTime:
-                nextWorkout?.time
+                nextWorkout?.time,
+            activeGoal:
+                primaryGoal?.title,
+            goalProgress:
+                primaryGoal.map {
+                    $0.progress * 100
+                },
+            goalDaysRemaining:
+                goalDaysRemaining,
+            calendarEvents:
+                homeAssistantCalendarEvents()
         )
     }
 
@@ -2497,7 +2538,11 @@ struct AppRootView: View {
     }
 
     private func homeAssistantWeeklyTrainingMetrics()
-        -> (minutes: Double, distanceKilometers: Double) {
+        -> (
+            minutes: Double,
+            distanceKilometers: Double,
+            workoutCount: Int
+        ) {
         var calendar = Calendar.current
         calendar.firstWeekday = 2
 
@@ -2507,7 +2552,7 @@ struct AppRootView: View {
                     for: Date()
                 )
         else {
-            return (0, 0)
+            return (0, 0, 0)
         }
 
         let workouts =
@@ -2526,8 +2571,179 @@ struct AppRootView: View {
 
         return (
             minutes: totalSeconds / 60,
-            distanceKilometers: totalMeters / 1_000
+            distanceKilometers: totalMeters / 1_000,
+            workoutCount: workouts.count
         )
+    }
+
+    private func homeAssistantTrainingStreak() -> Int {
+        let calendar = Calendar.current
+        let workoutDays =
+            Set(
+                health.workouts.map {
+                    calendar.startOfDay(
+                        for: $0.startDate
+                    )
+                }
+            )
+
+        guard !workoutDays.isEmpty else {
+            return 0
+        }
+
+        let today =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let yesterday =
+            calendar.date(
+                byAdding: .day,
+                value: -1,
+                to: today
+            ) ?? today
+
+        var cursor: Date
+        if workoutDays.contains(today) {
+            cursor = today
+        } else if workoutDays.contains(
+                    yesterday
+                  ) {
+            cursor = yesterday
+        } else {
+            return 0
+        }
+
+        var streak = 0
+        while workoutDays.contains(cursor) {
+            streak += 1
+            guard let previous =
+                    calendar.date(
+                        byAdding: .day,
+                        value: -1,
+                        to: cursor
+                    )
+            else {
+                break
+            }
+            cursor = previous
+        }
+
+        return streak
+    }
+
+    private func homeAssistantGoalDaysRemaining(
+        _ goal: ATHLTHGoal?
+    ) -> Int? {
+        guard let deadline =
+                goal?.deadline
+        else {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        let today =
+            calendar.startOfDay(
+                for: Date()
+            )
+        let end =
+            calendar.startOfDay(
+                for: deadline
+            )
+
+        return max(
+            calendar.dateComponents(
+                [.day],
+                from: today,
+                to: end
+            ).day ?? 0,
+            0
+        )
+    }
+
+    private func homeAssistantCalendarEvents()
+        -> [HomeAssistantCalendarEventPayload] {
+        let now = Date()
+        let lowerBound =
+            Calendar.current.date(
+                byAdding: .day,
+                value: -7,
+                to: now
+            ) ?? now
+        let upperBound =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 90,
+                to: now
+            ) ?? now
+
+        return homeAssistantPlannedOccurrences()
+            .compactMap { occurrence in
+                guard let start =
+                        occurrence
+                            .session
+                            .scheduledStart,
+                      start >= lowerBound,
+                      start <= upperBound
+                else {
+                    return nil
+                }
+
+                if let planID =
+                        occurrence.planID {
+                    if appSession
+                        .isPlanSessionSkipped(
+                            planID: planID,
+                            sessionID:
+                                occurrence
+                                    .session
+                                    .id
+                        ) {
+                        return nil
+                    }
+                }
+
+                let duration =
+                    max(
+                        occurrence
+                            .session
+                            .durationMinutes ??
+                            60,
+                        1
+                    )
+                let end =
+                    Calendar.current.date(
+                        byAdding: .minute,
+                        value: duration,
+                        to: start
+                    ) ??
+                    start.addingTimeInterval(
+                        Double(duration) * 60
+                    )
+
+                return HomeAssistantCalendarEventPayload(
+                    id:
+                        occurrence
+                            .session
+                            .id
+                            .uuidString,
+                    title:
+                        occurrence
+                            .session
+                            .title,
+                    start: start,
+                    end: end,
+                    type:
+                        occurrence
+                            .session
+                            .kind
+                            .rawValue
+                )
+            }
+            .sorted {
+                $0.start < $1.start
+            }
+            .prefix(64)
+            .map { $0 }
     }
 
     private func homeAssistantWeeklyProgress()
