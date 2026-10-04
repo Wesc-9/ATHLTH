@@ -6249,7 +6249,11 @@ struct SessionEditorView: View {
                 supersetGroupID:
                     clonedSupersetID,
                 progression:
-                    exercise.progression
+                    exercise.progression,
+                targetKind:
+                    exercise.targetKind,
+                targetDurationSeconds:
+                    exercise.targetDurationSeconds
             )
         }
     }
@@ -6972,7 +6976,10 @@ struct PlannedExerciseEditorView: View {
     let onSave: (PlannedExercise) -> Void
 
     @State private var sets: Int
+    @State private var targetKind:
+        StrengthExerciseTargetKind
     @State private var reps: Int
+    @State private var durationSeconds: Int
     @State private var weight: Double
     @State private var useWeight: Bool
 
@@ -6997,7 +7004,22 @@ struct PlannedExerciseEditorView: View {
         self.onSave = onSave
 
         _sets = State(initialValue: exercise.sets)
-        _reps = State(initialValue: exercise.reps ?? 8)
+        _targetKind = State(
+            initialValue:
+                exercise.resolvedTargetKind
+        )
+        _reps = State(
+            initialValue:
+                exercise.reps ?? 8
+        )
+        _durationSeconds = State(
+            initialValue:
+                exercise
+                    .resolvedTargetDurationSeconds ??
+                exercise
+                    .embeddedExercise
+                    .defaultStrengthTargetDurationSeconds
+        )
         _weight = State(
             initialValue: exercise.targetWeightKilograms ?? 20
         )
@@ -7039,25 +7061,33 @@ struct PlannedExerciseEditorView: View {
             Form {
                 Section(original.embeddedExercise.name) {
                     Stepper(
-                        "Sets: \(sets)",
+                        ATHLTHLocalization.format(
+                            english: "Sets: %d",
+                            norwegian: "Sett: %d",
+                            sets
+                        ),
                         value: $sets,
                         in: 1...20
                     )
 
-                    Stepper(
-                        "Reps: \(reps)",
-                        value: $reps,
-                        in: 1...100
-                    )
+                    targetRow
 
                     Toggle(
-                        "Target weight",
+                        ATHLTHLocalization.choose(
+                            english: "Target weight",
+                            norwegian: "Målvekt"
+                        ),
                         isOn: $useWeight
                     )
 
                     if useWeight {
                         HStack {
-                            Text("Weight")
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Weight",
+                                    norwegian: "Vekt"
+                                )
+                            )
                             Spacer()
                             TextField(
                                 "kg",
@@ -7073,14 +7103,23 @@ struct PlannedExerciseEditorView: View {
                     }
 
                     Stepper(
-                        "Rest: \(restSeconds) sec",
+                        ATHLTHLocalization.format(
+                            english: "Rest: %d sec",
+                            norwegian: "Hvile: %d sek",
+                            restSeconds
+                        ),
                         value: $restSeconds,
                         in: 0...600,
                         step: 15
                     )
                 }
 
-                Section("Effort") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Effort",
+                        norwegian: "Anstrengelse"
+                    )
+                ) {
                     Toggle("Use RPE", isOn: $useRPE)
 
                     if useRPE {
@@ -7110,67 +7149,69 @@ struct PlannedExerciseEditorView: View {
                     }
                 }
 
-                Section("Progression") {
-                    Picker(
-                        "Rule",
-                        selection: $progressionKind
-                    ) {
-                        ForEach(
-                            StrengthProgressionKind.allCases
-                        ) { kind in
-                            Text(kind.title).tag(kind)
+                if targetKind == .reps {
+                    Section("Progression") {
+                        Picker(
+                            "Rule",
+                            selection: $progressionKind
+                        ) {
+                            ForEach(
+                                StrengthProgressionKind.allCases
+                            ) { kind in
+                                Text(kind.title).tag(kind)
+                            }
                         }
-                    }
 
-                    if progressionKind != .none {
-                        HStack {
+                        if progressionKind != .none {
+                            HStack {
+                                Text(
+                                    progressionKind == .addReps
+                                        ? "Reps to add"
+                                        : progressionKind == .percentage
+                                            ? "Percent"
+                                            : "Weight to add"
+                                )
+
+                                Spacer()
+
+                                TextField(
+                                    "Amount",
+                                    value: $progressionAmount,
+                                    format: .number.precision(.fractionLength(0...2))
+                                )
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 90)
+
+                                Text(
+                                    progressionKind == .percentage
+                                        ? "%"
+                                        : progressionKind == .addReps
+                                            ? "reps"
+                                            : "kg"
+                                )
+                                .foregroundStyle(.secondary)
+                            }
+
+                            if progressionKind == .doubleProgression {
+                                Stepper(
+                                    "Rep range start: \(minimumReps)",
+                                    value: $minimumReps,
+                                    in: 1...50
+                                )
+                                Stepper(
+                                    "Rep range end: \(maximumReps)",
+                                    value: $maximumReps,
+                                    in: minimumReps...100
+                                )
+                            }
+
                             Text(
-                                progressionKind == .addReps
-                                    ? "Reps to add"
-                                    : progressionKind == .percentage
-                                        ? "Percent"
-                                        : "Weight to add"
+                                "The next prescription can use this rule after all planned sets are completed. ATHLTH keeps the rule separate from the recorded workout history."
                             )
-
-                            Spacer()
-
-                            TextField(
-                                "Amount",
-                                value: $progressionAmount,
-                                format: .number.precision(.fractionLength(0...2))
-                            )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 90)
-
-                            Text(
-                                progressionKind == .percentage
-                                    ? "%"
-                                    : progressionKind == .addReps
-                                        ? "reps"
-                                        : "kg"
-                            )
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                         }
-
-                        if progressionKind == .doubleProgression {
-                            Stepper(
-                                "Rep range start: \(minimumReps)",
-                                value: $minimumReps,
-                                in: 1...50
-                            )
-                            Stepper(
-                                "Rep range end: \(maximumReps)",
-                                value: $maximumReps,
-                                in: minimumReps...100
-                            )
-                        }
-
-                        Text(
-                            "The next prescription can use this rule after all planned sets are completed. ATHLTH keeps the rule separate from the recorded workout history."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     }
                 }
 
@@ -7196,7 +7237,16 @@ struct PlannedExerciseEditorView: View {
                     Button("Save") {
                         var updated = original
                         updated.sets = sets
-                        updated.reps = reps
+                        updated.targetKind =
+                            targetKind
+                        updated.reps =
+                            targetKind == .reps
+                                ? reps
+                                : nil
+                        updated.targetDurationSeconds =
+                            targetKind == .time
+                                ? durationSeconds
+                                : nil
                         updated.targetWeightKilograms =
                             useWeight ? weight : nil
                         updated.targetRPE =
@@ -7209,19 +7259,22 @@ struct PlannedExerciseEditorView: View {
                                 in: .whitespacesAndNewlines
                             )
                             .nilIfEmpty
-                        updated.progression = StrengthProgressionRule(
-                            kind: progressionKind,
-                            amount: max(progressionAmount, 0),
-                            minimumReps:
-                                progressionKind == .doubleProgression
-                                    ? minimumReps
-                                    : nil,
-                            maximumReps:
-                                progressionKind == .doubleProgression
-                                    ? maximumReps
-                                    : nil,
-                            applyWhenAllSetsCompleted: true
-                        )
+                        updated.progression =
+                            targetKind == .reps
+                                ? StrengthProgressionRule(
+                                    kind: progressionKind,
+                                    amount: max(progressionAmount, 0),
+                                    minimumReps:
+                                        progressionKind == .doubleProgression
+                                            ? minimumReps
+                                            : nil,
+                                    maximumReps:
+                                        progressionKind == .doubleProgression
+                                            ? maximumReps
+                                            : nil,
+                                    applyWhenAllSetsCompleted: true
+                                )
+                                : .none
 
                         onSave(updated)
                         dismiss()
@@ -7229,6 +7282,150 @@ struct PlannedExerciseEditorView: View {
                 }
             }
         }
+    }
+
+    private var targetRow:
+        some View {
+        HStack(spacing: 12) {
+            Menu {
+                Button {
+                    targetKind = .reps
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Target reps",
+                            norwegian: "Målreps"
+                        ),
+                        systemImage:
+                            targetKind == .reps
+                                ? "checkmark"
+                                : "repeat"
+                    )
+                }
+
+                Button {
+                    targetKind = .time
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ),
+                        systemImage:
+                            targetKind == .time
+                                ? "checkmark"
+                                : "timer"
+                    )
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Text(targetKind.title)
+                        .foregroundStyle(.primary)
+
+                    Image(
+                        systemName:
+                            "chevron.up.chevron.down"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Button {
+                adjustTarget(by: -1)
+            } label: {
+                Image(systemName: "minus")
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(
+                targetKind == .reps
+                    ? reps <= 1
+                    : durationSeconds <= 15
+            )
+
+            Text(targetValue)
+                .font(.body.monospacedDigit())
+                .frame(minWidth: 52)
+
+            Button {
+                adjustTarget(by: 1)
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var targetValue: String {
+        switch targetKind {
+        case .reps:
+            return "\(reps)"
+        case .time:
+            return formattedDuration(
+                durationSeconds
+            )
+        }
+    }
+
+    private func adjustTarget(
+        by direction: Int
+    ) {
+        switch targetKind {
+        case .reps:
+            reps =
+                min(
+                    max(
+                        reps + direction,
+                        1
+                    ),
+                    100
+                )
+
+        case .time:
+            durationSeconds =
+                min(
+                    max(
+                        durationSeconds +
+                            direction * 15,
+                        15
+                    ),
+                    7_200
+                )
+        }
+    }
+
+    private func formattedDuration(
+        _ seconds: Int
+    ) -> String {
+        let safe = max(seconds, 0)
+        let hours = safe / 3_600
+        let minutes =
+            (safe % 3_600) / 60
+        let seconds =
+            safe % 60
+
+        if hours > 0 {
+            return String(
+                format:
+                    "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format:
+                "%02d:%02d",
+            minutes,
+            seconds
+        )
     }
 }
 
