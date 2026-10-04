@@ -202,7 +202,10 @@ final class SocialStore: ObservableObject {
             )
 
             if let challengeStore {
-                challengeStore.mergeRemoteChallenges(remoteChallenges)
+                challengeStore
+                    .replaceWithRemoteChallenges(
+                        remoteChallenges
+                    )
             }
 
             if let notificationStore {
@@ -237,7 +240,7 @@ final class SocialStore: ObservableObject {
                     .loadRemoteChallenges()
 
             challengeStore
-                .mergeRemoteChallenges(
+                .replaceWithRemoteChallenges(
                     remoteChallenges
                 )
         } catch is CancellationError {
