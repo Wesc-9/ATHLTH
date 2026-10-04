@@ -23,6 +23,33 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
     @Published private(set) var lastPhoneDraftMutationAt:
         Date = .distantPast
+    @Published private(set) var recoveredCheckpointSavedAt:
+        Date?
+
+    private let staleRecoveryInterval:
+        TimeInterval = 12 * 60 * 60
+
+    var hasRecoveredActiveWorkout: Bool {
+        activeWorkout != nil &&
+        recoveredCheckpointSavedAt != nil
+    }
+
+    var recoveredActiveWorkoutNeedsReview: Bool {
+        guard activeWorkout != nil,
+              let recoveredCheckpointSavedAt
+        else {
+            return false
+        }
+
+        return Date()
+            .timeIntervalSince(
+                recoveredCheckpointSavedAt
+            ) >= staleRecoveryInterval
+    }
+
+    var recoveredActiveWorkoutReferenceDate: Date? {
+        recoveredCheckpointSavedAt
+    }
 
     private var accountID: UUID?
     private var loadingAccount = false
@@ -42,6 +69,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var rpe: Double
         var rir: Double? = nil
         var warmUp: Bool? = nil
+        var savedAt: Date? = nil
     }
 
     init() {}
@@ -57,7 +85,20 @@ final class StrengthWorkoutStore: ObservableObject {
         workoutHistory = userID.flatMap { AccountLocalStorage.read([StrengthWorkoutLog].self, name: "strengthHistory", userID: $0) } ?? []
         let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
         activeWorkout = checkpoint?.workout
-        if let workout = activeWorkout, workoutHistory.contains(where: { $0.id == workout.id }) { activeWorkout = nil }
+        if let workout = activeWorkout,
+           workout.endedAt != nil ||
+            workoutHistory.contains(
+                where: { $0.id == workout.id }
+            ) {
+            activeWorkout = nil
+        }
+        recoveredCheckpointSavedAt =
+            activeWorkout == nil
+                ? nil
+                : (
+                    checkpoint?.savedAt ??
+                    activeWorkout?.startedAt
+                )
         currentExerciseIndex = checkpoint?.exerciseIndex ?? 0
         currentSetIndex = checkpoint?.setIndex ?? 0
         restEndsAt = checkpoint?.restEndsAt
@@ -120,7 +161,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 rest: draftRestSeconds,
                 rpe: draftRPE,
                 rir: draftRIR,
-                warmUp: draftWarmUp
+                warmUp: draftWarmUp,
+                savedAt: Date()
             ),
             name: "strengthActive",
             userID: accountID
@@ -895,6 +937,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     )
                 }
 
+        recoveredCheckpointSavedAt = nil
         activeWorkout =
             StrengthWorkoutLog(
                 id: snapshot.workoutID,
@@ -1129,6 +1172,7 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        recoveredCheckpointSavedAt = nil
         activeWorkout = StrengthWorkoutLog(
             id: UUID(),
             plannedSessionID: nil,
@@ -1262,6 +1306,7 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        recoveredCheckpointSavedAt = nil
         let exerciseLogs = session.exercises.map { planned in
             let setCount = max(planned.sets, 1)
 
@@ -2345,9 +2390,33 @@ final class StrengthWorkoutStore: ObservableObject {
         completedWorkout = workout
         upsertWorkoutHistory(workout)
         activeWorkout = nil
+        recoveredCheckpointSavedAt = nil
         restEndsAt = nil
         currentExerciseIndex = 0
         currentSetIndex = 0
+        draftReps = 8
+        draftDurationSeconds = 60
+        draftWeightKilograms = 20
+        draftResistanceLevel = 5
+        draftRestSeconds = 90
+        draftRPE = 8
+        draftRIR = 2
+        draftWarmUp = false
+        persistCheckpointNow()
+    }
+
+    func discardActiveWorkout() {
+        guard activeWorkout != nil else {
+            return
+        }
+
+        checkpointSaveTask?.cancel()
+        checkpointSaveTask = nil
+        activeWorkout = nil
+        recoveredCheckpointSavedAt = nil
+        currentExerciseIndex = 0
+        currentSetIndex = 0
+        restEndsAt = nil
         draftReps = 8
         draftDurationSeconds = 60
         draftWeightKilograms = 20
