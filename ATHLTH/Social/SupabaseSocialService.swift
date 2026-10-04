@@ -1267,6 +1267,25 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func deleteChallenge(
+        challengeID: UUID
+    ) async throws {
+        guard currentUserID != nil else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        _ = try await client
+            .rpc(
+                "delete_social_challenge",
+                params:
+                    DeleteSocialChallengeParams(
+                        challengeID:
+                            challengeID
+                    )
+            )
+            .execute()
+    }
+
     func syncChallenge(_ challenge: ATHLTHChallenge) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -1797,6 +1816,14 @@ private struct ChallengeWrite: Encodable {
 }
 
 private struct JoinPublicChallengeParams: Encodable {
+    let challengeID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case challengeID = "p_challenge_id"
+    }
+}
+
+private struct DeleteSocialChallengeParams: Encodable {
     let challengeID: UUID
 
     enum CodingKeys: String, CodingKey {
