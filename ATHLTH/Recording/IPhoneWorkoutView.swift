@@ -905,6 +905,8 @@ struct IPhoneWorkoutView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var confirmFinish = false
     @State private var followMe = true
+    @State private var showingTreadmillInclineEditor = false
+    @State private var treadmillInclineDraft = 0.0
     @State private var routeCamera:
         MapCameraPosition = .automatic
 
@@ -1491,6 +1493,22 @@ struct IPhoneWorkoutView: View {
                     )
                 }
             }
+            .sheet(
+                isPresented:
+                    $showingTreadmillInclineEditor
+            ) {
+                TreadmillInclineEditorView(
+                    initialValue:
+                        treadmillInclineDraft
+                ) { value in
+                    recorder
+                        .setTreadmillInclinePercent(
+                            value
+                        )
+                    treadmillInclineDraft =
+                        value
+                }
+            }
             .confirmationDialog(
                 "Finish this workout?",
                 isPresented: $confirmFinish,
@@ -1667,66 +1685,90 @@ struct IPhoneWorkoutView: View {
 
                 Spacer()
 
-                HStack(spacing: 6) {
-                    Image(
-                        systemName:
+                Button {
+                    guard workout.runEnvironment ==
+                            .treadmill
+                    else {
+                        return
+                    }
+
+                    treadmillInclineDraft =
+                        workout
+                            .treadmillInclinePercent ??
+                        0
+                    showingTreadmillInclineEditor =
+                        true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(
+                            systemName:
+                                workout.runEnvironment ==
+                                .treadmill
+                                    ? "figure.run.treadmill"
+                                    : "location.fill"
+                        )
+
+                        Text(
                             workout.runEnvironment ==
-                            .treadmill
-                                ? "figure.run.treadmill"
-                                : "location.fill"
-                    )
-
-                    Text(
-                        workout.runEnvironment ==
-                            .treadmill
-                            ? ATHLTHLocalization.format(
-                                english:
-                                    "Treadmill · %.1f%%",
-                                norwegian:
-                                    "Tredemølle · %.1f%%",
-                                workout
-                                    .treadmillInclinePercent ??
-                                0
-                            )
-                            : (
-                                workout.points.last == nil
-                                    ? ATHLTHLocalization.choose(
-                                        english: "GPS waiting",
-                                        norwegian: "Venter på GPS"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "GPS on",
-                                        norwegian: "GPS på"
-                                    )
-                            )
-                    )
-                    .font(
-                        .caption.weight(
-                            .semibold
+                                .treadmill
+                                ? ATHLTHLocalization.format(
+                                    english:
+                                        "Treadmill · %.1f%%",
+                                    norwegian:
+                                        "Tredemølle · %.1f%%",
+                                    workout
+                                        .treadmillInclinePercent ??
+                                    0
+                                )
+                                : (
+                                    workout.points.last == nil
+                                        ? ATHLTHLocalization.choose(
+                                            english: "GPS waiting",
+                                            norwegian: "Venter på GPS"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "GPS on",
+                                            norwegian: "GPS på"
+                                        )
+                                )
                         )
-                    )
-                }
-                .foregroundStyle(
-                    workout.runEnvironment == .treadmill
-                        ? ATHLTHTheme.accentDeep
-                        : workout.points.last == nil
-                            ? Color.orange
-                            : ATHLTHTheme.vitality
-                )
-                .padding(.horizontal, 11)
-                .frame(height: 34)
-                .background(
-                    Color.white.opacity(0.88),
-                    in: Capsule()
-                )
-                .overlay {
-                    Capsule()
-                        .stroke(
-                            Color.black.opacity(0.04),
-                            lineWidth: 0.7
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
                         )
-                }
 
+                        if workout.runEnvironment ==
+                            .treadmill {
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(.caption2)
+                        }
+                    }
+                    .foregroundStyle(
+                        workout.runEnvironment == .treadmill
+                            ? ATHLTHTheme.accentDeep
+                            : workout.points.last == nil
+                                ? Color.orange
+                                : ATHLTHTheme.vitality
+                    )
+                    .padding(.horizontal, 11)
+                    .frame(height: 34)
+                    .background(
+                        Color.white.opacity(0.88),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color.black.opacity(0.04),
+                                lineWidth: 0.7
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
                 ATHLTHAudioRouteControl()
             }
 
@@ -2828,5 +2870,123 @@ struct IPhoneWorkoutView: View {
                 workout
                     .plannedRouteTitle
         )
+    }
+}
+
+
+private struct TreadmillInclineEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (Double) -> Void
+    @State private var value: Double
+
+    init(
+        initialValue: Double,
+        onSave: @escaping (Double) -> Void
+    ) {
+        self.onSave = onSave
+        _value = State(
+            initialValue:
+                min(
+                    max(initialValue, 0),
+                    20
+                )
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Treadmill",
+                        norwegian: "Tredemølle"
+                    )
+                ) {
+                    Stepper(
+                        value: $value,
+                        in: 0...20,
+                        step: 0.5
+                    ) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Incline",
+                                    norwegian: "Stigning"
+                                )
+                            )
+
+                            Spacer()
+
+                            Text(
+                                String(
+                                    format:
+                                        "%.1f%%",
+                                    value
+                                )
+                            )
+                            .monospacedDigit()
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+
+                    Slider(
+                        value: $value,
+                        in: 0...20,
+                        step: 0.5
+                    )
+                }
+
+                Section {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "You can change incline while the workout is running. The current value is stored with the workout.",
+                            norwegian:
+                                "Du kan endre stigning mens økten pågår. Gjeldende verdi lagres med økten."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Incline",
+                    norwegian: "Stigning"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement: .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        onSave(value)
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
