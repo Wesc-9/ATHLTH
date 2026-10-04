@@ -378,6 +378,16 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announcePauseResume: Bool? = nil
     var announceWorkoutComplete: Bool? = nil
 
+    // When a workout was launched from iPhone, iPhone owns spoken guidance
+    // while WatchConnectivity remains reachable so Spotify/AirPods can stay on
+    // the phone. Watch automatically becomes the voice fallback if the phone
+    // leaves range. Optional keeps older payloads fully compatible.
+    var preferIPhoneAudioWhenReachable: Bool? = nil
+
+    var shouldPreferIPhoneAudioWhenReachable: Bool {
+        preferIPhoneAudioWhenReachable ?? false
+    }
+
     // Strength-specific Audio Coach cues. Optional fields keep older queued
     // Watch payloads and persisted configurations backwards compatible.
     var announceStrengthSetComplete: Bool? = nil
