@@ -1205,7 +1205,9 @@ struct PerformanceStatsView: View {
         index: Int
     ) -> some View {
         let record =
-            record(kind.healthKind)
+            kind.healthKind.flatMap {
+                record($0)
+            }
 
         return ZStack(
             alignment: .topLeading
@@ -1299,8 +1301,16 @@ struct PerformanceStatsView: View {
                         .firstTextBaseline
                 ) {
                     Text(
-                        recordValue(
-                            for: kind
+                        kind.displayValue(
+                            healthRecords:
+                                resolvedHealthRecords,
+                            stats: stats,
+                            strengthRecords:
+                                strengthWorkout
+                                    .personalRecords,
+                            strengthRepRecords:
+                                strengthWorkout
+                                    .repPersonalRecords
                         )
                     )
                     .font(
@@ -7352,9 +7362,13 @@ private struct PerformanceMilestonesDetailView:
             ProfileFeaturedRecordKind
     ) -> some View {
         let sourceRecord =
-            healthRecords.first {
-                $0.kind ==
-                    kind.healthKind
+            kind.healthKind.flatMap {
+                healthKind in
+
+                healthRecords.first {
+                    $0.kind ==
+                        healthKind
+                }
             }
 
         return HStack(spacing: 13) {
@@ -7401,7 +7415,13 @@ private struct PerformanceMilestonesDetailView:
                     kind.displayValue(
                         healthRecords:
                             healthRecords,
-                        stats: stats
+                        stats: stats,
+                        strengthRecords:
+                            strengthWorkout
+                                .personalRecords,
+                        strengthRepRecords:
+                            strengthWorkout
+                                .repPersonalRecords
                     )
                 )
                 .font(
@@ -7494,11 +7514,13 @@ private struct PerformanceMilestonesDetailView:
         _ kind:
             ProfileFeaturedRecordKind
     ) -> Date? {
-        if let record =
+        if let healthKind =
+                kind.healthKind,
+           let record =
                 healthRecords.first(
                     where: {
                         $0.kind ==
-                            kind.healthKind
+                            healthKind
                     }
                 ) {
             return record.date
@@ -7520,6 +7542,46 @@ private struct PerformanceMilestonesDetailView:
         case .longestRun:
             return stats?
                 .longestRunDate
+        case .strengthHeaviestSet:
+            return strengthWorkout
+                .personalRecords
+                .filter {
+                    $0.kind ==
+                        .heaviestSet
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .date
+        case .strengthEstimatedOneRM:
+            return strengthWorkout
+                .personalRecords
+                .filter {
+                    $0.kind ==
+                        .estimatedOneRepMax
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .date
+        case .strengthWorkoutVolume:
+            return strengthWorkout
+                .personalRecords
+                .filter {
+                    $0.kind ==
+                        .workoutVolume
+                }
+                .max {
+                    $0.score < $1.score
+                }?
+                .date
+        case .strengthBestRepPR:
+            return strengthWorkout
+                .repPersonalRecords
+                .max {
+                    $0.date < $1.date
+                }?
+                .date
         default:
             return nil
         }
