@@ -944,6 +944,9 @@ private enum TrainTogetherTimeFilter:
 struct TrainTogetherPostDetailView:
     View
 {
+    @Environment(\.dismiss)
+    private var dismiss
+
     @EnvironmentObject private var marketplace:
         TrainTogetherMarketplaceStore
     @EnvironmentObject private var session:
@@ -958,6 +961,10 @@ struct TrainTogetherPostDetailView:
     @State private var showingLaunch =
         false
     @State private var confirmingCancel =
+        false
+    @State private var showingReport =
+        false
+    @State private var confirmingBlock =
         false
 
     private var post:
@@ -1052,6 +1059,52 @@ struct TrainTogetherPostDetailView:
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .toolbar {
+            if let post,
+               post.creatorID !=
+                session.profile.userID {
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    Menu {
+                        Button {
+                            showingReport = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Report",
+                                    norwegian: "Rapporter"
+                                ),
+                                systemImage:
+                                    "exclamationmark.bubble"
+                            )
+                        }
+
+                        Button(
+                            role: .destructive
+                        ) {
+                            confirmingBlock =
+                                true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Block athlete",
+                                    norwegian: "Blokker utøver"
+                                ),
+                                systemImage:
+                                    "hand.raised.fill"
+                            )
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "ellipsis.circle"
+                        )
+                    }
+                }
+            }
+        }
         .task(id: postID) {
             await marketplace.refresh()
 
@@ -1088,6 +1141,17 @@ struct TrainTogetherPostDetailView:
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingReport
+        ) {
+            if let post {
+                TrainTogetherReportSheet(
+                    userID:
+                        post.creatorID
+                )
+            }
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english:
@@ -1117,6 +1181,48 @@ struct TrainTogetherPostDetailView:
                     await social.refresh()
                 }
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english:
+                    "Block this athlete?",
+                norwegian:
+                    "Blokkere denne utøveren?"
+            ),
+            isPresented:
+                $confirmingBlock,
+            titleVisibility:
+                .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Block",
+                    norwegian: "Blokker"
+                ),
+                role: .destructive
+            ) {
+                if let post {
+                    Task {
+                        if await social
+                            .block(
+                                post.creatorID
+                            ) {
+                            await marketplace
+                                .refresh()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Their open Train Together workouts will no longer appear for you.",
+                    norwegian:
+                        "Åpne Train Together-økter fra brukeren vil ikke lenger vises for deg."
+                )
+            )
         }
     }
 
@@ -1859,6 +1965,149 @@ struct TrainTogetherPostDetailView:
             currentRequest?
                 .state ==
                 .accepted
+    }
+}
+
+private struct TrainTogetherReportSheet:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    @EnvironmentObject private var social:
+        SocialStore
+
+    let userID: UUID
+
+    @State private var reason =
+        "unsafe"
+    @State private var details = ""
+    @State private var sending =
+        false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Reason",
+                        norwegian: "Årsak"
+                    )
+                ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Reason",
+                            norwegian: "Årsak"
+                        ),
+                        selection: $reason
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Unsafe behaviour",
+                                norwegian:
+                                    "Utrygg oppførsel"
+                            )
+                        )
+                        .tag("unsafe")
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Harassment",
+                                norwegian:
+                                    "Trakassering"
+                            )
+                        )
+                        .tag("harassment")
+
+                        Text("Spam")
+                            .tag("spam")
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Other",
+                                norwegian: "Annet"
+                            )
+                        )
+                        .tag("other")
+                    }
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Details (optional)",
+                            norwegian:
+                                "Detaljer (valgfritt)"
+                        ),
+                        text: $details,
+                        axis: .vertical
+                    )
+                    .lineLimit(3...6)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Report athlete",
+                    norwegian:
+                        "Rapporter utøver"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Send",
+                            norwegian: "Send"
+                        )
+                    ) {
+                        sending = true
+
+                        Task {
+                            if await social.report(
+                                userID,
+                                reason: reason,
+                                details:
+                                    details
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
+                                        )
+                                        .isEmpty
+                                        ? nil
+                                        : details
+                            ) {
+                                dismiss()
+                            }
+
+                            sending = false
+                        }
+                    }
+                    .disabled(sending)
+                }
+            }
+        }
     }
 }
 
