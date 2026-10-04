@@ -3620,6 +3620,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) {
         guard !text.isEmpty else { return }
 
+        if audioCoachConfiguration
+                .shouldPreferIPhoneAudioWhenReachable,
+           WCSession.isSupported(),
+           WCSession.default.activationState ==
+                .activated,
+           WCSession.default.isReachable {
+            // iPhone is actively mirroring this workout and owns spoken
+            // guidance while reachable. If reachability drops, Watch resumes
+            // Audio Coach automatically on the next cue.
+            return
+        }
+
         let audioIsBusy =
             speechSynthesizer.isSpeaking ||
             audioCoachActivationTask != nil
