@@ -1567,19 +1567,6 @@ struct FriendProfileView: View {
                             profile.workoutMedia
                         )
                     }
-
-                    let workouts = profile.recentActivities.filter {
-                        $0.activity.kind == "workout"
-                    }
-
-                    if profile.card.isPublicProfile ||
-                        !workouts.isEmpty {
-                        workoutHistoryCard(workouts)
-                    }
-
-                    if !profile.goals.isEmpty {
-                        remoteGoalsCard(profile.goals)
-                    }
                 } else {
                     ContentUnavailableView(
                         "Profile unavailable",
