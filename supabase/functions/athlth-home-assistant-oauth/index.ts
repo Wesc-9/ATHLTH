@@ -5,7 +5,7 @@ const CLIENT_ID = "https://hnkybbzxffvyhzrstqdo.supabase.co/functions/v1/athlth-
 const metadata = {
   client_id: CLIENT_ID,
   client_name: "ATHLTH",
-  client_uri: "https://github.com/Wesc-9/ATHLTH",
+  client_uri: "https://github.com/Wesc-9/ATHLTH_HA",
   redirect_uris: ["athlth://home-assistant"],
   grant_types: ["authorization_code"],
   response_types: ["code"],
