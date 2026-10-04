@@ -754,7 +754,7 @@ struct AppRootView: View {
         .overlay(alignment: .top) {
             if appSession.signedIn,
                phoneWorkout.active != nil,
-               !phoneWorkout.liveViewIsVisible {
+               phoneWorkout.isUserMinimized {
                 Button {
                     phoneWorkout.presentWorkout()
                 } label: {
@@ -807,6 +807,11 @@ struct AppRootView: View {
                 .buttonStyle(.plain)
                 .padding(.top, 10)
                 .padding(.horizontal, 18)
+                .transition(
+                    .move(edge: .top)
+                        .combined(with: .opacity)
+                )
+                .zIndex(60)
             }
         }
         .overlay(alignment: .top) {
