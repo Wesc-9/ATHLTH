@@ -41,6 +41,50 @@ struct ATHLTHApp: App {
     @StateObject private var accountService = SupabaseAccountService()
 
     init() {
+        let homeAssistantStore =
+            HomeAssistantConnectionStore()
+        let healthStore =
+            HealthKitManager.shared
+
+        _homeAssistant =
+            StateObject(
+                wrappedValue:
+                    homeAssistantStore
+            )
+        _health =
+            StateObject(
+                wrappedValue:
+                    healthStore
+            )
+
+        healthStore
+            .backgroundRefreshDidComplete = {
+                [weak homeAssistantStore,
+                 weak healthStore] in
+
+                guard let homeAssistantStore,
+                      let healthStore
+                else {
+                    return
+                }
+
+                await homeAssistantStore
+                    .syncBackgroundHealthSnapshot(
+                        workouts:
+                            healthStore.workouts,
+                        sleep:
+                            healthStore.sleep,
+                        heart:
+                            healthStore.heart,
+                        training:
+                            healthStore.training,
+                        recoveryScore:
+                            healthStore
+                                .recovery
+                                .score
+                    )
+            }
+
         ATHLTHKeyboardCoordinator.shared.install()
     }
 
