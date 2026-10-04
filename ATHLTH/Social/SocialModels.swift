@@ -479,6 +479,7 @@ struct SocialFeedItem: Identifiable, Hashable {
 struct SocialInboxEvent: Identifiable, Codable, Hashable {
     let id: UUID
     let recipientID: UUID
+    let actorID: UUID?
     let kind: String
     let title: String
     let message: String
@@ -491,6 +492,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id
         case recipientID = "recipient_id"
+        case actorID = "actor_id"
         case kind
         case title
         case message
@@ -520,6 +522,15 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
 
         case "challenge_result":
             return "Nytt challenge-resultat"
+
+        case "challenge_accepted":
+            return "Challenge godtatt"
+
+        case "challenge_declined":
+            return "Challenge avslått"
+
+        case "challenge_withdrawn":
+            return "Challenge trukket tilbake"
 
         case "reaction":
             return "Ny reaksjon"
@@ -641,6 +652,24 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
 
         case "challenge_result":
             return localizedChallengeResultMessage
+
+        case "challenge_accepted":
+            return message.replacingOccurrences(
+                of: " accepted ",
+                with: " godtok "
+            )
+
+        case "challenge_declined":
+            return message.replacingOccurrences(
+                of: " declined ",
+                with: " avslo "
+            )
+
+        case "challenge_withdrawn":
+            return message.replacingOccurrences(
+                of: " withdrew ",
+                with: " trakk tilbake "
+            )
 
         case "reaction":
             return replacingSuffix(
