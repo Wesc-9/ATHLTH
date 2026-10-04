@@ -3578,7 +3578,7 @@ private struct HomeCurrentStreakCard: View {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 ForEach(currentWeekDays, id: \.self) { day in
                     streakDay(day)
                 }
@@ -9623,7 +9623,7 @@ struct ATHLTHProfileView: View {
             // The pinned/immersive transition visually overlaps the content
             // with the hero, so this needs a little more breathing room than
             // the standard section spacing.
-            .padding(.top, 142)
+            .padding(.top, 168)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
@@ -10015,16 +10015,16 @@ struct ATHLTHProfileView: View {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 9.5,
+                            size: 8.8,
                             weight: .semibold
                         )
                     )
-                    .frame(width: 12)
+                    .frame(width: 11)
 
                 Text(value)
                     .font(
                         .system(
-                            size: 11,
+                            size: 10.2,
                             weight: .bold,
                             design: .rounded
                         )
@@ -10041,7 +10041,7 @@ struct ATHLTHProfileView: View {
             Text(title)
                 .font(
                     .system(
-                        size: 6.8,
+                        size: 6.3,
                         weight: .medium
                     )
                 )
@@ -10054,13 +10054,13 @@ struct ATHLTHProfileView: View {
                 )
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 2)
+        .padding(.horizontal, 1)
         .frame(maxWidth: .infinity)
-        .frame(height: 34)
+        .frame(height: 30)
         .background(
             Color.black.opacity(0.43),
             in: RoundedRectangle(
-                cornerRadius: 12,
+                cornerRadius: 11,
                 style: .continuous
             )
         )
@@ -10120,12 +10120,12 @@ struct ATHLTHProfileView: View {
                             )
                         } label: {
                             VStack(
-                                spacing: 5
+                                spacing: 3
                             ) {
                                 ATHLTHTrophyCoreView(
                                     trophy:
                                         trophy,
-                                    size: 16
+                                    size: 12
                                 )
 
                                 Text(
@@ -10133,7 +10133,7 @@ struct ATHLTHProfileView: View {
                                 )
                                 .font(
                                     .system(
-                                        size: 6.8,
+                                        size: 6.2,
                                         weight: .bold
                                     )
                                 )
@@ -10176,7 +10176,7 @@ struct ATHLTHProfileView: View {
                                     )
                                     .font(
                                         .system(
-                                            size: 10,
+                                            size: 8,
                                             weight: .medium
                                         )
                                     )
@@ -10189,8 +10189,8 @@ struct ATHLTHProfileView: View {
                                     )
                                 }
                                 .frame(
-                                    width: 17,
-                                    height: 19
+                                    width: 13,
+                                    height: 15
                                 )
                                 .overlay {
                                     ATHLTHTrophyPlateShape()
@@ -10222,7 +10222,7 @@ struct ATHLTHProfileView: View {
                                 )
                                 .font(
                                     .system(
-                                        size: 8,
+                                        size: 6.8,
                                         weight:
                                             .semibold
                                     )
@@ -10657,15 +10657,15 @@ struct ATHLTHProfileView: View {
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 6
+            spacing: 4
         ) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(
                     systemName: kind.icon
                 )
                 .font(
                     .system(
-                        size: 13,
+                        size: 11,
                         weight: .semibold
                     )
                 )
@@ -10674,7 +10674,7 @@ struct ATHLTHProfileView: View {
                 Text(kind.shortTitle)
                     .font(
                         .system(
-                            size: 9.5,
+                            size: 8.5,
                             weight: .semibold
                         )
                     )
@@ -10702,7 +10702,7 @@ struct ATHLTHProfileView: View {
             )
             .font(
                 .system(
-                    size: 15,
+                    size: 13,
                     weight: .bold,
                     design: .rounded
                 )
@@ -10714,10 +10714,10 @@ struct ATHLTHProfileView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.62)
         }
-        .padding(8)
+        .padding(7)
         .frame(
             maxWidth: .infinity,
-            minHeight: 66,
+            minHeight: 58,
             alignment: .leading
         )
         .background(
@@ -10730,7 +10730,7 @@ struct ATHLTHProfileView: View {
                 endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(
-                cornerRadius: 16,
+                cornerRadius: 14,
                 style: .continuous
             )
         )
@@ -10748,11 +10748,11 @@ struct ATHLTHProfileView: View {
 
     private var emptyRecordShowcaseCard:
         some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             Image(systemName: "plus")
                 .font(
                     .system(
-                        size: 15,
+                        size: 13,
                         weight: .semibold
                     )
                 )
@@ -10769,7 +10769,7 @@ struct ATHLTHProfileView: View {
             )
             .font(
                 .system(
-                    size: 9.5,
+                    size: 8.5,
                     weight: .semibold
                 )
             )
@@ -10779,7 +10779,7 @@ struct ATHLTHProfileView: View {
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 66
+            minHeight: 58
         )
         .background(
             Color.black.opacity(0.025),
