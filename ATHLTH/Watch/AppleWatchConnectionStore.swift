@@ -484,6 +484,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         )
     }
 
+    func sendHomeAssistantConfiguration(
+        _ configuration: WatchHomeAssistantConfiguration
+    ) {
+        sendWatchPayload(
+            configuration,
+            kind: .homeAssistantConfiguration
+        )
+    }
+
     func sendSpotifyPlaybackState(
         _ playbackState: WatchSpotifyPlaybackState
     ) {
