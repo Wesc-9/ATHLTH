@@ -1,7 +1,9 @@
+import Combine
 import Foundation
 import Supabase
 import UIKit
 
+@MainActor
 enum ATHLTHDeviceRole {
     static var isIPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
