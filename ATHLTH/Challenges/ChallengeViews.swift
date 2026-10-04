@@ -7407,16 +7407,6 @@ struct ChallengeDetailView: View {
         _ challenge: ATHLTHChallenge
     ) -> some View {
         VStack(spacing: 18) {
-            Capsule()
-                .fill(
-                    Color.secondary.opacity(0.22)
-                )
-                .frame(
-                    width: 42,
-                    height: 5
-                )
-                .padding(.top, 4)
-
             ZStack {
                 Circle()
                     .fill(
