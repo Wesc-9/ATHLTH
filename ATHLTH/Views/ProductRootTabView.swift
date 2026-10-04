@@ -312,6 +312,36 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
                 }
 
                 presentationReady = true
+
+                // A Watch workout can begin while the quick-start sheet is
+                // still dismissing. SwiftUI may drop that first presentation
+                // request even though the binding stays true. Retry only when
+                // the live view never became visible, and never reopen a
+                // workout the user explicitly minimized.
+                for delay in [
+                    Duration.milliseconds(750),
+                    Duration.milliseconds(1_250)
+                ] {
+                    try? await Task.sleep(
+                        for: delay
+                    )
+
+                    guard !Task.isCancelled,
+                          scenePhase == .active,
+                          workoutMirroring
+                            .isPresentationRequested,
+                          !workoutMirroring
+                            .isUserMinimized,
+                          !workoutMirroring
+                            .liveViewIsVisible
+                    else {
+                        return
+                    }
+
+                    presentationReady = false
+                    await Task.yield()
+                    presentationReady = true
+                }
             }
     }
 }
