@@ -1069,6 +1069,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let immersiveTransition: Bool
     let scrollFadeTransition: Bool
     let pullDownFadeBridge: Bool
+    let sheetOverlapOverride: CGFloat?
     private let hero: Hero
     private let content: Content
 
@@ -1077,7 +1078,13 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     // Tab heroes reserve extra space below their copy for the fade and overlap.
     // Other screens retain their existing layout.
     private var sheetOverlap: CGFloat {
-        immersiveTransition ? 38 : (softTransition ? 24 : 8)
+        if let sheetOverlapOverride {
+            return sheetOverlapOverride
+        }
+
+        return immersiveTransition
+            ? 38
+            : (softTransition ? 24 : 8)
     }
     private var sheetCornerRadius: CGFloat {
         immersiveTransition ? 36 : 30
@@ -1109,6 +1116,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         immersiveTransition: Bool = false,
         scrollFadeTransition: Bool = false,
         pullDownFadeBridge: Bool = false,
+        sheetOverlapOverride: CGFloat? = nil,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
@@ -1117,6 +1125,8 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         self.immersiveTransition = immersiveTransition
         self.scrollFadeTransition = scrollFadeTransition
         self.pullDownFadeBridge = pullDownFadeBridge
+        self.sheetOverlapOverride =
+            sheetOverlapOverride
         self.hero = hero()
         self.content = content()
     }
