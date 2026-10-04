@@ -981,29 +981,14 @@ struct AppRootView: View {
                     .athlthHomeAssistantCommandReceived
             )
         ) { notification in
-            guard let command =
-                    notification.object
-                        as? HomeAssistantInboundCommand
-            else {
-                return
-            }
-
-            Task {
-                await handleHomeAssistantCommand(
-                    command
-                )
-            }
+            handleHomeAssistantCommandNotification(
+                notification
+            )
         }
         .onReceive(phoneWorkout.$active) { workout in
-            guard ATHLTHDeviceRole.isIPhone else {
-                return
-            }
-
-            Task {
-                await syncHomeAssistantPhoneWorkoutLiveState(
-                    workout
-                )
-            }
+            handlePhoneWorkoutLiveUpdate(
+                workout
+            )
         }
         .onReceive(strengthWorkout.$activeWorkout) { workout in
             handleStrengthWorkoutLiveUpdate(
@@ -1013,32 +998,17 @@ struct AppRootView: View {
         .onChange(
             of: strengthWorkout.currentExerciseIndex
         ) { _, _ in
-            Task {
-                await syncHomeAssistantStrengthLiveState(
-                    strengthWorkout.activeWorkout,
-                    force: true
-                )
-            }
+            handleStrengthWorkoutProgressChanged()
         }
         .onChange(
             of: strengthWorkout.currentSetIndex
         ) { _, _ in
-            Task {
-                await syncHomeAssistantStrengthLiveState(
-                    strengthWorkout.activeWorkout,
-                    force: true
-                )
-            }
+            handleStrengthWorkoutProgressChanged()
         }
         .onChange(
             of: strengthWorkout.restEndsAt
         ) { _, _ in
-            Task {
-                await syncHomeAssistantStrengthLiveState(
-                    strengthWorkout.activeWorkout,
-                    force: true
-                )
-            }
+            handleStrengthWorkoutProgressChanged()
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -2505,6 +2475,45 @@ struct AppRootView: View {
         // Keep review mandatory. Nothing is published until the user
         // confirms the completed workout from the review screen.
         pendingWorkoutReview = workout
+    }
+
+    private func handleHomeAssistantCommandNotification(
+        _ notification: Notification
+    ) {
+        guard let command =
+                notification.object as? HomeAssistantInboundCommand
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await handleHomeAssistantCommand(
+                command
+            )
+        }
+    }
+
+    private func handlePhoneWorkoutLiveUpdate(
+        _ workout: PhoneWorkout?
+    ) {
+        guard ATHLTHDeviceRole.isIPhone else {
+            return
+        }
+
+        Task { @MainActor in
+            await syncHomeAssistantPhoneWorkoutLiveState(
+                workout
+            )
+        }
+    }
+
+    private func handleStrengthWorkoutProgressChanged() {
+        Task { @MainActor in
+            await syncHomeAssistantStrengthLiveState(
+                strengthWorkout.activeWorkout,
+                force: true
+            )
+        }
     }
 
     private func handleStrengthWorkoutLiveUpdate(
