@@ -693,15 +693,15 @@ struct MessageInboxView: View {
     }
 
     private var filteredRequestCount: Int {
-        displayedPersonItems.filter(
-            \.needsResponse
-        ).count
+        displayedPersonItems.filter {
+            $0.needsResponse
+        }.count
     }
 
     private var totalRequestCount: Int {
-        personInboxItems.filter(
-            \.needsResponse
-        ).count
+        personInboxItems.filter {
+            $0.needsResponse
+        }.count
     }
 
     private var personInboxItems:
@@ -1066,7 +1066,7 @@ private struct MessagePersonRow: View {
                 if item.latestActivityAt >
                     .distantPast {
                     Text(
-                        inboxTimestamp(
+                        timestamp(
                             item.latestActivityAt
                         )
                     )
@@ -1174,7 +1174,13 @@ private struct MessagePersonRow: View {
     private var previewText: String {
         if item.pendingChallenges.count > 1 {
             return
-                "\(item.pendingChallenges.count) utfordringer venter"
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "\(item.pendingChallenges.count) challenges waiting",
+                        norwegian:
+                            "\(item.pendingChallenges.count) utfordringer venter"
+                    )
         }
 
         if let challenge =
@@ -1196,14 +1202,32 @@ private struct MessagePersonRow: View {
         }
 
         if item.isIncomingMessageRequest {
-            return "Meldingsforespørsel"
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Message request",
+                    norwegian:
+                        "Meldingsforespørsel"
+                )
         }
 
         if item.isOutgoingMessageRequest {
-            return "Venter på svar"
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Waiting for response",
+                    norwegian:
+                        "Venter på svar"
+                )
         }
 
-        return "Start en samtale"
+        return ATHLTHLocalization
+            .choose(
+                english:
+                    "Start a conversation",
+                norwegian:
+                    "Start en samtale"
+            )
     }
 
     private var statusChips: [String] {
@@ -1213,26 +1237,85 @@ private struct MessagePersonRow: View {
             .pendingChallenges
             .isEmpty {
             values.append(
-                item.pendingChallenges
-                    .count == 1
-                    ? "Utfordring"
-                    : "\(item.pendingChallenges.count) utfordringer"
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            item.pendingChallenges
+                                .count == 1
+                                ? "Challenge"
+                                : "\(item.pendingChallenges.count) challenges",
+                        norwegian:
+                            item.pendingChallenges
+                                .count == 1
+                                ? "Utfordring"
+                                : "\(item.pendingChallenges.count) utfordringer"
+                    )
             )
         }
 
         if item
             .isIncomingMessageRequest {
             values.append(
-                "Meldingsforespørsel"
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Message request",
+                        norwegian:
+                            "Meldingsforespørsel"
+                    )
             )
         } else if item
             .isOutgoingMessageRequest {
             values.append(
-                "Venter"
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Pending",
+                        norwegian:
+                            "Venter"
+                    )
             )
         }
 
         return values
+    }
+
+    private func timestamp(
+        _ date: Date
+    ) -> String {
+        let calendar =
+            Calendar.current
+
+        if calendar
+            .isDateInToday(
+                date
+            ) {
+            return date.formatted(
+                date: .omitted,
+                time: .shortened
+            )
+        }
+
+        if calendar
+            .isDateInYesterday(
+                date
+            ) {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Yesterday",
+                    norwegian:
+                        "I går"
+                )
+        }
+
+        return date.formatted(
+            .dateTime
+                .day()
+                .month(
+                    .abbreviated
+                )
+        )
     }
 }
 
