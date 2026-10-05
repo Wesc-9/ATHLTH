@@ -1589,7 +1589,9 @@ final class IPhoneWorkoutStore:
         }
 
         workout.ghostRaceTitle =
-            title ?? "Ghost"
+            ghostOpponentName ??
+            title ??
+            "Ghost"
         workout.ghostDistanceDeltaMeters =
             comparison.signedDistanceMeters
         workout.ghostTimeDeltaSeconds =
