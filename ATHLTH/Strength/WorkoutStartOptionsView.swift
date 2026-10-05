@@ -255,6 +255,36 @@ struct WorkoutStartOptionsView: View {
                         .padding(.top, 8)
                     }
 
+                    advancedOptionButton(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Train with someone",
+                                norwegian:
+                                    "Trene med noen"
+                            ),
+                        subtitle:
+                            selectedFriendIDs.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Private invite · optional",
+                                    norwegian:
+                                        "Privat invitasjon · valgfritt"
+                                )
+                                : ATHLTHLocalization.format(
+                                    english:
+                                        "%d selected · %@",
+                                    norwegian:
+                                        "%d valgt · %@",
+                                    selectedFriendIDs.count,
+                                    socialMode.title
+                                ),
+                        icon: "person.2.fill",
+                        tint: ATHLTHTheme.vitality
+                    ) {
+                        showingTrainingPartners = true
+                    }
+
                     if trackingMode == .advanced {
                         VStack(spacing: 9) {
                             advancedOptionButton(
@@ -297,29 +327,6 @@ struct WorkoutStartOptionsView: View {
                                 tint: ATHLTHTheme.accent
                             ) {
                                 showingRestCueSettings = true
-                            }
-
-                            advancedOptionButton(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english: "Train Together",
-                                        norwegian: "Tren sammen"
-                                    ),
-                                subtitle:
-                                    selectedFriendIDs.isEmpty
-                                        ? ATHLTHLocalization.choose(
-                                            english: "No one selected",
-                                            norwegian: "Ingen valgt"
-                                        )
-                                        : ATHLTHLocalization.format(
-                                            english: "%d selected",
-                                            norwegian: "%d valgt",
-                                            selectedFriendIDs.count
-                                        ),
-                                icon: "person.2.fill",
-                                tint: ATHLTHTheme.vitality
-                            ) {
-                                showingTrainingPartners = true
                             }
 
                             advancedOptionButton(
@@ -523,8 +530,10 @@ struct WorkoutStartOptionsView: View {
                     }
                     .navigationTitle(
                         ATHLTHLocalization.choose(
-                            english: "Train Together",
-                            norwegian: "Tren sammen"
+                            english:
+                                "Train with someone",
+                            norwegian:
+                                "Trene med noen"
                         )
                     )
                     .navigationBarTitleDisplayMode(.inline)
@@ -605,15 +614,13 @@ struct WorkoutStartOptionsView: View {
     private var strengthStartButton: some View {
         Button {
             let selectedFriends =
-                trackingMode == .advanced
-                    ? social.trainingPartners
-                        .filter {
-                            selectedFriendIDs
-                                .contains(
-                                    $0.userID
-                                )
-                        }
-                    : []
+                social.trainingPartners
+                    .filter {
+                        selectedFriendIDs
+                            .contains(
+                                $0.userID
+                            )
+                    }
 
             let advancedConfiguration =
                 StrengthAdvancedConfiguration(
