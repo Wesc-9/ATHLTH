@@ -311,9 +311,9 @@ struct TrainTogetherMarketplaceView:
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Create a real workout you want company for. Everyone can browse the list and ask to join. You decide who is accepted.",
+                            "Create a real workout you want company for. Choose in-person or remote, then approve requests or open the workout for instant joining.",
                         norwegian:
-                            "Opprett en konkret treningsøkt du ønsker selskap på. Alle kan se listen og spørre om å bli med. Du bestemmer hvem som godkjennes."
+                            "Opprett en konkret treningsøkt du ønsker selskap på. Velg fysisk eller på avstand, og godkjenn forespørsler eller åpne økten for direkte påmelding."
                     )
                 )
                 .font(.subheadline)
@@ -670,6 +670,30 @@ struct TrainTogetherMarketplaceView:
                             icon: "clock"
                         )
                     }
+                }
+
+                HStack(spacing: 8) {
+                    infoPill(
+                        post
+                            .resolvedParticipationMode
+                            .title,
+                        icon:
+                            post
+                                .resolvedParticipationMode
+                                .systemImage
+                    )
+
+                    infoPill(
+                        post
+                            .resolvedJoinPolicy
+                            .title,
+                        icon:
+                            post
+                                .resolvedJoinPolicy ==
+                                .open
+                                ? "door.left.hand.open"
+                                : "hand.raised.fill"
+                    )
                 }
 
                 if let request =
