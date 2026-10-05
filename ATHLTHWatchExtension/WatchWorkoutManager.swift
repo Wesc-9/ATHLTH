@@ -3542,24 +3542,42 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             currentSign != 0 &&
             lastGhostLeadSign != 0 &&
             currentSign !=
-                lastGhostLeadSign
+                lastGhostLeadSign &&
+            abs(distanceDelta) >=
+                configuration
+                    .resolvedLeadFlipThresholdMeters
 
-        let movedEnough =
-            lastGhostAnnouncedLeadMeters.map {
+        let previousLead =
+            lastGhostAnnouncedLeadMeters
+        let absoluteLeadChange =
+            previousLead.map {
                 abs(
                     distanceDelta - $0
-                ) >=
+                )
+            } ?? 0
+        let movedEnough =
+            absoluteLeadChange >=
                 max(
                     configuration
                         .leadChangeThresholdMeters,
                     10
                 )
-            } ?? false
+        let important =
+            signChanged ||
+            absoluteLeadChange >=
+                configuration
+                    .resolvedImportantLeadChangeMeters
+        let requiredCooldown =
+            important
+                ? configuration
+                    .resolvedImportantLeadChangeCooldownSeconds
+                : configuration
+                    .resolvedLeadChangeCooldownSeconds
 
         let cooldownSatisfied =
             lastGhostLeadAlertAt.map {
                 Date().timeIntervalSince($0) >=
-                    30
+                    requiredCooldown
             } ?? true
 
         guard cooldownSatisfied &&
@@ -3573,20 +3591,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
             return
         }
-
-        let previousLead =
-            lastGhostAnnouncedLeadMeters
-        let absoluteLeadChange =
-            previousLead.map {
-                abs(
-                    distanceDelta - $0
-                )
-            } ?? 0
-        let important =
-            signChanged ||
-            absoluteLeadChange >=
-                configuration
-                    .resolvedImportantLeadChangeMeters
 
         announceGhostRaceLead(
             distanceDelta:
