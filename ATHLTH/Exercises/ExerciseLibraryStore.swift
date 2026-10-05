@@ -88,6 +88,7 @@ final class ExerciseLibraryStore: ObservableObject {
     private let client: SupabaseClient = SupabaseEnvironment.client
 
     private var accountID: UUID?
+    private var lastATHLTHCatalogRefreshAt: Date?
 
     init() {
         loadCachedRepDB()
@@ -138,7 +139,9 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func refresh(force: Bool = false) async {
-        await refreshATHLTHCatalog()
+        await refreshATHLTHCatalog(
+            force: force
+        )
 
         if !force,
            !repDBExercises.isEmpty,
@@ -325,7 +328,18 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
 
-    private func refreshATHLTHCatalog() async {
+    private func refreshATHLTHCatalog(
+        force: Bool = false
+    ) async {
+        if !force,
+           !athlthCatalogExercises.isEmpty,
+           let lastATHLTHCatalogRefreshAt,
+           Date().timeIntervalSince(
+                lastATHLTHCatalogRefreshAt
+           ) < 30 * 60 {
+            return
+        }
+
         do {
             let rows: [ATHLTHExerciseCatalogRecord] =
                 try await client
@@ -338,9 +352,27 @@ final class ExerciseLibraryStore: ObservableObject {
                     .execute()
                     .value
 
+            lastATHLTHCatalogRefreshAt =
+                Date()
+
             if !rows.isEmpty {
-                athlthCatalogExercises =
+                let refreshed =
                     rows.map(mapATHLTHCatalog)
+
+                let currentSignature =
+                    athlthCatalogExercises.map {
+                        "\($0.id.uuidString)|\($0.name)"
+                    }
+                let refreshedSignature =
+                    refreshed.map {
+                        "\($0.id.uuidString)|\($0.name)"
+                    }
+
+                if currentSignature !=
+                    refreshedSignature {
+                    athlthCatalogExercises =
+                        refreshed
+                }
             }
         } catch {
             if athlthCatalogExercises.isEmpty {
