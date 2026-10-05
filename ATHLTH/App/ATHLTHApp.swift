@@ -3434,8 +3434,12 @@ struct AppRootView: View {
 
         let presence =
             appSession.profile.presence
+        let plannedOccurrences =
+            homeAssistantPlannedOccurrences()
         let nextWorkout =
-            homeAssistantNextWorkoutOccurrence()
+            homeAssistantNextWorkoutOccurrence(
+                from: plannedOccurrences
+            )
         let weeklyMetrics =
             homeAssistantWeeklyTrainingMetrics()
         let primaryGoal =
@@ -3480,7 +3484,9 @@ struct AppRootView: View {
                     health.recovery.state
                 ),
             weeklyProgress:
-                homeAssistantWeeklyProgress(),
+                homeAssistantWeeklyProgress(
+                    from: plannedOccurrences
+                ),
             weeklyTrainingMinutes:
                 weeklyMetrics.minutes,
             weeklyDistanceKilometers:
@@ -3502,7 +3508,9 @@ struct AppRootView: View {
             goalDaysRemaining:
                 goalDaysRemaining,
             calendarEvents:
-                homeAssistantCalendarEvents()
+                homeAssistantCalendarEvents(
+                    from: plannedOccurrences
+                )
         )
 
         await syncHomeAssistantPhoneWorkoutLiveState(
@@ -3518,13 +3526,14 @@ struct AppRootView: View {
             Date()
     }
 
+    private typealias HomeAssistantPlannedOccurrence =
+        (
+            planID: UUID?,
+            session: PlannedSession
+        )
+
     private func homeAssistantPlannedOccurrences()
-        -> [
-            (
-                planID: UUID?,
-                session: PlannedSession
-            )
-        ] {
+        -> [HomeAssistantPlannedOccurrence] {
         var plansByID: [UUID: TrainingPlan] = [:]
 
         if let activePlan =
@@ -3538,12 +3547,7 @@ struct AppRootView: View {
         }
 
         var occurrences:
-            [
-                (
-                    planID: UUID?,
-                    session: PlannedSession
-                )
-            ] = []
+            [HomeAssistantPlannedOccurrence] = []
 
         for plan in plansByID.values {
             for session in
@@ -3574,12 +3578,14 @@ struct AppRootView: View {
         return occurrences
     }
 
-    private func homeAssistantNextWorkoutOccurrence()
-        -> (title: String, time: Date)? {
+    private func homeAssistantNextWorkoutOccurrence(
+        from occurrences:
+            [HomeAssistantPlannedOccurrence]
+    ) -> (title: String, time: Date)? {
         let now = Date()
 
         let candidates =
-            homeAssistantPlannedOccurrences()
+            occurrences
                 .filter { occurrence in
                     guard let start =
                             occurrence.session
@@ -3770,8 +3776,10 @@ struct AppRootView: View {
         )
     }
 
-    private func homeAssistantCalendarEvents()
-        -> [HomeAssistantCalendarEventPayload] {
+    private func homeAssistantCalendarEvents(
+        from occurrences:
+            [HomeAssistantPlannedOccurrence]
+    ) -> [HomeAssistantCalendarEventPayload] {
         let now = Date()
         let lowerBound =
             Calendar.current.date(
@@ -3786,7 +3794,7 @@ struct AppRootView: View {
                 to: now
             ) ?? now
 
-        return homeAssistantPlannedOccurrences()
+        return occurrences
             .compactMap { occurrence in
                 guard let start =
                         occurrence
@@ -3856,8 +3864,10 @@ struct AppRootView: View {
             .map { $0 }
     }
 
-    private func homeAssistantWeeklyProgress()
-        -> Double? {
+    private func homeAssistantWeeklyProgress(
+        from occurrences:
+            [HomeAssistantPlannedOccurrence]
+    ) -> Double? {
         var calendar = Calendar.current
         calendar.firstWeekday = 2
 
@@ -3882,7 +3892,7 @@ struct AppRootView: View {
         var unfinished = 0
 
         let planned =
-            homeAssistantPlannedOccurrences()
+            occurrences
                 .filter {
                     guard let start =
                             $0.session
