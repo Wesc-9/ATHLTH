@@ -11,7 +11,13 @@ struct WorkoutFriendPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Train together (optional)", systemImage: "person.2.fill")
+                Label(
+                        ATHLTHLocalization.choose(
+                            english: "Train with someone",
+                            norwegian: "Trene med noen"
+                        ),
+                        systemImage: "person.2.fill"
+                    )
                     .font(.headline)
 
                 Spacer()
@@ -90,8 +96,18 @@ struct WorkoutFriendPicker: View {
 
             Text(
                 selectedFriendIDs.isEmpty
-                    ? "You can always start the workout solo."
-                    : "Selected training partners receive an invite and appear on the workout after they accept."
+                    ? ATHLTHLocalization.choose(
+                            english:
+                                "You can always start the workout solo.",
+                            norwegian:
+                                "Du kan alltid starte økten alene."
+                        )
+                    : ATHLTHLocalization.choose(
+                            english:
+                                "Selected training partners receive a private workout invite.",
+                            norwegian:
+                                "Valgte treningspartnere får en privat invitasjon til økten."
+                        )
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
