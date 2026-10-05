@@ -7265,12 +7265,14 @@ struct ATHLTHRecoveryView: View {
             }
             .sheet(isPresented: $showingRecoveryCoach) {
                 if session.aiHealthDataSharingEnabled {
-                    RecoveryCoachView(
-                        context: recoveryAIContext,
-                        insight:
-                            recoveryAIInsight ??
-                            fallbackRecoveryAIInsight
-                    )
+                    NavigationStack {
+                        RecoveryCoachView(
+                            context: recoveryAIContext,
+                            insight:
+                                recoveryAIInsight ??
+                                fallbackRecoveryAIInsight
+                        )
+                    }
                 } else {
                     ContentUnavailableView(
                         insightText("Coach health access is off", "Tilgang til helsedata for Coach er av"),
