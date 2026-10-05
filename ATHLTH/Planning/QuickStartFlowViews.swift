@@ -1058,7 +1058,9 @@ struct RunQuickStartSheet: View {
                     modeCard
                     runEnvironmentCard
 
-                    runDeviceCard
+                    if ATHLTHDeviceRole.isIPad {
+                        runDeviceCard
+                    }
 
                     selectionCard
 
@@ -1984,103 +1986,91 @@ struct RunQuickStartSheet: View {
     }
 
     private var runStickyStartBar: some View {
-        startButton
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            .background(
-                .ultraThinMaterial
-            )
-            .overlay(
-                alignment: .top
-            ) {
-                Divider()
-                    .opacity(0.35)
+        Group {
+            if ATHLTHDeviceRole.isIPad {
+                startButton
+            } else {
+                iPhoneRunActions
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(
+            .ultraThinMaterial
+        )
+        .overlay(
+            alignment: .top
+        ) {
+            Divider()
+                .opacity(0.35)
+        }
+    }
+
+    private var iPhoneRunActions: some View {
+        VStack(spacing: 7) {
+            Button {
+                submitQuickRun(
+                    captureDevice: .iPhone
+                )
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Start Workout",
+                        norwegian: "Start økt"
+                    ),
+                    systemImage: "play.fill"
+                )
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(ATHLTHTheme.vitality)
+            .disabled(!canSubmitQuickRun(
+                captureDevice: .iPhone
+            ))
+
+            Button {
+                submitQuickRun(
+                    captureDevice: .appleWatch
+                )
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Send to Apple Watch",
+                        norwegian: "Send til Apple Watch"
+                    ),
+                    systemImage: "applewatch"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(ATHLTHTheme.accentDeep)
+            .disabled(
+                !canSubmitQuickRun(
+                    captureDevice: .appleWatch
+                )
+            )
+            .opacity(
+                watchConnected
+                    ? 1
+                    : 0.55
+            )
+        }
     }
 
     private var startButton: some View {
         Button {
-            let friends =
-                social.trainingPartners
-                    .filter {
-                        selectedFriendIDs
-                            .contains(
-                                $0.userID
-                            )
-                    }
-
-            var routeAlerts =
-                routeGuardianDraft
-                    .configuration
-            if !isAdvancedSetup {
-                routeAlerts.enabled = false
-            }
-
-            onStart(
-                RunQuickStartConfiguration(
-                    mode: mode,
-                    route:
-                        mode == .route
-                            ? selectedRoute
-                            : nil,
-                    workout:
-                        mode == .structured
-                            ? selectedWorkout
-                            : nil,
-                    captureDevice: captureDevice,
-                    environment: environment,
-                    treadmillInclinePercent:
-                        environment == .treadmill
-                            ? treadmillInclinePercent
-                            : nil,
-                    audioCoach:
-                        isAdvancedSetup
-                            ? audioCoachConfiguration
-                            : .disabled,
-                    routeAlerts:
-                        routeAlerts,
-                    ghostTargetDurationSeconds:
-                        isAdvancedSetup &&
-                        guidanceRoute != nil
-                            ? ghostDraft
-                                .targetDuration
-                            : nil,
-                    ghostUpdates:
-                        isAdvancedSetup &&
-                        guidanceRoute != nil &&
-                        ghostDraft.enabled &&
-                        ghostDraft.updatesEnabled
-                            ? settings
-                                .ghostRaceAudioConfiguration
-                            : nil,
-                    autoPauseEnabled:
-                        environment == .outdoor &&
-                        (
-                            isAdvancedSetup
-                                ? autoPausePreference
-                                : .appDefault
-                        )
-                        .resolved(
-                            appDefault:
-                                settings.autoPauseOutdoorWorkouts
-                        ),
-                    spotifyPlaylist:
-                        isAdvancedSetup &&
-                        spotifyAutoplay
-                            ? selectedSpotifyPlaylist
-                            : nil,
-                    spotifyAutoplay:
-                        isAdvancedSetup &&
-                        spotifyAutoplay &&
-                        selectedSpotifyPlaylist != nil,
-                    friends: friends,
-                    socialMode:
-                        socialMode,
-                    gearIDs: selectedGearIDs
-                )
+            submitQuickRun(
+                captureDevice:
+                    captureDevice
             )
-            dismiss()
         } label: {
             Label(
                 startButtonTitle,
@@ -2095,28 +2085,134 @@ struct RunQuickStartSheet: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .tint(ATHLTHTheme.vitality)
-        .disabled(!canStart)
+        .disabled(
+            !canSubmitQuickRun(
+                captureDevice:
+                    captureDevice
+            )
+        )
+    }
+
+    private func canSubmitQuickRun(
+        captureDevice:
+            WorkoutCaptureDevice
+    ) -> Bool {
+        if captureDevice == .appleWatch,
+           !watchConnected,
+           !ATHLTHDeviceRole.isIPad {
+            return false
+        }
+
+        switch mode {
+        case .free:
+            return true
+        case .route:
+            return selectedRoute != nil
+        case .structured:
+            return selectedWorkout != nil
+        }
+    }
+
+    private func submitQuickRun(
+        captureDevice:
+            WorkoutCaptureDevice
+    ) {
+        guard canSubmitQuickRun(
+            captureDevice:
+                captureDevice
+        ) else {
+            return
+        }
+
+        let friends =
+            social.trainingPartners
+                .filter {
+                    selectedFriendIDs
+                        .contains(
+                            $0.userID
+                        )
+                }
+
+        var routeAlerts =
+            routeGuardianDraft
+                .configuration
+        if !isAdvancedSetup {
+            routeAlerts.enabled = false
+        }
+
+        onStart(
+            RunQuickStartConfiguration(
+                mode: mode,
+                route:
+                    mode == .route
+                        ? selectedRoute
+                        : nil,
+                workout:
+                    mode == .structured
+                        ? selectedWorkout
+                        : nil,
+                captureDevice:
+                    captureDevice,
+                environment: environment,
+                treadmillInclinePercent:
+                    environment == .treadmill
+                        ? treadmillInclinePercent
+                        : nil,
+                audioCoach:
+                    isAdvancedSetup
+                        ? audioCoachConfiguration
+                        : .disabled,
+                routeAlerts:
+                    routeAlerts,
+                ghostTargetDurationSeconds:
+                    isAdvancedSetup &&
+                    guidanceRoute != nil
+                        ? ghostDraft
+                            .targetDuration
+                        : nil,
+                ghostUpdates:
+                    isAdvancedSetup &&
+                    guidanceRoute != nil &&
+                    ghostDraft.enabled &&
+                    ghostDraft.updatesEnabled
+                        ? settings
+                            .ghostRaceAudioConfiguration
+                        : nil,
+                autoPauseEnabled:
+                    environment == .outdoor &&
+                    (
+                        isAdvancedSetup
+                            ? autoPausePreference
+                            : .appDefault
+                    )
+                    .resolved(
+                        appDefault:
+                            settings.autoPauseOutdoorWorkouts
+                    ),
+                spotifyPlaylist:
+                    isAdvancedSetup &&
+                    spotifyAutoplay
+                        ? selectedSpotifyPlaylist
+                        : nil,
+                spotifyAutoplay:
+                    isAdvancedSetup &&
+                    spotifyAutoplay &&
+                    selectedSpotifyPlaylist != nil,
+                friends: friends,
+                socialMode:
+                    socialMode,
+                gearIDs: selectedGearIDs
+            )
+        )
+        dismiss()
     }
 
     private var startButtonTitle: String {
         if captureDevice == .iPhone {
-            switch mode {
-            case .free:
-                return ATHLTHLocalization.choose(
-                    english: "Start Free Run on iPhone",
-                    norwegian: "Start fri løpeøkt på iPhone"
-                )
-            case .route:
-                return ATHLTHLocalization.choose(
-                    english: "Start Route on iPhone",
-                    norwegian: "Start rute på iPhone"
-                )
-            case .structured:
-                return ATHLTHLocalization.choose(
-                    english: "Start Workout on iPhone",
-                    norwegian: "Start treningsøkt på iPhone"
-                )
-            }
+            return ATHLTHLocalization.choose(
+                english: "Start Workout",
+                norwegian: "Start økt"
+            )
         }
 
         guard watchConnected ||
