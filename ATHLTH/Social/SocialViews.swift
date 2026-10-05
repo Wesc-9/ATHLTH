@@ -2737,7 +2737,8 @@ struct FriendProfileView: View {
                             URL(
                                 string:
                                     item.imageURL
-                            )
+                            ),
+                        maxPixelSize: 420
                     ) { phase in
                         switch phase {
                         case .success(let image):
