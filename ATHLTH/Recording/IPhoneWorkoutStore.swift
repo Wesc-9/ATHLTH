@@ -2014,7 +2014,10 @@ final class IPhoneWorkoutStore:
         let signChanged =
             currentSign != 0 &&
             lastGhostLeadSign != 0 &&
-            currentSign != lastGhostLeadSign
+            currentSign != lastGhostLeadSign &&
+            abs(distanceDelta) >=
+                configuration
+                    .resolvedLeadFlipThresholdMeters
         let change =
             lastGhostAnnouncedLeadMeters.map {
                 abs(distanceDelta - $0)
@@ -2026,10 +2029,21 @@ final class IPhoneWorkoutStore:
                     .leadChangeThresholdMeters,
                 10
             )
+        let important =
+            signChanged ||
+            change >=
+                configuration
+                    .resolvedImportantLeadChangeMeters
+        let requiredCooldown =
+            important
+                ? configuration
+                    .resolvedImportantLeadChangeCooldownSeconds
+                : configuration
+                    .resolvedLeadChangeCooldownSeconds
         let cooldownSatisfied =
             lastGhostLeadAlertAt.map {
                 Date().timeIntervalSince($0) >=
-                    30
+                    requiredCooldown
             } ?? true
 
         guard cooldownSatisfied &&
@@ -2044,12 +2058,6 @@ final class IPhoneWorkoutStore:
             }
             return
         }
-
-        let important =
-            signChanged ||
-            change >=
-                configuration
-                    .resolvedImportantLeadChangeMeters
 
         deliverGhostUpdate(
             distanceDelta: distanceDelta,
