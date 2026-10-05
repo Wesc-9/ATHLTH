@@ -630,7 +630,8 @@ struct HomeActivityStrengthDetailView: View {
                     .scaledToFill()
             } else {
                 ATHLTHStorageImage(
-                    url: url
+                    url: url,
+                    maxPixelSize: 1_000
                 ) { phase in
                     switch phase {
                     case .success(let image):
