@@ -243,7 +243,13 @@ struct ExerciseLibraryView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
 
-                TextField("Search exercise, muscle or equipment", text: $query)
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Search exercise, muscle or equipment",
+                        norwegian: "Søk øvelse på norsk eller engelsk"
+                    ),
+                    text: $query
+                )
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
