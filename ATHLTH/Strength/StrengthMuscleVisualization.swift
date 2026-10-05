@@ -273,9 +273,10 @@ enum StrengthMuscleProfileBuilder {
         // that are missing their primary-muscle metadata. This avoids walking
         // and grouping the full exercise database every time a strength
         // detail view is evaluated.
-        let legacyLookupNames =
+        let legacyLookupNames: Set<String> =
             Set(
-                performed.compactMap { log in
+                performed.compactMap {
+                    log -> String? in
                     guard log.exercise
                         .primaryMuscles
                         .isEmpty
