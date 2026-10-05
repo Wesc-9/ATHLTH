@@ -203,6 +203,7 @@ private struct HomeAssistantPairResponse: Decodable {
 private struct HomeAssistantStoredPairing: Codable {
     let instanceName: String
     let instanceURL: URL
+    let alternateURL: URL?
     let protocolVersion: Int
     let clientID: String
     let webhookID: String
@@ -380,8 +381,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         [HomeAssistantDiscoveredInstance] = []
     @Published private(set) var connectedInstanceName: String?
     @Published private(set) var connectedInstanceURL: URL?
+    @Published private(set) var connectedAlternateURL: URL? = nil
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var lastConnectionTestSucceeded = false
+    @Published private(set) var lastLocalConnectionTestSucceeded: Bool? = nil
+    @Published private(set) var lastAlternateConnectionTestSucceeded: Bool? = nil
     @Published private(set) var pendingDeliveryCount: Int = 0
     @Published var syncMode: HomeAssistantSyncMode {
         didSet {
@@ -574,6 +578,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         label: "com.wesc9.athlth.home-assistant.discovery",
         qos: .userInitiated
     )
+    private let routeMonitor = NWPathMonitor()
+    private let routeMonitorQueue = DispatchQueue(
+        label: "com.wesc9.athlth.home-assistant.route-monitor",
+        qos: .utility
+    )
 
     private var browser: NWBrowser?
     private var webAuthenticationSession: ASWebAuthenticationSession?
@@ -582,6 +591,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     private var hasPersistedPendingDeliveries = false
     private var lastSnapshotState:
         [String: HomeAssistantJSONValue]?
+    private var prefersLocalNetworkRoute = true
 
     private var oauthClientID: String {
         configuredInfoValue("ATHLTHHomeAssistantClientID")
@@ -622,6 +632,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             clientID: pairing.clientID,
             webhookURL: pairing.webhookURL,
             fallbackWebhookURL:
+                Self.alternateWebhookURL(
+                    for: pairing
+                ) ??
                 Self.fallbackWebhookURL(
                     for: pairing
                 ),
@@ -749,8 +762,24 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             )
         connectedInstanceName = restored?.instanceName
         connectedInstanceURL = restored?.instanceURL
+        connectedAlternateURL = restored?.alternateURL
         connectionState = restored == nil ? .disconnected : .connected
         super.init()
+
+        routeMonitor.pathUpdateHandler = {
+            [weak self] path in
+            let prefersLocal =
+                path.usesInterfaceType(.wifi) ||
+                path.usesInterfaceType(.wiredEthernet)
+            Task { @MainActor [weak self] in
+                self?.prefersLocalNetworkRoute =
+                    prefersLocal
+            }
+        }
+        routeMonitor.start(
+            queue: routeMonitorQueue
+        )
+
         hasPersistedPendingDeliveries =
             !restoredPending.isEmpty
         updatePendingDeliveryCountIfNeeded()
@@ -851,7 +880,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             await completeLocalPairing(
                 baseURL: baseURL,
                 instanceName: instance.name,
-                pairingCode: pairingCode
+                pairingCode: pairingCode,
+                alternateURL:
+                    instance.externalURL == baseURL
+                    ? nil
+                    : instance.externalURL
             )
         }
     }
@@ -901,7 +934,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
         beginAuthorization(
             baseURL: baseURL,
-            instanceName: instance.name
+            instanceName: instance.name,
+            alternateURL:
+                instance.externalURL == baseURL
+                ? nil
+                : instance.externalURL
         )
     }
 
@@ -928,6 +965,114 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         )
     }
 
+    func configureAlternateAddress(
+        _ address: String
+    ) {
+        guard let pairing = storedPairing else {
+            return
+        }
+
+        let trimmed =
+            address.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        if trimmed.isEmpty {
+            updateAlternateURL(
+                nil,
+                for: pairing
+            )
+            return
+        }
+
+        guard let alternateURL =
+                Self.normalizedBaseURL(
+                    from: trimmed
+                )
+        else {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Enter a valid VPN or external Home Assistant address.",
+                norwegian:
+                    "Skriv inn en gyldig VPN- eller ekstern Home Assistant-adresse."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        updateAlternateURL(
+            alternateURL,
+            for: pairing
+        )
+    }
+
+    func clearAlternateAddress() {
+        guard let pairing = storedPairing else {
+            return
+        }
+
+        updateAlternateURL(
+            nil,
+            for: pairing
+        )
+    }
+
+    private func updateAlternateURL(
+        _ alternateURL: URL?,
+        for pairing: HomeAssistantStoredPairing
+    ) {
+        let updated =
+            HomeAssistantStoredPairing(
+                instanceName:
+                    pairing.instanceName,
+                instanceURL:
+                    pairing.instanceURL,
+                alternateURL:
+                    alternateURL,
+                protocolVersion:
+                    pairing.protocolVersion,
+                clientID:
+                    pairing.clientID,
+                webhookID:
+                    pairing.webhookID,
+                webhookURL:
+                    pairing.webhookURL,
+                webhookPath:
+                    pairing.webhookPath,
+                sharedSecret:
+                    pairing.sharedSecret,
+                signatureAlgorithm:
+                    pairing.signatureAlgorithm,
+                capabilities:
+                    pairing.capabilities,
+                pairedAt:
+                    pairing.pairedAt
+            )
+
+        do {
+            try storePairing(updated)
+            storedPairing = updated
+            connectedAlternateURL =
+                alternateURL
+            lastLocalConnectionTestSucceeded =
+                nil
+            lastAlternateConnectionTestSucceeded =
+                nil
+            lastConnectionTestSucceeded =
+                false
+            lastErrorMessage = nil
+            connectionState = .connected
+        } catch {
+            lastErrorMessage =
+                error.localizedDescription
+            connectionState =
+                .error(
+                    error.localizedDescription
+                )
+        }
+    }
+
     func disconnect() async {
         if isConnected {
             try? await send(event: "unpair")
@@ -946,9 +1091,12 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         storedPairing = nil
         connectedInstanceName = nil
         connectedInstanceURL = nil
+        connectedAlternateURL = nil
         discoveredInstances = []
         lastErrorMessage = nil
         lastConnectionTestSucceeded = false
+        lastLocalConnectionTestSucceeded = nil
+        lastAlternateConnectionTestSucceeded = nil
         connectionState = .disconnected
         lastSnapshotState = nil
     }
@@ -969,8 +1117,17 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         encoder.outputFormatting = [.sortedKeys]
         let body = try encoder.encode(envelope)
 
-        let timestamp = String(Int(Date().timeIntervalSince1970))
-        let nonce = UUID().uuidString.lowercased()
+        let timestamp =
+            String(
+                Int(
+                    Date()
+                        .timeIntervalSince1970
+                )
+            )
+        let nonce =
+            UUID()
+                .uuidString
+                .lowercased()
         let signature = Self.signature(
             secret: pairing.sharedSecret,
             timestamp: timestamp,
@@ -978,96 +1135,86 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             body: body
         )
 
-        do {
-            let result = try await Self.sendWebhookRequest(
-                to: pairing.webhookURL,
-                body: body,
-                timestamp: timestamp,
-                nonce: nonce,
-                signature: signature,
-                clientID: pairing.clientID
+        let candidates =
+            webhookCandidates(
+                for: pairing
             )
+        guard !candidates.isEmpty else {
+            throw HomeAssistantConnectionError
+                .webhookUnavailable
+        }
 
-            guard (200..<300).contains(result.statusCode) else {
-                if Self.shouldTryWebhookFallback(
-                    after: result.statusCode
-                ),
-                   let fallback =
-                    Self.fallbackWebhookURL(
-                        for: pairing
-                    ),
-                   fallback != pairing.webhookURL {
-                    let fallbackResult =
-                        try await Self.sendWebhookRequest(
-                            to: fallback,
+        let timeoutInterval:
+            TimeInterval =
+                candidates.count > 1
+                ? 6
+                : 15
+        var lastFailure: Error =
+            HomeAssistantConnectionError
+                .webhookUnavailable
+
+        for (
+            index,
+            url
+        ) in candidates.enumerated() {
+            do {
+                let result =
+                    try await Self
+                        .sendWebhookRequest(
+                            to: url,
                             body: body,
-                            timestamp: timestamp,
+                            timestamp:
+                                timestamp,
                             nonce: nonce,
-                            signature: signature,
-                            clientID: pairing.clientID
+                            signature:
+                                signature,
+                            clientID:
+                                pairing.clientID,
+                            timeoutInterval:
+                                timeoutInterval
                         )
 
-                    guard (200..<300)
-                        .contains(
-                            fallbackResult.statusCode
-                        ) ||
-                        fallbackResult.statusCode == 409
-                    else {
-                        throw Self.webhookError(
-                            for: fallbackResult.statusCode
-                        )
-                    }
+                if (200..<300)
+                    .contains(
+                        result.statusCode
+                    ) ||
+                    result.statusCode == 409 {
                     await handleWebhookResponse(
-                        fallbackResult.data,
+                        result.data,
                         sourceEvent: event
                     )
                     return
                 }
 
-                throw Self.webhookError(
-                    for: result.statusCode
-                )
+                let requestError =
+                    Self.webhookError(
+                        for:
+                            result.statusCode
+                    )
+                lastFailure =
+                    requestError
+
+                if !Self
+                    .shouldTryWebhookFallback(
+                        after:
+                            result.statusCode
+                    ) {
+                    throw requestError
+                }
+            } catch {
+                lastFailure = error
             }
 
-            await handleWebhookResponse(
-                result.data,
-                sourceEvent: event
-            )
-        } catch let error as HomeAssistantConnectionError {
-            throw error
-        } catch {
-            guard let fallback =
-                    Self.fallbackWebhookURL(
-                        for: pairing
-                    ),
-                  fallback != pairing.webhookURL
-            else {
-                throw error
+            if index ==
+                candidates.index(
+                    before:
+                        candidates.endIndex
+                ) {
+                throw lastFailure
             }
-
-            let fallbackResult =
-                try await Self.sendWebhookRequest(
-                    to: fallback,
-                    body: body,
-                    timestamp: timestamp,
-                    nonce: nonce,
-                    signature: signature,
-                    clientID: pairing.clientID
-                )
-
-            guard (200..<300).contains(fallbackResult.statusCode) ||
-                    fallbackResult.statusCode == 409
-            else {
-                throw Self.webhookError(
-                    for: fallbackResult.statusCode
-                )
-            }
-
-            await handleWebhookResponse(
-                fallbackResult.data,
-                sourceEvent: event
-            )
         }
+
+        throw lastFailure
     }
 
     private func handleWebhookResponse(
@@ -1670,27 +1817,151 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     }
 
     func sendConnectionTest() async {
-        guard isConnected else {
+        guard let pairing = storedPairing else {
             return
         }
 
         lastConnectionTestSucceeded = false
+        lastLocalConnectionTestSucceeded = nil
+        lastAlternateConnectionTestSucceeded = nil
 
-        do {
-            try await send(
+        let localURL =
+            Self.fallbackWebhookURL(
+                for: pairing
+            )
+        let alternateURL =
+            Self.alternateWebhookURL(
+                for: pairing
+            )
+
+        var anySucceeded = false
+
+        if let localURL {
+            let succeeded =
+                await testWebhookRoute(
+                    localURL,
+                    pairing: pairing
+                )
+            lastLocalConnectionTestSucceeded =
+                succeeded
+            anySucceeded =
+                anySucceeded || succeeded
+        }
+
+        if let alternateURL,
+           alternateURL != localURL {
+            let succeeded =
+                await testWebhookRoute(
+                    alternateURL,
+                    pairing: pairing
+                )
+            lastAlternateConnectionTestSucceeded =
+                succeeded
+            anySucceeded =
+                anySucceeded || succeeded
+        }
+
+        if pairing.webhookURL != localURL,
+           pairing.webhookURL != alternateURL {
+            anySucceeded =
+                anySucceeded ||
+                await testWebhookRoute(
+                    pairing.webhookURL,
+                    pairing: pairing
+                )
+        }
+
+        lastConnectionTestSucceeded =
+            anySucceeded
+
+        if anySucceeded {
+            lastErrorMessage = nil
+            connectionState = .connected
+        } else {
+            let message =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could not reach Home Assistant through the configured connections.",
+                    norwegian:
+                        "Fikk ikke kontakt med Home Assistant via de konfigurerte tilkoblingene."
+                )
+            lastErrorMessage = message
+            connectionState =
+                .error(message)
+        }
+    }
+
+    private func testWebhookRoute(
+        _ url: URL,
+        pairing: HomeAssistantStoredPairing
+    ) async -> Bool {
+        let envelope =
+            HomeAssistantWebhookEnvelope(
                 event: "sync_snapshot",
                 payload: [
                     "state": .object([:])
                 ]
             )
-            lastErrorMessage = nil
-            lastConnectionTestSucceeded = true
-            connectionState = .connected
-        } catch {
-            lastConnectionTestSucceeded = false
-            lastErrorMessage = error.localizedDescription
-            connectionState = .error(error.localizedDescription)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting =
+            [.sortedKeys]
+
+        guard let body =
+                try? encoder.encode(
+                    envelope
+                )
+        else {
+            return false
         }
+
+        let timestamp =
+            String(
+                Int(
+                    Date()
+                        .timeIntervalSince1970
+                )
+            )
+        let nonce =
+            UUID()
+                .uuidString
+                .lowercased()
+        let signature =
+            Self.signature(
+                secret:
+                    pairing.sharedSecret,
+                timestamp:
+                    timestamp,
+                nonce:
+                    nonce,
+                body:
+                    body
+            )
+
+        guard let result =
+                try? await Self
+                    .sendWebhookRequest(
+                        to: url,
+                        body: body,
+                        timestamp:
+                            timestamp,
+                        nonce:
+                            nonce,
+                        signature:
+                            signature,
+                        clientID:
+                            pairing.clientID,
+                        timeoutInterval:
+                            5
+                    )
+        else {
+            return false
+        }
+
+        return (200..<300)
+            .contains(
+                result.statusCode
+            ) ||
+            result.statusCode == 409
     }
 
     func enableAllSharing() {
@@ -2595,7 +2866,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     private func completeLocalPairing(
         baseURL: URL,
         instanceName: String,
-        pairingCode: String
+        pairingCode: String,
+        alternateURL: URL? = nil
     ) async {
         let normalizedCode =
             pairingCode.filter(\.isNumber)
@@ -2633,6 +2905,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                         instanceName,
                     instanceURL:
                         baseURL,
+                    alternateURL:
+                        alternateURL,
                     protocolVersion:
                         response
                             .protocolVersion,
@@ -2660,6 +2934,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 instanceName
             connectedInstanceURL =
                 baseURL
+            connectedAlternateURL =
+                pairing.alternateURL
             lastErrorMessage = nil
             connectionState = .connected
 
@@ -2769,7 +3045,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     private func beginAuthorization(
         baseURL: URL,
-        instanceName: String
+        instanceName: String,
+        alternateURL: URL? = nil
     ) {
         guard isOAuthClientConfigured else {
             let message = ATHLTHLocalization.choose(
@@ -2824,6 +3101,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     error: error,
                     baseURL: baseURL,
                     instanceName: instanceName,
+                    alternateURL:
+                        alternateURL,
                     verifier: verifier,
                     expectedState: state
                 )
@@ -2851,6 +3130,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         error: Error?,
         baseURL: URL,
         instanceName: String,
+        alternateURL: URL?,
         verifier: String,
         expectedState: String
     ) async {
@@ -2947,6 +3227,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 let pairing = HomeAssistantStoredPairing(
                     instanceName: instanceName,
                     instanceURL: baseURL,
+                    alternateURL:
+                        alternateURL,
                     protocolVersion: pairResponse.protocolVersion,
                     clientID: pairResponse.clientID,
                     webhookID: pairResponse.webhookID,
@@ -2963,6 +3245,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 storedPairing = pairing
                 connectedInstanceName = instanceName
                 connectedInstanceURL = baseURL
+                connectedAlternateURL =
+                    pairing.alternateURL
                 lastErrorMessage = nil
                 connectionState = .connected
 
@@ -3568,10 +3852,12 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         timestamp: String,
         nonce: String,
         signature: String,
-        clientID: String
+        clientID: String,
+        timeoutInterval: TimeInterval = 15
     ) async throws -> HomeAssistantWebhookHTTPResult {
         var request = URLRequest(url: url)
-        request.timeoutInterval = 15
+        request.timeoutInterval =
+            timeoutInterval
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue(
@@ -3636,17 +3922,86 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             statusCode >= 500
     }
 
+    private func webhookCandidates(
+        for pairing: HomeAssistantStoredPairing
+    ) -> [URL] {
+        let local =
+            Self.fallbackWebhookURL(
+                for: pairing
+            )
+        let alternate =
+            Self.alternateWebhookURL(
+                for: pairing
+            )
+
+        let ordered:
+            [URL?] =
+                prefersLocalNetworkRoute
+                ? [
+                    local,
+                    pairing.webhookURL,
+                    alternate
+                ]
+                : [
+                    alternate,
+                    pairing.webhookURL,
+                    local
+                ]
+
+        var seen = Set<String>()
+        return ordered
+            .compactMap { $0 }
+            .filter {
+                seen.insert(
+                    $0.absoluteString
+                )
+                .inserted
+            }
+    }
+
     private static func fallbackWebhookURL(
         for pairing: HomeAssistantStoredPairing
     ) -> URL? {
-        guard var components = URLComponents(
-            url: pairing.instanceURL,
-            resolvingAgainstBaseURL: false
-        ) else {
+        webhookURL(
+            baseURL:
+                pairing.instanceURL,
+            path:
+                pairing.webhookPath
+        )
+    }
+
+    private static func alternateWebhookURL(
+        for pairing: HomeAssistantStoredPairing
+    ) -> URL? {
+        guard let alternateURL =
+                pairing.alternateURL
+        else {
             return nil
         }
 
-        components.path = pairing.webhookPath
+        return webhookURL(
+            baseURL:
+                alternateURL,
+            path:
+                pairing.webhookPath
+        )
+    }
+
+    private static func webhookURL(
+        baseURL: URL,
+        path: String
+    ) -> URL? {
+        guard var components =
+                URLComponents(
+                    url: baseURL,
+                    resolvingAgainstBaseURL:
+                        false
+                )
+        else {
+            return nil
+        }
+
+        components.path = path
         components.query = nil
         components.fragment = nil
         return components.url
