@@ -2515,6 +2515,11 @@ struct ATHLTHGhostRuntimeObserver: View {
             return
         }
 
+        syncLiveGhostConnectionContext(
+            session: selected,
+            sendToWatch: true
+        )
+
         guard let comparison =
                 realtime
                     .liveGhostComparison(
@@ -2574,6 +2579,11 @@ struct ATHLTHGhostRuntimeObserver: View {
             }
             return
         }
+
+        syncLiveGhostConnectionContext(
+            session: selected,
+            sendToWatch: false
+        )
 
         guard let comparison =
                 realtime
@@ -2930,6 +2940,77 @@ struct ATHLTHGhostRuntimeObserver: View {
             }?
             .resolvedName ??
         session.title
+    }
+
+    @MainActor
+    private func syncLiveGhostConnectionContext(
+        session:
+            ATHLTHLiveWorkoutSession,
+        sendToWatch: Bool
+    ) {
+        let name =
+            opponentName(
+                session
+            )
+        let connection =
+            liveGhostConnectionText
+        let audio =
+            settings
+                .ghostRaceAudioConfiguration
+
+        if !sendToWatch {
+            phoneWorkout
+                .applyLiveGhostConnectionState(
+                    opponentName: name,
+                    state: connection,
+                    configuration: audio
+                )
+        }
+
+        var context =
+            ATHLTHLiveWorkoutContextStore
+                .load()
+
+        guard var liveGhost =
+                context.liveGhost
+        else {
+            return
+        }
+
+        let liveAudio =
+            liveGhostAudioContext
+        let changed =
+            liveGhost.connectionText !=
+                connection ||
+            liveGhost.opponentName !=
+                name ||
+            liveGhost.audio !=
+                liveAudio
+
+        guard changed else {
+            return
+        }
+
+        liveGhost.connectionText =
+            connection
+        liveGhost.opponentName =
+            name
+        liveGhost.title =
+            name
+        liveGhost.audio =
+            liveAudio
+        context.liveGhost =
+            liveGhost
+
+        ATHLTHLiveWorkoutContextStore
+            .save(context)
+
+        if sendToWatch {
+            watchConnection
+                .sendLiveSurfaceContext(
+                    context
+                )
+        }
     }
 
     @MainActor
