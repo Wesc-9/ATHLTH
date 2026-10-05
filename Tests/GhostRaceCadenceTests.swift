@@ -39,6 +39,28 @@ final class GhostRaceCadenceTests:
             configuration
                 .announceLeadChanges
         )
+        XCTAssertEqual(
+            configuration
+                .resolvedStatusDetailMode,
+            .both
+        )
+        XCTAssertTrue(
+            configuration
+                .shouldAnnounceOvertakes
+        )
+        XCTAssertTrue(
+            configuration
+                .shouldAnnounceFinalPhase
+        )
+        XCTAssertEqual(
+            configuration
+                .resolvedFinalPhaseStartMeters,
+            500
+        )
+        XCTAssertTrue(
+            configuration
+                .shouldAnnounceLiveConnectionChanges
+        )
     }
 
     func testGhostDistanceAndTimeUnitsAreConvertedExactly() {
@@ -73,6 +95,85 @@ final class GhostRaceCadenceTests:
             configuration
                 .timeIntervalSeconds,
             300
+        )
+    }
+
+    func testGhostStatusModePersistsAndTransfers() {
+        let defaults =
+            makeDefaults()
+        let settings =
+            AppSettingsStore(
+                defaults: defaults
+            )
+
+        settings
+            .ghostRaceStatusDetailMode =
+            .time
+        settings
+            .ghostRaceAnnounceOvertakes =
+            false
+        settings
+            .ghostRaceFinalPhaseEnabled =
+            true
+        settings
+            .ghostRaceFinalPhaseStartMeters =
+            1_000
+        settings
+            .ghostRaceLiveConnectionAlerts =
+            false
+
+        let configuration =
+            settings
+                .ghostRaceAudioConfiguration
+
+        XCTAssertEqual(
+            configuration
+                .resolvedStatusDetailMode,
+            .time
+        )
+        XCTAssertFalse(
+            configuration
+                .shouldAnnounceOvertakes
+        )
+        XCTAssertTrue(
+            configuration
+                .shouldAnnounceFinalPhase
+        )
+        XCTAssertEqual(
+            configuration
+                .resolvedFinalPhaseStartMeters,
+            1_000
+        )
+        XCTAssertFalse(
+            configuration
+                .shouldAnnounceLiveConnectionChanges
+        )
+    }
+
+    func testFriendGhostIdentityIsOptionalAndPreserved() throws {
+        let transfer =
+            WatchGhostRaceTransfer(
+                title: "Reference",
+                referenceDuration: 1_800,
+                routeDistanceMeters: 5_000,
+                points: [],
+                audio: .standard,
+                opponentName: "Runner"
+            )
+
+        let encoded =
+            try JSONEncoder()
+                .encode(transfer)
+        let decoded =
+            try JSONDecoder()
+                .decode(
+                    WatchGhostRaceTransfer.self,
+                    from: encoded
+                )
+
+        XCTAssertEqual(
+            decoded.opponentName,
+            "Runner"
         )
     }
 
