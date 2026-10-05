@@ -159,6 +159,36 @@ final class TrainTogetherMarketplaceStore:
         }
     }
 
+    func joinOpen(
+        postID: UUID
+    ) async -> Bool {
+        guard !isWorking else {
+            return false
+        }
+
+        isWorking = true
+        defer { isWorking = false }
+
+        do {
+            try await client
+                .rpc(
+                    "join_train_together_open",
+                    params:
+                        OpenJoinParams(
+                            postID: postID
+                        )
+                )
+                .execute()
+
+            await refresh()
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func withdraw(
         requestID: UUID
     ) async -> Bool {
@@ -332,6 +362,19 @@ private struct RequestJoinParams:
     {
         case postID = "p_post_id"
         case message = "p_message"
+    }
+}
+
+private struct OpenJoinParams:
+    Encodable
+{
+    let postID: UUID
+
+    enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case postID = "p_post_id"
     }
 }
 
