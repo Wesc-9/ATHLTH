@@ -102,6 +102,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var ghostRaceTitle: String?
     @Published private(set) var ghostDistanceDeltaMeters: Double?
     @Published private(set) var ghostTimeDeltaSeconds: TimeInterval?
+    @Published private(set) var ghostMapUserLatitude: Double?
+    @Published private(set) var ghostMapUserLongitude: Double?
+    @Published private(set) var ghostMapLatitude: Double?
+    @Published private(set) var ghostMapLongitude: Double?
+    @Published private(set) var ghostMapRevision = 0
     @Published private(set) var lapCount = 0
     @Published private(set) var currentLapElapsedTime: TimeInterval = 0
     @Published private(set) var currentLapDistanceMeters: Double = 0
@@ -171,6 +176,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastGhostAnnouncedLeadMeters: Double?
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
+    private var lastGhostMapPublishedAt: Date?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -375,6 +381,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        lastGhostMapPublishedAt = nil
 
         if let interval =
                 audio?.distanceIntervalMeters,
@@ -2114,6 +2121,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostRaceTitle = nil
             self.ghostDistanceDeltaMeters = nil
             self.ghostTimeDeltaSeconds = nil
+            self.ghostMapUserLatitude = nil
+            self.ghostMapUserLongitude = nil
+            self.ghostMapLatitude = nil
+            self.ghostMapLongitude = nil
+            self.ghostMapRevision = 0
         }
 
         resetAudioCoachThresholds()
@@ -3102,7 +3114,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         updateGhostRace(
             traveledAlongRoute:
-                guidance.traveledAlongRouteMeters
+                guidance.traveledAlongRouteMeters,
+            userLocation:
+                location
         )
 
         evaluateRouteAlert(
@@ -3114,7 +3128,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func updateGhostRace(
-        traveledAlongRoute: Double
+        traveledAlongRoute: Double,
+        userLocation: CLLocation
     ) {
         guard let ghost =
                 ghostRaceConfiguration,
@@ -3194,6 +3209,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 timeDelta
         }
 
+        publishGhostMapPositionIfNeeded(
+            userLocation:
+                userLocation,
+            ghostDistanceMeters:
+                ghostAtTime
+                    .cumulativeMeters,
+            routeDistanceMeters:
+                ghost
+                    .routeDistanceMeters
+        )
+
         evaluateGhostRaceCoach(
             configuration:
                 ghost.audio,
@@ -3203,6 +3229,155 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceDelta,
             timeDelta:
                 timeDelta
+        )
+    }
+
+    private func publishGhostMapPositionIfNeeded(
+        userLocation: CLLocation,
+        ghostDistanceMeters: Double,
+        routeDistanceMeters: Double
+    ) {
+        guard plannedRouteLocations.count >= 2,
+              plannedRouteCumulativeMeters.count ==
+                plannedRouteLocations.count,
+              plannedRouteGeometryMeters > 0,
+              routeDistanceMeters > 0
+        else {
+            return
+        }
+
+        let now = Date()
+        if let lastGhostMapPublishedAt,
+           now.timeIntervalSince(
+                lastGhostMapPublishedAt
+           ) < 0.85 {
+            return
+        }
+
+        let progress =
+            min(
+                max(
+                    ghostDistanceMeters /
+                    routeDistanceMeters,
+                    0
+                ),
+                1
+            )
+        let targetGeometryMeters =
+            plannedRouteGeometryMeters *
+            progress
+
+        guard let ghostLocation =
+                interpolatedPlannedRouteLocation(
+                    atGeometryMeters:
+                        targetGeometryMeters
+                )
+        else {
+            return
+        }
+
+        lastGhostMapPublishedAt = now
+
+        publish {
+            self.ghostMapUserLatitude =
+                userLocation.coordinate.latitude
+            self.ghostMapUserLongitude =
+                userLocation.coordinate.longitude
+            self.ghostMapLatitude =
+                ghostLocation.coordinate.latitude
+            self.ghostMapLongitude =
+                ghostLocation.coordinate.longitude
+            self.ghostMapRevision &+= 1
+        }
+    }
+
+    private func interpolatedPlannedRouteLocation(
+        atGeometryMeters target:
+            Double
+    ) -> CLLocation? {
+        guard plannedRouteLocations.count >= 2,
+              plannedRouteCumulativeMeters.count ==
+                plannedRouteLocations.count
+        else {
+            return nil
+        }
+
+        let clamped =
+            min(
+                max(
+                    target,
+                    0
+                ),
+                plannedRouteGeometryMeters
+            )
+
+        guard let upperIndex =
+                plannedRouteCumulativeMeters
+                    .firstIndex(
+                        where: {
+                            $0 >= clamped
+                        }
+                    )
+        else {
+            return plannedRouteLocations.last
+        }
+
+        if upperIndex == 0 {
+            return plannedRouteLocations[0]
+        }
+
+        let lowerIndex =
+            upperIndex - 1
+        let lowerDistance =
+            plannedRouteCumulativeMeters[
+                lowerIndex
+            ]
+        let upperDistance =
+            plannedRouteCumulativeMeters[
+                upperIndex
+            ]
+        let span =
+            max(
+                upperDistance -
+                lowerDistance,
+                0.001
+            )
+        let fraction =
+            min(
+                max(
+                    (
+                        clamped -
+                        lowerDistance
+                    ) / span,
+                    0
+                ),
+                1
+            )
+
+        let lower =
+            plannedRouteLocations[
+                lowerIndex
+            ].coordinate
+        let upper =
+            plannedRouteLocations[
+                upperIndex
+            ].coordinate
+
+        return CLLocation(
+            latitude:
+                lower.latitude +
+                (
+                    upper.latitude -
+                    lower.latitude
+                ) *
+                fraction,
+            longitude:
+                lower.longitude +
+                (
+                    upper.longitude -
+                    lower.longitude
+                ) *
+                fraction
         )
     }
 
