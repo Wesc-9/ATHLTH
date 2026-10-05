@@ -89,6 +89,9 @@ final class ExerciseLibraryStore: ObservableObject {
 
     private var accountID: UUID?
     private var lastATHLTHCatalogRefreshAt: Date?
+    private var cachedAllExercises: [ExerciseLibraryEntry]?
+    private var cachedBodyParts: [String]?
+    private var cachedEquipmentOptions: [String]?
 
     init() {
         loadCachedRepDB()
@@ -98,44 +101,87 @@ final class ExerciseLibraryStore: ObservableObject {
         guard accountID != userID else { return }
         accountID = userID
         customExercises = []
+        invalidateDerivedCaches()
         guard userID != nil else { return }
         loadCustomExercises()
     }
 
     var allExercises: [ExerciseLibraryEntry] {
-        (
-            customExercises +
-            athlthCatalogExercises +
-            repDBExercises
-        )
-        .reduce(into: [UUID: ExerciseLibraryEntry]()) {
-            result, entry in
-            result[entry.id] = entry
+        if let cachedAllExercises {
+            return cachedAllExercises
         }
-        .values
-        .sorted {
-            $0.name.localizedCaseInsensitiveCompare(
-                $1.name
-            ) == .orderedAscending
-        }
+
+        let resolved =
+            (
+                customExercises +
+                athlthCatalogExercises +
+                repDBExercises
+            )
+            .reduce(
+                into:
+                    [UUID:
+                        ExerciseLibraryEntry]()
+            ) {
+                result,
+                entry in
+                result[entry.id] =
+                    entry
+            }
+            .values
+            .sorted {
+                $0.canonicalName
+                    .localizedCaseInsensitiveCompare(
+                        $1.canonicalName
+                    ) ==
+                    .orderedAscending
+            }
+
+        cachedAllExercises = resolved
+        return resolved
     }
 
     var bodyParts: [String] {
-        Array(
-            Set(
-                allExercises.compactMap { $0.bodyPart }
+        if let cachedBodyParts {
+            return cachedBodyParts
+        }
+
+        let resolved =
+            Array(
+                Set(
+                    allExercises.compactMap {
+                        $0.bodyPart
+                    }
+                )
             )
-        )
-        .sorted()
+            .sorted()
+
+        cachedBodyParts = resolved
+        return resolved
     }
 
     var equipmentOptions: [String] {
-        Array(
-            Set(
-                allExercises.flatMap { $0.exercise.equipment }
+        if let cachedEquipmentOptions {
+            return cachedEquipmentOptions
+        }
+
+        let resolved =
+            Array(
+                Set(
+                    allExercises.flatMap {
+                        $0.exercise.equipment
+                    }
+                )
             )
-        )
-        .sorted()
+            .sorted()
+
+        cachedEquipmentOptions = resolved
+        return resolved
+    }
+
+    private func invalidateDerivedCaches() {
+        cachedAllExercises = nil
+        cachedBodyParts = nil
+        cachedEquipmentOptions = nil
     }
 
     func refresh(force: Bool = false) async {
@@ -174,6 +220,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
             let mapped = dataset.exercises.map(mapRepDB)
             repDBExercises = mapped
+            invalidateDerivedCaches()
             lastUpdated = Date()
             persistRepDBCache(data)
         } catch {
@@ -281,8 +328,9 @@ final class ExerciseLibraryStore: ObservableObject {
 
         customExercises.append(entry)
         customExercises.sort {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            $0.canonicalName.localizedCaseInsensitiveCompare($1.canonicalName) == .orderedAscending
         }
+        invalidateDerivedCaches()
         persistCustomExercises()
         return entry
     }
@@ -311,8 +359,9 @@ final class ExerciseLibraryStore: ObservableObject {
         }
 
         customExercises.sort {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            $0.canonicalName.localizedCaseInsensitiveCompare($1.canonicalName) == .orderedAscending
         }
+        invalidateDerivedCaches()
         persistCustomExercises()
     }
 
@@ -324,6 +373,7 @@ final class ExerciseLibraryStore: ObservableObject {
         }
 
         customExercises.removeAll { $0.id == id }
+        invalidateDerivedCaches()
         persistCustomExercises()
     }
 
@@ -372,12 +422,14 @@ final class ExerciseLibraryStore: ObservableObject {
                     refreshedSignature {
                     athlthCatalogExercises =
                         refreshed
+                    invalidateDerivedCaches()
                 }
             }
         } catch {
             if athlthCatalogExercises.isEmpty {
                 athlthCatalogExercises =
                     Self.fallbackATHLTHExercises
+                invalidateDerivedCaches()
             }
         }
     }
@@ -537,6 +589,7 @@ final class ExerciseLibraryStore: ObservableObject {
         }
 
         repDBExercises = dataset.exercises.map(mapRepDB)
+        invalidateDerivedCaches()
 
         if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey]) {
             lastUpdated = values.contentModificationDate
@@ -587,6 +640,7 @@ final class ExerciseLibraryStore: ObservableObject {
                 imagePeakURL: nil
             )
         }
+        invalidateDerivedCaches()
     }
 
     private func persistCustomExercises() {
