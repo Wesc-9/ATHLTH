@@ -1765,7 +1765,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                             english:
                                 "point for every 5 active minutes",
                             norwegian:
-                                "poeng for hver 5. aktive minutt"
+                                "poeng per 5 aktive minutter"
                         )
                 )
 
