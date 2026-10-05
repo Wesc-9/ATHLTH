@@ -458,9 +458,12 @@ struct WatchHomeView: View {
                         workout.indoor
                 )
 
+            if case .failed =
+                    workoutManager.state {
+                return
+            }
+
             if workoutManager.state !=
-                    .failed &&
-                workoutManager.state !=
                     .idle {
                 routeStore
                     .consumePreparedWorkout(
