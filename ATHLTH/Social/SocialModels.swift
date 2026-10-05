@@ -1159,7 +1159,7 @@ struct SocialWorkoutInvitePayload: Codable, Hashable {
                 maxParticipants ?? 2,
                 2
             ),
-            6
+            16
         )
     }
 
