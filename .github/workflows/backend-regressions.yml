@@ -3,9 +3,9 @@ name: ATHLTH 1.6.1 backend regressions
 on:
   workflow_dispatch:
   pull_request:
-    branches: [release/v1.6.2]
+    branches: [release/v1.6.3]
   push:
-    branches: [release/v1.6.2]
+    branches: [release/v1.6.3]
 
 permissions:
   contents: read
@@ -40,6 +40,7 @@ jobs:
           supabase db reset --local --no-seed
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/v160_audit.sql
           docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/athlete_tools.sql
+          docker exec -i supabase_db_ATHLTH-1.6.0 psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/train_together_rls.sql
           python3 scripts/test_ai_budget_concurrency.py
       - name: Stop local Supabase
         if: always()
