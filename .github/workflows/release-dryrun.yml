@@ -8,7 +8,7 @@ on:
       - release/v1.4.3
       - release/v1.4.6
       - release/v1.5.1
-      - release/v1.6.3
+      - release/v1.6.4
       - fix/v1.4.2-swift6-release
     paths:
       - .github/release-trigger
