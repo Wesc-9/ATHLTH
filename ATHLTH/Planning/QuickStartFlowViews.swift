@@ -2136,27 +2136,27 @@ struct RunQuickStartSheet: View {
 
     private var quickRunGuidanceCard:
         some View {
-        NavigationLink {
-            RunGuidanceSetupView(
-                audioCoach:
-                    $audioCoachDraft,
-                routeGuardian:
-                    $routeGuardianDraft,
-                ghost:
-                    $ghostDraft,
-                route:
-                    guidanceRoute,
-                structuredWorkout:
-                    mode == .structured
-                        ? selectedWorkout
-                        : nil
-            )
-        } label: {
-            ATHLTHCard {
-                VStack(
-                    alignment: .leading,
-                    spacing: 14
-                ) {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                NavigationLink {
+                    RunGuidanceSetupView(
+                        audioCoach:
+                            $audioCoachDraft,
+                        routeGuardian:
+                            $routeGuardianDraft,
+                        ghost:
+                            $ghostDraft,
+                        route:
+                            guidanceRoute,
+                        structuredWorkout:
+                            mode == .structured
+                                ? selectedWorkout
+                                : nil
+                    )
+                } label: {
                     HStack(spacing: 12) {
                         Image(
                             systemName:
@@ -2192,14 +2192,12 @@ struct RunQuickStartSheet: View {
                             Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Run guidance",
+                                        "Run tools",
                                     norwegian:
-                                        "Løpeveiledning"
+                                        "Løpsverktøy"
                                 )
                             )
-                            .font(
-                                .headline
-                            )
+                            .font(.headline)
                             .foregroundStyle(
                                 ATHLTHTheme
                                     .primaryText
@@ -2208,9 +2206,9 @@ struct RunQuickStartSheet: View {
                             Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Coach, Ghost and live alerts for this run",
+                                        "Audio Coach, Ghost and route tools for this run",
                                     norwegian:
-                                        "Coach, Ghost og live-varsler for denne økten"
+                                        "Audio Coach, Ghost og ruteverktøy for denne økten"
                                 )
                             )
                             .font(.caption)
@@ -2234,129 +2232,256 @@ struct RunQuickStartSheet: View {
                             .secondary
                         )
                     }
-
-                    HStack(spacing: 8) {
-                        runGuidanceFeaturePill(
-                            title: "Audio Coach",
-                            icon:
-                                "waveform.and.person.filled",
-                            active:
-                                audioCoachDraft.enabled,
-                            unavailable: false
-                        )
-
-                        runGuidanceFeaturePill(
-                            title: "Ghost",
-                            icon:
-                                "figure.run.circle.fill",
-                            active:
-                                ghostDraft.enabled &&
-                                guidanceRoute != nil,
-                            unavailable:
-                                guidanceRoute == nil
-                        )
-
-                        runGuidanceFeaturePill(
-                            title:
-                                ATHLTHLocalization.choose(
-                                    english: "Route",
-                                    norwegian: "Rute"
-                                ),
-                            icon:
-                                "location.fill",
-                            active:
-                                routeGuardianDraft.enabled &&
-                                guidanceRoute != nil,
-                            unavailable:
-                                guidanceRoute == nil
-                        )
-                    }
-
-                    Text(
-                        guidanceRoute == nil
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Audio Coach works on every run. Choose a route to unlock Ghost and Route Guardian.",
-                                norwegian:
-                                    "Audio Coach fungerer på alle økter. Velg en rute for å bruke Ghost og Route Guardian."
-                            )
-                            : guidanceSummary
-                    )
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .medium
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
+                    .contentShape(
+                        Rectangle()
                     )
                 }
+                .buttonStyle(.plain)
+
+                HStack(spacing: 8) {
+                    runGuidanceFeaturePill(
+                        title:
+                            "Audio Coach",
+                        icon:
+                            "waveform.and.person.filled",
+                        active:
+                            audioCoachDraft.enabled,
+                        unavailable: false
+                    ) {
+                        activateAdvancedGuidanceIfNeeded()
+
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.16
+                            )
+                        ) {
+                            audioCoachDraft.enabled
+                                .toggle()
+                        }
+                    }
+
+                    runGuidanceFeaturePill(
+                        title: "Ghost",
+                        icon:
+                            "figure.run.circle.fill",
+                        active:
+                            ghostDraft.enabled &&
+                            guidanceRoute != nil,
+                        unavailable:
+                            guidanceRoute == nil
+                    ) {
+                        guard guidanceRoute != nil
+                        else {
+                            return
+                        }
+
+                        activateAdvancedGuidanceIfNeeded()
+
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.16
+                            )
+                        ) {
+                            ghostDraft.enabled
+                                .toggle()
+                        }
+                    }
+
+                    runGuidanceFeaturePill(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Route",
+                                norwegian:
+                                    "Rute"
+                            ),
+                        icon:
+                            "location.fill",
+                        active:
+                            routeGuardianDraft
+                                .enabled &&
+                            guidanceRoute != nil,
+                        unavailable:
+                            guidanceRoute == nil
+                    ) {
+                        guard guidanceRoute != nil
+                        else {
+                            return
+                        }
+
+                        activateAdvancedGuidanceIfNeeded()
+
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.16
+                            )
+                        ) {
+                            routeGuardianDraft
+                                .enabled
+                                .toggle()
+                        }
+                    }
+                }
+
+                Text(
+                    guidanceRoute == nil
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Tap a tool to turn it on or off. Choose a route to unlock Ghost and Route.",
+                            norwegian:
+                                "Trykk på et verktøy for å skru det av eller på. Velg en rute for å bruke Ghost og Rute."
+                        )
+                        : guidanceSummary
+                )
+                .font(
+                    .system(
+                        size: 11,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
             }
         }
-        .buttonStyle(.plain)
     }
 
     private func runGuidanceFeaturePill(
         title: String,
         icon: String,
         active: Bool,
-        unavailable: Bool
+        unavailable: Bool,
+        action: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 5) {
-            Image(
-                systemName: icon
-            )
-            .font(
-                .system(
-                    size: 10,
-                    weight: .semibold
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(
+                    systemName: icon
                 )
-            )
-
-            Text(title)
                 .font(
                     .system(
                         size: 10,
                         weight: .semibold
                     )
                 )
-                .lineLimit(1)
-                .minimumScaleFactor(
-                    0.72
+
+                Text(title)
+                    .font(
+                        .system(
+                            size: 10,
+                            weight: .semibold
+                        )
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.72
+                    )
+
+                Spacer(
+                    minLength: 1
                 )
-        }
-        .foregroundStyle(
-            unavailable
-                ? ATHLTHTheme
-                    .mutedText
-                    .opacity(0.65)
-                : (
+
+                Image(
+                    systemName:
+                        active
+                            ? "checkmark.circle.fill"
+                            : "circle"
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .semibold
+                    )
+                )
+            }
+            .foregroundStyle(
+                unavailable
+                    ? ATHLTHTheme
+                        .mutedText
+                        .opacity(0.52)
+                    : (
+                        active
+                            ? ATHLTHTheme
+                                .vitality
+                            : ATHLTHTheme
+                                .primaryText
+                    )
+            )
+            .padding(
+                .horizontal,
+                9
+            )
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(height: 36)
+            .background(
+                (
                     active
                         ? ATHLTHTheme
-                            .vitality
-                        : ATHLTHTheme
-                            .primaryText
+                            .vitalitySoft
+                        : Color.primary
+                            .opacity(0.04)
+                ),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        active
+                            ? ATHLTHTheme
+                                .vitality
+                                .opacity(0.13)
+                            : Color.primary
+                                .opacity(0.025),
+                        lineWidth: 0.7
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(unavailable)
+        .opacity(
+            unavailable
+                ? 0.62
+                : 1
+        )
+        .accessibilityValue(
+            unavailable
+                ? ATHLTHLocalization.choose(
+                    english:
+                        "Unavailable without a route",
+                    norwegian:
+                        "Krever en rute"
+                )
+                : (
+                    active
+                        ? ATHLTHLocalization.choose(
+                            english: "On",
+                            norwegian: "På"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Off",
+                            norwegian: "Av"
+                        )
                 )
         )
-        .frame(
-            maxWidth: .infinity
-        )
-        .frame(height: 34)
-        .background(
-            (
-                active
-                    ? ATHLTHTheme
-                        .vitalitySoft
-                    : Color.primary
-                        .opacity(0.04)
-            ),
-            in: Capsule()
+    }
+
+    private func activateAdvancedGuidanceIfNeeded() {
+        guard !isAdvancedSetup
+        else {
+            return
+        }
+
+        isAdvancedSetup = true
+        settings.recordAdvancedSetup(
+            true,
+            for: .running
         )
     }
 
