@@ -75,7 +75,7 @@ for folder in \
   "ATHLTH/Assets.xcassets/OnboardingHero.imageset"
 do
   while IFS= read -r file; do
-    resize_if_needed "$file" 3200
+    resize_if_needed "$file" 2200
   done < <(
     find "$folder" -maxdepth 1 -type f \
       \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
@@ -97,7 +97,7 @@ do
   [ -d "$folder" ] || continue
   case "$folder" in
     *Thumbnail.imageset) max_dimension=600 ;;
-    *) max_dimension=2400 ;;
+    *) max_dimension=1800 ;;
   esac
 
   while IFS= read -r file; do
