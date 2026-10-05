@@ -6,7 +6,7 @@ struct ATHLTHProfileSetupView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var social: SocialStore
 
-    @State private var selectedFocus: TrainingFocus?
+    @State private var selectedFocuses: Set<TrainingFocus> = []
     @State private var trainingFocusVisibility: ProfileVisibility = .privateOnly
     @State private var trainingStatusVisibility: ProfileVisibility = .privateOnly
     @State private var performanceVisibility: ProfileVisibility = .privateOnly
@@ -40,7 +40,9 @@ struct ATHLTHProfileSetupView: View {
                     ],
                     spacing: 10
                 ) {
-                    ForEach(TrainingFocus.allCases) { focus in
+                    ForEach(
+                        TrainingFocus.profileSelectionCases
+                    ) { focus in
                         trainingFocusButton(focus)
                     }
                 }
@@ -167,23 +169,28 @@ struct ATHLTHProfileSetupView: View {
                         }
                     }
                 }
-                .disabled(selectedFocus == nil || saving)
+                .disabled(selectedFocuses.isEmpty || saving)
             }
         }
         .navigationTitle("Profile Setup")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            selectedFocus = session.onboardingProfile?.trainingFocus
+            selectedFocuses =
+                TrainingFocus.profileSelections(
+                    from:
+                        session.onboardingProfile?
+                            .trainingFocus
+                )
             await social.refresh()
             loadSharingSettings()
         }
     }
 
     private func trainingFocusButton(_ focus: TrainingFocus) -> some View {
-        let selected = selectedFocus == focus
+        let selected = selectedFocuses.contains(focus)
 
         return Button {
-            selectedFocus = focus
+            toggleTrainingFocus(focus)
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -239,6 +246,37 @@ struct ATHLTHProfileSetupView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var persistedTrainingFocus: TrainingFocus? {
+        TrainingFocus.persistedProfileFocus(
+            from: selectedFocuses
+        )
+    }
+
+    private func toggleTrainingFocus(
+        _ focus: TrainingFocus
+    ) {
+        let pairedFocuses: Set<TrainingFocus> = [
+            .running,
+            .strength
+        ]
+
+        if pairedFocuses.contains(focus) {
+            if !selectedFocuses.isSubset(of: pairedFocuses) {
+                selectedFocuses = [focus]
+                return
+            }
+
+            if selectedFocuses.contains(focus) {
+                selectedFocuses.remove(focus)
+            } else {
+                selectedFocuses.insert(focus)
+            }
+            return
+        }
+
+        selectedFocuses = [focus]
     }
 
     private func profileToggle(
@@ -338,14 +376,16 @@ struct ATHLTHProfileSetupView: View {
 
     @MainActor
     private func save() async {
-        guard let selectedFocus else { return }
+        guard let persistedTrainingFocus else { return }
 
         saving = true
         errorMessage = nil
         defer { saving = false }
 
-        session.setTrainingFocus(selectedFocus)
-        await social.syncOwnTrainingFocus(selectedFocus)
+        session.setTrainingFocus(persistedTrainingFocus)
+        await social.syncOwnTrainingFocus(
+            persistedTrainingFocus
+        )
 
         if let message = social.errorMessage, !message.isEmpty {
             errorMessage = message
