@@ -2590,7 +2590,8 @@ final class SocialStore: ObservableObject {
             uniqueKeysWithValues: sessions.map { ($0.id, $0) }
         )
 
-        let refreshedWorkoutInvites =
+        let refreshedWorkoutInvites:
+            [SocialWorkoutInviteDisplay] =
             participants
                 .filter {
                     $0.userID == currentUserID &&
@@ -2622,9 +2623,9 @@ final class SocialStore: ObservableObject {
                             ]
                     )
                 }
-                .sorted {
-                    $0.session.createdAt >
-                        $1.session.createdAt
+                .sorted { lhs, rhs in
+                    lhs.session.createdAt >
+                        rhs.session.createdAt
                 }
 
         if workoutInvites !=
@@ -2734,7 +2735,8 @@ final class SocialStore: ObservableObject {
                 }
         )
 
-        let refreshedIncoming =
+        let refreshedIncoming:
+            [SocialFriendRequestDisplay] =
             requests
                 .filter {
                     $0.status == .pending &&
@@ -2755,12 +2757,13 @@ final class SocialStore: ObservableObject {
                         isIncoming: true
                     )
                 }
-                .sorted {
-                    $0.request.createdAt >
-                        $1.request.createdAt
+                .sorted { lhs, rhs in
+                    lhs.request.createdAt >
+                        rhs.request.createdAt
                 }
 
-        let refreshedOutgoing =
+        let refreshedOutgoing:
+            [SocialFriendRequestDisplay] =
             requests
                 .filter {
                     $0.status == .pending &&
@@ -2781,9 +2784,9 @@ final class SocialStore: ObservableObject {
                         isIncoming: false
                     )
                 }
-                .sorted {
-                    $0.request.createdAt >
-                        $1.request.createdAt
+                .sorted { lhs, rhs in
+                    lhs.request.createdAt >
+                        rhs.request.createdAt
                 }
 
         if incomingRequests !=
