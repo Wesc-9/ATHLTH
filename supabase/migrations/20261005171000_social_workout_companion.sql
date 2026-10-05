@@ -19,7 +19,7 @@ create table if not exists public.social_workout_messages (
   sender_id uuid not null references public.profiles(id) on delete cascade,
   sender_display_name text not null check (char_length(btrim(sender_display_name)) between 1 and 100),
   kind text not null default 'text'
-    check (kind in ('text','reaction','system')),
+    check (kind in ('text','reaction','location_request','system')),
   body text check (body is null or char_length(body) <= 800),
   created_at timestamptz not null default now()
 );
