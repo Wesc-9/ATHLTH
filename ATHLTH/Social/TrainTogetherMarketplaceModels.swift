@@ -242,6 +242,9 @@ struct TrainTogetherMeetup:
     let postID: UUID
     let creatorID: UUID
     var meetingName: String?
+    var meetingAddress: String?
+    var meetingLatitude: Double?
+    var meetingLongitude: Double?
     var meetingDetails: String?
     let createdAt: Date?
     var updatedAt: Date?
@@ -254,6 +257,12 @@ struct TrainTogetherMeetup:
         case creatorID = "creator_id"
         case meetingName =
             "meeting_name"
+        case meetingAddress =
+            "meeting_address"
+        case meetingLatitude =
+            "meeting_latitude"
+        case meetingLongitude =
+            "meeting_longitude"
         case meetingDetails =
             "meeting_details"
         case createdAt = "created_at"
@@ -330,6 +339,9 @@ struct TrainTogetherMeetupWrite:
     let postID: UUID
     let creatorID: UUID
     let meetingName: String?
+    let meetingAddress: String?
+    let meetingLatitude: Double?
+    let meetingLongitude: Double?
     let meetingDetails: String?
 
     enum CodingKeys:
@@ -340,6 +352,12 @@ struct TrainTogetherMeetupWrite:
         case creatorID = "creator_id"
         case meetingName =
             "meeting_name"
+        case meetingAddress =
+            "meeting_address"
+        case meetingLatitude =
+            "meeting_latitude"
+        case meetingLongitude =
+            "meeting_longitude"
         case meetingDetails =
             "meeting_details"
     }
