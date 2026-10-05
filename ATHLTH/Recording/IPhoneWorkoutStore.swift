@@ -2118,7 +2118,8 @@ final class IPhoneWorkoutStore:
                 ghostFinalPhaseAnnounced =
                     true
                 finalPhaseRemainingMeters =
-                    remaining
+                    configuration
+                        .resolvedFinalPhaseStartMeters
             }
         }
 
