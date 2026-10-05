@@ -4122,98 +4122,84 @@ private struct HomeStrengthMuscleArtwork:
                 LinearGradient(
                     colors: [
                         Color(
-                            red: 1.0,
-                            green: 0.986,
-                            blue: 0.968
+                            red: 0.995,
+                            green: 0.985,
+                            blue: 0.972
                         ),
                         Color(
-                            red: 0.988,
-                            green: 0.944,
-                            blue: 0.904
+                            red: 0.985,
+                            green: 0.956,
+                            blue: 0.930
                         )
                     ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
 
                 RadialGradient(
                     colors: [
-                        activationTint
-                            .opacity(0.18),
-                        activationTint
-                            .opacity(0.06),
+                        activationTint.opacity(0.13),
+                        activationTint.opacity(0.035),
                         Color.clear
                     ],
-                    center:
-                        UnitPoint(
-                            x: 0.52,
-                            y: 0.52
-                        ),
-                    startRadius: 2,
-                    endRadius:
-                        max(
-                            proxy.size.width *
-                                0.60,
-                            108
-                        )
+                    center: UnitPoint(
+                        x: 0.52,
+                        y: 0.60
+                    ),
+                    startRadius: 4,
+                    endRadius: max(
+                        proxy.size.width * 0.58,
+                        118
+                    )
                 )
 
-                Circle()
-                    .fill(
-                        Color.white
-                            .opacity(0.30)
+                RoundedRectangle(
+                    cornerRadius: 48,
+                    style: .continuous
+                )
+                .fill(Color.white.opacity(0.22))
+                .frame(
+                    width: min(
+                        proxy.size.width * 0.88,
+                        196
+                    ),
+                    height: max(
+                        height * 0.86,
+                        104
                     )
-                    .frame(
-                        width:
-                            min(
-                                proxy.size.width *
-                                    0.82,
-                                178
-                            )
-                    )
-                    .blur(radius: 1)
+                )
+                .blur(radius: 0.5)
 
                 StrengthMuscleMapView(
                     profile: profile,
                     compact: true,
-                    figureStyle:
-                        figureStyle,
-                    activationTint:
-                        activationTint
+                    figureStyle: figureStyle,
+                    activationTint: activationTint
                 )
                 .frame(
-                    width:
-                        min(
-                            max(
-                                height * 1.74,
-                                166
-                            ),
-                            proxy.size.width -
-                                8
-                        ),
-                    height:
+                    width: min(
                         max(
-                            height + 26,
-                            132
-                        )
+                            height * 1.68,
+                            176
+                        ),
+                        proxy.size.width - 10
+                    ),
+                    height: max(
+                        height + 34,
+                        144
+                    )
                 )
-                .offset(y: 11)
-                .opacity(0.995)
+                .offset(y: 14)
+                .opacity(1.0)
 
                 LinearGradient(
                     colors: [
-                        Color.white
-                            .opacity(0.24),
+                        Color.white.opacity(0.16),
                         Color.clear,
-                        Color.black
-                            .opacity(0.025)
+                        Color.black.opacity(0.018)
                     ],
-                    startPoint:
-                        .top,
-                    endPoint:
-                        .bottom
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
             }
             .frame(
@@ -4244,6 +4230,8 @@ private struct HomePersonalWorkoutVisual:
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
     let height: CGFloat
+    var precomputedStrengthProfile:
+        StrengthMuscleProfile? = nil
 
     @State private var loadedRoute: [CLLocation] = []
     @State private var routePreviewImage: UIImage?
@@ -4267,6 +4255,12 @@ private struct HomePersonalWorkoutVisual:
 
     private var muscleProfile:
         StrengthMuscleProfile {
+        if let precomputedStrengthProfile,
+           !precomputedStrengthProfile
+                .activations.isEmpty {
+            return precomputedStrengthProfile
+        }
+
         if let strengthWorkout {
             let built =
                 StrengthMuscleProfileBuilder
