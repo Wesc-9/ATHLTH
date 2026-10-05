@@ -11707,7 +11707,11 @@ struct ATHLTHProfileView: View {
                     strengthRecords:
                         strengthWorkout.personalRecords,
                     strengthRepRecords:
-                        strengthWorkout.repPersonalRecords
+                        strengthWorkout.repPersonalRecords,
+                    performanceWorkouts:
+                        health.workouts,
+                    strengthWorkouts:
+                        strengthWorkout.workoutHistory
                 )
             )
             .font(
