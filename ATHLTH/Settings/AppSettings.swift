@@ -980,7 +980,7 @@ final class AppSettingsStore: ObservableObject {
         ghostRaceAudioAnnounceLeadChanges =
             defaults.object(
                 forKey: "settings.ghostRace.audio.leadChanges"
-            ) as? Bool ?? true
+            ) as? Bool ?? false
         ghostRaceAudioLeadChangeMeters =
             defaults.object(
                 forKey: "settings.ghostRace.audio.leadChangeMeters"
