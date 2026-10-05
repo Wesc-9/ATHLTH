@@ -553,7 +553,10 @@ struct ATHLTHEditProfileView: View {
                     y: 7
                 )
         } else if let avatarURL = session.profile.avatarURL {
-            ATHLTHStorageImage(url: avatarURL) { phase in
+            ATHLTHStorageImage(
+                url: avatarURL,
+                maxPixelSize: 360
+            ) { phase in
                 switch phase {
                 case .success(let image):
                     image
