@@ -1795,118 +1795,308 @@ struct RunQuickStartSheet: View {
 
         case .route:
             ATHLTHCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(
-                            selectedRoute?.title ??
-                                "Choose a saved route"
-                        )
-                        .font(.headline)
-
-                        if let selectedRoute {
-                            Text(
-                                String(
-                                    format: "%.1f km · saved route",
-                                    selectedRoute.distanceKilometers
-                                )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        } else {
-                            Text(
-                                session.savedRoutes.isEmpty
-                                    ? "You do not have any saved routes yet."
-                                    : "\(session.savedRoutes.count) routes available"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    Button {
-                        showingRoutes = true
-                    } label: {
-                        Text(
-                            selectedRoute == nil
-                                ? "Choose"
-                                : "Change"
-                        )
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(ATHLTHTheme.accent)
-                }
-
-                if let distance =
-                        distanceToSelectedRouteStart,
-                   distance > 250 {
-                    Divider()
-                        .padding(.vertical, 8)
-
-                    HStack(
-                        alignment: .top,
-                        spacing: 10
-                    ) {
-                        Image(
-                            systemName:
-                                "location.circle.fill"
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.premiumGold
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 4
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    if let selectedRoute,
+                       selectedRoute
+                        .coordinates
+                        .count >= 2 {
+                        ZStack(
+                            alignment: .topLeading
                         ) {
-                            Text(
-                                routeStartDistanceText(
-                                    distance
-                                )
+                            RouteMapSnapshotThumbnail(
+                                route: selectedRoute,
+                                height: 112
+                            )
+
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Selected route",
+                                    norwegian: "Valgt rute"
+                                ),
+                                systemImage:
+                                    "point.3.connected.trianglepath.dotted"
                             )
                             .font(
-                                .subheadline
-                                    .weight(.semibold)
+                                .caption2
+                                    .weight(.bold)
                             )
-
-                            Text(
-                                "You can start anyway, but ATHLTH will mark your route progress only when you reach the course."
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
                             )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .padding(
+                                .horizontal,
+                                9
+                            )
+                            .padding(
+                                .vertical,
+                                6
+                            )
+                            .background(
+                                .ultraThinMaterial,
+                                in: Capsule()
+                            )
+                            .padding(9)
+                        }
+                    }
 
-                            Button {
-                                openDirectionsToRouteStart()
-                            } label: {
-                                Label(
-                                    "Directions to start",
-                                    systemImage:
-                                        "arrow.triangle.turn.up.right.diamond.fill"
+                    HStack(
+                        alignment: .center,
+                        spacing: 12
+                    ) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 5
+                        ) {
+                            HStack(
+                                spacing: 7
+                            ) {
+                                Image(
+                                    systemName:
+                                        "figure.run"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+
+                                Text(
+                                    selectedRoute?
+                                        .title ??
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Choose a saved route",
+                                            norwegian:
+                                                "Velg en lagret rute"
+                                        )
+                                )
+                                .font(.headline)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(2)
+
+                                if let selectedRoute {
+                                    Image(
+                                        systemName:
+                                            selectedRouteVisibilityIcon(
+                                                selectedRoute
+                                                    .visibility
+                                            )
+                                    )
+                                    .font(
+                                        .caption2
+                                            .weight(
+                                                .bold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        selectedRouteVisibilityTint(
+                                            selectedRoute
+                                                .visibility
+                                        )
+                                    )
+                                }
+                            }
+
+                            if let selectedRoute {
+                                HStack(
+                                    spacing: 8
+                                ) {
+                                    Text(
+                                        String(
+                                            format:
+                                                "%.1f km",
+                                            selectedRoute
+                                                .distanceKilometers
+                                        )
+                                    )
+
+                                    if let start =
+                                            selectedRoute
+                                                .startName,
+                                       !start.isEmpty,
+                                       let end =
+                                            selectedRoute
+                                                .endName,
+                                       !end.isEmpty {
+                                        Text("·")
+                                        Text(
+                                            "\(start) → \(end)"
+                                        )
+                                        .lineLimit(1)
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            } else {
+                                Text(
+                                    session
+                                        .savedRoutes
+                                        .isEmpty
+                                        ? ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "You do not have any saved routes yet.",
+                                                norwegian:
+                                                    "Du har ingen lagrede ruter ennå."
+                                            )
+                                        : ATHLTHLocalization
+                                            .format(
+                                                english:
+                                                    "%d routes available",
+                                                norwegian:
+                                                    "%d ruter tilgjengelig",
+                                                session
+                                                    .savedRoutes
+                                                    .count
+                                            )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
                                 )
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .padding(.top, 3)
                         }
 
-                        Spacer(minLength: 0)
-                    }
-                }
+                        Spacer(
+                            minLength: 8
+                        )
 
-                if session.savedRoutes.isEmpty {
-                    NavigationLink {
-                        RunRouteBuilderView()
-                    } label: {
-                        Label(
-                            "Create Route",
-                            systemImage: "plus"
+                        Button {
+                            showingRoutes = true
+                        } label: {
+                            Text(
+                                selectedRoute == nil
+                                    ? ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Choose",
+                                            norwegian:
+                                                "Velg"
+                                        )
+                                    : ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Change",
+                                            norwegian:
+                                                "Endre"
+                                        )
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .controlSize(.small)
+                        .tint(
+                            ATHLTHTheme
+                                .accentDeep
                         )
                     }
-                    .padding(.top, 10)
+
+                    if let distance =
+                            distanceToSelectedRouteStart,
+                       distance > 250 {
+                        Divider()
+
+                        HStack(
+                            alignment: .top,
+                            spacing: 10
+                        ) {
+                            Image(
+                                systemName:
+                                    "location.circle.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 4
+                            ) {
+                                Text(
+                                    routeStartDistanceText(
+                                        distance
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "You can start anyway, but ATHLTH will mark route progress when you reach the course.",
+                                        norwegian:
+                                            "Du kan starte uansett, men ATHLTH registrerer rutefremdrift når du når løypen."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                                Button {
+                                    openDirectionsToRouteStart()
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Directions to start",
+                                            norwegian:
+                                                "Veibeskrivelse til start"
+                                        ),
+                                        systemImage:
+                                            "arrow.triangle.turn.up.right.diamond.fill"
+                                    )
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .padding(.top, 3)
+                            }
+
+                            Spacer(
+                                minLength: 0
+                            )
+                        }
+                    }
+
+                    if session
+                        .savedRoutes
+                        .isEmpty {
+                        NavigationLink {
+                            RunRouteBuilderView()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Create Route",
+                                    norwegian:
+                                        "Opprett rute"
+                                ),
+                                systemImage:
+                                    "plus"
+                            )
+                        }
+                    }
                 }
             }
+            .athlthLightweightCardChrome()
 
         case .structured:
             ATHLTHCard {
@@ -2576,6 +2766,32 @@ struct RunQuickStartSheet: View {
             true,
             for: .running
         )
+    }
+
+    private func selectedRouteVisibilityIcon(
+        _ visibility: ProfileVisibility
+    ) -> String {
+        switch visibility {
+        case .privateOnly:
+            return "lock.fill"
+        case .friends:
+            return "person.2.fill"
+        case .publicProfile:
+            return "globe.europe.africa.fill"
+        }
+    }
+
+    private func selectedRouteVisibilityTint(
+        _ visibility: ProfileVisibility
+    ) -> Color {
+        switch visibility {
+        case .privateOnly:
+            return ATHLTHTheme.accentDeep
+        case .friends:
+            return ATHLTHTheme.recoveryBlue
+        case .publicProfile:
+            return ATHLTHTheme.vitality
+        }
     }
 
     private var guidanceRoute:
