@@ -103,6 +103,140 @@ struct WorkoutFriendPicker: View {
     }
 }
 
+struct WorkoutSocialModePicker: View {
+    @Binding var mode:
+        SocialWorkoutParticipationMode
+
+    var body: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "HOW ARE YOU TRAINING?",
+                    norwegian: "HVORDAN TRENER DERE?"
+                )
+            )
+            .font(.caption2.weight(.bold))
+            .tracking(1.0)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+
+            ForEach(
+                SocialWorkoutParticipationMode
+                    .allCases
+            ) { option in
+                Button {
+                    mode = option
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(
+                            systemName:
+                                option
+                                    .systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 16,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            mode == option
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .vitality
+                        )
+                        .frame(
+                            width: 36,
+                            height: 36
+                        )
+                        .background(
+                            mode == option
+                                ? ATHLTHTheme
+                                    .vitality
+                                : ATHLTHTheme
+                                    .vitalitySoft,
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 11,
+                                    style:
+                                        .continuous
+                                )
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(option.title)
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                            Text(
+                                option.subtitle
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .fixedSize(
+                                horizontal:
+                                    false,
+                                vertical: true
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                mode == option
+                                    ? "checkmark.circle.fill"
+                                    : "circle"
+                        )
+                        .foregroundStyle(
+                            mode == option
+                                ? ATHLTHTheme
+                                    .vitality
+                                : Color
+                                    .secondary
+                        )
+                    }
+                    .padding(10)
+                    .background(
+                        mode == option
+                            ? ATHLTHTheme
+                                .vitalitySoft
+                                .opacity(0.65)
+                            : Color.primary
+                                .opacity(0.025),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 15,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
 struct QuickWorkoutStartSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
