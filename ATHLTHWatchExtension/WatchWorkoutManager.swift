@@ -3547,7 +3547,46 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 updatedNext
         }
 
-        if periodicAnnouncement {
+        var finalPhaseRemainingMeters:
+            Double?
+
+        if configuration
+                .shouldAnnounceFinalPhase,
+           !ghostFinalPhaseAnnounced {
+            let totalDistance =
+                ghostRaceConfiguration?
+                    .routeDistanceMeters ??
+                plannedRoute.map {
+                    max(
+                        $0.distanceKilometers *
+                            1_000,
+                        0
+                    )
+                }
+
+            if let totalDistance,
+               totalDistance > 0 {
+                let remaining =
+                    max(
+                        totalDistance -
+                            userDistance,
+                        0
+                    )
+
+                if remaining > 0 &&
+                    remaining <=
+                        configuration
+                            .resolvedFinalPhaseStartMeters {
+                    ghostFinalPhaseAnnounced =
+                        true
+                    finalPhaseRemainingMeters =
+                        remaining
+                }
+            }
+        }
+
+        if periodicAnnouncement ||
+            finalPhaseRemainingMeters != nil {
             announceGhostRaceLead(
                 distanceDelta:
                     distanceDelta,
@@ -3557,7 +3596,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     configuration
                         .resolvedPeriodicDelivery,
                 priority:
-                    .ghostPeriodic
+                    .ghostPeriodic,
+                configuration:
+                    configuration,
+                finalPhaseRemainingMeters:
+                    finalPhaseRemainingMeters
             )
             lastGhostAnnouncedLeadMeters =
                 distanceDelta
@@ -3569,8 +3612,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        guard configuration
-            .announceLeadChanges,
+        guard (
+            configuration
+                .announceLeadChanges ||
+            configuration
+                .shouldAnnounceOvertakes
+        ),
               elapsedTime >= 20
         else {
             return
@@ -3598,17 +3645,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             } ?? 0
         let movedEnough =
+            configuration
+                .announceLeadChanges &&
             absoluteLeadChange >=
                 max(
                     configuration
                         .leadChangeThresholdMeters,
                     10
                 )
+        let overtakeDue =
+            configuration
+                .shouldAnnounceOvertakes &&
+            signChanged
         let important =
-            signChanged ||
-            absoluteLeadChange >=
+            overtakeDue ||
+            (
                 configuration
-                    .resolvedImportantLeadChangeMeters
+                    .announceLeadChanges &&
+                absoluteLeadChange >=
+                    configuration
+                        .resolvedImportantLeadChangeMeters
+            )
         let requiredCooldown =
             important
                 ? configuration
@@ -3623,7 +3680,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             } ?? true
 
         guard cooldownSatisfied &&
-                (signChanged || movedEnough)
+                (overtakeDue || movedEnough)
         else {
             if lastGhostAnnouncedLeadMeters == nil {
                 lastGhostAnnouncedLeadMeters =
@@ -3648,7 +3705,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             priority:
                 important
                     ? .ghostImportant
-                    : .ghostPeriodic
+                    : .ghostPeriodic,
+            configuration:
+                configuration,
+            finalPhaseRemainingMeters:
+                nil
         )
 
         lastGhostAnnouncedLeadMeters =
@@ -3662,98 +3723,281 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         distanceDelta: Double,
         timeDelta: TimeInterval?,
         delivery: WatchAlertDelivery,
-        priority: ATHLTHGuidancePriority
+        priority: ATHLTHGuidancePriority,
+        configuration:
+            WatchGhostRaceAudioConfiguration,
+        finalPhaseRemainingMeters:
+            Double?
     ) {
         let meters =
             abs(distanceDelta)
+        let mode =
+            configuration
+                .resolvedStatusDetailMode
+        let includeDistance =
+            mode != .time ||
+            timeDelta == nil
+        let includeTime =
+            mode != .distance &&
+            timeDelta != nil
+        let opponent =
+            currentLiveGhostOpponentName
 
-        let english: String
-        let norwegian: String
+        var englishParts: [String] = []
+        var norwegianParts: [String] = []
+
+        if let finalPhaseRemainingMeters {
+            englishParts.append(
+                "Final " +
+                ghostGapDistancePhrase(
+                    finalPhaseRemainingMeters,
+                    norwegian: false
+                ) +
+                "."
+            )
+            norwegianParts.append(
+                "Siste " +
+                ghostGapDistancePhrase(
+                    finalPhaseRemainingMeters,
+                    norwegian: true
+                ) +
+                "."
+            )
+        }
 
         if meters < 8 {
-            english =
-                "Ghost Race. Neck and neck."
-            norwegian =
-                "Spøkelsesløp. Helt jevnt."
+            if let opponent {
+                englishParts.append(
+                    "You and \(opponent) are neck and neck."
+                )
+                norwegianParts.append(
+                    "Du og \(opponent) ligger helt jevnt."
+                )
+            } else {
+                englishParts.append(
+                    "Ghost Race. Neck and neck."
+                )
+                norwegianParts.append(
+                    "Ghost Race. Helt jevnt."
+                )
+            }
         } else if distanceDelta > 0 {
-            var englishParts = [
-                "Ghost Race. You are " +
-                    spokenDistance(meters) +
-                    " ahead."
-            ]
-            var norwegianParts = [
-                "Spøkelsesløp. Du er " +
-                    spokenDistance(meters) +
-                    " foran."
-            ]
+            if let opponent {
+                if includeDistance {
+                    englishParts.append(
+                        "You are " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead of \(opponent)."
+                    )
+                    norwegianParts.append(
+                        "Du er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran \(opponent)."
+                    )
+                }
 
-            if let timeDelta {
-                englishParts.append(
-                    "About " +
-                    spokenDuration(
-                        abs(timeDelta)
-                    ) +
-                    " ahead."
-                )
-                norwegianParts.append(
-                    "Omtrent " +
-                    spokenDuration(
-                        abs(timeDelta)
-                    ) +
-                    " foran."
-                )
+                if includeTime,
+                   let timeDelta {
+                    if includeDistance {
+                        englishParts.append(
+                            "About " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead."
+                        )
+                        norwegianParts.append(
+                            "Omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran."
+                        )
+                    } else {
+                        englishParts.append(
+                            "You are about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead of \(opponent)."
+                        )
+                        norwegianParts.append(
+                            "Du er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran \(opponent)."
+                        )
+                    }
+                }
+            } else {
+                if includeDistance {
+                    englishParts.append(
+                        "Ghost Race. You are " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "Ghost Race. Du er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
+
+                if includeTime,
+                   let timeDelta {
+                    englishParts.append(
+                        (includeDistance
+                            ? "About "
+                            : "Ghost Race. You are about ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        (includeDistance
+                            ? "Omtrent "
+                            : "Ghost Race. Du er omtrent ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
             }
-
-            english =
-                englishParts.joined(
-                    separator: " "
-                )
-            norwegian =
-                norwegianParts.joined(
-                    separator: " "
-                )
         } else {
-            var englishParts = [
-                "Ghost Race. Your ghost is " +
-                    spokenDistance(meters) +
-                    " ahead."
-            ]
-            var norwegianParts = [
-                "Spøkelsesløp. Spøkelset er " +
-                    spokenDistance(meters) +
-                    " foran."
-            ]
+            if let opponent {
+                if includeDistance {
+                    englishParts.append(
+                        "\(opponent) is " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "\(opponent) er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
 
-            if let timeDelta {
-                englishParts.append(
-                    "About " +
-                    spokenDuration(
-                        abs(timeDelta)
-                    ) +
-                    " behind."
-                )
-                norwegianParts.append(
-                    "Omtrent " +
-                    spokenDuration(
-                        abs(timeDelta)
-                    ) +
-                    " bak."
-                )
+                if includeTime,
+                   let timeDelta {
+                    if includeDistance {
+                        englishParts.append(
+                            "You are about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " behind."
+                        )
+                        norwegianParts.append(
+                            "Du er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " bak."
+                        )
+                    } else {
+                        englishParts.append(
+                            "\(opponent) is about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead."
+                        )
+                        norwegianParts.append(
+                            "\(opponent) er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran."
+                        )
+                    }
+                }
+            } else {
+                if includeDistance {
+                    englishParts.append(
+                        "Ghost Race. Your ghost is " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "Ghost Race. Ghosten er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
+
+                if includeTime,
+                   let timeDelta {
+                    englishParts.append(
+                        (includeDistance
+                            ? "You are about "
+                            : "Ghost Race. You are about ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: false
+                        ) +
+                        " behind."
+                    )
+                    norwegianParts.append(
+                        (includeDistance
+                            ? "Du er omtrent "
+                            : "Ghost Race. Du er omtrent ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: true
+                        ) +
+                        " bak."
+                    )
+                }
             }
-
-            english =
-                englishParts.joined(
-                    separator: " "
-                )
-            norwegian =
-                norwegianParts.joined(
-                    separator: " "
-                )
         }
 
         deliverWorkoutAlert(
-            english: english,
-            norwegian: norwegian,
+            english:
+                englishParts.joined(
+                    separator: " "
+                ),
+            norwegian:
+                norwegianParts.joined(
+                    separator: " "
+                ),
             delivery: delivery,
             haptic:
                 distanceDelta >= 0
@@ -3761,6 +4005,147 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     : .notification,
             priority: priority
         )
+    }
+
+    private var currentLiveGhostOpponentName:
+        String? {
+        guard ghostRaceConfiguration == nil,
+              let raw =
+                liveSurfaceContext
+                    .liveGhost?
+                    .opponentName?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ),
+              !raw.isEmpty
+        else {
+            return nil
+        }
+
+        return raw
+    }
+
+    private func ghostGapDistancePhrase(
+        _ meters: Double,
+        norwegian: Bool
+    ) -> String {
+        let value =
+            max(meters, 0)
+
+        if value >= 1_000 {
+            return String(
+                format: "%.1f km",
+                value / 1_000
+            )
+        }
+
+        let rounded =
+            Int(value.rounded())
+        return norwegian
+            ? "\(rounded) meter"
+            : "\(rounded) meters"
+    }
+
+    private func ghostGapTimePhrase(
+        _ seconds: TimeInterval,
+        norwegian: Bool
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+
+        if total < 90 {
+            return norwegian
+                ? "\(total) sekunder"
+                : "\(total) seconds"
+        }
+
+        let minutes =
+            total / 60
+        let remainder =
+            total % 60
+
+        if remainder == 0 {
+            return norwegian
+                ? "\(minutes) minutter"
+                : "\(minutes) minutes"
+        }
+
+        return norwegian
+            ? "\(minutes) minutter \(remainder) sekunder"
+            : "\(minutes) minutes \(remainder) seconds"
+    }
+
+    private func announceLiveGhostConnectionChangeIfNeeded(
+        previous: String?,
+        current: String?,
+        opponentName: String,
+        configuration:
+            WatchGhostRaceAudioConfiguration?
+    ) {
+        let normalizedCurrent =
+            current?.uppercased()
+        let normalizedPrevious =
+            previous?.uppercased()
+
+        lastLiveGhostConnectionText =
+            normalizedCurrent
+
+        guard isActive,
+              kind == .running,
+              let configuration,
+              configuration.enabled,
+              configuration
+                .shouldAnnounceLiveConnectionChanges,
+              let normalizedPrevious,
+              let normalizedCurrent,
+              normalizedPrevious !=
+                normalizedCurrent
+        else {
+            return
+        }
+
+        let trimmedName =
+            opponentName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        let name =
+            trimmedName.isEmpty
+                ? ATHLTHLocalization.choose(
+                    english: "your opponent",
+                    norwegian: "motstanderen"
+                )
+                : trimmedName
+
+        if normalizedCurrent == "LIVE",
+           normalizedPrevious != "LIVE" {
+            deliverWorkoutAlert(
+                english:
+                    "\(name) is live again.",
+                norwegian:
+                    "\(name) er live igjen.",
+                delivery:
+                    configuration
+                        .resolvedImportantLeadChangeDelivery,
+                haptic: .success,
+                priority: .ghostImportant
+            )
+        } else if normalizedPrevious == "LIVE",
+                  normalizedCurrent != "LIVE" {
+            deliverWorkoutAlert(
+                english:
+                    "Live connection to \(name) is interrupted.",
+                norwegian:
+                    "Live-tilkoblingen til \(name) er avbrutt.",
+                delivery:
+                    configuration
+                        .resolvedImportantLeadChangeDelivery,
+                haptic: .notification,
+                priority: .ghostImportant
+            )
+        }
     }
 
     private func ghostLeadSign(
