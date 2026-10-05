@@ -333,6 +333,11 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var coverArtworkName: String? = nil
     var coverImageURL: String? = nil
 
+    // Optional marker for a direct Friends-vs-Friends duel. Stored in the
+    // existing rules JSON, so older challenges remain fully compatible and no
+    // database schema change is required.
+    var headToHeadMetricRaw: String? = nil
+
     var startsAt: Date
     var endsAt: Date?
     var allowMultipleAttempts: Bool
