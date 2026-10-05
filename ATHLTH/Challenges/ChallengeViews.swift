@@ -587,6 +587,11 @@ struct ChallengeCoverArtworkView: View {
                         Color(red: 0.20, green: 0.26, blue: 0.36),
                         Color(red: 0.34, green: 0.43, blue: 0.57)
                     ]
+                case .walking:
+                    return [
+                        Color(red: 0.20, green: 0.34, blue: 0.30),
+                        Color(red: 0.42, green: 0.55, blue: 0.43)
+                    ]
                 case .strength:
                     return [
                         Color(red: 0.26, green: 0.27, blue: 0.31),
@@ -920,6 +925,19 @@ struct ChallengeCreationView: View {
                 case .running:
                     scoring =
                         .fastestDistance
+                    verificationPolicy =
+                        .verifiedRequired
+
+                case .walking:
+                    scoring =
+                        .mostDistance
+                    usesSpecificRoute =
+                        false
+                    selectedRouteID = nil
+                    gpsRequired = false
+                    allowTreadmill = false
+                    allowTargetGhost = false
+                    allowLiveGhost = false
                     verificationPolicy =
                         .verifiedRequired
 
@@ -1478,6 +1496,11 @@ struct ChallengeCreationView: View {
                 english: "Running challenge",
                 norwegian: "Løpechallenge"
             )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking challenge",
+                norwegian: "Gåchallenge"
+            )
         case .strength:
             return ATHLTHLocalization.choose(
                 english: "Strength challenge",
@@ -1630,6 +1653,8 @@ struct ChallengeCreationView: View {
             switch sport {
             case .running:
                 creationRunningRules
+            case .walking:
+                creationWalkingRules
             case .strength:
                 creationStrengthRules
             case .heartRate:
@@ -2382,6 +2407,123 @@ struct ChallengeCreationView: View {
     }
 
     @ViewBuilder
+    private var creationWalkingRules:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            if scoring ==
+                .fastestDistance {
+                creationTextField(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Distance",
+                            norwegian: "Distanse"
+                        ),
+                    placeholder: "5.0",
+                    text:
+                        Binding(
+                            get: {
+                                targetDistanceKm
+                                    .formatted(
+                                        .number
+                                            .precision(
+                                                .fractionLength(
+                                                    0...2
+                                                )
+                                            )
+                                    )
+                            },
+                            set: {
+                                targetDistanceKm =
+                                    Double(
+                                        $0.replacingOccurrences(
+                                            of: ",",
+                                            with: "."
+                                        )
+                                    ) ??
+                                    targetDistanceKm
+                            }
+                        ),
+                    icon: "figure.walk"
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Fastest verified walk over the selected distance.",
+                        norwegian:
+                            "Raskeste verifiserte gåtur over valgt distanse."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if scoring ==
+                        .farthestInTime {
+                creationTextField(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Time",
+                            norwegian: "Tid"
+                        ),
+                    placeholder: "60",
+                    text:
+                        Binding(
+                            get: {
+                                Int(
+                                    targetDurationMinutes
+                                )
+                                .description
+                            },
+                            set: {
+                                targetDurationMinutes =
+                                    Double($0) ??
+                                    targetDurationMinutes
+                            }
+                        ),
+                    icon: "clock.fill"
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Longest verified walking distance within the selected time.",
+                        norwegian:
+                            "Lengst verifiserte gådistanse innen valgt tid."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "All verified walking distance in the challenge period is added together.",
+                        norwegian:
+                            "All verifisert gådistanse i utfordringsperioden summeres."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+            }
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Require GPS verification",
+                    norwegian:
+                        "Krev GPS-verifisering"
+                ),
+                isOn: $gpsRequired
+            )
+        }
+    }
+
+    @ViewBuilder
     private var creationStrengthRules:
         some View {
         if scoring != .workoutVolume {
@@ -2834,6 +2976,25 @@ struct ChallengeCreationView: View {
                     )
                 }
                 .buttonStyle(.bordered)
+            }
+
+        case .walking:
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                creationAttemptControls
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Walking challenges use verified distance and time. Ghost and treadmill-specific running controls are disabled.",
+                        norwegian:
+                            "Gåutfordringer bruker verifisert distanse og tid. Ghost og løpespecifikke møllevalg er slått av."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
         case .strength:
@@ -3480,7 +3641,7 @@ struct ChallengeCreationView: View {
         }
 
         switch sport {
-        case .running:
+        case .running, .walking:
             if scoring ==
                 .fastestDistance {
                 return usesSpecificRoute
@@ -3585,8 +3746,7 @@ struct ChallengeCreationView: View {
         switch sheet {
         case .sport:
             ForEach(
-                ATHLTHChallengeSport
-                    .allCases
+                challengeSportOptions
             ) { option in
                 selectionSheetButton(
                     title: option.title,
@@ -3796,6 +3956,21 @@ struct ChallengeCreationView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var challengeSportOptions:
+        [ATHLTHChallengeSport] {
+        if !preselectedFriends.isEmpty &&
+            preselectedRouteID == nil {
+            return [
+                .running,
+                .walking,
+                .strength
+            ]
+        }
+
+        return ATHLTHChallengeSport
+            .allCases
     }
 
     private func selectionSheetTitle(
@@ -4428,10 +4603,20 @@ struct ChallengeCreationView: View {
                 )
                 .font(.title2.bold())
 
-                HStack(spacing: 10) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible()),
+                        GridItem(.flexible())
+                    ],
+                    spacing: 10
+                ) {
                     sportButton(.running)
+                    sportButton(.walking)
                     sportButton(.strength)
-                    sportButton(.heartRate)
+
+                    if preselectedFriends.isEmpty {
+                        sportButton(.heartRate)
+                    }
                 }
             }
 
@@ -4529,6 +4714,8 @@ struct ChallengeCreationView: View {
             switch sport {
             case .running:
                 runningRules
+            case .walking:
+                walkingRules
             case .strength:
                 strengthRules
             case .heartRate:
@@ -5123,6 +5310,11 @@ struct ChallengeCreationView: View {
         }
         .padding()
         .challengeCard()
+    }
+
+    private var walkingRules:
+        some View {
+        runningRules
     }
 
     private var heartRateRules: some View {
@@ -5855,7 +6047,7 @@ struct ChallengeCreationView: View {
 
     private var scoringOptions: [ATHLTHChallengeScoring] {
         switch sport {
-        case .running:
+        case .running, .walking:
             return [.fastestDistance, .farthestInTime, .mostDistance]
         case .strength:
             return [.heaviestWeight, .mostReps, .exerciseVolume, .workoutVolume]
@@ -5894,7 +6086,8 @@ struct ChallengeCreationView: View {
         case 0:
             return true
         case 1:
-            if sport == .running {
+            if sport == .running ||
+                sport == .walking {
                 if scoring == .fastestDistance {
                     if usesSpecificRoute {
                         return selectedRouteID != nil
@@ -5942,7 +6135,8 @@ struct ChallengeCreationView: View {
     }
 
     private var effectiveScoring: ATHLTHChallengeScoring {
-        if sport == .running &&
+        if (sport == .running ||
+            sport == .walking) &&
             scoring == .fastestDistance &&
             usesSpecificRoute {
             return .fastestRoute
@@ -5997,6 +6191,7 @@ struct ChallengeCreationView: View {
     ) -> String {
         switch sport {
         case .running: return "GoalRunning"
+        case .walking: return "GoalWalking"
         case .strength: return "GoalStrength"
         case .heartRate: return "GoalEndurance"
         }
@@ -6186,29 +6381,34 @@ struct ChallengeCreationView: View {
                     ? routeMatchPercent
                     : nil,
             distanceTolerancePercent:
-                sport == .running &&
+                (sport == .running ||
+                 sport == .walking) &&
                 scoring == .fastestDistance &&
                 !usesSpecificRoute
                     ? distanceTolerancePercent
                     : nil,
             startFinishToleranceMeters:
-                sport == .running &&
+                (sport == .running ||
+                 sport == .walking) &&
                 usesSpecificRoute
                     ? startFinishToleranceMeters
                     : nil,
             routeDirection:
-                sport == .running &&
+                (sport == .running ||
+                 sport == .walking) &&
                 usesSpecificRoute
                     ? routeDirection
                     : nil,
             attemptPolicy:
-                sport == .running
+                (sport == .running ||
+                 sport == .walking)
                     ? (allowMultipleAttempts
                         ? attemptPolicy
                         : .first)
                     : nil,
             maximumAttempts:
-                sport == .running
+                (sport == .running ||
+                 sport == .walking)
                     ? (allowMultipleAttempts
                         ? (attemptLimit == 0
                             ? nil
@@ -9055,8 +9255,17 @@ struct ChallengeDetailView: View {
                         ? "Allowed"
                         : "Disabled by creator"
                 )
-            } else if challenge.sport == .running {
-                ruleRow("Course", "Run Anywhere")
+            } else if challenge.sport == .running ||
+                      challenge.sport == .walking {
+                ruleRow(
+                    "Course",
+                    challenge.sport == .walking
+                        ? ATHLTHLocalization.choose(
+                            english: "Walk Anywhere",
+                            norwegian: "Gå hvor som helst"
+                        )
+                        : "Run Anywhere"
+                )
                 ruleRow(
                     "Live Ghost",
                     challenge.rules.liveGhostAllowed
@@ -9084,7 +9293,8 @@ struct ChallengeDetailView: View {
                 }
             }
 
-            if challenge.sport == .running {
+            if challenge.sport == .running ||
+                challenge.sport == .walking {
                 ruleRow(
                     "Timing",
                     challenge.rules.timeBasis.title
