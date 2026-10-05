@@ -350,7 +350,7 @@ struct ATHLTHGhostUpdatesSettingsView: View {
 
                 Section("Lead changes") {
                     Toggle(
-                        "Meaningful lead changes",
+                        "Extra lead-change alerts",
                         isOn:
                             $settings
                                 .ghostRaceAudioAnnounceLeadChanges
@@ -424,7 +424,7 @@ struct ATHLTHGhostUpdatesSettingsView: View {
 
                 Section {
                     Text(
-                        "A switch from ahead to behind is always treated as important. Important Ghost events can use voice; smaller changes can stay haptic-only."
+                        "Distance and time intervals are the normal Ghost cadence. Lead-change alerts are optional extra events between those intervals. Small GPS changes around neck-and-neck are ignored, and extra alerts are rate-limited."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
