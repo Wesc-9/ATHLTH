@@ -15,6 +15,7 @@ struct HomeAssistantSettingsView: View {
 
                 if homeAssistant.isConnected {
                     connectedCard
+                    syncTimingCard
                     sharingCard
                 } else {
                     discoveryCard
@@ -296,6 +297,108 @@ struct HomeAssistantSettingsView: View {
         .background(
             ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+    }
+
+    private var syncTimingCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        ATHLTHTheme.accentSoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Update frequency",
+                            norwegian: "Oppdateringsfrekvens"
+                        )
+                    )
+                    .font(.headline)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Choose how aggressively ATHLTH keeps routine Home Assistant sensors up to date.",
+                            norwegian:
+                                "Velg hvor aktivt ATHLTH skal holde vanlige Home Assistant-sensorer oppdatert."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Update frequency",
+                    norwegian: "Oppdateringsfrekvens"
+                ),
+                selection:
+                    $homeAssistant.syncMode
+            ) {
+                ForEach(
+                    HomeAssistantSyncMode
+                        .allCases
+                ) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(
+                homeAssistant.syncMode.detail
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+
+            Label(
+                ATHLTHLocalization.choose(
+                    english:
+                        "ATHLTH now skips unchanged snapshots automatically.",
+                    norwegian:
+                        "ATHLTH hopper nå automatisk over uendrede statusoppdateringer."
+                ),
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+        }
+        .padding(18)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
         )
     }
 
