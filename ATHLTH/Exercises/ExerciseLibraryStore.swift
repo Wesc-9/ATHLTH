@@ -197,7 +197,7 @@ final class ExerciseLibraryStore: ObservableObject {
                 matchesText = true
             } else {
                 let haystack = [
-                    entry.name,
+                    entry.exercise.searchNames.joined(separator: " "),
                     entry.summary ?? "",
                     entry.bodyPart ?? "",
                     entry.exercise.primaryMuscles.joined(separator: " "),
@@ -207,7 +207,15 @@ final class ExerciseLibraryStore: ObservableObject {
                 .joined(separator: " ")
                 .lowercased()
 
-                matchesText = haystack.contains(cleanQuery)
+                let queryTokens =
+                    cleanQuery
+                        .split(whereSeparator: { $0.isWhitespace })
+                        .map(String.init)
+
+                matchesText =
+                    queryTokens.allSatisfy {
+                        haystack.contains($0)
+                    }
             }
 
             let matchesBodyPart =
