@@ -2,6 +2,7 @@ import Foundation
 
 enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable {
     case running
+    case walking
     case strength
     case heartRate
 
@@ -9,15 +10,33 @@ enum ATHLTHChallengeSport: String, CaseIterable, Identifiable, Codable, Hashable
 
     var title: String {
         switch self {
-        case .running: return ATHLTHLocalization.string( "Running")
-        case .strength: return ATHLTHLocalization.string( "Strength")
-        case .heartRate: return ATHLTHLocalization.string( "Heart Rate")
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåing"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .heartRate:
+            return ATHLTHLocalization.choose(
+                english: "Heart Rate",
+                norwegian: "Puls"
+            )
         }
     }
 
     var systemImage: String {
         switch self {
         case .running: return "figure.run"
+        case .walking: return "figure.walk"
         case .strength: return "dumbbell.fill"
         case .heartRate: return "heart.circle.fill"
         }
