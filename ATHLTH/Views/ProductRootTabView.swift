@@ -7063,6 +7063,14 @@ struct ATHLTHRecoveryView: View {
                                     showingRecoveryCoach = true
                                 }
                             )
+
+                            // Coach is now a dedicated next step instead of
+                            // one of several utility buttons inside the score
+                            // card. This keeps the primary insight cleaner and
+                            // makes conversational follow-up easier to find.
+                            RecoveryCoachEntryCard {
+                                showingRecoveryCoach = true
+                            }
                         } else {
                             recoveryScoreCard
                             todaysSignalsCard
