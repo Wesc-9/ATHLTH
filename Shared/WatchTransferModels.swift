@@ -39,59 +39,23 @@ enum ATHLTHRouteCompletionAnalyzer {
         toleranceMeters: Double = 80
     ) -> ATHLTHRouteCompletionAnalysis? {
         guard actualLocations.count >= 2,
-              referenceLocations.count >= 2
+              referenceLocations.count >= 2,
+              let match =
+                RoutePerformanceMatcher
+                    .analyze(
+                        reference:
+                            referenceLocations,
+                        actual:
+                            actualLocations
+                    )
         else {
             return nil
         }
 
-        let sampleStep =
-            max(
-                referenceLocations.count / 120,
-                1
-            )
-        let referenceSamples =
-            stride(
-                from: 0,
-                to: referenceLocations.count,
-                by: sampleStep
-            )
-            .map {
-                referenceLocations[$0]
-            }
-
-        guard !referenceSamples.isEmpty else {
-            return nil
-        }
-
-        let nearestDistances =
-            referenceSamples.map { point in
-                actualLocations.lazy
-                    .map {
-                        $0.distance(from: point)
-                    }
-                    .min() ??
-                    .greatestFiniteMagnitude
-            }
-        let finite =
-            nearestDistances.filter(\.isFinite)
-
-        guard !finite.isEmpty else {
-            return nil
-        }
-
-        let matched =
-            nearestDistances.filter {
-                $0 <= toleranceMeters
-            }.count
-        let matchPercent =
-            Double(matched) /
-            Double(referenceSamples.count) *
-            100
-        let average =
-            finite.reduce(0, +) /
-            Double(finite.count)
-        let maximum =
-            finite.max() ?? 0
+        // Kept in the public signature for compatibility with older call
+        // sites. Matching is now soft/bidirectional rather than binary at a
+        // single tolerance threshold.
+        _ = toleranceMeters
 
         let actualStart =
             actualLocations[0]
@@ -128,11 +92,11 @@ enum ATHLTHRouteCompletionAnalyzer {
 
         return ATHLTHRouteCompletionAnalysis(
             routeMatchPercent:
-                min(max(matchPercent, 0), 100),
+                match.routeMatchPercent,
             averageDeviationMeters:
-                max(average, 0),
+                match.averageDeviationMeters,
             maxDeviationMeters:
-                max(maximum, 0),
+                match.maxDeviationMeters,
             startDistanceMeters:
                 useReverse
                     ? reverseStart
