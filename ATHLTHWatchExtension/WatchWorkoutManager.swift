@@ -94,6 +94,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var routeRemainingMeters: Double?
     @Published private(set) var routeDeviationMeters: Double?
     @Published private(set) var routeDistanceToStartMeters: Double?
+    @Published private(set) var routeNavigationLatitude: Double?
+    @Published private(set) var routeNavigationLongitude: Double?
+    @Published private(set) var routeNavigationCourseDegrees: Double?
+    @Published private(set) var routeNavigationNearestPointIndex: Int?
+    @Published private(set) var routeNavigationRevision = 0
     @Published private(set) var routeAlertConfiguration:
         WatchRouteAlertConfiguration = .standard
     @Published private(set) var targetAlertConfiguration:
@@ -177,6 +182,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
     private var lastGhostMapPublishedAt: Date?
+    private var lastRouteNavigationMapPublishedAt: Date?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
@@ -387,6 +393,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
         lastGhostMapPublishedAt = nil
+        lastRouteNavigationMapPublishedAt = nil
 
         if let interval =
                 audio?.distanceIntervalMeters,
@@ -2120,6 +2127,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routeRemainingMeters = nil
             self.routeDeviationMeters = nil
             self.routeDistanceToStartMeters = nil
+            self.routeNavigationLatitude = nil
+            self.routeNavigationLongitude = nil
+            self.routeNavigationCourseDegrees = nil
+            self.routeNavigationNearestPointIndex = nil
+            self.routeNavigationRevision = 0
             self.routeAlertConfiguration = .standard
             self.targetAlertConfiguration = nil
             self.liveTargetStatus = nil
@@ -2312,6 +2324,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
             self.routeDeviationMeters = nil
             self.routeDistanceToStartMeters = nil
+            self.routeNavigationLatitude = nil
+            self.routeNavigationLongitude = nil
+            self.routeNavigationCourseDegrees = nil
+            self.routeNavigationNearestPointIndex = nil
+            self.routeNavigationRevision = 0
             self.liveTargetStatus = nil
             self.lapCount = 0
             self.currentLapElapsedTime = 0
@@ -3117,6 +3134,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 guidance.distanceToStartMeters
         }
 
+        publishRouteNavigationPositionIfNeeded(
+            location:
+                location,
+            nearestPointIndex:
+                guidance
+                    .nearestRoutePointIndex
+        )
+
         updateGhostRace(
             traveledAlongRoute:
                 guidance.traveledAlongRouteMeters,
@@ -3130,6 +3155,44 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             horizontalAccuracy:
                 location.horizontalAccuracy
         )
+    }
+
+    private func publishRouteNavigationPositionIfNeeded(
+        location: CLLocation,
+        nearestPointIndex: Int
+    ) {
+        guard plannedRoute != nil
+        else {
+            return
+        }
+
+        let now = Date()
+        if let lastRouteNavigationMapPublishedAt,
+           now.timeIntervalSince(
+                lastRouteNavigationMapPublishedAt
+           ) < 0.85 {
+            return
+        }
+
+        lastRouteNavigationMapPublishedAt = now
+
+        let resolvedCourse =
+            location.course >= 0 &&
+            location.course <= 360
+                ? location.course
+                : nil
+
+        publish {
+            self.routeNavigationLatitude =
+                location.coordinate.latitude
+            self.routeNavigationLongitude =
+                location.coordinate.longitude
+            self.routeNavigationCourseDegrees =
+                resolvedCourse
+            self.routeNavigationNearestPointIndex =
+                nearestPointIndex
+            self.routeNavigationRevision &+= 1
+        }
     }
 
     private func updateGhostRace(
