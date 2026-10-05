@@ -919,22 +919,29 @@ final class HealthKitManager: ObservableObject {
                 previousSleepDuration {
                 invalidateTrophySnapshotCache()
             }
-            sleep = fetchedSleep
+            if sleep != fetchedSleep {
+                sleep = fetchedSleep
+            }
         }
 
-        if let fetchedHeart {
+        if let fetchedHeart,
+           heart != fetchedHeart {
             heart = fetchedHeart
         }
 
-        if let fetchedTraining {
+        if let fetchedTraining,
+           training != fetchedTraining {
             training = fetchedTraining
         }
 
-        if let refreshedRecovery {
+        if let refreshedRecovery,
+           recovery != refreshedRecovery {
             recovery = refreshedRecovery
         }
 
-        personalDetails = fetchedProfile
+        if personalDetails != fetchedProfile {
+            personalDetails = fetchedProfile
+        }
     }
 
     func refreshAll() async {
@@ -1100,7 +1107,9 @@ final class HealthKitManager: ObservableObject {
                 invalidateWorkoutDerivedCaches()
             }
 
-            workouts = summaries
+            if workouts != summaries {
+                workouts = summaries
+            }
             workoutObjects =
                 fetchedWorkouts.reduce(
                     into: [:]
@@ -1144,26 +1153,36 @@ final class HealthKitManager: ObservableObject {
                 previousSleepDuration {
                 invalidateTrophySnapshotCache()
             }
-            sleep = fetchedSleep
+            if sleep != fetchedSleep {
+                sleep = fetchedSleep
+            }
             completedRead = true
         }
 
         if let fetchedHeart {
-            heart = fetchedHeart
+            if heart != fetchedHeart {
+                heart = fetchedHeart
+            }
             completedRead = true
         }
 
         if let fetchedTraining {
-            training = fetchedTraining
+            if training != fetchedTraining {
+                training = fetchedTraining
+            }
             completedRead = true
         }
 
         if let fetchedRecovery {
-            recovery = fetchedRecovery
+            if recovery != fetchedRecovery {
+                recovery = fetchedRecovery
+            }
             completedRead = true
         }
 
-        personalDetails = fetchedProfile
+        if personalDetails != fetchedProfile {
+            personalDetails = fetchedProfile
+        }
 
         if completedRead ||
             fetchedProfile.hasAnyValue {
@@ -3251,8 +3270,11 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshPersonalDetails() async {
-        personalDetails =
+        let fetched =
             await fetchPersonalDetailsSnapshot()
+        if personalDetails != fetched {
+            personalDetails = fetched
+        }
     }
 
     private func fetchPersonalDetailsSnapshot()
