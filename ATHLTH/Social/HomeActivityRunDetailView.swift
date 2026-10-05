@@ -232,8 +232,7 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
-                if linkedRoute != nil ||
-                    isLoadingRouteResult {
+                if linkedRoute != nil {
                     routeResultCard
                 }
 
@@ -274,10 +273,11 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var summaryCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
             HStack(
                 alignment: .firstTextBaseline
             ) {
@@ -406,24 +406,8 @@ struct HomeActivityRunDetailView: View {
                 }
             }
         }
-        .padding(16)
-        .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
-            )
         }
+        .athlthLightweightCardChrome()
     }
 
     @ViewBuilder
@@ -843,10 +827,11 @@ struct HomeActivityRunDetailView: View {
 
     @ViewBuilder
     private var mapCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
             HStack {
                 VStack(
                     alignment: .leading,
@@ -985,24 +970,8 @@ struct HomeActivityRunDetailView: View {
                 )
             }
         }
-        .padding(14)
-        .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
-            )
         }
+        .athlthLightweightCardChrome()
     }
 
     private var paceLegend: some View {
@@ -1046,10 +1015,11 @@ struct HomeActivityRunDetailView: View {
     }
 
     private var routeFactsCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
             Text("Route details")
                 .font(
                     .headline.weight(
@@ -1112,24 +1082,8 @@ struct HomeActivityRunDetailView: View {
                 )
             }
         }
-        .padding(16)
-        .background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme.border,
-                lineWidth: 1
-            )
         }
+        .athlthLightweightCardChrome()
     }
 
     private var coachCard: some View {
