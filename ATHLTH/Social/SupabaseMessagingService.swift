@@ -37,6 +37,21 @@ final class SupabaseMessagingService: Sendable {
             .value
     }
 
+    func loadConversation(
+        id: UUID
+    ) async throws -> DirectConversationRecord? {
+        let rows: [DirectConversationRecord] =
+            try await client
+                .from("direct_conversations")
+                .select()
+                .eq("id", value: id)
+                .limit(1)
+                .execute()
+                .value
+
+        return rows.first
+    }
+
     func loadRecentMessages(limit: Int = 500) async throws -> [DirectMessageRecord] {
         try await client
             .from("direct_messages")
