@@ -55,11 +55,60 @@ struct RecoveryAIInsight: Codable, Hashable {
     let quickQuestions: [String]
 }
 
+enum RecoveryCoachMessageRole:
+    String,
+    Codable,
+    Hashable {
+    case user
+    case assistant
+}
+
+struct RecoveryCoachMessage:
+    Identifiable,
+    Codable,
+    Hashable {
+    let id: UUID
+    let role: RecoveryCoachMessageRole
+    let text: String
+    let createdAt: Date
+
+    init(
+        id: UUID = UUID(),
+        role: RecoveryCoachMessageRole,
+        text: String,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.createdAt = createdAt
+    }
+}
+
+struct RecoveryCoachReply: Hashable {
+    let answer: String
+    let quickQuestions: [String]
+}
+
+struct RecoveryCoachConversationState:
+    Codable,
+    Hashable {
+    var messages: [RecoveryCoachMessage]
+    var quickQuestions: [String]
+    var contextSignature: String?
+}
+
+private struct RecoveryAIChatTurn: Encodable {
+    let role: String
+    let content: String
+}
+
 private struct RecoveryAIRequest: Encodable {
     let mode: String
     let context: RecoveryAIContext
     let question: String?
     let language: String
+    let history: [RecoveryAIChatTurn]?
 }
 
 private struct RecoveryAIInsightCacheEntry: Codable {
@@ -91,6 +140,114 @@ private struct RecoveryAICacheSignature: Codable {
 
 private struct RecoveryAIAnswer: Decodable {
     let answer: String
+    let quickQuestions: [String]?
+}
+
+enum RecoveryCoachConversationPersistence {
+    private static let maxStoredMessages = 200
+
+    static func load(
+        userID: UUID
+    ) -> RecoveryCoachConversationState? {
+        let url = conversationURL(
+            userID: userID
+        )
+
+        guard let data =
+                try? Data(contentsOf: url)
+        else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(
+            RecoveryCoachConversationState.self,
+            from: data
+        )
+    }
+
+    static func save(
+        _ state: RecoveryCoachConversationState,
+        userID: UUID
+    ) {
+        let trimmed =
+            RecoveryCoachConversationState(
+                messages:
+                    Array(
+                        state.messages
+                            .suffix(
+                                maxStoredMessages
+                            )
+                    ),
+                quickQuestions:
+                    Array(
+                        state.quickQuestions
+                            .prefix(3)
+                    ),
+                contextSignature:
+                    state.contextSignature
+            )
+
+        guard let data =
+                try? JSONEncoder()
+                    .encode(trimmed)
+        else {
+            return
+        }
+
+        let url =
+            conversationURL(
+                userID: userID
+            )
+
+        do {
+            try FileManager.default
+                .createDirectory(
+                    at:
+                        url
+                            .deletingLastPathComponent(),
+                    withIntermediateDirectories:
+                        true
+                )
+            try data.write(
+                to: url,
+                options: .atomic
+            )
+        } catch {
+            return
+        }
+    }
+
+    private static func conversationURL(
+        userID: UUID
+    ) -> URL {
+        let language =
+            ATHLTHLocalization.isNorwegian
+                ? "nb"
+                : "en"
+
+        let directory =
+            FileManager.default
+                .urls(
+                    for: .applicationSupportDirectory,
+                    in: .userDomainMask
+                )
+                .first ??
+            URL(
+                fileURLWithPath:
+                    NSTemporaryDirectory(),
+                isDirectory: true
+            )
+
+        return directory
+            .appendingPathComponent(
+                "ATHLTH",
+                isDirectory: true
+            )
+            .appendingPathComponent(
+                "recovery-coach-(userID.uuidString)-(language).json",
+                isDirectory: false
+            )
+    }
 }
 
 @MainActor
@@ -153,7 +310,8 @@ final class RecoveryAIService {
                         language:
                             ATHLTHLocalization.isNorwegian
                                 ? "nb"
-                                : "en"
+                                : "en",
+                        history: nil
                     )
                 )
             )
@@ -235,8 +393,24 @@ final class RecoveryAIService {
 
     func ask(
         _ question: String,
-        context: RecoveryAIContext
-    ) async throws -> String {
+        context: RecoveryAIContext,
+        history: [RecoveryCoachMessage]
+    ) async throws -> RecoveryCoachReply {
+        let requestHistory =
+            history
+                .suffix(16)
+                .map {
+                    RecoveryAIChatTurn(
+                        role:
+                            $0.role.rawValue,
+                        content:
+                            String(
+                                $0.text
+                                    .prefix(1800)
+                            )
+                    )
+                }
+
         let response: RecoveryAIAnswer =
             try await client.functions.invoke(
                 "recovery-sense",
@@ -248,11 +422,33 @@ final class RecoveryAIService {
                         language:
                             ATHLTHLocalization.isNorwegian
                                 ? "nb"
-                                : "en"
+                                : "en",
+                        history:
+                            requestHistory.isEmpty
+                                ? nil
+                                : requestHistory
                     )
                 )
             )
 
-        return response.answer
+        return RecoveryCoachReply(
+            answer: response.answer,
+            quickQuestions:
+                Array(
+                    (
+                        response.quickQuestions ??
+                        []
+                    )
+                    .filter {
+                        !$0
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                    }
+                    .prefix(3)
+                )
+        )
     }
 }
