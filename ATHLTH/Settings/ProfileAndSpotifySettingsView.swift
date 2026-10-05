@@ -14,6 +14,8 @@ struct ATHLTHEditProfileView: View {
     @State private var selectedTrainingFocuses: Set<TrainingFocus> = []
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedAvatarData: Data?
+    @State private var pendingAvatarCropImage: UIImage?
+    @State private var showingAvatarCrop = false
     @State private var usernameAvailable: Bool?
     @State private var checkingUsername = false
     @State private var saving = false
@@ -139,19 +141,43 @@ struct ATHLTHEditProfileView: View {
                             type: Data.self
                         ),
                         let image = UIImage(data: data),
-                        let jpeg = image.jpegData(compressionQuality: 0.82)
+                        let preparedImage =
+                            ATHLTHAvatarCropper.prepare(image)
                     else {
                         throw ProfileEditingError.invalidImage
                     }
 
                     await MainActor.run {
-                        selectedAvatarData = jpeg
+                        pendingAvatarCropImage = preparedImage
+                        showingAvatarCrop = true
+                        errorMessage = nil
                     }
                 } catch {
                     await MainActor.run {
+                        selectedPhoto = nil
                         errorMessage = error.localizedDescription
                     }
                 }
+            }
+        }
+        .fullScreenCover(
+            isPresented: $showingAvatarCrop
+        ) {
+            if let pendingAvatarCropImage {
+                ATHLTHAvatarCropView(
+                    image: pendingAvatarCropImage,
+                    onCancel: {
+                        selectedPhoto = nil
+                        self.pendingAvatarCropImage = nil
+                        showingAvatarCrop = false
+                    },
+                    onUse: { jpegData in
+                        selectedAvatarData = jpegData
+                        selectedPhoto = nil
+                        self.pendingAvatarCropImage = nil
+                        showingAvatarCrop = false
+                    }
+                )
             }
         }
         .task(id: username) {
@@ -885,6 +911,643 @@ struct ATHLTHEditProfileView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct ATHLTHAvatarCropView: View {
+    let image: UIImage
+    let onCancel: () -> Void
+    let onUse: (Data) -> Void
+
+    @State private var committedScale: CGFloat = 1
+    @State private var committedOffset: CGSize = .zero
+    @State private var cropSide: CGFloat = 1
+    @State private var exportFailed = false
+    @GestureState private var gestureScale: CGFloat = 1
+    @GestureState private var gestureTranslation: CGSize = .zero
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black
+                    .ignoresSafeArea()
+
+                VStack(spacing: 24) {
+                    Spacer(minLength: 20)
+
+                    GeometryReader { proxy in
+                        let side = max(
+                            1,
+                            min(
+                                proxy.size.width - 32,
+                                proxy.size.height,
+                                430
+                            )
+                        )
+
+                        cropCanvas(side: side)
+                            .frame(
+                                width: side,
+                                height: side
+                            )
+                            .position(
+                                x: proxy.size.width / 2,
+                                y: proxy.size.height / 2
+                            )
+                            .onAppear {
+                                cropSide = side
+                                committedOffset =
+                                    clampedOffset(
+                                        committedOffset,
+                                        scale:
+                                            committedScale,
+                                        cropSide: side
+                                    )
+                            }
+                            .onChange(
+                                of: proxy.size
+                            ) { _, _ in
+                                cropSide = side
+                                committedOffset =
+                                    clampedOffset(
+                                        committedOffset,
+                                        scale:
+                                            committedScale,
+                                        cropSide: side
+                                    )
+                            }
+                    }
+                    .frame(maxHeight: 500)
+
+                    VStack(spacing: 8) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Move and scale the photo",
+                                norwegian:
+                                    "Flytt og skaler bildet"
+                            )
+                        )
+                        .font(.headline)
+                        .foregroundStyle(.white)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Drag to position. Pinch to zoom. The circle shows exactly how your profile photo will appear.",
+                                norwegian:
+                                    "Dra for å plassere bildet. Knip for å zoome. Sirkelen viser nøyaktig hvordan profilbildet vil se ut."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            .white.opacity(0.68)
+                        )
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 26)
+                    }
+
+                    Button {
+                        committedScale = 1
+                        committedOffset = .zero
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Reset crop",
+                                norwegian:
+                                    "Tilbakestill utsnitt"
+                            ),
+                            systemImage:
+                                "arrow.counterclockwise"
+                        )
+                        .font(
+                            .subheadline.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .frame(height: 42)
+                        .background(
+                            .white.opacity(0.12),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 18)
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Crop profile photo",
+                    norwegian: "Velg utsnitt"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(
+                Color.black,
+                for: .navigationBar
+            )
+            .toolbarColorScheme(
+                .dark,
+                for: .navigationBar
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement: .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        onCancel()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Use photo",
+                            norwegian: "Bruk bilde"
+                        )
+                    ) {
+                        useCurrentCrop()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could not crop photo",
+                    norwegian:
+                        "Kunne ikke beskjære bildet"
+                ),
+                isPresented: $exportFailed
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Try a different crop or choose another photo.",
+                        norwegian:
+                            "Prøv et annet utsnitt eller velg et annet bilde."
+                    )
+                )
+            }
+        }
+    }
+
+    private func cropCanvas(
+        side: CGFloat
+    ) -> some View {
+        let liveScale =
+            ATHLTHAvatarCropper.clampedScale(
+                committedScale *
+                    gestureScale
+            )
+        let proposedOffset = CGSize(
+            width:
+                committedOffset.width +
+                gestureTranslation.width,
+            height:
+                committedOffset.height +
+                gestureTranslation.height
+        )
+        let liveOffset =
+            clampedOffset(
+                proposedOffset,
+                scale: liveScale,
+                cropSide: side
+            )
+        let baseSize =
+            ATHLTHAvatarCropper.baseDisplaySize(
+                image: image,
+                cropSide: side
+            )
+
+        return ZStack {
+            Color.black.opacity(0.92)
+
+            Image(uiImage: image)
+                .resizable()
+                .interpolation(.high)
+                .frame(
+                    width: baseSize.width,
+                    height: baseSize.height
+                )
+                .scaleEffect(liveScale)
+                .offset(liveOffset)
+        }
+        .frame(width: side, height: side)
+        .clipShape(Circle())
+        .overlay {
+            Circle()
+                .stroke(
+                    Color.white.opacity(0.96),
+                    lineWidth: 2
+                )
+        }
+        .overlay {
+            Circle()
+                .stroke(
+                    Color.white.opacity(0.22),
+                    lineWidth: 8
+                )
+                .padding(4)
+        }
+        .contentShape(Circle())
+        .simultaneousGesture(
+            DragGesture(
+                minimumDistance: 0
+            )
+            .updating(
+                $gestureTranslation
+            ) { value, state, _ in
+                state = value.translation
+            }
+            .onEnded { value in
+                let proposed = CGSize(
+                    width:
+                        committedOffset.width +
+                        value.translation.width,
+                    height:
+                        committedOffset.height +
+                        value.translation.height
+                )
+
+                committedOffset =
+                    clampedOffset(
+                        proposed,
+                        scale:
+                            committedScale,
+                        cropSide: side
+                    )
+            }
+        )
+        .simultaneousGesture(
+            MagnificationGesture()
+                .updating(
+                    $gestureScale
+                ) { value, state, _ in
+                    state = value
+                }
+                .onEnded { value in
+                    committedScale =
+                        ATHLTHAvatarCropper
+                            .clampedScale(
+                                committedScale *
+                                    value
+                            )
+                    committedOffset =
+                        clampedOffset(
+                            committedOffset,
+                            scale:
+                                committedScale,
+                            cropSide: side
+                        )
+                }
+        )
+        .accessibilityLabel(
+            ATHLTHLocalization.choose(
+                english:
+                    "Profile photo crop",
+                norwegian:
+                    "Utsnitt for profilbilde"
+            )
+        )
+    }
+
+    private func clampedOffset(
+        _ value: CGSize,
+        scale: CGFloat,
+        cropSide: CGFloat
+    ) -> CGSize {
+        ATHLTHAvatarCropper.clampedOffset(
+            value,
+            image: image,
+            scale: scale,
+            cropSide: cropSide
+        )
+    }
+
+    private func useCurrentCrop() {
+        guard cropSide > 1,
+              let data =
+                ATHLTHAvatarCropper.jpegData(
+                    from: image,
+                    cropSide: cropSide,
+                    scale:
+                        ATHLTHAvatarCropper
+                            .clampedScale(
+                                committedScale
+                            ),
+                    offset:
+                        clampedOffset(
+                            committedOffset,
+                            scale:
+                                ATHLTHAvatarCropper
+                                    .clampedScale(
+                                        committedScale
+                                    ),
+                            cropSide: cropSide
+                        )
+                )
+        else {
+            exportFailed = true
+            return
+        }
+
+        onUse(data)
+    }
+}
+
+private enum ATHLTHAvatarCropper {
+    static let maximumZoom: CGFloat = 5
+    static let maximumSourceDimension:
+        CGFloat = 4_096
+    static let outputDimension:
+        CGFloat = 1_200
+
+    static func prepare(
+        _ image: UIImage
+    ) -> UIImage? {
+        let sourceWidth =
+            image.size.width * image.scale
+        let sourceHeight =
+            image.size.height * image.scale
+
+        guard sourceWidth > 0,
+              sourceHeight > 0
+        else {
+            return nil
+        }
+
+        let longest =
+            max(sourceWidth, sourceHeight)
+        let reduction =
+            min(
+                1,
+                maximumSourceDimension /
+                    longest
+            )
+        let targetSize = CGSize(
+            width:
+                max(
+                    1,
+                    floor(
+                        sourceWidth *
+                            reduction
+                    )
+                ),
+            height:
+                max(
+                    1,
+                    floor(
+                        sourceHeight *
+                            reduction
+                    )
+                )
+        )
+
+        let format =
+            UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        let renderer =
+            UIGraphicsImageRenderer(
+                size: targetSize,
+                format: format
+            )
+
+        return renderer.image { _ in
+            image.draw(
+                in: CGRect(
+                    origin: .zero,
+                    size: targetSize
+                )
+            )
+        }
+    }
+
+    static func clampedScale(
+        _ value: CGFloat
+    ) -> CGFloat {
+        min(
+            max(value, 1),
+            maximumZoom
+        )
+    }
+
+    static func baseDisplaySize(
+        image: UIImage,
+        cropSide: CGFloat
+    ) -> CGSize {
+        let width = max(image.size.width, 1)
+        let height =
+            max(image.size.height, 1)
+        let aspect = width / height
+
+        if aspect >= 1 {
+            return CGSize(
+                width: cropSide * aspect,
+                height: cropSide
+            )
+        }
+
+        return CGSize(
+            width: cropSide,
+            height: cropSide / aspect
+        )
+    }
+
+    static func clampedOffset(
+        _ value: CGSize,
+        image: UIImage,
+        scale: CGFloat,
+        cropSide: CGFloat
+    ) -> CGSize {
+        let resolvedScale =
+            clampedScale(scale)
+        let base =
+            baseDisplaySize(
+                image: image,
+                cropSide: cropSide
+            )
+        let maxX =
+            max(
+                0,
+                (
+                    base.width *
+                    resolvedScale -
+                    cropSide
+                ) / 2
+            )
+        let maxY =
+            max(
+                0,
+                (
+                    base.height *
+                    resolvedScale -
+                    cropSide
+                ) / 2
+            )
+
+        return CGSize(
+            width:
+                min(
+                    max(value.width, -maxX),
+                    maxX
+                ),
+            height:
+                min(
+                    max(value.height, -maxY),
+                    maxY
+                )
+        )
+    }
+
+    static func jpegData(
+        from image: UIImage,
+        cropSide: CGFloat,
+        scale: CGFloat,
+        offset: CGSize
+    ) -> Data? {
+        guard let source = image.cgImage,
+              cropSide > 1
+        else {
+            return nil
+        }
+
+        let sourceWidth =
+            CGFloat(source.width)
+        let sourceHeight =
+            CGFloat(source.height)
+        let baseScale =
+            max(
+                cropSide / sourceWidth,
+                cropSide / sourceHeight
+            )
+        let finalScale =
+            baseScale *
+            clampedScale(scale)
+        let visibleSide =
+            min(
+                floor(
+                    cropSide /
+                    finalScale
+                ),
+                min(
+                    sourceWidth,
+                    sourceHeight
+                )
+            )
+
+        guard visibleSide >= 1 else {
+            return nil
+        }
+
+        let sourceCenterX =
+            sourceWidth / 2 -
+            offset.width /
+            finalScale
+        let sourceCenterY =
+            sourceHeight / 2 -
+            offset.height /
+            finalScale
+        let maxOriginX =
+            max(
+                0,
+                sourceWidth -
+                    visibleSide
+            )
+        let maxOriginY =
+            max(
+                0,
+                sourceHeight -
+                    visibleSide
+            )
+        let originX =
+            min(
+                max(
+                    floor(
+                        sourceCenterX -
+                        visibleSide / 2
+                    ),
+                    0
+                ),
+                maxOriginX
+            )
+        let originY =
+            min(
+                max(
+                    floor(
+                        sourceCenterY -
+                        visibleSide / 2
+                    ),
+                    0
+                ),
+                maxOriginY
+            )
+        let cropRect = CGRect(
+            x: originX,
+            y: originY,
+            width: visibleSide,
+            height: visibleSide
+        )
+
+        guard let cropped =
+                source.cropping(
+                    to: cropRect
+                )
+        else {
+            return nil
+        }
+
+        let outputSide =
+            min(
+                outputDimension,
+                visibleSide
+            )
+        let outputSize = CGSize(
+            width: outputSide,
+            height: outputSide
+        )
+        let format =
+            UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+
+        let rendered =
+            UIGraphicsImageRenderer(
+                size: outputSize,
+                format: format
+            )
+            .image { _ in
+                UIImage(
+                    cgImage: cropped,
+                    scale: 1,
+                    orientation: .up
+                )
+                .draw(
+                    in: CGRect(
+                        origin: .zero,
+                        size: outputSize
+                    )
+                )
+            }
+
+        return rendered.jpegData(
+            compressionQuality: 0.86
+        )
     }
 }
 
