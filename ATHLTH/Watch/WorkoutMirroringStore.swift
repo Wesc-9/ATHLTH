@@ -263,7 +263,15 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                             norwegian:
                                 "Direkte fra Apple Watch"
                         )
-            if !self.isUserMinimized {
+            if latestSnapshot.state == .completed ||
+                latestSnapshot.state == .failed {
+                // The Watch is authoritative for workout state. Once it says
+                // the workout has ended, stop presenting the frozen live UI
+                // immediately. Keep the completed snapshot in memory long
+                // enough for the result/review pipeline to reconcile it.
+                self.isPresentationRequested = false
+                self.liveViewIsVisible = false
+            } else if !self.isUserMinimized {
                 self.isPresentationRequested = true
             }
         }
@@ -345,7 +353,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 norwegian:
                     "Økt fullført"
             )
-        isPresentationRequested = true
+        isPresentationRequested = false
+        liveViewIsVisible = false
         ATHLTHWatchWorkoutRuntime
             .isMirroredWorkoutActive = false
         ATHLTHWatchWorkoutRuntime
@@ -457,7 +466,11 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                         english: "Live from Apple Watch",
                         norwegian: "Direkte fra Apple Watch"
                     )
-            if !self.isUserMinimized {
+            if newState == .completed ||
+                newState == .failed {
+                self.isPresentationRequested = false
+                self.liveViewIsVisible = false
+            } else if !self.isUserMinimized {
                 self.isPresentationRequested = true
             }
 
