@@ -903,8 +903,11 @@ struct HomePersonalRecentActivitySection:
             .strengthWorkout(
                 for: workout,
                 in:
-                    strength
-                        .workoutHistory
+                    Array(
+                        strength
+                            .workoutHistory
+                            .prefix(32)
+                    )
             )
     }
 
@@ -916,8 +919,11 @@ struct HomePersonalRecentActivitySection:
             .phoneWorkout(
                 for: workout,
                 in:
-                    phoneWorkout
-                        .history
+                    Array(
+                        phoneWorkout
+                            .history
+                            .prefix(32)
+                    )
             )
     }
 
