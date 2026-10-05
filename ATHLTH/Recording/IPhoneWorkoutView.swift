@@ -880,6 +880,8 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var socialCompanion =
+        SocialWorkoutCompanionStore()
     @State private var confirmFinish = false
     @State private var followMe = true
     @State private var showingTreadmillInclineEditor = false
@@ -1513,6 +1515,95 @@ struct IPhoneWorkoutView: View {
                     recorder.checkpoint()
                     await publishLivePointIfNeeded()
                 }
+            }
+        }
+        .task(
+            id:
+                social
+                    .currentJoinedWorkoutSessionID ??
+                social
+                    .activeWorkoutSession?
+                    .id
+        ) {
+            guard
+                let sessionID =
+                    social
+                        .currentJoinedWorkoutSessionID ??
+                    social
+                        .activeWorkoutSession?
+                        .id,
+                let userID =
+                    social.currentUserID
+            else {
+                return
+            }
+
+            while !Task.isCancelled {
+                guard let workout =
+                        recorder.active
+                else {
+                    return
+                }
+
+                let displayName =
+                    social
+                        .workoutParticipants
+                        .first {
+                            $0.sessionID ==
+                                sessionID &&
+                            $0.userID ==
+                                userID
+                        }?
+                        .displayNameSnapshot ??
+                    ATHLTHLocalization.choose(
+                        english: "You",
+                        norwegian: "Deg"
+                    )
+
+                let elapsed =
+                    workout
+                        .accumulatedSeconds +
+                    (
+                        workout
+                            .resumedAt
+                            .map {
+                                max(
+                                    Date()
+                                        .timeIntervalSince(
+                                            $0
+                                        ),
+                                    0
+                                )
+                            } ??
+                        0
+                    )
+
+                await socialCompanion
+                    .publishCardio(
+                        sessionID:
+                            sessionID,
+                        userID:
+                            userID,
+                        displayName:
+                            displayName,
+                        walking:
+                            workout.walking,
+                        title:
+                            workout
+                                .workoutTitle,
+                        distanceMeters:
+                            workout
+                                .distanceMeters,
+                        elapsedSeconds:
+                            elapsed,
+                        paceSecondsPerKilometer:
+                            workout
+                                .currentPaceSecondsPerKilometer
+                    )
+
+                try? await Task.sleep(
+                    for: .seconds(3)
+                )
             }
         }
         .onAppear {
