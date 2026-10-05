@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -619,29 +618,18 @@ struct HomeActivityStrengthDetailView: View {
         some View {
         if let url =
                 workoutHeroImageURL {
-            if url.isFileURL,
-               let image =
-                UIImage(
-                    contentsOfFile:
-                        url.path
-                ) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ATHLTHStorageImage(
-                    url: url,
-                    maxPixelSize: 1_000
-                ) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
+            ATHLTHStorageImage(
+                url: url,
+                maxPixelSize: 1_000
+            ) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
 
-                    default:
-                        workoutHeroFallback
-                    }
+                default:
+                    workoutHeroFallback
                 }
             }
         } else {
