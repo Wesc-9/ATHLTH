@@ -2561,13 +2561,25 @@ final class SocialStore: ObservableObject {
         participants: [SocialWorkoutParticipantRecord],
         cards: [SocialProfileCard]
     ) {
-        workoutSessions = sessions
-        workoutParticipants = participants
+        if workoutSessions != sessions {
+            workoutSessions = sessions
+        }
+        if workoutParticipants !=
+            participants {
+            workoutParticipants =
+                participants
+        }
 
         guard let currentUserID else {
-            workoutInvites = []
-            activeWorkoutSession = nil
-            activeWorkoutParticipants = []
+            if !workoutInvites.isEmpty {
+                workoutInvites = []
+            }
+            if activeWorkoutSession != nil {
+                activeWorkoutSession = nil
+            }
+            if !activeWorkoutParticipants.isEmpty {
+                activeWorkoutParticipants = []
+            }
             return
         }
 
@@ -2578,34 +2590,51 @@ final class SocialStore: ObservableObject {
             uniqueKeysWithValues: sessions.map { ($0.id, $0) }
         )
 
-        workoutInvites = participants
-            .filter {
-                $0.userID == currentUserID &&
-                (
-                    $0.state == .invited ||
+        let refreshedWorkoutInvites =
+            participants
+                .filter {
+                    $0.userID == currentUserID &&
                     (
-                        $0.state == .accepted &&
-                        $0.workoutStartedAt == nil &&
-                        $0.launchFailedAt == nil
+                        $0.state == .invited ||
+                        (
+                            $0.state == .accepted &&
+                            $0.workoutStartedAt == nil &&
+                            $0.launchFailedAt == nil
+                        )
                     )
-                )
-            }
-            .compactMap { participant in
-                guard let session = sessionsByID[participant.sessionID],
-                      session.status == .active
-                else {
-                    return nil
+                }
+                .compactMap { participant in
+                    guard let session =
+                            sessionsByID[
+                                participant.sessionID
+                            ],
+                          session.status == .active
+                    else {
+                        return nil
+                    }
+
+                    return SocialWorkoutInviteDisplay(
+                        session: session,
+                        participant: participant,
+                        creator:
+                            cardsByID[
+                                session.creatorID
+                            ]
+                    )
+                }
+                .sorted {
+                    $0.session.createdAt >
+                        $1.session.createdAt
                 }
 
-                return SocialWorkoutInviteDisplay(
-                    session: session,
-                    participant: participant,
-                    creator: cardsByID[session.creatorID]
-                )
-            }
-            .sorted { $0.session.createdAt > $1.session.createdAt }
+        if workoutInvites !=
+            refreshedWorkoutInvites {
+            workoutInvites =
+                refreshedWorkoutInvites
+        }
 
-        activeWorkoutSession = sessions
+        let refreshedActiveWorkoutSession =
+            sessions
             .filter { candidate in
                 guard candidate.creatorID == currentUserID,
                       candidate.status == .active
@@ -2622,19 +2651,48 @@ final class SocialStore: ObservableObject {
                 return ownParticipant?.workoutFinishedAt == nil &&
                     ownParticipant?.launchFailedAt == nil
             }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted {
+                $0.createdAt >
+                    $1.createdAt
+            }
             .first
 
-        if let activeWorkoutSession {
-            activeWorkoutParticipants = participants
-                .filter { $0.sessionID == activeWorkoutSession.id }
-                .sorted { lhs, rhs in
-                    if lhs.state == .creator { return true }
-                    if rhs.state == .creator { return false }
-                    return lhs.displayNameSnapshot < rhs.displayNameSnapshot
-                }
+        if activeWorkoutSession !=
+            refreshedActiveWorkoutSession {
+            activeWorkoutSession =
+                refreshedActiveWorkoutSession
+        }
+
+        let refreshedActiveParticipants:
+            [SocialWorkoutParticipantRecord]
+        if let refreshedActiveWorkoutSession {
+            refreshedActiveParticipants =
+                participants
+                    .filter {
+                        $0.sessionID ==
+                            refreshedActiveWorkoutSession
+                                .id
+                    }
+                    .sorted { lhs, rhs in
+                        if lhs.state == .creator {
+                            return true
+                        }
+                        if rhs.state == .creator {
+                            return false
+                        }
+                        return lhs
+                            .displayNameSnapshot <
+                            rhs
+                            .displayNameSnapshot
+                    }
         } else {
-            activeWorkoutParticipants = []
+            refreshedActiveParticipants = []
+        }
+
+        if activeWorkoutParticipants !=
+            refreshedActiveParticipants {
+            activeWorkoutParticipants =
+                refreshedActiveParticipants
         }
     }
 
