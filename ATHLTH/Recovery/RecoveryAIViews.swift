@@ -855,6 +855,7 @@ struct RecoveryCoachView: View {
     @State private var errorMessage: String?
     @State private var didLoadConversation =
         false
+    @State private var coachPinned = true
 
     private let service = RecoveryAIService()
     private let bottomAnchorID =
@@ -997,13 +998,25 @@ struct RecoveryCoachView: View {
         .safeAreaInset(edge: .bottom) {
             coachComposer
         }
-        .navigationTitle(
-            "ATHLTH Coach"
-        )
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(
             .inline
         )
+        .toolbarBackground(
+            .visible,
+            for: .navigationBar
+        )
+        .toolbarBackground(
+            Color.white.opacity(0.94),
+            for: .navigationBar
+        )
         .toolbar {
+            ToolbarItem(
+                placement: .principal
+            ) {
+                coachNavigationHeader
+            }
+
             if showsDoneButton {
                 ToolbarItem(
                     placement:
@@ -1018,8 +1031,161 @@ struct RecoveryCoachView: View {
                         dismiss()
                     }
                 }
+            } else {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Menu {
+                        Button {
+                            coachPinned.toggle()
+                            RecoveryCoachInboxPreferences
+                                .setPinned(
+                                    coachPinned,
+                                    userID:
+                                        session
+                                            .profile
+                                            .userID
+                                )
+                        } label: {
+                            Label(
+                                coachPinned
+                                    ? recoveryAIText(
+                                        "Unpin conversation",
+                                        "Løsne samtalen"
+                                    )
+                                    : recoveryAIText(
+                                        "Pin conversation",
+                                        "Fest samtalen"
+                                    ),
+                                systemImage:
+                                    coachPinned
+                                        ? "pin.slash"
+                                        : "pin.fill"
+                            )
+                        }
+                    } label: {
+                        Image(
+                            systemName:
+                                "ellipsis"
+                        )
+                        .font(
+                            .system(
+                                size: 17,
+                                weight: .semibold
+                            )
+                        )
+                        .frame(
+                            width: 34,
+                            height: 34
+                        )
+                        .contentShape(
+                            Circle()
+                        )
+                    }
+                }
             }
         }
+        .onAppear {
+            coachPinned =
+                RecoveryCoachInboxPreferences
+                    .isPinned(
+                        userID:
+                            session.profile
+                                .userID
+                    )
+        }
+    }
+
+    private var coachNavigationHeader:
+        some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(
+                                    red: 0.10,
+                                    green: 0.13,
+                                    blue: 0.19
+                                ),
+                                Color.indigo
+                                    .opacity(0.82)
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        )
+                    )
+
+                Image(
+                    systemName:
+                        "sparkles"
+                )
+                .font(
+                    .system(
+                        size: 13,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white
+                )
+            }
+            .frame(
+                width: 34,
+                height: 34
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text("ATHLTH Coach")
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                HStack(spacing: 4) {
+                    Text(
+                        recoveryAIText(
+                            "Online",
+                            "På nett"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 10.5,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    Circle()
+                        .fill(
+                            Color.green
+                        )
+                        .frame(
+                            width: 5,
+                            height: 5
+                        )
+                }
+            }
+        }
+        .accessibilityElement(
+            children: .combine
+        )
     }
 
     private var coachInsightCard:
@@ -1084,7 +1250,7 @@ struct RecoveryCoachView: View {
                     .foregroundStyle(
                         .secondary
                     )
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .fixedSize(
                         horizontal: false,
                         vertical: true
@@ -1302,16 +1468,41 @@ struct RecoveryCoachView: View {
 
                         Spacer()
 
-                        Image(
-                            systemName:
-                                "sparkles"
-                        )
-                        .font(
-                            .caption
-                                .weight(.semibold)
-                        )
-                        .foregroundStyle(
-                            .indigo
+                        Button {
+                            withAnimation(
+                                .easeInOut(
+                                    duration: 0.18
+                                )
+                            ) {
+                                quickQuestions =
+                                    contextAwareQuestions()
+                            }
+                        } label: {
+                            Image(
+                                systemName:
+                                    "arrow.clockwise"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .frame(
+                                width: 28,
+                                height: 28
+                            )
+                            .contentShape(
+                                Circle()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            recoveryAIText(
+                                "Refresh suggestions",
+                                "Oppdater forslag"
+                            )
                         )
                     }
                     .padding(
@@ -1344,7 +1535,10 @@ struct RecoveryCoachView: View {
                                     ) {
                                         Image(
                                             systemName:
-                                                "sparkles"
+                                                quickQuestionIcon(
+                                                    for:
+                                                        suggestion
+                                                )
                                         )
                                         .font(
                                             .system(
@@ -1426,6 +1620,71 @@ struct RecoveryCoachView: View {
             }
 
             HStack(spacing: 9) {
+                Menu {
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            quickQuestions =
+                                contextAwareQuestions()
+                        }
+                    } label: {
+                        Label(
+                            recoveryAIText(
+                                "New suggestions",
+                                "Nye forslag"
+                            ),
+                            systemImage:
+                                "arrow.clockwise"
+                        )
+                    }
+
+                    Button(
+                        role: .destructive
+                    ) {
+                        messages.removeAll()
+                        quickQuestions =
+                            contextAwareQuestions()
+                        errorMessage = nil
+                        persistConversation()
+                    } label: {
+                        Label(
+                            recoveryAIText(
+                                "Start new conversation",
+                                "Start ny samtale"
+                            ),
+                            systemImage:
+                                "bubble.left.and.exclamationmark.bubble.right"
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        Color.primary
+                            .opacity(0.055),
+                        in: Circle()
+                    )
+                }
+                .buttonStyle(.plain)
+
                 TextField(
                     recoveryAIText(
                         "Ask ATHLTH Coach…",
@@ -1929,6 +2188,36 @@ struct RecoveryCoachView: View {
                     session.profile
                         .userID
             )
+    }
+
+    private func quickQuestionIcon(
+        for question: String
+    ) -> String {
+        let value =
+            question.lowercased()
+
+        if value.contains("sleep") ||
+            value.contains("søvn") {
+            return "moon.fill"
+        }
+
+        if value.contains("strength") ||
+            value.contains("styrke") {
+            return "dumbbell.fill"
+        }
+
+        if value.contains("run") ||
+            value.contains("løp") ||
+            value.contains("interval") {
+            return "figure.run"
+        }
+
+        if value.contains("recovery") ||
+            value.contains("restitusjon") {
+            return "heart.fill"
+        }
+
+        return "sparkles"
     }
 
     private var scoreTint:
