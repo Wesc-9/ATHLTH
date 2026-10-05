@@ -3607,7 +3607,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
             lastGhostAnnouncedLeadMeters =
                 distanceDelta
-            lastGhostLeadAlertAt = Date()
+            // Periodic kilometre/time status must not consume the cooldown
+            // for a real overtake or meaningful race event.
             lastGhostLeadSign =
                 ghostLeadSign(
                     distanceDelta
