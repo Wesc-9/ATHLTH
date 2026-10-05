@@ -44,32 +44,37 @@ struct TrainTogetherCreatorLobbyView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    headerCard
+                    participantCard
+
+                    if let startAt =
+                            session?
+                                .coordinatedStartAt {
+                        countdownCard(
+                            startAt: startAt
+                        )
+                    } else {
+                        actionCard
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 34)
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .background(
                 ATHLTHPremiumCanvas(
                     accent:
-                        ATHLTHTheme.accent
-                            .opacity(0.18)
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.10)
                 )
                 .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 18) {
-                        headerCard
-                        participantCard
-
-                        if let startAt =
-                                session?
-                                    .coordinatedStartAt {
-                            countdownCard(
-                                startAt: startAt
-                            )
-                        } else {
-                            actionCard
-                        }
-                    }
-                    .padding(16)
-                }
-            }
+            )
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Train Together",
@@ -95,56 +100,146 @@ struct TrainTogetherCreatorLobbyView: View {
     }
 
     private var headerCard: some View {
-        ATHLTHCard {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            Image("TrainHero")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 190)
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.04),
+                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.70)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
             VStack(
                 alignment: .leading,
-                spacing: 8
+                spacing: 7
             ) {
-                HStack(spacing: 10) {
-                    Image(
-                        systemName:
-                            "person.3.fill"
+                HStack {
+                    Label(
+                        "TRAIN TOGETHER",
+                        systemImage:
+                            "person.2.fill"
                     )
-                    .font(.title2)
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .tracking(0.8)
                     .foregroundStyle(
-                        ATHLTHTheme.accent
+                        Color.white
+                            .opacity(0.92)
                     )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            session?.title ??
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Shared workout",
-                                norwegian:
-                                    "Fellesøkt"
-                            )
-                        )
-                        .font(
-                            .title3.weight(.bold)
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Everyone keeps their own workout session. Start together when you are ready.",
-                                norwegian:
-                                    "Alle får sin egen økt. Start sammen når dere er klare."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
-                    }
 
                     Spacer()
+
+                    Button {
+                        social
+                            .minimizeCoordinatedLobby()
+                    } label: {
+                        Image(
+                            systemName:
+                                "rectangle.compress.vertical"
+                        )
+                        .font(
+                            .system(
+                                size: 14,
+                                weight:
+                                    .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            width: 38,
+                            height: 38
+                        )
+                        .background(
+                            .ultraThinMaterial,
+                            in: Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Minimize Train Together",
+                            norwegian:
+                                "Minimer Tren sammen"
+                        )
+                    )
                 }
+
+                Text(
+                    session?.title ??
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Shared workout",
+                        norwegian:
+                            "Fellesøkt"
+                    )
+                )
+                .font(
+                    .title2.weight(.bold)
+                )
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Everyone keeps their own workout. Start together when everyone is ready.",
+                        norwegian:
+                            "Alle får sin egen økt. Start sammen når alle er klare."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    Color.white
+                        .opacity(0.86)
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
             }
+            .padding(16)
         }
+        .frame(height: 190)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.30),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.10),
+            radius: 18,
+            y: 8
+        )
     }
 
     private var participantCard: some View {
@@ -153,124 +248,250 @@ struct TrainTogetherCreatorLobbyView: View {
                 alignment: .leading,
                 spacing: 12
             ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Participants",
-                        norwegian: "Deltakere"
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "LOBBY",
+                            norwegian: "LOBBY"
+                        )
                     )
+                    .font(
+                        .caption.weight(.bold)
+                    )
+                    .tracking(1.1)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+
+                    Spacer()
+
+                    Text(
+                        "\(participants.count)"
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                ForEach(
+                    Array(
+                        participants
+                            .enumerated()
+                    ),
+                    id: \.element.id
+                ) {
+                    index,
+                    participant in
+
+                    if index > 0 {
+                        Divider()
+                    }
+
+                    participantRow(
+                        participant
+                    )
+                }
+            }
+        }
+    }
+
+    private func participantRow(
+        _ participant:
+            SocialWorkoutParticipantRecord
+    ) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(
+                    participant.isReady
+                        ? ATHLTHTheme
+                            .vitality
+                            .opacity(0.14)
+                        : Color.primary
+                            .opacity(0.055)
+                )
+                .frame(
+                    width: 44,
+                    height: 44
+                )
+                .overlay {
+                    Image(
+                        systemName:
+                            participant.isReady
+                                ? "checkmark"
+                                : "person.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        participant.isReady
+                            ? ATHLTHTheme
+                                .vitality
+                            : ATHLTHTheme
+                                .mutedText
+                    )
+                }
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    participant
+                        .displayNameSnapshot
                 )
                 .font(
-                    .headline.weight(.semibold)
+                    .subheadline
+                        .weight(.semibold)
                 )
 
-                ForEach(participants) {
-                    participant in
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(
-                                statusColor(
-                                    participant
-                                )
-                            )
-                            .frame(
-                                width: 10,
-                                height: 10
-                            )
+                HStack(spacing: 5) {
+                    Text(
+                        statusText(
+                            participant
+                        )
+                    )
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text(
+                    if let icon =
+                            deviceIcon(
                                 participant
-                                    .displayNameSnapshot
-                            )
-                            .font(
-                                .subheadline
-                                    .weight(
-                                        .semibold
-                                    )
-                            )
-
-                            Text(
-                                statusText(
-                                    participant
-                                )
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(
-                                .secondary
-                            )
-                        }
-
-                        Spacer()
-
-                        if let icon =
-                                deviceIcon(
-                                    participant
-                                ) {
-                            Image(
-                                systemName: icon
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accent
-                            )
-                        }
-
-                        if participant.userID !=
-                                social.currentUserID,
-                           participant.workoutStartedAt == nil,
-                           participant.state == .invited ||
-                                participant.state == .accepted {
-                            Menu {
-                                Button(
-                                    role: .destructive
-                                ) {
-                                    Task {
-                                        await social
-                                            .withdrawWorkoutParticipant(
-                                                participant
-                                            )
-                                    }
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Remove from workout",
-                                            norwegian:
-                                                "Fjern fra økten"
-                                        ),
-                                        systemImage:
-                                            "person.badge.minus"
-                                    )
-                                }
-                            } label: {
-                                Image(
-                                    systemName:
-                                        "ellipsis"
-                                )
-                                .font(
-                                    .system(
-                                        size: 16,
-                                        weight: .semibold
-                                    )
-                                )
-                                .frame(
-                                    width: 30,
-                                    height: 30
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                            ) {
+                        Image(
+                            systemName: icon
+                        )
                     }
                 }
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+
+            Spacer()
+
+            Text(
+                participant.isReady
+                    ? ATHLTHLocalization.choose(
+                        english: "READY",
+                        norwegian: "KLAR"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "WAITING",
+                        norwegian: "VENTER"
+                    )
+            )
+            .font(
+                .caption2.weight(.bold)
+            )
+            .foregroundStyle(
+                participant.isReady
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .mutedText
+            )
+
+            if participant.userID !=
+                    social.currentUserID,
+               participant.workoutStartedAt == nil,
+               participant.state == .invited ||
+                    participant.state == .accepted {
+                Menu {
+                    Button(
+                        role: .destructive
+                    ) {
+                        Task {
+                            await social
+                                .withdrawWorkoutParticipant(
+                                    participant
+                                )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Remove from workout",
+                                norwegian:
+                                    "Fjern fra økten"
+                            ),
+                            systemImage:
+                                "person.badge.minus"
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .frame(
+                        width: 28,
+                        height: 28
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
     private var actionCard: some View {
         ATHLTHCard {
-            VStack(spacing: 10) {
+            VStack(spacing: 11) {
+                HStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            allAcceptedGuestsReady
+                                ? "checkmark.circle.fill"
+                                : "clock.fill"
+                    )
+                    .foregroundStyle(
+                        allAcceptedGuestsReady
+                            ? ATHLTHTheme
+                                .vitality
+                            : ATHLTHTheme
+                                .premiumGold
+                    )
+
+                    Text(
+                        allAcceptedGuestsReady
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Everyone is ready",
+                                norwegian:
+                                    "Alle er klare"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Waiting for the others",
+                                norwegian:
+                                    "Venter på de andre"
+                            )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Spacer()
+                }
+
                 Button {
                     Task {
                         _ = await social
@@ -299,12 +520,14 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(
                         maxWidth: .infinity
                     )
+                    .frame(height: 52)
                 }
                 .buttonStyle(
                     .borderedProminent
                 )
-                .controlSize(.large)
-                .tint(ATHLTHTheme.accent)
+                .tint(
+                    ATHLTHTheme.vitality
+                )
                 .disabled(
                     !allAcceptedGuestsReady
                 )
@@ -327,9 +550,14 @@ struct TrainTogetherCreatorLobbyView: View {
                                 "Start nå"
                         )
                     )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
                     .frame(
                         maxWidth: .infinity
                     )
+                    .frame(height: 46)
                 }
                 .buttonStyle(.bordered)
 
@@ -337,19 +565,22 @@ struct TrainTogetherCreatorLobbyView: View {
                     allAcceptedGuestsReady
                         ? ATHLTHLocalization.choose(
                             english:
-                                "Everyone who joined is ready.",
+                                "ATHLTH starts one synchronized countdown for everyone.",
                             norwegian:
-                                "Alle som har godtatt er klare."
+                                "ATHLTH starter én synkronisert nedtelling for alle."
                         )
                         : ATHLTHLocalization.choose(
                             english:
-                                "Wait for the others, or start now. Late participants can still join.",
+                                "You can minimize this lobby while you wait. Late participants can still join.",
                             norwegian:
-                                "Vent på de andre, eller start nå. De som er sene kan fortsatt bli med."
+                                "Du kan minimere lobbyen mens du venter. De som er sene kan fortsatt bli med."
                         )
                 )
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
                 .multilineTextAlignment(
                     .center
                 )
@@ -371,6 +602,10 @@ struct TrainTogetherCreatorLobbyView: View {
                             norwegian:
                                 "Avbryt fellesøkten"
                         )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
                     )
                 }
             }
