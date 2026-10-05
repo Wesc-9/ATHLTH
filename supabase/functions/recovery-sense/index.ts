@@ -28,11 +28,17 @@ type RecoveryContext = {
   };
 };
 
+type RecoveryChatTurn = {
+  role?: "user" | "assistant";
+  content?: string;
+};
+
 type RecoveryRequest = {
   mode?: "insight" | "ask";
   context?: RecoveryContext;
   question?: string | null;
   language?: "en" | "nb";
+  history?: RecoveryChatTurn[];
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -118,6 +124,28 @@ function extractOutputText(payload: any): string | null {
 
   return null;
 }
+
+const chatReplySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "answer",
+    "quickQuestions",
+  ],
+  properties: {
+    answer: {
+      type: "string",
+    },
+    quickQuestions: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "string",
+      },
+    },
+  },
+};
 
 const insightSchema = {
   type: "object",
@@ -352,6 +380,31 @@ function sanitizeContext(input: RecoveryContext | undefined) {
   };
 }
 
+function sanitizeHistory(
+  input: RecoveryChatTurn[] | undefined,
+) {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .slice(-16)
+    .map((turn) => {
+      const role =
+        turn?.role === "assistant"
+          ? "assistant"
+          : "user";
+      const content =
+        String(turn?.content ?? "")
+          .trim()
+          .slice(0, 1800);
+
+      return {
+        role,
+        content,
+      };
+    })
+    .filter((turn) => turn.content.length > 0);
+}
+
 const sharedInstructions = `
 You are ATHLTH Coach, the recovery interpretation layer inside a fitness app.
 Use only the data supplied in the request.
@@ -394,6 +447,8 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Ask a recovery question first." }, 400);
     }
 
+    const history = sanitizeHistory(body.history);
+
     const response = await fetch("https://api.groq.com/openai/v1/responses", {
       method: "POST",
       headers: {
@@ -406,8 +461,29 @@ Deno.serve(async (req: Request) => {
         instructions:
           sharedInstructions +
           languageInstruction +
-          "\nAnswer the user's question directly in 2-5 short sentences. Make the relationship to their supplied recovery data clear.",
-        input: JSON.stringify({ context, question }),
+          `
+You are continuing an ATHLTH Coach conversation.
+- Use the supplied conversation history to understand follow-up questions and references such as "that", "tomorrow", or "what about strength?".
+- Answer the latest question directly in 2-5 short sentences.
+- Make the relationship to the supplied recovery data clear when relevant.
+- Do not repeat information from earlier answers unless it helps answer the latest question.
+- Return exactly three short follow-up questions that are useful next steps based on today's recovery context and the conversation so far.
+- Follow-up questions must be meaningfully different from questions the user already asked.
+- Prioritize decisions the user could reasonably make next: training intensity, recovery, sleep, muscle readiness, workload, or tomorrow's plan.
+`,
+        input: JSON.stringify({
+          context,
+          history,
+          question,
+        }),
+        text: {
+          format: {
+            type: "json_schema",
+            name: "athlth_recovery_chat_reply",
+            strict: true,
+            schema: chatReplySchema,
+          },
+        },
       }),
     });
 
@@ -424,12 +500,40 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload = await response.json();
-    const answer = extractOutputText(payload)?.trim();
-    if (!answer) {
+    const outputText = extractOutputText(payload)?.trim();
+    if (!outputText) {
       return json({ error: "ATHLTH Coach returned an empty answer." }, 502);
     }
 
-    return json({ answer: answer.slice(0, 1800) });
+    try {
+      const parsed = JSON.parse(outputText);
+      const answer = String(parsed?.answer ?? "").trim().slice(0, 1800);
+      const quickQuestions = Array.isArray(parsed?.quickQuestions)
+        ? parsed.quickQuestions
+            .map((item: unknown) => String(item ?? "").trim().slice(0, 300))
+            .filter((item: string) => item.length > 0)
+            .slice(0, 3)
+        : [];
+
+      if (!answer || quickQuestions.length !== 3) {
+        throw new Error("Incomplete chat reply.");
+      }
+
+      return json({
+        answer,
+        quickQuestions,
+      });
+    } catch (error) {
+      console.error("Unable to parse ATHLTH Coach chat reply", {
+        userID: access.userID,
+        output: outputText.slice(0, 1500),
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      });
+      return json({ error: "ATHLTH Coach returned an invalid answer." }, 502);
+    }
   }
 
   const response = await fetch("https://api.groq.com/openai/v1/responses", {
