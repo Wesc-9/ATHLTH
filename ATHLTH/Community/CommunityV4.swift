@@ -3079,6 +3079,8 @@ private struct CommunityDiscoveryChallengeCard:
         switch challenge.sport {
         case .running:
             return "GoalRunningThumbnail"
+        case .walking:
+            return "GoalWalkingThumbnail"
         case .strength:
             return "GoalStrengthThumbnail"
         case .heartRate:
