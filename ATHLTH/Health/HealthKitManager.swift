@@ -3476,44 +3476,17 @@ final class HealthKitManager: ObservableObject {
             return nil
         }
 
-        let sampleStep = max(reference.count / 120, 1)
-        let referenceSamples = stride(
-            from: 0,
-            to: reference.count,
-            by: sampleStep
-        )
-        .map { reference[$0] }
-
-        guard !referenceSamples.isEmpty else {
+        guard let match =
+                RoutePerformanceMatcher
+                    .analyze(
+                        reference:
+                            reference,
+                        actual:
+                            actual
+                    )
+        else {
             return nil
         }
-
-        let nearestDistances = referenceSamples.map { point in
-            actual.lazy
-                .map { $0.distance(from: point) }
-                .min() ?? .greatestFiniteMagnitude
-        }
-
-        let toleranceMeters = 80.0
-        let matchedCount = nearestDistances.filter {
-            $0 <= toleranceMeters
-        }.count
-
-        let routeMatchPercent =
-            Double(matchedCount) /
-            Double(referenceSamples.count) *
-            100
-
-        let finiteDeviations = nearestDistances.filter(\.isFinite)
-        guard !finiteDeviations.isEmpty else {
-            return nil
-        }
-
-        let averageDeviation =
-            finiteDeviations.reduce(0, +) /
-            Double(finiteDeviations.count)
-        let maxDeviation =
-            finiteDeviations.max() ?? 0
 
         let actualStart = actual.first!
         let actualEnd = actual.last!
@@ -3535,9 +3508,12 @@ final class HealthKitManager: ObservableObject {
             startedAt: summary.startDate,
             durationSeconds: summary.duration,
             distanceMeters: summary.distanceMeters ?? 0,
-            routeMatchPercent: min(max(routeMatchPercent, 0), 100),
-            averageDeviationMeters: max(averageDeviation, 0),
-            maxDeviationMeters: max(maxDeviation, 0),
+            routeMatchPercent:
+                match.routeMatchPercent,
+            averageDeviationMeters:
+                match.averageDeviationMeters,
+            maxDeviationMeters:
+                match.maxDeviationMeters,
             startDistanceMeters:
                 useReverse ? reverseStart : forwardStart,
             endDistanceMeters:
