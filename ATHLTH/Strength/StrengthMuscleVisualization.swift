@@ -266,14 +266,46 @@ enum StrengthMuscleProfileBuilder {
             return .empty
         }
 
-        let catalogByName =
-            Dictionary(
-                grouping: library
-            ) {
-                normalizedName(
-                    $0.exercise.name
-                )
+        // Most modern workout snapshots already contain the muscle
+        // metadata we need. Only build a catalog lookup for legacy exercises
+        // that are missing their primary-muscle metadata. This avoids walking
+        // and grouping the full exercise database every time a strength
+        // detail view is evaluated.
+        let legacyLookupNames =
+            Set(
+                performed.compactMap { log in
+                    guard log.exercise
+                        .primaryMuscles
+                        .isEmpty
+                    else {
+                        return nil
+                    }
+
+                    return normalizedName(
+                        log.exercise.name
+                    )
+                }
+            )
+
+        var catalogByName:
+            [String: ExerciseLibraryEntry] =
+                [:]
+
+        if !legacyLookupNames.isEmpty {
+            for entry in library {
+                let key =
+                    normalizedName(
+                        entry.exercise.name
+                    )
+                guard legacyLookupNames
+                    .contains(key),
+                      catalogByName[key] == nil
+                else {
+                    continue
+                }
+                catalogByName[key] = entry
             }
+        }
 
         var scores:
             [StrengthMuscleRegion: Double] = [:]
@@ -286,8 +318,7 @@ enum StrengthMuscleProfileBuilder {
                     normalizedName(
                         log.exercise.name
                     )
-                ]?
-                .first
+                ]
 
             let primary =
                 uniqueMuscles(
