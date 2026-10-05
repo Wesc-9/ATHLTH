@@ -3741,7 +3741,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             mode != .distance &&
             timeDelta != nil
         let opponent =
-            currentLiveGhostOpponentName
+            currentGhostOpponentName
 
         var englishParts: [String] = []
         var norwegianParts: [String] = []
@@ -4007,22 +4007,34 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
-    private var currentLiveGhostOpponentName:
+    private var currentGhostOpponentName:
         String? {
-        guard ghostRaceConfiguration == nil,
-              let raw =
-                liveSurfaceContext
-                    .liveGhost?
-                    .opponentName?
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ),
-              !raw.isEmpty
-        else {
-            return nil
+        let fixed =
+            ghostRaceConfiguration?
+                .opponentName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        if let fixed,
+           !fixed.isEmpty {
+            return fixed
         }
 
-        return raw
+        let live =
+            liveSurfaceContext
+                .liveGhost?
+                .opponentName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        if let live,
+           !live.isEmpty {
+            return live
+        }
+
+        return nil
     }
 
     private func ghostGapDistancePhrase(
