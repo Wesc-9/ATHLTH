@@ -1128,6 +1128,42 @@ enum ProfileFeaturedRecordKind:
         }
     }
 
+    private func formatKilograms(
+        _ kilograms: Double
+    ) -> String {
+        guard kilograms.isFinite,
+              kilograms > 0
+        else {
+            return "—"
+        }
+
+        if kilograms >= 1_000_000 {
+            return String(
+                format: "%.2fM kg",
+                kilograms / 1_000_000
+            )
+        }
+
+        if kilograms >= 1_000 {
+            return String(
+                format: "%.1fk kg",
+                kilograms / 1_000
+            )
+        }
+
+        if kilograms.rounded() == kilograms {
+            return String(
+                format: "%.0f kg",
+                kilograms
+            )
+        }
+
+        return String(
+            format: "%.1f kg",
+            kilograms
+        )
+    }
+
     private func bestWeeklyRunningDistanceValue(
         _ workouts: [WorkoutSummary]
     ) -> String {
