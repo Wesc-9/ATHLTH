@@ -1324,6 +1324,30 @@ struct TrainTogetherPostDetailView:
                             "person.2"
                     )
                 }
+
+                HStack(spacing: 8) {
+                    detailChip(
+                        post
+                            .resolvedParticipationMode
+                            .title,
+                        icon:
+                            post
+                                .resolvedParticipationMode
+                                .systemImage
+                    )
+
+                    detailChip(
+                        post
+                            .resolvedJoinPolicy
+                            .title,
+                        icon:
+                            post
+                                .resolvedJoinPolicy ==
+                                .open
+                                ? "door.left.hand.open"
+                                : "hand.raised.fill"
+                    )
+                }
             }
         }
     }
@@ -1676,24 +1700,82 @@ struct TrainTogetherPostDetailView:
                 case .declined,
                      .withdrawn:
                     Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "You can send a new request if the workout is still open.",
-                            norwegian:
-                                "Du kan sende en ny forespørsel hvis økten fortsatt er åpen."
-                        )
+                        post.resolvedJoinPolicy ==
+                            .open
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "You can join again while the workout still has an open spot.",
+                                norwegian:
+                                    "Du kan bli med igjen så lenge økten fortsatt har en ledig plass."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "You can send a new request if the workout is still open.",
+                                norwegian:
+                                    "Du kan sende en ny forespørsel hvis økten fortsatt er åpen."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(
                         .secondary
                     )
 
-                    askButton(post)
+                    joinControl(post)
 
                 case .none:
-                    askButton(post)
+                    joinControl(post)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func joinControl(
+        _ post: TrainTogetherPost
+    ) -> some View {
+        if post.resolvedJoinPolicy ==
+            .open {
+            Button {
+                Task {
+                    _ = await marketplace
+                        .joinOpen(
+                            postID:
+                                post.id
+                        )
+                    await social.refresh()
+                }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Join now",
+                        norwegian:
+                            "Bli med nå"
+                    ),
+                    systemImage:
+                        "door.left.hand.open"
+                )
+                .font(.headline)
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+            }
+            .buttonStyle(
+                .borderedProminent
+            )
+            .controlSize(.large)
+            .tint(
+                ATHLTHTheme
+                    .vitality
+            )
+            .disabled(
+                post.spotsLeft == 0 ||
+                post.status != .open ||
+                marketplace.isWorking
+            )
+        } else {
+            askButton(post)
         }
     }
 
