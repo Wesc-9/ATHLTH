@@ -8,12 +8,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var connectionText = "Connecting to iPhone"
     @Published private(set) var companionLinked = false
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
+    @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
     @Published private(set) var spotifyPlaybackState =
         WatchSpotifyPlaybackState.unavailable
 
     private let fileManager = FileManager.default
     private let todayWorkoutDefaultsKey =
         "athlth.watch.todayWorkout.v1"
+    private let preparedWorkoutDefaultsKey =
+        "athlth.watch.preparedWorkout.v1"
+    private let preparedWorkoutSnapshotDateKey =
+        "athlth.watch.preparedWorkoutSnapshotDate.v1"
     private var pendingWorkoutRouteID: UUID?
     private var latestTransportTimestampByKind:
         [String: TimeInterval] = [:]
@@ -22,6 +27,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         super.init()
         loadRoutes()
         loadTodayWorkout()
+        loadPreparedWorkout()
         activateConnectivity()
     }
 
@@ -148,6 +154,100 @@ final class WatchRouteStore: NSObject, ObservableObject {
             data,
             forKey: todayWorkoutDefaultsKey
         )
+    }
+
+    private func loadPreparedWorkout() {
+        guard let data =
+                UserDefaults.standard.data(
+                    forKey: preparedWorkoutDefaultsKey
+                ),
+              let workout =
+                try? JSONDecoder().decode(
+                    WatchPreparedWorkoutTransfer.self,
+                    from: data
+                )
+        else {
+            return
+        }
+
+        guard Date().timeIntervalSince(
+                workout.updatedAt
+            ) < 24 * 60 * 60
+        else {
+            UserDefaults.standard.removeObject(
+                forKey: preparedWorkoutDefaultsKey
+            )
+            preparedWorkout = nil
+            return
+        }
+
+        preparedWorkout = workout
+    }
+
+    private func storePreparedWorkout(
+        _ workout: WatchPreparedWorkoutTransfer
+    ) {
+        preparedWorkout = workout
+
+        guard let data =
+                try? JSONEncoder().encode(workout)
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: preparedWorkoutDefaultsKey
+        )
+        UserDefaults.standard.set(
+            workout.updatedAt,
+            forKey: preparedWorkoutSnapshotDateKey
+        )
+    }
+
+    func consumePreparedWorkout(
+        _ id: UUID
+    ) {
+        guard preparedWorkout?.id == id else {
+            return
+        }
+
+        preparedWorkout = nil
+        UserDefaults.standard.removeObject(
+            forKey: preparedWorkoutDefaultsKey
+        )
+    }
+
+    private func applyPreparedWorkout(
+        data: Data
+    ) {
+        guard let workout =
+                try? JSONDecoder().decode(
+                    WatchPreparedWorkoutTransfer.self,
+                    from: data
+                )
+        else {
+            return
+        }
+
+        let currentUpdatedAt =
+            preparedWorkout?.updatedAt ??
+            UserDefaults.standard.object(
+                forKey:
+                    preparedWorkoutSnapshotDateKey
+            ) as? Date ??
+            .distantPast
+
+        // Immediate delivery and the durable queued delivery contain the same
+        // payload. Only a strictly newer prepared workout may replace the one
+        // already shown on Watch.
+        guard workout.updatedAt >
+                currentUpdatedAt
+        else {
+            return
+        }
+
+        storePreparedWorkout(workout)
     }
 
     private func requestTodayWorkoutSnapshot() {
@@ -588,6 +688,36 @@ final class WatchRouteStore: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 self?.markCompanionConnected()
             }
+            return
+        }
+
+        if rawKind ==
+            WatchPreparedWorkoutTransport.kind,
+           let data =
+                payload[
+                    WatchTransferMetadataKey.payload
+                ] as? Data {
+            let sentAt =
+                payload[
+                    WatchTransferMetadataKey.sentAt
+                ] as? TimeInterval
+
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.shouldAcceptTransport(
+                        kind: rawKind,
+                        sentAt: sentAt
+                      )
+                else {
+                    return
+                }
+
+                self.applyPreparedWorkout(
+                    data: data
+                )
+            }
+
+            replyHandler?([:])
             return
         }
 
