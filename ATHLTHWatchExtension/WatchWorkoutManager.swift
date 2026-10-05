@@ -374,7 +374,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         publish {
-            self.ghostRaceTitle = ghost?.title
+            self.ghostRaceTitle =
+                ghost?.opponentName ??
+                ghost?.title
             self.ghostDistanceDeltaMeters = nil
             self.ghostTimeDeltaSeconds = nil
             self.ghostMapUserLatitude = nil
