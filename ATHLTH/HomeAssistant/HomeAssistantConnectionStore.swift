@@ -22,6 +22,104 @@ struct HomeAssistantDiscoveredInstance: Identifiable, Hashable, Sendable {
     }
 }
 
+enum HomeAssistantSyncMode: String, CaseIterable, Identifiable, Codable, Hashable {
+    case smart
+    case live
+    case efficient
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .smart:
+            return ATHLTHLocalization.choose(
+                english: "Smart",
+                norwegian: "Smart"
+            )
+        case .live:
+            return ATHLTHLocalization.choose(
+                english: "Live",
+                norwegian: "Live"
+            )
+        case .efficient:
+            return ATHLTHLocalization.choose(
+                english: "Battery saver",
+                norwegian: "Strømsparing"
+            )
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .smart:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Recommended. Important workout events are immediate, while routine health and planning updates are grouped to reduce background work.",
+                norwegian:
+                    "Anbefalt. Viktige treningshendelser sendes med en gang, mens vanlige helse- og planoppdateringer samles for å redusere bakgrunnsarbeid."
+            )
+        case .live:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Updates Home Assistant as quickly as practical. Uses more network and battery during active use.",
+                norwegian:
+                    "Oppdaterer Home Assistant så raskt som praktisk mulig. Bruker mer nettverk og batteri under aktiv bruk."
+            )
+        case .efficient:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Sends routine snapshots less often. Workout start/stop and milestones still remain immediate.",
+                norwegian:
+                    "Sender vanlige statusoppdateringer sjeldnere. Start/stopp av økt og milepæler sendes fortsatt med en gang."
+            )
+        }
+    }
+
+    var routineSnapshotMinimumInterval: TimeInterval {
+        switch self {
+        case .smart:
+            return 30
+        case .live:
+            return 2
+        case .efficient:
+            return 5 * 60
+        }
+    }
+
+    var coalescingDelay: TimeInterval {
+        switch self {
+        case .smart:
+            return 1.5
+        case .live:
+            return 0.35
+        case .efficient:
+            return 3
+        }
+    }
+
+    var liveWorkoutInterval: TimeInterval {
+        switch self {
+        case .smart:
+            return 5
+        case .live:
+            return 2
+        case .efficient:
+            return 15
+        }
+    }
+
+    var liveStrengthInterval: TimeInterval {
+        switch self {
+        case .smart:
+            return 1
+        case .live:
+            return 0.5
+        case .efficient:
+            return 5
+        }
+    }
+}
+
 enum HomeAssistantConnectionState: Equatable {
     case disconnected
     case discovering
@@ -285,6 +383,14 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var lastErrorMessage: String?
     @Published private(set) var lastConnectionTestSucceeded = false
     @Published private(set) var pendingDeliveryCount: Int = 0
+    @Published var syncMode: HomeAssistantSyncMode {
+        didSet {
+            UserDefaults.standard.set(
+                syncMode.rawValue,
+                forKey: Self.syncModeKey
+            )
+        }
+    }
 
     @Published var shareWorkoutState: Bool {
         didSet {
@@ -422,6 +528,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    private static let syncModeKey =
+        "athlth.homeAssistant.syncMode"
     private static let shareWorkoutStateKey =
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
@@ -471,6 +579,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var storedPairing: HomeAssistantStoredPairing?
     private var pendingDeliveries: [HomeAssistantPendingDelivery]
+    private var hasPersistedPendingDeliveries = false
+    private var lastSnapshotState:
+        [String: HomeAssistantJSONValue]?
 
     private var oauthClientID: String {
         configuredInfoValue("ATHLTHHomeAssistantClientID")
@@ -545,6 +656,14 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 account: "pending-deliveries-v1"
             )
 
+        syncMode =
+            HomeAssistantSyncMode(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            Self.syncModeKey
+                    ) ?? ""
+            ) ?? .smart
         shareWorkoutState = Self.storedBool(
             defaults,
             key: Self.shareWorkoutStateKey,
@@ -632,7 +751,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         connectedInstanceURL = restored?.instanceURL
         connectionState = restored == nil ? .disconnected : .connected
         super.init()
-        pendingDeliveryCount = pendingDeliveries.count
+        hasPersistedPendingDeliveries =
+            !restoredPending.isEmpty
+        updatePendingDeliveryCountIfNeeded()
 
         if pendingDeliveries.count !=
             restoredPending.count {
@@ -829,6 +950,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         lastErrorMessage = nil
         lastConnectionTestSucceeded = false
         connectionState = .disconnected
+        lastSnapshotState = nil
     }
 
     func send(
@@ -1073,12 +1195,17 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
 
         if event == "sync_snapshot" {
+            let pendingCountBefore =
+                pendingDeliveries.count
             pendingDeliveries.removeAll {
                 $0.pairingWebhookID ==
                     pairing.webhookID &&
                 $0.event == "sync_snapshot"
             }
-            persistPendingDeliveries()
+            if pendingDeliveries.count !=
+                pendingCountBefore {
+                persistPendingDeliveries()
+            }
         }
 
         await flushPendingDeliveries()
@@ -1117,6 +1244,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     func flushPendingDeliveries() async {
         guard let pairing = storedPairing else {
             clearPendingDeliveries()
+            return
+        }
+
+        guard !pendingDeliveries.isEmpty else {
             return
         }
 
@@ -1240,20 +1371,36 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 pairingWebhookID ||
             $0.createdAt < cutoff
         }
-        pendingDeliveryCount =
+        updatePendingDeliveryCountIfNeeded()
+    }
+
+    private func updatePendingDeliveryCountIfNeeded() {
+        let newCount =
             pendingDeliveries.count
+        guard pendingDeliveryCount !=
+                newCount
+        else {
+            return
+        }
+        pendingDeliveryCount = newCount
     }
 
     private func persistPendingDeliveries() {
-        pendingDeliveryCount =
-            pendingDeliveries.count
+        updatePendingDeliveryCountIfNeeded()
 
         guard !pendingDeliveries.isEmpty else {
+            guard hasPersistedPendingDeliveries
+            else {
+                return
+            }
+
             Self.deleteSecureItem(
                 service: keychainService,
                 account:
                     pendingDeliveryAccount
             )
+            hasPersistedPendingDeliveries =
+                false
             return
         }
 
@@ -1272,16 +1419,29 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             account:
                 pendingDeliveryAccount
         )
+        hasPersistedPendingDeliveries =
+            true
     }
 
     private func clearPendingDeliveries() {
+        guard !pendingDeliveries.isEmpty ||
+                hasPersistedPendingDeliveries
+        else {
+            return
+        }
+
         pendingDeliveries.removeAll()
-        pendingDeliveryCount = 0
-        Self.deleteSecureItem(
-            service: keychainService,
-            account:
-                pendingDeliveryAccount
-        )
+        updatePendingDeliveryCountIfNeeded()
+
+        if hasPersistedPendingDeliveries {
+            Self.deleteSecureItem(
+                service: keychainService,
+                account:
+                    pendingDeliveryAccount
+            )
+            hasPersistedPendingDeliveries =
+                false
+        }
     }
 
     func syncBackgroundHealthSnapshot(
@@ -2321,12 +2481,21 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         state["pending_delivery_count"] =
             .int(pendingDeliveryCount)
 
+        if pendingDeliveries.isEmpty,
+           lastSnapshotState == state {
+            return
+        }
+
         await sendReliably(
             event: "sync_snapshot",
             payload: [
                 "state": .object(state)
             ]
         )
+
+        if pendingDeliveries.isEmpty {
+            lastSnapshotState = state
+        }
     }
 
     func clearDisabledValues() async {
