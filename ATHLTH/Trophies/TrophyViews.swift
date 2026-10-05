@@ -1701,16 +1701,27 @@ struct TrophyCollectionView: View {
         TrophyHubTab
     @State private var filter:
         TrophyCollectionFilter = .all
-    @State private var showingShelfPicker = false
+    @State private var showingShelfPicker: Bool
+    @State private var replacementTrophyID:
+        String?
 
     init(
-        startInCabinet: Bool = false
+        startInCabinet: Bool = false,
+        replacingTrophyID: String? = nil
     ) {
         _selectedTab = State(
             initialValue:
                 startInCabinet
                     ? .shelf
                     : .collection
+        )
+        _showingShelfPicker = State(
+            initialValue:
+                replacingTrophyID != nil
+        )
+        _replacementTrophyID = State(
+            initialValue:
+                replacingTrophyID
         )
     }
 
@@ -1834,9 +1845,13 @@ struct TrophyCollectionView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Choose an award",
+                                    replacementTrophyID == nil
+                                        ? "Choose an award"
+                                        : "Replace trophy",
                                 norwegian:
-                                    "Velg en utmerkelse"
+                                    replacementTrophyID == nil
+                                        ? "Velg en utmerkelse"
+                                        : "Bytt trofé"
                             )
                         )
                         .font(
@@ -1847,9 +1862,13 @@ struct TrophyCollectionView: View {
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Achievements and trophies are shown together, rarest first.",
+                                    replacementTrophyID == nil
+                                        ? "Achievements and trophies are shown together, rarest first."
+                                        : "Choose an unlocked award to replace the selected trophy in the same shelf position.",
                                 norwegian:
-                                    "Achievements og pokaler vises samlet, fra sjeldnest til vanligst."
+                                    replacementTrophyID == nil
+                                        ? "Achievements og pokaler vises samlet, fra sjeldnest til vanligst."
+                                        : "Velg en opplåst utmerkelse som skal erstatte troféet i samme plass på hyllen."
                             )
                         )
                         .font(.subheadline)
@@ -1987,6 +2006,8 @@ struct TrophyCollectionView: View {
                             norwegian: "Ferdig"
                         )
                     ) {
+                        replacementTrophyID =
+                            nil
                         showingShelfPicker =
                             false
                     }
@@ -2916,8 +2937,31 @@ struct TrophyCollectionView: View {
                 .showcaseLimit
 
         return Button {
-            guard !selected,
-                  !limitReached
+            guard !selected
+            else {
+                return
+            }
+
+            if let replacementTrophyID {
+                withAnimation(
+                    .snappy(
+                        duration: 0.20
+                    )
+                ) {
+                    trophies
+                        .replaceShowcase(
+                            replacementTrophyID,
+                            with:
+                                trophy.id
+                        )
+                }
+                self.replacementTrophyID =
+                    nil
+                showingShelfPicker = false
+                return
+            }
+
+            guard !limitReached
             else {
                 return
             }
