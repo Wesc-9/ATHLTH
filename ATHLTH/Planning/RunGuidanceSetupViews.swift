@@ -437,9 +437,9 @@ struct RunGuidanceSetupView: View {
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
-                    "Run Guidance",
+                    "Run Tools",
                 norwegian:
-                    "Løpeveiledning"
+                    "Løpsverktøy"
             )
         )
         .navigationBarTitleDisplayMode(
