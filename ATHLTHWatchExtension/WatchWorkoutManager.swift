@@ -474,7 +474,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 important,
             importantLeadChangeMeters:
                 context
-                    .importantLeadChangeMeters
+                    .importantLeadChangeMeters,
+            statusDetailMode:
+                context
+                    .statusDetailModeRawValue
+                    .flatMap(
+                        GhostRaceStatusDetailMode
+                            .init(rawValue:)
+                    ),
+            announceOvertakes:
+                context
+                    .announceOvertakes,
+            finalPhaseEnabled:
+                context
+                    .finalPhaseEnabled,
+            finalPhaseStartMeters:
+                context
+                    .finalPhaseStartMeters,
+            liveConnectionAlerts:
+                context
+                    .liveConnectionAlerts
         )
     }
 
