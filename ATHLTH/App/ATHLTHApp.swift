@@ -947,6 +947,11 @@ struct AppRootView: View {
         ) { _ in
             ATHLTHArtworkImage
                 .clearRemoteCache()
+            health
+                .releaseTransientCachesForMemoryPressure()
+            HomeActivityRouteSnapshotRendererV2
+                .shared
+                .clearCache()
         }
         )
     }
