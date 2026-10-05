@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 struct TrainTogetherMarketplaceView:
@@ -1991,6 +1992,20 @@ struct TrainTogetherPostDetailView:
                         )
                 }
 
+                if let address =
+                        meetup.meetingAddress,
+                   !address.isEmpty {
+                    Label(
+                        address,
+                        systemImage:
+                            "map.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
                 if let details =
                         meetup.meetingDetails,
                    !details.isEmpty {
@@ -2380,8 +2395,7 @@ struct TrainTogetherPostCreateView:
             )
     @State private var durationMinutes =
         60
-    @State private var distanceKilometers =
-        5.0
+    @State private var distanceText = ""
     @State private var level = "all"
     @State private var broadArea = ""
     @State private var note = ""
@@ -2393,63 +2407,30 @@ struct TrainTogetherPostCreateView:
             .request
     @State private var maxGuests = 1
     @State private var meetingName = ""
+    @State private var meetingAddress = ""
+    @State private var meetingLatitude:
+        Double?
+    @State private var meetingLongitude:
+        Double?
     @State private var meetingDetails = ""
+    @State private var plannedExercises:
+        [PlannedExercise] = []
+    @State private var showingExercisePicker =
+        false
+    @State private var editingExercise:
+        PlannedExercise?
+    @State private var showingMeetingSearch =
+        false
 
     var body: some View {
-        Form {
-            Section {
-                Menu {
-                    Button {
-                        selectedSourceID = nil
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Create from scratch",
-                                norwegian:
-                                    "Lag fra bunnen"
-                            ),
-                            systemImage:
-                                "plus"
-                        )
-                    }
+        ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 18
+            ) {
+                introCard
 
-                    ForEach(
-                        availablePlannedSessions
-                    ) { workout in
-                        Button {
-                            apply(workout)
-                        } label: {
-                            Label(
-                                workout.title,
-                                systemImage:
-                                    workout
-                                        .kind
-                                        .systemImage
-                            )
-                        }
-                    }
-                } label: {
-                    LabeledContent(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Workout source",
-                            norwegian:
-                                "Grunnlag"
-                        ),
-                        value:
-                            selectedWorkout?
-                                .title ??
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "New workout",
-                                norwegian:
-                                    "Ny økt"
-                            )
-                    )
-                }
-            } header: {
-                Text(
+                createSectionHeader(
                     ATHLTHLocalization.choose(
                         english:
                             "Use a real workout",
@@ -2457,229 +2438,39 @@ struct TrainTogetherPostCreateView:
                             "Bruk en faktisk økt"
                     )
                 )
-            } footer: {
-                Text(
+
+                sourceCard
+
+                createSectionHeader(
                     ATHLTHLocalization.choose(
-                        english:
-                            "Choose a planned workout to publish its structure, or create a simple workout from scratch.",
-                        norwegian:
-                            "Velg en planlagt økt for å publisere oppsettet, eller lag en enkel økt fra bunnen."
+                        english: "Workout",
+                        norwegian: "Treningsøkt"
                     )
                 )
-            }
 
-            Section(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Workout",
-                    norwegian:
-                        "Treningsøkt"
-                )
-            ) {
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Workout title",
-                        norwegian:
-                            "Navn på økten"
-                    ),
-                    text: $title
-                )
+                workoutCard
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Activity",
-                        norwegian:
-                            "Aktivitet"
-                    ),
-                    selection: $kind
-                ) {
-                    Text(
-                        WorkoutKind
-                            .running
-                            .title
-                    )
-                    .tag(
-                        WorkoutKind
-                            .running
-                    )
-                    Text(
-                        WorkoutKind
-                            .strength
-                            .title
-                    )
-                    .tag(
-                        WorkoutKind
-                            .strength
-                    )
-                    Text(
-                        WorkoutKind
-                            .walking
-                            .title
-                    )
-                    .tag(
-                        WorkoutKind
-                            .walking
-                    )
-                    Text(
-                        WorkoutKind
-                            .custom
-                            .title
-                    )
-                    .tag(
-                        WorkoutKind
-                            .custom
-                    )
-                }
-
-                DatePicker(
-                    ATHLTHLocalization.choose(
-                        english: "When",
-                        norwegian: "Når"
-                    ),
-                    selection:
-                        $scheduledStart,
-                    in:
-                        Date()
-                            .addingTimeInterval(
-                                15 * 60
-                            )...,
-                    displayedComponents: [
-                        .date,
-                        .hourAndMinute
-                    ]
-                )
-
-                Stepper(
-                    ATHLTHLocalization.format(
-                        english:
-                            "Duration: %d min",
-                        norwegian:
-                            "Varighet: %d min",
-                        durationMinutes
-                    ),
-                    value:
-                        $durationMinutes,
-                    in: 10...360,
-                    step: 5
-                )
-
-                if kind == .running ||
-                    kind == .walking {
-                    TextField(
+                if kind == .strength {
+                    createSectionHeader(
                         ATHLTHLocalization.choose(
                             english:
-                                "Distance (km)",
+                                "Strength exercises",
                             norwegian:
-                                "Distanse (km)"
+                                "Styrkeøvelser"
                         ),
-                        value:
-                            $distanceKilometers,
-                        format: .number
+                        subtitle:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Optional. Add the exercises if everyone should receive the same structured workout.",
+                                norwegian:
+                                    "Valgfritt. Legg inn øvelser hvis alle skal få samme strukturerte styrkeøkt."
+                            )
                     )
-                    .keyboardType(
-                        .decimalPad
-                    )
+
+                    strengthExercisesCard
                 }
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Level",
-                        norwegian:
-                            "Nivå"
-                    ),
-                    selection: $level
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "All levels",
-                            norwegian:
-                                "Alle nivåer"
-                        )
-                    )
-                    .tag("all")
-                    Text("Beginner")
-                        .tag("beginner")
-                    Text("Intermediate")
-                        .tag("intermediate")
-                    Text("Advanced")
-                        .tag("advanced")
-                }
-
-                if participationMode ==
-                    .physical {
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "City / broad area",
-                            norwegian:
-                                "By / område"
-                        ),
-                        text: $broadArea
-                    )
-                }
-
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Short description (optional)",
-                        norwegian:
-                            "Kort beskrivelse (valgfritt)"
-                    ),
-                    text: $note,
-                    axis: .vertical
-                )
-                .lineLimit(2...5)
-
-                Stepper(
-                    ATHLTHLocalization.format(
-                        english:
-                            "Open spots: %d",
-                        norwegian:
-                            "Ledige plasser: %d",
-                        maxGuests
-                    ),
-                    value:
-                        $maxGuests,
-                    in: 1...5
-                )
-            }
-
-            Section {
-                WorkoutSocialModePicker(
-                    mode:
-                        $participationMode
-                )
-
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Who can join?",
-                        norwegian:
-                            "Hvem kan bli med?"
-                    ),
-                    selection:
-                        $joinPolicy
-                ) {
-                    ForEach(
-                        TrainTogetherJoinPolicy
-                            .allCases
-                    ) { policy in
-                        Text(policy.title)
-                            .tag(policy)
-                    }
-                }
-
-                Text(joinPolicy.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-            } header: {
-                Text(
+                createSectionHeader(
                     ATHLTHLocalization.choose(
                         english:
                             "Social workout",
@@ -2687,63 +2478,46 @@ struct TrainTogetherPostCreateView:
                             "Sosial økt"
                     )
                 )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Request to join is recommended for public workouts. Open join lets people enter instantly until the workout is full.",
-                        norwegian:
-                            "«Be om å bli med» anbefales for offentlige økter. «Åpen påmelding» lar folk bli med direkte til økten er full."
-                    )
-                )
-            }
 
-            if participationMode ==
-                .physical {
-            Section {
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Meeting place",
-                        norwegian:
-                            "Møtested"
-                    ),
-                    text: $meetingName
-                )
+                socialWorkoutCard
 
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Extra directions",
-                        norwegian:
-                            "Ekstra beskrivelse"
-                    ),
-                    text:
-                        $meetingDetails,
-                    axis: .vertical
-                )
-                .lineLimit(2...4)
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Private meetup",
-                        norwegian:
-                            "Privat møtested"
+                if participationMode ==
+                    .physical {
+                    createSectionHeader(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Private meetup",
+                            norwegian:
+                                "Privat møtested"
+                        ),
+                        subtitle:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose an address from Apple Maps. Exact meetup details are only shown to accepted participants.",
+                                norwegian:
+                                    "Velg en adresse fra Apple Maps. Nøyaktig møtested vises bare til godkjente deltakere."
+                            )
                     )
-                )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Only the broad area is visible in the marketplace. Exact meetup details are revealed after you accept someone.",
-                        norwegian:
-                            "Kun området vises i listen. Nøyaktig møtested vises først etter at du har godkjent noen."
-                    )
-                )
+
+                    meetupCard
+                }
             }
-            }
+            .padding(16)
+            .padding(.bottom, 40)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(
+            .interactively
+        )
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.18)
+            )
+        )
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
@@ -2754,6 +2528,10 @@ struct TrainTogetherPostCreateView:
         )
         .navigationBarTitleDisplayMode(
             .inline
+        )
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
         )
         .toolbar {
             ToolbarItem(
@@ -2786,12 +2564,1180 @@ struct TrainTogetherPostCreateView:
                 ) {
                     publish()
                 }
+                .fontWeight(.semibold)
                 .disabled(
                     !canPublish ||
                     marketplace.isWorking
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingExercisePicker
+        ) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    selectionTitle:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Add exercise",
+                            norwegian:
+                                "Legg til øvelse"
+                        )
+                ) { entry in
+                    addExercise(
+                        entry.exercise
+                    )
+                    showingExercisePicker =
+                        false
+                }
+            }
+        }
+        .sheet(
+            item:
+                $editingExercise
+        ) { exercise in
+            PlannedExerciseEditorView(
+                exercise: exercise
+            ) { updated in
+                updateExercise(
+                    updated
+                )
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingMeetingSearch
+        ) {
+            NavigationStack {
+                TrainTogetherMapPlacePickerView {
+                    place in
+                    applyMeetingPlace(
+                        place
+                    )
+                    showingMeetingSearch =
+                        false
+                }
+            }
+        }
+    }
+
+    private var introCard:
+        some View {
+        ATHLTHCard {
+            HStack(
+                alignment: .top,
+                spacing: 14
+            ) {
+                VStack(
+                    alignment: .leading,
+                    spacing: 7
+                ) {
+                    Text(
+                        "TRAIN TOGETHER"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .tracking(1.7)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "One workout. Your people.",
+                            norwegian:
+                                "Én økt. Dine folk."
+                        )
+                    )
+                    .font(
+                        .title2
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Set up the workout like Ghost: clear, structured and ready to share. Training details stay attached when someone joins.",
+                            norwegian:
+                                "Sett opp økten som i Ghost: ryddig, strukturert og klar til å dele. Treningsdetaljene følger med når noen blir med."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "person.2.wave.2.fill"
+                )
+                .font(
+                    .system(
+                        size: 25,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    width: 54,
+                    height: 54
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 17,
+                            style:
+                                .continuous
+                        )
+                )
+            }
+        }
+    }
+
+    private var sourceCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                Menu {
+                    Button {
+                        startFromScratch()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Create from scratch",
+                                norwegian:
+                                    "Lag fra bunnen"
+                            ),
+                            systemImage:
+                                "plus"
+                        )
+                    }
+
+                    ForEach(
+                        availablePlannedSessions
+                    ) { workout in
+                        Button {
+                            apply(workout)
+                        } label: {
+                            Label(
+                                workout.title,
+                                systemImage:
+                                    workout
+                                        .kind
+                                        .systemImage
+                            )
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        createIcon(
+                            selectedWorkout?
+                                .kind
+                                .systemImage ??
+                            "calendar.badge.plus"
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Workout source",
+                                    norwegian:
+                                        "Grunnlag"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Text(
+                                selectedWorkout?
+                                    .title ??
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "New workout",
+                                    norwegian:
+                                        "Ny økt"
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.up.chevron.down"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Choose a planned workout to reuse its structure, or build a new one here.",
+                        norwegian:
+                            "Velg en planlagt økt for å bruke oppsettet, eller bygg en ny her."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+        }
+    }
+
+    private var workoutCard:
+        some View {
+        ATHLTHCard {
+            VStack(spacing: 0) {
+                createTextFieldRow(
+                    icon: "text.cursor",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Workout title",
+                            norwegian:
+                                "Navn på økten"
+                        ),
+                    text: $title
+                )
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        kind.systemImage
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Activity",
+                            norwegian:
+                                "Aktivitet"
+                        )
+                    )
+
+                    Spacer()
+
+                    Picker(
+                        "",
+                        selection: $kind
+                    ) {
+                        Text(
+                            WorkoutKind
+                                .running
+                                .title
+                        )
+                        .tag(
+                            WorkoutKind
+                                .running
+                        )
+                        Text(
+                            WorkoutKind
+                                .strength
+                                .title
+                        )
+                        .tag(
+                            WorkoutKind
+                                .strength
+                        )
+                        Text(
+                            WorkoutKind
+                                .walking
+                                .title
+                        )
+                        .tag(
+                            WorkoutKind
+                                .walking
+                        )
+                        Text(
+                            WorkoutKind
+                                .custom
+                                .title
+                        )
+                        .tag(
+                            WorkoutKind
+                                .custom
+                        )
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+                .padding(.vertical, 13)
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        "calendar"
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "When",
+                            norwegian:
+                                "Når"
+                        )
+                    )
+
+                    Spacer()
+
+                    DatePicker(
+                        "",
+                        selection:
+                            $scheduledStart,
+                        in:
+                            Date()
+                                .addingTimeInterval(
+                                    15 * 60
+                                )...,
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
+                    )
+                    .labelsHidden()
+                }
+                .padding(.vertical, 11)
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        "timer"
+                    )
+
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "Duration: %d min",
+                            norwegian:
+                                "Varighet: %d min",
+                            durationMinutes
+                        )
+                    )
+
+                    Spacer()
+
+                    Stepper(
+                        "",
+                        value:
+                            $durationMinutes,
+                        in: 10...360,
+                        step: 5
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                .padding(.vertical, 11)
+
+                if kind == .running ||
+                    kind == .walking {
+                    createDivider
+
+                    HStack(spacing: 12) {
+                        createIcon(
+                            "point.topleft.down.to.point.bottomright.curvepath"
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Distance",
+                                    norwegian:
+                                        "Distanse"
+                                )
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Optional",
+                                    norwegian:
+                                        "Valgfritt"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        Spacer()
+
+                        TextField(
+                            "km",
+                            text:
+                                $distanceText
+                        )
+                        .keyboardType(
+                            .decimalPad
+                        )
+                        .multilineTextAlignment(
+                            .trailing
+                        )
+                        .frame(width: 88)
+
+                        Text("km")
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+                    .padding(.vertical, 11)
+                }
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        "gauge.with.dots.needle.50percent"
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Level",
+                            norwegian:
+                                "Nivå"
+                        )
+                    )
+
+                    Spacer()
+
+                    Picker(
+                        "",
+                        selection: $level
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "All levels",
+                                norwegian:
+                                    "Alle nivåer"
+                            )
+                        )
+                        .tag("all")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Beginner",
+                                norwegian:
+                                    "Nybegynner"
+                            )
+                        )
+                        .tag("beginner")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Intermediate",
+                                norwegian:
+                                    "Middels"
+                            )
+                        )
+                        .tag(
+                            "intermediate"
+                        )
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Advanced",
+                                norwegian:
+                                    "Avansert"
+                            )
+                        )
+                        .tag("advanced")
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+                .padding(.vertical, 13)
+
+                if participationMode ==
+                    .physical {
+                    createDivider
+
+                    createTextFieldRow(
+                        icon:
+                            "location.circle.fill",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "City / area",
+                                norwegian:
+                                    "By / område"
+                            ),
+                        text:
+                            $broadArea
+                    )
+                }
+
+                createDivider
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 9
+                ) {
+                    HStack(spacing: 12) {
+                        createIcon(
+                            "text.alignleft"
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Description",
+                                norwegian:
+                                    "Beskrivelse"
+                            )
+                        )
+
+                        Spacer()
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Optional",
+                                norwegian:
+                                    "Valgfritt"
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "A short note about the workout",
+                            norwegian:
+                                "Kort om økten"
+                        ),
+                        text: $note,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                    .padding(12)
+                    .background(
+                        ATHLTHTheme
+                            .surfaceSage,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+                .padding(.vertical, 13)
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        "person.2.fill"
+                    )
+
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "Open spots: %d",
+                            norwegian:
+                                "Ledige plasser: %d",
+                            maxGuests
+                        )
+                    )
+
+                    Spacer()
+
+                    Stepper(
+                        "",
+                        value:
+                            $maxGuests,
+                        in: 1...15
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                .padding(.vertical, 11)
+            }
+        }
+    }
+
+    private var strengthExercisesCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                if plannedExercises.isEmpty {
+                    HStack(
+                        alignment: .top,
+                        spacing: 11
+                    ) {
+                        createIcon(
+                            "dumbbell.fill"
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "No exercises added",
+                                    norwegian:
+                                        "Ingen øvelser lagt til"
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "That is fine for a free strength session. Add exercises only when the session should have a shared structure.",
+                                    norwegian:
+                                        "Det er helt fint for en fri styrkeøkt. Legg bare til øvelser når økten skal ha et felles oppsett."
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+                    }
+                } else {
+                    ForEach(
+                        Array(
+                            plannedExercises
+                                .enumerated()
+                        ),
+                        id: \.element.id
+                    ) { index, exercise in
+                        if index > 0 {
+                            createDivider
+                        }
+
+                        HStack(spacing: 10) {
+                            Button {
+                                editingExercise =
+                                    exercise
+                            } label: {
+                                HStack(
+                                    spacing: 11
+                                ) {
+                                    createIcon(
+                                        "dumbbell.fill"
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(
+                                            exercise
+                                                .embeddedExercise
+                                                .displayName
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                        .lineLimit(2)
+
+                                        Text(
+                                            exerciseSummary(
+                                                exercise
+                                            )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                    }
+
+                                    Spacer()
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            Button(
+                                role:
+                                    .destructive
+                            ) {
+                                plannedExercises
+                                    .removeAll {
+                                        $0.id ==
+                                            exercise.id
+                                    }
+                            } label: {
+                                Image(
+                                    systemName:
+                                        "trash"
+                                )
+                                .font(
+                                    .system(
+                                        size: 14,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .frame(
+                                    width: 34,
+                                    height: 34
+                                )
+                                .background(
+                                    Color.red
+                                        .opacity(
+                                            0.07
+                                        ),
+                                    in: Circle()
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(
+                            .vertical,
+                            4
+                        )
+                    }
+                }
+
+                Button {
+                    showingExercisePicker =
+                        true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                plannedExercises
+                                    .isEmpty
+                                    ? "Add exercises"
+                                    : "Add another exercise",
+                            norwegian:
+                                plannedExercises
+                                    .isEmpty
+                                    ? "Legg til øvelser"
+                                    : "Legg til en øvelse"
+                        ),
+                        systemImage:
+                            "plus.circle.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 46)
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+            }
+        }
+    }
+
+    private var socialWorkoutCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                WorkoutSocialModePicker(
+                    mode:
+                        $participationMode
+                )
+
+                createDivider
+
+                HStack(spacing: 12) {
+                    createIcon(
+                        "person.badge.plus"
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Who can join?",
+                                norwegian:
+                                    "Hvem kan bli med?"
+                            )
+                        )
+
+                        Text(
+                            joinPolicy
+                                .subtitle
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(2)
+                    }
+
+                    Spacer()
+
+                    Picker(
+                        "",
+                        selection:
+                            $joinPolicy
+                    ) {
+                        ForEach(
+                            TrainTogetherJoinPolicy
+                                .allCases
+                        ) { policy in
+                            Text(
+                                policy.title
+                            )
+                            .tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+            }
+        }
+    }
+
+    private var meetupCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                Button {
+                    showingMeetingSearch =
+                        true
+                } label: {
+                    HStack(spacing: 12) {
+                        createIcon(
+                            "map.fill"
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                meetingName
+                                    .isEmpty
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Choose meeting point",
+                                        norwegian:
+                                            "Velg møtepunkt"
+                                    )
+                                    : meetingName
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(1)
+
+                            Text(
+                                meetingAddress
+                                    .isEmpty
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Search addresses and places in Apple Maps",
+                                        norwegian:
+                                            "Søk etter adresse eller sted i Apple Maps"
+                                    )
+                                    : meetingAddress
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if !meetingName.isEmpty ||
+                    !meetingAddress.isEmpty {
+                    Button(
+                        role: .destructive
+                    ) {
+                        clearMeetingPlace()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Clear meeting point",
+                                norwegian:
+                                    "Fjern møtepunkt"
+                            ),
+                            systemImage:
+                                "xmark.circle"
+                        )
+                        .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                createDivider
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Extra directions",
+                            norwegian:
+                                "Ekstra beskrivelse"
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Entrance, landmark or other useful detail",
+                            norwegian:
+                                "Inngang, landemerke eller annen nyttig info"
+                        ),
+                        text:
+                            $meetingDetails,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                    .padding(12)
+                    .background(
+                        ATHLTHTheme
+                            .surfaceSage,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    private func createSectionHeader(
+        _ title: String,
+        subtitle: String? = nil
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 3
+        ) {
+            Text(title)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+        }
+        .padding(
+            .horizontal,
+            2
+        )
+    }
+
+    private func createTextFieldRow(
+        icon: String,
+        title: String,
+        text:
+            Binding<String>
+    ) -> some View {
+        HStack(spacing: 12) {
+            createIcon(icon)
+
+            TextField(
+                title,
+                text: text
+            )
+        }
+        .padding(.vertical, 13)
+    }
+
+    private func createIcon(
+        _ systemImage: String
+    ) -> some View {
+        Image(
+            systemName:
+                systemImage
+        )
+        .font(
+            .system(
+                size: 14,
+                weight: .semibold
+            )
+        )
+        .foregroundStyle(
+            ATHLTHTheme
+                .accentDeep
+        )
+        .frame(
+            width: 32,
+            height: 32
+        )
+        .background(
+            ATHLTHTheme
+                .accentSoft,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 10,
+                    style: .continuous
+                )
+        )
+    }
+
+    private var createDivider:
+        some View {
+        Rectangle()
+            .fill(
+                ATHLTHTheme
+                    .divider
+            )
+            .frame(height: 1)
+            .padding(
+                .leading,
+                44
+            )
     }
 
     private var selectedWorkout:
@@ -2850,6 +3796,44 @@ struct TrainTogetherPostCreateView:
             }
     }
 
+    private var distanceKilometers:
+        Double? {
+        let clean =
+            distanceText
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .replacingOccurrences(
+                    of: ",",
+                    with: "."
+                )
+
+        guard !clean.isEmpty
+        else {
+            return nil
+        }
+
+        return Double(clean)
+    }
+
+    private var distanceIsValid:
+        Bool {
+        let clean =
+            distanceText
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        return
+            clean.isEmpty ||
+            (
+                distanceKilometers ??
+                0
+            ) > 0
+    }
+
     private var canPublish:
         Bool {
         let cleanTitle =
@@ -2878,8 +3862,16 @@ struct TrainTogetherPostCreateView:
                         10 * 60
                     ) &&
             durationMinutes >= 10 &&
-            distanceKilometers >
-                0
+            distanceIsValid
+    }
+
+    private func startFromScratch() {
+        selectedSourceID = nil
+        title = ""
+        kind = .running
+        distanceText = ""
+        plannedExercises = []
+        note = ""
     }
 
     private func apply(
@@ -2903,13 +3895,122 @@ struct TrainTogetherPostCreateView:
         durationMinutes =
             workout.durationMinutes ??
             durationMinutes
-        distanceKilometers =
-            workout
-                .targetDistanceKilometers ??
-            distanceKilometers
+
+        if let distance =
+                workout
+                    .targetDistanceKilometers {
+            distanceText =
+                String(
+                    format: "%g",
+                    distance
+                )
+        } else {
+            distanceText = ""
+        }
+
+        plannedExercises =
+            workout.exercises
         note =
             workout.notes ??
-            note
+            ""
+    }
+
+    private func addExercise(
+        _ exercise: Exercise
+    ) {
+        let planned =
+            PlannedExercise(
+                id: UUID(),
+                exerciseID:
+                    exercise.id,
+                embeddedExercise:
+                    exercise.snapshot,
+                sets: 3,
+                reps: 8,
+                targetWeightKilograms:
+                    nil,
+                targetRPE: nil,
+                restSeconds: 90,
+                notes: nil,
+                targetRIR: nil,
+                supersetGroupID:
+                    nil,
+                progression:
+                    StrengthProgressionRule
+                        .none
+            )
+
+        plannedExercises.append(
+            planned
+        )
+    }
+
+    private func updateExercise(
+        _ updated:
+            PlannedExercise
+    ) {
+        guard let index =
+                plannedExercises
+                    .firstIndex(
+                        where: {
+                            $0.id ==
+                                updated.id
+                        }
+                    )
+        else {
+            return
+        }
+
+        plannedExercises[index] =
+            updated
+    }
+
+    private func exerciseSummary(
+        _ exercise:
+            PlannedExercise
+    ) -> String {
+        [
+            exercise
+                .compactTargetSummary,
+            exercise
+                .compactLoadSummary
+        ]
+        .compactMap { $0 }
+        .joined(
+            separator: " · "
+        )
+    }
+
+    private func applyMeetingPlace(
+        _ place:
+            TrainTogetherMapPlace
+    ) {
+        meetingName =
+            place.name
+        meetingAddress =
+            place.address
+        meetingLatitude =
+            place.latitude
+        meetingLongitude =
+            place.longitude
+
+        if broadArea
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+            .isEmpty,
+           !place.broadArea.isEmpty {
+            broadArea =
+                place.broadArea
+        }
+    }
+
+    private func clearMeetingPlace() {
+        meetingName = ""
+        meetingAddress = ""
+        meetingLatitude = nil
+        meetingLongitude = nil
     }
 
     private func publish() {
@@ -2931,6 +4032,11 @@ struct TrainTogetherPostCreateView:
                         in:
                             .whitespacesAndNewlines
                     )
+        let resolvedDistance =
+            kind == .running ||
+            kind == .walking
+                ? distanceKilometers
+                : nil
 
         var workout =
             selectedWorkout ??
@@ -2943,14 +4049,14 @@ struct TrainTogetherPostCreateView:
                 durationMinutes:
                     durationMinutes,
                 targetDistanceKilometers:
-                    kind == .running ||
-                    kind == .walking
-                        ? distanceKilometers
-                        : nil,
+                    resolvedDistance,
                 targetPaceSecondsPerKilometer:
                     nil,
                 routeID: nil,
-                exercises: [],
+                exercises:
+                    kind == .strength
+                        ? plannedExercises
+                        : [],
                 notes:
                     note.isEmpty
                         ? nil
@@ -2963,12 +4069,12 @@ struct TrainTogetherPostCreateView:
             scheduledStart
         workout.durationMinutes =
             durationMinutes
+        workout.targetDistanceKilometers =
+            resolvedDistance
 
-        if kind == .running ||
-            kind == .walking {
-            workout
-                .targetDistanceKilometers =
-                distanceKilometers
+        if kind == .strength {
+            workout.exercises =
+                plannedExercises
         }
 
         let route =
@@ -2996,7 +4102,7 @@ struct TrainTogetherPostCreateView:
                             maxGuests + 1,
                             2
                         ),
-                        6
+                        16
                     )
             )
 
@@ -3033,10 +4139,7 @@ struct TrainTogetherPostCreateView:
                 durationMinutes:
                     durationMinutes,
                 distanceKilometers:
-                    kind == .running ||
-                    kind == .walking
-                        ? distanceKilometers
-                        : nil,
+                    resolvedDistance,
                 level: level,
                 broadArea: cleanArea,
                 note:
@@ -3074,6 +4177,12 @@ struct TrainTogetherPostCreateView:
                     in:
                         .whitespacesAndNewlines
                 )
+        let cleanAddress =
+            meetingAddress
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
         let cleanDetails =
             meetingDetails
                 .trimmingCharacters(
@@ -3085,26 +4194,37 @@ struct TrainTogetherPostCreateView:
             participationMode ==
                 .physical
                 ? TrainTogetherMeetupWrite(
-                postID: postID,
-                creatorID:
-                    session
-                        .profile
-                        .userID,
-                meetingName:
-                    cleanMeeting.isEmpty
-                        ? nil
-                        : String(
-                            cleanMeeting
-                                .prefix(160)
-                        ),
-                meetingDetails:
-                    cleanDetails.isEmpty
-                        ? nil
-                        : String(
-                            cleanDetails
-                                .prefix(600)
-                        )
-            )
+                    postID: postID,
+                    creatorID:
+                        session
+                            .profile
+                            .userID,
+                    meetingName:
+                        cleanMeeting.isEmpty
+                            ? nil
+                            : String(
+                                cleanMeeting
+                                    .prefix(160)
+                            ),
+                    meetingAddress:
+                        cleanAddress.isEmpty
+                            ? nil
+                            : String(
+                                cleanAddress
+                                    .prefix(400)
+                            ),
+                    meetingLatitude:
+                        meetingLatitude,
+                    meetingLongitude:
+                        meetingLongitude,
+                    meetingDetails:
+                        cleanDetails.isEmpty
+                            ? nil
+                            : String(
+                                cleanDetails
+                                    .prefix(600)
+                            )
+                )
                 : nil
 
         Task {
@@ -3116,6 +4236,391 @@ struct TrainTogetherPostCreateView:
                 dismiss()
             }
         }
+    }
+}
+
+private struct TrainTogetherMapPlace:
+    Identifiable,
+    Hashable
+{
+    let id: String
+    let name: String
+    let address: String
+    let broadArea: String
+    let latitude: Double
+    let longitude: Double
+}
+
+private struct TrainTogetherMapPlacePickerView:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let onSelect:
+        (TrainTogetherMapPlace) -> Void
+
+    @State private var query = ""
+    @State private var results:
+        [TrainTogetherMapPlace] = []
+    @State private var isSearching =
+        false
+    @State private var searchError:
+        String?
+
+    var body: some View {
+        List {
+            if query
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .count < 2 {
+                Section {
+                    ContentUnavailableView {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Search Apple Maps",
+                                norwegian:
+                                    "Søk i Apple Maps"
+                            ),
+                            systemImage:
+                                "map.fill"
+                        )
+                    } description: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Search for a street address, gym, park or other meeting point.",
+                                norwegian:
+                                    "Søk etter gateadresse, treningssenter, park eller et annet møtepunkt."
+                            )
+                        )
+                    }
+                }
+                .listRowBackground(
+                    Color.clear
+                )
+            } else if isSearching &&
+                        results.isEmpty {
+                Section {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(
+                        .vertical,
+                        24
+                    )
+                }
+                .listRowBackground(
+                    Color.clear
+                )
+            } else if let searchError,
+                      results.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Could not search Maps",
+                            norwegian:
+                                "Kunne ikke søke i Maps"
+                        ),
+                        systemImage:
+                            "exclamationmark.triangle",
+                        description:
+                            Text(searchError)
+                    )
+                }
+                .listRowBackground(
+                    Color.clear
+                )
+            } else {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Places",
+                        norwegian:
+                            "Steder"
+                    )
+                ) {
+                    ForEach(results) {
+                        place in
+                        Button {
+                            onSelect(place)
+                            dismiss()
+                        } label: {
+                            HStack(
+                                spacing: 12
+                            ) {
+                                Image(
+                                    systemName:
+                                        "mappin.and.ellipse"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .vitalitySoft,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        place.name
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Text(
+                                        place.address
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                    .lineLimit(2)
+                                }
+
+                                Spacer()
+                            }
+                            .padding(
+                                .vertical,
+                                3
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(
+            .hidden
+        )
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.14)
+            )
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Meeting point",
+                norwegian:
+                    "Møtepunkt"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .searchable(
+            text: $query,
+            placement:
+                .navigationBarDrawer(
+                    displayMode:
+                        .always
+                ),
+            prompt:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Address or place",
+                    norwegian:
+                        "Adresse eller sted"
+                )
+        )
+        .task(id: query) {
+            await searchMaps()
+        }
+    }
+
+    @MainActor
+    private func searchMaps() async {
+        let clean =
+            query
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        guard clean.count >= 2
+        else {
+            results = []
+            isSearching = false
+            searchError = nil
+            return
+        }
+
+        do {
+            try await Task.sleep(
+                for:
+                    .milliseconds(280)
+            )
+        } catch {
+            return
+        }
+
+        guard !Task.isCancelled
+        else {
+            return
+        }
+
+        isSearching = true
+        searchError = nil
+
+        let request =
+            MKLocalSearch.Request()
+        request.naturalLanguageQuery =
+            clean
+        request.resultTypes = [
+            .address,
+            .pointOfInterest
+        ]
+
+        do {
+            let response =
+                try await MKLocalSearch(
+                    request: request
+                )
+                .start()
+
+            guard !Task.isCancelled
+            else {
+                return
+            }
+
+            results =
+                response.mapItems
+                    .prefix(20)
+                    .map(
+                        mapPlace
+                    )
+            isSearching = false
+        } catch {
+            guard !Task.isCancelled
+            else {
+                return
+            }
+
+            results = []
+            isSearching = false
+            searchError =
+                error.localizedDescription
+        }
+    }
+
+    private func mapPlace(
+        _ item: MKMapItem
+    ) -> TrainTogetherMapPlace {
+        let placemark =
+            item.placemark
+        let street =
+            [
+                placemark
+                    .subThoroughfare,
+                placemark
+                    .thoroughfare
+            ]
+            .compactMap { $0 }
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(separator: " ")
+        let city =
+            [
+                placemark.postalCode,
+                placemark.locality
+            ]
+            .compactMap { $0 }
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(separator: " ")
+        let address =
+            [
+                street,
+                city,
+                placemark
+                    .administrativeArea,
+                placemark.country
+            ]
+            .compactMap { $0 }
+            .filter {
+                !$0.isEmpty
+            }
+            .joined(separator: ", ")
+        let resolvedAddress =
+            address.isEmpty
+                ? (
+                    placemark.title ??
+                    item.name ??
+                    ""
+                )
+                : address
+        let name =
+            item.name ??
+            placemark.name ??
+            resolvedAddress
+        let broadArea =
+            placemark.locality ??
+            placemark.subAdministrativeArea ??
+            placemark.administrativeArea ??
+            ""
+
+        return TrainTogetherMapPlace(
+            id:
+                "\(placemark.coordinate.latitude)|\(placemark.coordinate.longitude)|\(name)",
+            name: name,
+            address:
+                resolvedAddress,
+            broadArea:
+                broadArea,
+            latitude:
+                placemark
+                    .coordinate
+                    .latitude,
+            longitude:
+                placemark
+                    .coordinate
+                    .longitude
+        )
     }
 }
 
