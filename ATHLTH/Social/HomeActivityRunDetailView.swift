@@ -6,6 +6,7 @@ import SwiftUI
 struct HomeActivityRunDetailView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
 
     let workout: SocialPublishableWorkout
 
@@ -13,6 +14,10 @@ struct HomeActivityRunDetailView: View {
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingDetail = false
     @State private var isLoadingAIInsight = false
+    @State private var linkedRoute: TrainingRoute?
+    @State private var linkedRouteAttempt: RouteAttemptRecord?
+    @State private var linkedRouteAttempts: [RouteAttemptRecord] = []
+    @State private var isLoadingRouteResult = false
 
     init(
         workout: SocialPublishableWorkout,
@@ -131,10 +136,106 @@ struct HomeActivityRunDetailView: View {
         return (fast, slow)
     }
 
+    private var leaderboardEntries:
+        [RouteAttemptRecord] {
+        var bestByUser:
+            [UUID: RouteAttemptRecord] = [:]
+
+        for attempt in linkedRouteAttempts
+        where attempt.leaderboardEligible {
+            if let current =
+                    bestByUser[
+                        attempt.userID
+                    ] {
+                if attempt.durationSeconds <
+                    current.durationSeconds {
+                    bestByUser[
+                        attempt.userID
+                    ] = attempt
+                }
+            } else {
+                bestByUser[
+                    attempt.userID
+                ] = attempt
+            }
+        }
+
+        return bestByUser
+            .values
+            .sorted {
+                if abs(
+                    $0.durationSeconds -
+                    $1.durationSeconds
+                ) > 0.1 {
+                    return $0.durationSeconds <
+                        $1.durationSeconds
+                }
+
+                return $0.routeMatchPercent >
+                    $1.routeMatchPercent
+            }
+    }
+
+    private var leaderboardLeader:
+        RouteAttemptRecord? {
+        leaderboardEntries.first
+    }
+
+    private var ownLeaderboardBest:
+        RouteAttemptRecord? {
+        leaderboardEntries.first {
+            $0.userID ==
+                session.profile.userID
+        }
+    }
+
+    private var ownLeaderboardRank:
+        Int? {
+        guard let index =
+                leaderboardEntries
+                    .firstIndex(
+                        where: {
+                            $0.userID ==
+                                session
+                                    .profile
+                                    .userID
+                        }
+                    )
+        else {
+            return nil
+        }
+
+        return index + 1
+    }
+
+    private var currentRouteTime:
+        TimeInterval {
+        linkedRouteAttempt?
+            .durationSeconds ??
+        workout.duration
+    }
+
+    private var routeLeaderGap:
+        TimeInterval? {
+        guard let leader =
+                leaderboardLeader
+        else {
+            return nil
+        }
+
+        return currentRouteTime -
+            leader.durationSeconds
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 summaryCard
+
+                if linkedRoute != nil ||
+                    isLoadingRouteResult {
+                    routeResultCard
+                }
 
                 if workout.allowsTrainingPlaceCheckIn {
                     WorkoutPlaceCheckInSection(
@@ -323,6 +424,421 @@ struct HomeActivityRunDetailView: View {
                 lineWidth: 1
             )
         }
+    }
+
+    @ViewBuilder
+    private var routeResultCard:
+        some View {
+        if let route = linkedRoute {
+            ATHLTHCard {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "flag.checkered"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                        .frame(
+                            width: 38,
+                            height: 38
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft,
+                            in: Circle()
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "ROUTE RESULT",
+                                        norwegian:
+                                            "RUTERESULTAT"
+                                    )
+                            )
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+                            .tracking(1.3)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Text(route.title)
+                                .font(
+                                    .headline
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        if linkedRouteAttempt?
+                            .leaderboardEligible ==
+                            true {
+                            Image(
+                                systemName:
+                                    "checkmark.seal.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                        }
+                    }
+
+                    LazyVGrid(
+                        columns: [
+                            GridItem(
+                                .flexible(),
+                                spacing: 10
+                            ),
+                            GridItem(
+                                .flexible(),
+                                spacing: 10
+                            )
+                        ],
+                        spacing: 10
+                    ) {
+                        routeResultMetric(
+                            label:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "This run",
+                                        norwegian:
+                                            "Denne økten"
+                                    ),
+                            value:
+                                routeTimeText(
+                                    currentRouteTime
+                                ),
+                            icon:
+                                "timer"
+                        )
+
+                        routeResultMetric(
+                            label:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Route leader",
+                                        norwegian:
+                                            "Ruteleder"
+                                    ),
+                            value:
+                                leaderboardLeader
+                                    .map {
+                                        routeTimeText(
+                                            $0.durationSeconds
+                                        )
+                                    } ??
+                                "—",
+                            icon:
+                                "trophy.fill"
+                        )
+
+                        routeResultMetric(
+                            label:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Gap to leader",
+                                        norwegian:
+                                            "Bak leder"
+                                    ),
+                            value:
+                                routeGapText(
+                                    routeLeaderGap
+                                ),
+                            icon:
+                                "arrow.left.arrow.right"
+                        )
+
+                        routeResultMetric(
+                            label:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Your route PB",
+                                        norwegian:
+                                            "Din rute-PB"
+                                    ),
+                            value:
+                                ownLeaderboardBest
+                                    .map {
+                                        routeTimeText(
+                                            $0.durationSeconds
+                                        )
+                                    } ??
+                                "—",
+                            icon:
+                                "medal.fill"
+                        )
+                    }
+
+                    HStack(spacing: 10) {
+                        if linkedRouteAttempt?
+                            .leaderboardEligible ==
+                            true,
+                           let rank =
+                            ownLeaderboardRank {
+                            Label(
+                                ATHLTHLocalization
+                                    .format(
+                                        english:
+                                            "#%d of %d",
+                                        norwegian:
+                                            "#%d av %d",
+                                        rank,
+                                        leaderboardEntries
+                                            .count
+                                    ),
+                                systemImage:
+                                    "list.number"
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                        } else if let attempt =
+                                    linkedRouteAttempt {
+                            Label(
+                                ATHLTHLocalization
+                                    .format(
+                                        english:
+                                            "%.0f%% route match · not ranked",
+                                        norwegian:
+                                            "%.0f%% rutetreff · ikke rangert",
+                                        attempt
+                                            .routeMatchPercent
+                                    ),
+                                systemImage:
+                                    "location.slash.fill"
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                .orange
+                            )
+                        }
+
+                        Spacer()
+
+                        NavigationLink {
+                            RouteDetailView(
+                                route: route
+                            )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Leaderboard",
+                                        norwegian:
+                                            "Leaderboard"
+                                    ),
+                                systemImage:
+                                    "chevron.right"
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                    }
+                }
+            }
+            .athlthLightweightCardChrome()
+        } else if isLoadingRouteResult {
+            ATHLTHCard {
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.small)
+
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Loading route result…",
+                                norwegian:
+                                    "Laster ruteresultat…"
+                            )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Spacer()
+                }
+            }
+            .athlthLightweightCardChrome()
+        }
+    }
+
+    private func routeResultMetric(
+        label: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(
+                    .caption
+                        .weight(
+                            .semibold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    width: 30,
+                    height: 30
+                )
+                .background(
+                    ATHLTHTheme
+                        .surfaceSage,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 9,
+                            style: .continuous
+                        )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+
+                Text(value)
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.75
+                    )
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(9)
+        .background(
+            ATHLTHTheme
+                .surfaceStone
+                .opacity(0.62),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func routeTimeText(
+        _ duration: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(duration.rounded()),
+                0
+            )
+        let hours =
+            total / 3_600
+        let minutes =
+            (total % 3_600) / 60
+        let seconds =
+            total % 60
+
+        if hours > 0 {
+            return String(
+                format:
+                    "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format:
+                "%d:%02d",
+            minutes,
+            seconds
+        )
+    }
+
+    private func routeGapText(
+        _ gap: TimeInterval?
+    ) -> String {
+        guard let gap else {
+            return "—"
+        }
+
+        if abs(gap) < 0.5 {
+            return "0:00"
+        }
+
+        let prefix =
+            gap > 0
+                ? "+"
+                : "−"
+
+        return prefix +
+            routeTimeText(
+                abs(gap)
+            )
     }
 
     @ViewBuilder
@@ -738,7 +1254,96 @@ struct HomeActivityRunDetailView: View {
             isLoadingDetail = false
         }
 
+        await loadRouteResultIfNeeded()
         await loadCoachInsightIfNeeded()
+    }
+
+    @MainActor
+    private func loadRouteResultIfNeeded() async {
+        guard linkedRoute == nil,
+              linkedRouteAttempt == nil,
+              !isLoadingRouteResult
+        else {
+            return
+        }
+
+        isLoadingRouteResult = true
+        defer {
+            isLoadingRouteResult = false
+        }
+
+        let service =
+            SupabaseRouteAttemptService()
+
+        do {
+            if let attempt =
+                    try await service.load(
+                        workoutID: workout.id
+                    ),
+               let route =
+                    session.savedRoutes
+                        .first(
+                            where: {
+                                $0.id ==
+                                    attempt.routeID
+                            }
+                        ) {
+                linkedRouteAttempt =
+                    attempt
+                linkedRoute =
+                    route
+                linkedRouteAttempts =
+                    try await service.load(
+                        routeID:
+                            attempt.routeID
+                    )
+                return
+            }
+        } catch {
+            // Fall through to local iPhone metadata when the route attempt
+            // endpoint is temporarily unavailable.
+        }
+
+        guard let local =
+                phoneWorkout.history
+                    .first(
+                        where: {
+                            $0.healthID ==
+                                workout.id
+                        }
+                    ),
+              let routeID =
+                local.plannedRouteID,
+              let route =
+                session.savedRoutes
+                    .first(
+                        where: {
+                            $0.id ==
+                                routeID
+                        }
+                    )
+        else {
+            return
+        }
+
+        linkedRoute = route
+
+        do {
+            linkedRouteAttempts =
+                try await service.load(
+                    routeID: routeID
+                )
+            linkedRouteAttempt =
+                linkedRouteAttempts
+                    .first(
+                        where: {
+                            $0.workoutID ==
+                                workout.id
+                        }
+                    )
+        } catch {
+            linkedRouteAttempts = []
+        }
     }
 
     @MainActor
