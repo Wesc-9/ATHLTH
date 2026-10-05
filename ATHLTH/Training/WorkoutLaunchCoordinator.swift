@@ -451,20 +451,16 @@ enum WorkoutLaunchCoordinator {
             }
         }()
 
-        var resolvedAudioCoach =
+        let resolvedAudioCoach =
             configuration.audioCoach
-
-        if configuration
-            .ghostTargetDurationSeconds != nil,
-           configuration.ghostUpdates != nil {
-            // Ghost owns recurring race cadence. Keep Audio Coach active for
-            // structured-step and critical guidance without duplicate periodic
-            // metric announcements.
-            resolvedAudioCoach
-                .distanceIntervalMeters = nil
-            resolvedAudioCoach
-                .timeIntervalSeconds = nil
-        }
+        let resolvedGhostUpdates =
+            GhostRaceStartService
+                .coexistingGhostAudio(
+                    configuration
+                        .ghostUpdates,
+                    audioCoach:
+                        resolvedAudioCoach
+                )
 
         if let targetDuration =
                 configuration
@@ -529,8 +525,7 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .routeAlerts,
                 ghostUpdates:
-                    configuration
-                        .ghostUpdates,
+                    resolvedGhostUpdates,
                 autoPauseEnabled:
                     configuration
                         .autoPauseEnabled
@@ -578,8 +573,7 @@ enum WorkoutLaunchCoordinator {
                     .preparedTransfer(
                         ghostRace: ghostRace,
                         audio:
-                            configuration
-                                .ghostUpdates ??
+                            resolvedGhostUpdates ??
                             .disabled
                     ) {
             watchConnection
