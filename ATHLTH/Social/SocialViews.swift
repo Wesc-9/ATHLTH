@@ -4826,6 +4826,10 @@ struct WorkoutInviteLaunchSheet: View {
                                     spotifyPlaylist: nil,
                                     spotifyAutoplay: false,
                                     friends: [],
+                                    socialMode:
+                                        payload?
+                                            .resolvedParticipationMode ??
+                                        .physical,
                                     gearIDs: []
                                 ),
                             session: session,
@@ -4862,6 +4866,10 @@ struct WorkoutInviteLaunchSheet: View {
                                     spotifyPlaylist: nil,
                                     spotifyAutoplay: false,
                                     friends: [],
+                                    socialMode:
+                                        payload?
+                                            .resolvedParticipationMode ??
+                                        .physical,
                                     gearIDs: []
                                 ),
                             settings: settings,
