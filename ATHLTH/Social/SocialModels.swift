@@ -1076,6 +1076,62 @@ enum SocialWorkoutParticipantState: String, Codable, Hashable {
     case declined
 }
 
+enum SocialWorkoutParticipationMode:
+    String,
+    Codable,
+    Hashable,
+    CaseIterable,
+    Identifiable
+{
+    case physical
+    case remote
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .physical:
+            return ATHLTHLocalization.choose(
+                english: "Together in person",
+                norwegian: "Sammen fysisk"
+            )
+        case .remote:
+            return ATHLTHLocalization.choose(
+                english: "Same workout · apart",
+                norwegian: "Samme økt · hver for seg"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .physical:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Meet up and use a shared start when everyone is ready.",
+                norwegian:
+                    "Møt hverandre og bruk felles start når alle er klare."
+            )
+        case .remote:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Train from different places with chat and live partner progress.",
+                norwegian:
+                    "Tren fra ulike steder med chat og live fremdrift fra partnerne."
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .physical:
+            return "person.2.fill"
+        case .remote:
+            return "point.3.connected.trianglepath.dotted"
+        }
+    }
+}
+
 struct SocialWorkoutInvitePayload: Codable, Hashable {
     var version: Int = 1
     var workout: PlannedSession
@@ -1085,6 +1141,28 @@ struct SocialWorkoutInvitePayload: Codable, Hashable {
         StrengthAdvancedConfiguration? = nil
     var routeAlerts:
         WatchRouteAlertConfiguration? = nil
+
+    // Optional for backwards compatibility with workout invites created
+    // before social workout modes existed.
+    var participationMode:
+        SocialWorkoutParticipationMode? = nil
+    var maxParticipants: Int? = nil
+
+    var resolvedParticipationMode:
+        SocialWorkoutParticipationMode {
+        participationMode ?? .physical
+    }
+
+    var resolvedMaxParticipants: Int {
+        min(
+            max(
+                maxParticipants ?? 2,
+                2
+            ),
+            6
+        )
+    }
+
     var createdAt: Date = Date()
 
     /// The invited athlete chooses their own capture device, gear and music.
