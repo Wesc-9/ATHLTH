@@ -134,10 +134,7 @@ enum ProfileFeaturedRecordKind:
              .bestRunningMonth:
             return .running
 
-        case .bestWeeklyRunningDistance,
-             .mostRunsInWeek,
-             .bestRunningMonth,
-             .strengthBenchPress,
+        case .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
              .strengthShoulderPress,
@@ -227,22 +224,10 @@ enum ProfileFeaturedRecordKind:
             return .mostActiveCalories
         case .mostStepsInWorkout:
             return .mostStepsInWorkout
-        case .bestWeeklyRunningDistance:
-            return bestWeeklyRunningDistanceValue(
-                performanceWorkouts
-            )
-
-        case .mostRunsInWeek:
-            return mostRunsInWeekValue(
-                performanceWorkouts
-            )
-
-        case .bestRunningMonth:
-            return bestRunningMonthValue(
-                performanceWorkouts
-            )
-
-        case .strengthBenchPress,
+        case .bestWeeklyRunningDistance,
+             .mostRunsInWeek,
+             .bestRunningMonth,
+             .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
              .strengthShoulderPress,
@@ -928,6 +913,21 @@ enum ProfileFeaturedRecordKind:
                     kilometers
                 )
 
+        case .bestWeeklyRunningDistance:
+            return bestWeeklyRunningDistanceValue(
+                performanceWorkouts
+            )
+
+        case .mostRunsInWeek:
+            return mostRunsInWeekValue(
+                performanceWorkouts
+            )
+
+        case .bestRunningMonth:
+            return bestRunningMonthValue(
+                performanceWorkouts
+            )
+
         case .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
@@ -1093,7 +1093,7 @@ enum ProfileFeaturedRecordKind:
                 strengthWorkouts
                     .filter(\.isFinished)
                     .compactMap {
-                        $0.healthMetrics?
+                        $0.healthMetrics
                             .activeCalories
                     }
                     .filter { $0 > 0 }
