@@ -184,23 +184,13 @@ final class GhostRaceStore: ObservableObject {
             validRoute.first?.timestamp ?? startedAt
         let lastTimestamp =
             validRoute.last?.timestamp ?? startedAt
-
-        let hasUsefulTimestamps =
+        let timestampSpan =
             lastTimestamp.timeIntervalSince(
                 firstTimestamp
-            ) > 10
-
-        let firstPointStartOffset =
-            firstTimestamp.timeIntervalSince(
-                startedAt
             )
 
-        let timestampBaseline =
-            hasUsefulTimestamps &&
-            firstPointStartOffset >= -30 &&
-            firstPointStartOffset <= 300
-                ? startedAt
-                : firstTimestamp
+        let hasUsefulTimestamps =
+            timestampSpan > 10
 
         let points = sampledIndices.map {
             index -> GhostRacePoint in
@@ -214,12 +204,29 @@ final class GhostRaceStore: ObservableObject {
 
             let rawElapsed: TimeInterval
 
-            if hasUsefulTimestamps {
+            if hasUsefulTimestamps,
+               duration > 0 {
+                // Health route timestamps can span a noticeably different
+                // wall-clock interval than HKWorkout.duration (GPS startup,
+                // pauses and delayed route samples are common). Normalize the
+                // route timeline to the authoritative workout duration while
+                // preserving the original pacing shape. This prevents a Ghost
+                // from reaching the finish kilometres too early.
+                let timestampProgress =
+                    min(
+                        max(
+                            location.timestamp
+                                .timeIntervalSince(
+                                    firstTimestamp
+                                ) /
+                            timestampSpan,
+                            0
+                        ),
+                        1
+                    )
                 rawElapsed =
-                    location.timestamp
-                        .timeIntervalSince(
-                            timestampBaseline
-                        )
+                    duration *
+                    timestampProgress
             } else {
                 rawElapsed =
                     max(duration, 0) *
@@ -461,6 +468,8 @@ final class GhostRaceStore: ObservableObject {
         guard let matchedIndex =
                 nearestReferenceIndex(
                     to: currentLocation,
+                    expectedDistanceMeters:
+                        snapshot.distanceMeters,
                     in: reference
                 )
         else {
@@ -724,11 +733,36 @@ final class GhostRaceStore: ObservableObject {
 
     private func nearestReferenceIndex(
         to location: CLLocation,
+        expectedDistanceMeters: Double,
         in reference: GhostRaceReference
     ) -> Int? {
         guard !reference.points.isEmpty else {
             return nil
         }
+
+        let routeDistance =
+            max(
+                reference.routeDistanceMeters,
+                reference.points.last?
+                    .cumulativeMeters ?? 0,
+                1
+            )
+        let expectedDistance =
+            min(
+                max(
+                    expectedDistanceMeters,
+                    0
+                ),
+                routeDistance
+            )
+        let progressWindow =
+            max(
+                280,
+                min(
+                    routeDistance * 0.12,
+                    900
+                )
+            )
 
         if let lastMatchedIndex {
             let lower =
@@ -743,7 +777,11 @@ final class GhostRaceStore: ObservableObject {
                 nearestIndex(
                     to: location,
                     points: reference.points,
-                    range: lower...upper
+                    range: lower...upper,
+                    expectedDistanceMeters:
+                        expectedDistance,
+                    maximumProgressDriftMeters:
+                        progressWindow
                 ) {
                 let localDistance =
                     location.distance(
@@ -753,57 +791,94 @@ final class GhostRaceStore: ObservableObject {
                             ].location
                     )
 
-                if localDistance <= 180 {
+                if localDistance <= 220 {
                     return local
                 }
             }
         }
 
-        let initialUpper =
+        let expectedProgress =
+            expectedDistance /
+            routeDistance
+        let expectedIndex =
+            Int(
+                (
+                    expectedProgress *
+                    Double(
+                        reference.points.count - 1
+                    )
+                )
+                .rounded()
+            )
+        let indexRadius =
+            max(
+                30,
+                Int(
+                    Double(reference.points.count) *
+                    0.14
+                )
+            )
+        let lower =
+            max(
+                expectedIndex - indexRadius,
+                0
+            )
+        let upper =
             min(
-                max(
-                    Int(
-                        Double(reference.points.count) *
-                        0.18
-                    ),
-                    24
-                ),
+                expectedIndex + indexRadius,
                 reference.points.count - 1
             )
 
-        guard let initial =
+        guard let matched =
                 nearestIndex(
                     to: location,
                     points: reference.points,
-                    range: 0...initialUpper
+                    range: lower...upper,
+                    expectedDistanceMeters:
+                        expectedDistance,
+                    maximumProgressDriftMeters:
+                        progressWindow
                 )
         else {
             return nil
         }
 
-        let initialDistance =
+        let matchedDistance =
             location.distance(
                 from:
                     reference.points[
-                        initial
+                        matched
                     ].location
             )
 
-        return initialDistance <= 250
-            ? initial
+        return matchedDistance <= 250
+            ? matched
             : nil
     }
 
     private func nearestIndex(
         to location: CLLocation,
         points: [GhostRacePoint],
-        range: ClosedRange<Int>
+        range: ClosedRange<Int>,
+        expectedDistanceMeters: Double? = nil,
+        maximumProgressDriftMeters: Double? = nil
     ) -> Int? {
         var bestIndex: Int?
         var bestDistance =
             Double.greatestFiniteMagnitude
 
         for index in range {
+            if let expectedDistanceMeters,
+               let maximumProgressDriftMeters,
+               abs(
+                    points[index]
+                        .cumulativeMeters -
+                    expectedDistanceMeters
+               ) >
+                maximumProgressDriftMeters {
+                continue
+            }
+
             let distance =
                 location.distance(
                     from:
