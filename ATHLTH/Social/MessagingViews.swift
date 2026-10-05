@@ -86,6 +86,8 @@ struct MessageInboxView: View {
     @State private var showingSearch = false
     @State private var selectedFilter:
         MessageInboxFilter = .priority
+    @State private var selectedWorkoutInvite:
+        SocialWorkoutInviteDisplay?
 
     var body: some View {
         ScrollView {
@@ -125,7 +127,21 @@ struct MessageInboxView: View {
                     LazyVStack(spacing: 10) {
                         ForEach(displayedPersonItems) { item in
                             Group {
-                                if item.conversation != nil {
+                                if let workoutInvite =
+                                        item.pendingWorkoutInvites.first {
+                                    Button {
+                                        selectedWorkoutInvite =
+                                            workoutInvite
+                                    } label: {
+                                        MessagePersonRow(
+                                            item: item,
+                                            isOnline:
+                                                realtime.isOnline(
+                                                    item.friend.userID
+                                                )
+                                        )
+                                    }
+                                } else if item.conversation != nil {
                                     NavigationLink {
                                         DirectMessageThreadView(
                                             friend: item.friend
@@ -253,6 +269,13 @@ struct MessageInboxView: View {
             await messaging.refresh()
             messaging.loadPinnedConversations()
             await realtime.refreshOnlineUsers()
+        }
+        .sheet(
+            item: $selectedWorkoutInvite
+        ) { invite in
+            WorkoutInviteLaunchSheet(
+                invite: invite
+            )
         }
     }
 
@@ -1255,6 +1278,30 @@ struct MessageInboxView: View {
             grouped[userID] = current
         }
 
+        for invite in social.workoutInvites
+        where invite.participant.state == .invited {
+            guard let friend =
+                    invite.creator ??
+                    profile(
+                        for:
+                            invite.session.creatorID
+                    )
+            else {
+                continue
+            }
+
+            var current =
+                grouped[friend.userID] ??
+                MessagePersonInboxItem(
+                    friend: friend
+                )
+
+            current.pendingWorkoutInvites
+                .append(invite)
+            grouped[friend.userID] =
+                current
+        }
+
         for challenge in incomingChallengeRequests {
             guard
                 let friend =
@@ -1397,6 +1444,8 @@ private struct MessagePersonInboxItem: Identifiable {
     var isPinned = false
     var isIncomingMessageRequest = false
     var isOutgoingMessageRequest = false
+    var pendingWorkoutInvites:
+        [SocialWorkoutInviteDisplay] = []
     var pendingChallenges: [ATHLTHChallenge] = []
     var outgoingChallenges: [ATHLTHChallenge] = []
 
@@ -1443,11 +1492,13 @@ private struct MessagePersonInboxItem: Identifiable {
 
     var needsResponse: Bool {
         isIncomingMessageRequest ||
+            !pendingWorkoutInvites.isEmpty ||
             !pendingChallenges.isEmpty
     }
 
     var hasGroupLikeActivity:
         Bool {
+        !pendingWorkoutInvites.isEmpty ||
         !pendingChallenges.isEmpty ||
         !outgoingChallenges.isEmpty
     }
@@ -1509,6 +1560,12 @@ private struct MessagePersonInboxItem: Identifiable {
             )
         }
 
+        dates.append(
+            contentsOf:
+                pendingWorkoutInvites.map {
+                    $0.participant.invitedAt
+                }
+        )
         dates.append(
             contentsOf:
                 pendingChallenges.map(
@@ -1826,6 +1883,25 @@ private struct MessagePersonRow: View {
     }
 
     private var previewText: String {
+        if item.pendingWorkoutInvites.count > 1 {
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(item.pendingWorkoutInvites.count) workout invites waiting",
+                norwegian:
+                    "\(item.pendingWorkoutInvites.count) treningsforespørsler venter"
+            )
+        }
+
+        if let workoutInvite =
+                item.pendingWorkoutInvites.first {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Wants to train together · \(workoutInvite.session.title)",
+                norwegian:
+                    "Vil trene sammen · \(workoutInvite.session.title)"
+            )
+        }
+
         if item.pendingChallenges.count > 1 {
             return
                 ATHLTHLocalization
@@ -1907,6 +1983,23 @@ private struct MessagePersonRow: View {
 
     private var statusChips: [String] {
         var values: [String] = []
+
+        if !item
+            .pendingWorkoutInvites
+            .isEmpty {
+            values.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        item.pendingWorkoutInvites.count == 1
+                            ? "Train Together request"
+                            : "\(item.pendingWorkoutInvites.count) Train Together requests",
+                    norwegian:
+                        item.pendingWorkoutInvites.count == 1
+                            ? "Tren sammen-forespørsel"
+                            : "\(item.pendingWorkoutInvites.count) Tren sammen-forespørsler"
+                )
+            )
+        }
 
         if !item
             .pendingChallenges
