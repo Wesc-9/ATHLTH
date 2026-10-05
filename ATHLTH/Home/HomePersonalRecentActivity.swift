@@ -501,7 +501,7 @@ struct HomePersonalRecentActivitySection:
                             horizontalItem(
                                 item
                             )
-                            .frame(width: 190)
+                            .frame(width: 202)
                         }
                     }
                     .padding(
@@ -894,7 +894,10 @@ private struct HomePersonalHorizontalWorkoutCard:
     let phoneWorkout: PhoneWorkout?
 
     var body: some View {
-        VStack(
+        let summary =
+            resolvedStrengthSummary
+
+        return VStack(
             alignment: .leading,
             spacing: 0
         ) {
@@ -904,12 +907,16 @@ private struct HomePersonalHorizontalWorkoutCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: 106
+                height: 124,
+                precomputedStrengthProfile:
+                    workout.activity == .strength
+                        ? summary.profile
+                        : nil
             )
 
             VStack(
                 alignment: .leading,
-                spacing: 5
+                spacing: 6
             ) {
                 HStack(spacing: 4) {
                     Text(
@@ -920,7 +927,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
                     .font(
                         .system(
-                            size: 9,
+                            size: 9.5,
                             weight: .bold
                         )
                     )
@@ -929,7 +936,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
 
                     Text("·")
-                        .font(.system(size: 9))
+                        .font(.system(size: 9.5))
                         .foregroundStyle(
                             ATHLTHTheme.mutedText
                         )
@@ -938,7 +945,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                         workout.startDate,
                         style: .relative
                     )
-                    .font(.system(size: 9))
+                    .font(.system(size: 9.5))
                     .foregroundStyle(
                         ATHLTHTheme.mutedText
                     )
@@ -948,7 +955,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                 Text(workout.title)
                     .font(
                         .system(
-                            size: 13,
+                            size: 15,
                             weight: .bold
                         )
                     )
@@ -957,22 +964,29 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
                     .lineLimit(2)
 
-                Text(detailText)
-                    .font(.system(size: 9.5))
+                Text(
+                    detailText(
+                        summary: summary
+                    )
+                )
+                    .font(.system(size: 10.5))
                     .foregroundStyle(
                         ATHLTHTheme.mutedText
                     )
                     .lineLimit(1)
 
-                if let muscleFocusText {
-                    HStack(spacing: 5) {
+                if let muscleFocusText =
+                        muscleFocusText(
+                            summary: summary
+                        ) {
+                    HStack(spacing: 6) {
                         Image(
                             systemName:
                                 "figure.strengthtraining.traditional"
                         )
                         .font(
                             .system(
-                                size: 8,
+                                size: 9.5,
                                 weight: .semibold
                             )
                         )
@@ -980,25 +994,16 @@ private struct HomePersonalHorizontalWorkoutCard:
                         Text(muscleFocusText)
                             .font(
                                 .system(
-                                    size: 8.5,
+                                    size: 10,
                                     weight: .semibold
                                 )
                             )
                             .lineLimit(1)
                     }
                     .foregroundStyle(
-                        strengthAccent
-                    )
-                    .padding(
-                        .horizontal,
-                        7
+                        ATHLTHTheme.mutedText
                     )
                     .frame(height: 22)
-                    .background(
-                        strengthAccent
-                            .opacity(0.09),
-                        in: Capsule()
-                    )
                 } else if let exerciseNames,
                           !exerciseNames.isEmpty {
                     Text(exerciseNames)
@@ -1014,29 +1019,29 @@ private struct HomePersonalHorizontalWorkoutCard:
                         .lineLimit(1)
                 }
             }
-            .padding(10)
+            .padding(12)
             .frame(
                 maxWidth: .infinity,
                 alignment: .leading
             )
         }
-        .frame(height: 220, alignment: .top)
+        .frame(height: 252, alignment: .top)
         .background(
             Color.white.opacity(0.96),
             in: RoundedRectangle(
-                cornerRadius: 20,
+                cornerRadius: 22,
                 style: .continuous
             )
         )
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 20,
+                cornerRadius: 22,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 20,
+                cornerRadius: 22,
                 style: .continuous
             )
             .stroke(
@@ -1046,7 +1051,7 @@ private struct HomePersonalHorizontalWorkoutCard:
         }
     }
 
-    private var strengthSummary:
+    private var resolvedStrengthSummary:
         StrengthMuscleSessionSummary {
         guard let strengthWorkout else {
             return .empty
@@ -1071,12 +1076,14 @@ private struct HomePersonalHorizontalWorkoutCard:
         )
     }
 
-    private var muscleFocusText:
-        String? {
+    private func muscleFocusText(
+        summary:
+            StrengthMuscleSessionSummary
+    ) -> String? {
         var titles: [String] = []
 
         for activation in
-            strengthSummary
+            summary
                 .profile
                 .topActivations {
             let title =
@@ -1155,11 +1162,14 @@ private struct HomePersonalHorizontalWorkoutCard:
         )
     }
 
-    private var detailText: String {
+    private func detailText(
+        summary:
+            StrengthMuscleSessionSummary
+    ) -> String {
         if workout.activity == .strength {
             let count =
                 max(
-                    strengthSummary
+                    summary
                         .exercises
                         .count,
                     workout
