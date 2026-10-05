@@ -545,13 +545,27 @@ struct GhostFriendRaceHubView: View {
         do {
             realtime.selectLiveGhost(nil)
 
+            let currentUserID =
+                session.profile.userID
+            let opponentUserID =
+                challenge.senderID ==
+                    currentUserID
+                    ? challenge.recipientID
+                    : challenge.senderID
+            let opponent =
+                profileName(
+                    opponentUserID
+                )
+
             try await GhostRaceStartService.start(
                 reference:
                     challenge.reference(),
                 ownerID:
-                    session.profile.userID,
+                    currentUserID,
                 comparisonRouteID:
                     challenge.id,
+                opponentName:
+                    opponent,
                 ghostRace:
                     ghostRace,
                 watchConnection:
