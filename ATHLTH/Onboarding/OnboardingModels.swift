@@ -64,25 +64,108 @@ enum TrainingFocus: String, CaseIterable, Identifiable, Codable, Hashable {
 
     var id: String { rawValue }
 
+    // Profile editing exposes running and strength as two independent choices.
+    // The existing hybrid value remains the persisted/backend representation
+    // when both are selected, so this improvement does not require a schema
+    // migration and older clients keep understanding the value.
+    static var profileSelectionCases: [TrainingFocus] {
+        allCases.filter { $0 != .hybrid }
+    }
+
+    static func profileSelections(
+        from persistedFocus: TrainingFocus?
+    ) -> Set<TrainingFocus> {
+        guard let persistedFocus else {
+            return []
+        }
+
+        if persistedFocus == .hybrid {
+            return [.running, .strength]
+        }
+
+        return [persistedFocus]
+    }
+
+    static func persistedProfileFocus(
+        from selections: Set<TrainingFocus>
+    ) -> TrainingFocus? {
+        if selections.contains(.running) &&
+            selections.contains(.strength) {
+            return .hybrid
+        }
+
+        return profileSelectionCases.first {
+            selections.contains($0)
+        }
+    }
+
     var title: String {
         switch self {
-        case .running: return "Running"
-        case .strength: return "Strength"
-        case .hybrid: return "Hybrid"
-        case .walking: return "Walking"
-        case .generalFitness: return "General Fitness"
-        case .recovery: return "Recovery"
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength training",
+                norwegian: "Styrketrening"
+            )
+        case .hybrid:
+            return ATHLTHLocalization.choose(
+                english: "Running · Strength",
+                norwegian: "Løping · Styrketrening"
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåing"
+            )
+        case .generalFitness:
+            return ATHLTHLocalization.choose(
+                english: "General fitness",
+                norwegian: "Allsidig trening"
+            )
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Recovery",
+                norwegian: "Restitusjon"
+            )
         }
     }
 
     var subtitle: String {
         switch self {
-        case .running: return "Running performance, endurance and structured run training."
-        case .strength: return "Strength, muscle and progressive resistance training."
-        case .hybrid: return "Combine running and strength training."
-        case .walking: return "Walking, daily movement and active lifestyle."
-        case .generalFitness: return "A balanced mix of health, fitness and movement."
-        case .recovery: return "Recovery, sleep and readiness as the main focus."
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running performance, endurance and structured run training.",
+                norwegian: "Løpsprestasjon, utholdenhet og strukturert løpetrening."
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength, muscle and progressive resistance training.",
+                norwegian: "Styrke, muskelutvikling og progressiv styrketrening."
+            )
+        case .hybrid:
+            return ATHLTHLocalization.choose(
+                english: "Running and strength training.",
+                norwegian: "Løping og styrketrening."
+            )
+        case .walking:
+            return ATHLTHLocalization.choose(
+                english: "Walking, daily movement and active lifestyle.",
+                norwegian: "Gåing, hverdagsaktivitet og en aktiv livsstil."
+            )
+        case .generalFitness:
+            return ATHLTHLocalization.choose(
+                english: "A balanced mix of health, fitness and movement.",
+                norwegian: "En balansert kombinasjon av helse, trening og bevegelse."
+            )
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Recovery, sleep and readiness as the main focus.",
+                norwegian: "Restitusjon, søvn og treningsberedskap som hovedfokus."
+            )
         }
     }
 
