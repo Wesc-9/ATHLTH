@@ -11127,8 +11127,9 @@ struct ATHLTHProfileView: View {
                             ]
 
                         NavigationLink {
-                            TrophyDetailView(
-                                trophyID:
+                            TrophyCollectionView(
+                                startInCabinet: true,
+                                replacingTrophyID:
                                     trophy.id
                             )
                         } label: {
