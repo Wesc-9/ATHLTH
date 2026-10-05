@@ -80,7 +80,10 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
-            ATHLTHRecoveryView { tab in
+            ATHLTHRecoveryView(
+                isActive:
+                    selectedTab == 1
+            ) { tab in
                 selectedTab = tab
             }
                 .tabItem {
@@ -6744,6 +6747,7 @@ struct ATHLTHTrainView: View {
 }
 
 struct ATHLTHRecoveryView: View {
+    var isActive: Bool = true
     var onSelectTab: (Int) -> Void = { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
@@ -6999,7 +7003,11 @@ struct ATHLTHRecoveryView: View {
                     force: true
                 )
             }
-            .task {
+            .task(id: isActive) {
+                guard isActive else {
+                    return
+                }
+
                 let performanceID =
                     ATHLTHPerformance.begin(
                         "InsightInitialLoad"
@@ -7021,6 +7029,9 @@ struct ATHLTHRecoveryView: View {
                     .$workoutHistory
                     .dropFirst()
             ) { _ in
+                guard isActive else {
+                    return
+                }
                 Task { @MainActor in
                     await refreshRecoveryDerivedSnapshot()
                 }
@@ -7030,6 +7041,9 @@ struct ATHLTHRecoveryView: View {
                     .$entries
                     .dropFirst()
             ) { _ in
+                guard isActive else {
+                    return
+                }
                 Task { @MainActor in
                     await refreshRecoveryDerivedSnapshot()
                 }
