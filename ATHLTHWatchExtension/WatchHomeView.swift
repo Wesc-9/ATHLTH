@@ -10,6 +10,13 @@ struct WatchHomeView: View {
                 VStack(spacing: 9) {
                     header
 
+                    if let prepared =
+                            routeStore.preparedWorkout {
+                        preparedWorkoutCard(
+                            prepared
+                        )
+                    }
+
                     if let today =
                             routeStore.todayWorkout {
                         todayWorkoutCard(today)
@@ -213,6 +220,254 @@ struct WatchHomeView: View {
         .padding(.horizontal, 3)
         .padding(.top, 3)
         .padding(.bottom, 2)
+    }
+
+    private func preparedWorkoutCard(
+        _ workout:
+            WatchPreparedWorkoutTransfer
+    ) -> some View {
+        let routeReady =
+            workout.routeID == nil ||
+            workout.routeID.flatMap {
+                routeStore.route(with: $0)
+            } != nil
+        let canStart =
+            routeReady &&
+            workoutManager.state !=
+                .preparing
+
+        return Button {
+            startPreparedWorkout(workout)
+        } label: {
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "READY",
+                            norwegian: "KLAR"
+                        ),
+                        systemImage:
+                            "applewatch.radiowaves.left.and.right"
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(1)
+                    .foregroundStyle(
+                        WatchTheme.accent
+                    )
+
+                    Spacer()
+
+                    Text(
+                        routeReady
+                            ? "START"
+                            : ATHLTHLocalization.choose(
+                                english: "SYNCING",
+                                norwegian: "SYNKER"
+                            )
+                    )
+                    .font(
+                        .system(
+                            size: 8,
+                            weight: .black
+                        )
+                    )
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        routeReady
+                            ? WatchTheme.accent
+                            : WatchTheme.muted
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                        .fill(
+                            WatchTheme
+                                .accent
+                                .opacity(0.16)
+                        )
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+
+                        Image(
+                            systemName:
+                                workout
+                                    .kind
+                                    .systemImage
+                        )
+                        .font(
+                            .system(
+                                size: 20,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.accent
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(workout.title)
+                            .font(
+                                .system(
+                                    size: 15,
+                                    weight: .bold
+                                )
+                            )
+                            .lineLimit(1)
+
+                        Text(
+                            routeReady
+                                ? workout.summary
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Receiving route from iPhone…",
+                                    norwegian:
+                                        "Mottar rute fra iPhone…"
+                                )
+                        )
+                        .font(
+                            .system(
+                                size: 9
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme
+                                .textSecondary
+                        )
+                        .lineLimit(2)
+                    }
+
+                    Spacer(
+                        minLength: 2
+                    )
+
+                    Image(
+                        systemName:
+                            routeReady
+                                ? "play.circle.fill"
+                                : "arrow.triangle.2.circlepath"
+                    )
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        routeReady
+                            ? WatchTheme.accent
+                            : WatchTheme.muted
+                    )
+                }
+            }
+            .padding(11)
+            .frame(
+                maxWidth: .infinity
+            )
+            .watchSurface(
+                radius: 19
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canStart)
+        .opacity(
+            canStart
+                ? 1
+                : 0.62
+        )
+    }
+
+    private func startPreparedWorkout(
+        _ workout:
+            WatchPreparedWorkoutTransfer
+    ) {
+        let route =
+            workout.routeID.flatMap {
+                routeStore.route(
+                    with: $0
+                )
+            }
+
+        guard workout.routeID == nil ||
+                route != nil
+        else {
+            return
+        }
+
+        workoutManager
+            .configurePlannedRoute(
+                route
+            )
+        workoutManager
+            .configureAudioCoach(
+                workout.audioCoach ??
+                    .disabled
+            )
+        workoutManager
+            .configureGhostRace(
+                workout.ghostRace
+            )
+
+        if let running =
+                workout.runningWorkout {
+            workoutManager
+                .configureRunningWorkout(
+                    running
+                )
+        } else if workout.kind ==
+                    .running ||
+                    workout.kind ==
+                    .walking {
+            workoutManager
+                .configureRunningWorkout(
+                    WatchRunningWorkoutTransfer(
+                        title:
+                            workout.title,
+                        steps: [],
+                        routeAlerts:
+                            .standard
+                    )
+                )
+        }
+
+        Task {
+            await workoutManager
+                .startPreparedWorkout(
+                    kind:
+                        workout.kind,
+                    route: route,
+                    indoor:
+                        workout.indoor
+                )
+
+            if workoutManager.state !=
+                    .failed &&
+                workoutManager.state !=
+                    .idle {
+                routeStore
+                    .consumePreparedWorkout(
+                        workout.id
+                    )
+            }
+        }
     }
 
     private func todayWorkoutCard(
