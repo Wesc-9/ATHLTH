@@ -302,6 +302,7 @@ struct AppRootView: View {
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
     @State private var lastHomeAssistantLiveWorkoutSyncAt = Date.distantPast
     @State private var lastHomeAssistantStrengthSyncAt = Date.distantPast
+    @State private var lastHomeAssistantSnapshotSyncAt = Date.distantPast
     @State private var homeAssistantSnapshotSyncTask:
         Task<Void, Never>?
     @State private var homeAssistantReportedStrengthSetIDs: Set<String> = []
@@ -716,24 +717,24 @@ struct AppRootView: View {
         lastFullLifecycleRefreshAt = Date()
     }
 
-    private var lifecycleRootContent: some View {
-        
+    private var lifecycleRootContent: AnyView {
+        AnyView(
                 Group {
             if appSession.previewModeEnabled {
-                ProductRootTabView()
+                AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
                 ATHLTHLaunchGateView()
             } else if !appSession.signedIn || !appSession.onboardingCompleted {
                 OnboardingFlowView()
             } else {
-                ProductRootTabView()
+                AnyView(ProductRootTabView())
             }
         }
-        
+        )
     }
 
-    private var lifecycleWorkoutContent: some View {
-        
+    private var lifecycleWorkoutContent: AnyView {
+        AnyView(
             lifecycleRootContent
         .task {
             await runLifecycleStartupTask()
@@ -787,11 +788,11 @@ struct AppRootView: View {
         .onChange(of: spotifyPlayback.connectionState) { _, _ in
             syncSpotifyPlaybackToWatch()
         }
-        
+        )
     }
 
-    private var lifecycleChromeContent: some View {
-        
+    private var lifecycleChromeContent: AnyView {
+        AnyView(
             lifecycleWorkoutContent
         .overlay(alignment: .top) {
             if appSession.signedIn,
@@ -947,11 +948,11 @@ struct AppRootView: View {
             ATHLTHArtworkImage
                 .clearRemoteCache()
         }
-        
+        )
     }
 
-    private var lifecycleSessionContent: some View {
-        
+    private var lifecycleSessionContent: AnyView {
+        AnyView(
             lifecycleChromeContent
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -1049,11 +1050,11 @@ struct AppRootView: View {
                 notification
             )
         }
-        
+        )
     }
 
-    private var lifecycleHealthSyncContent: some View {
-        
+    private var lifecycleHealthSyncContent: AnyView {
+        AnyView(
             lifecycleSessionContent
         .onReceive(phoneWorkout.$active) { workout in
             handlePhoneWorkoutLiveUpdate(
@@ -1112,14 +1113,7 @@ struct AppRootView: View {
             }
             scheduleHomeAssistantSnapshotSync()
         }
-        .onChange(of: health.recovery.score) { _, score in
-            Task {
-                if ATHLTHDeviceRole.isIPhone {
-                    await homeAssistant.sendRecovery(
-                        score: score
-                    )
-                }
-            }
+        .onChange(of: health.recovery.score) { _, _ in
             scheduleHomeAssistantSnapshotSync()
         }
         .onChange(of: health.recovery.state) { _, _ in
@@ -1150,11 +1144,12 @@ struct AppRootView: View {
                     allowed: settings.backgroundHealthSyncEnabled
                 )
             }
-        }        
+        }
+        )
     }
 
-    private var lifecycleCompletionContent: some View {
-        
+    private var lifecycleCompletionContent: AnyView {
+        AnyView(
             lifecycleHealthSyncContent
         .onChange(of: health.personalDetails) { _, details in
             guard let source = appSession.onboardingProfile?.personalDetailsSource,
@@ -1242,11 +1237,12 @@ struct AppRootView: View {
         .onChange(of: strengthWorkout.completedWorkout) { _, workout in
             guard let workout else { return }
             handleStrengthWorkoutCompletion(workout)
-        }        
+        }
+        )
     }
 
-    private var lifecycleSocialContent: some View {
-        
+    private var lifecycleSocialContent: AnyView {
+        AnyView(
             lifecycleCompletionContent
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
@@ -1293,8 +1289,8 @@ struct AppRootView: View {
                 }
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
-                await syncHomeAssistantSnapshot()
             }
+            scheduleHomeAssistantSnapshotSync()
         }
         .onChange(of: appSession.activePlan) { _, plan in
             guard appSession.signedIn else {
@@ -1305,15 +1301,13 @@ struct AppRootView: View {
                 await syncCalendarIfAllowed(
                     plan: plan
                 )
-                await syncHomeAssistantSnapshot()
             }
+            scheduleHomeAssistantSnapshotSync()
         }
         .onChange(
             of: appSession.standalonePlannedSessions.map(\.id)
         ) { _, _ in
-            Task {
-                await syncHomeAssistantSnapshot()
-            }
+            scheduleHomeAssistantSnapshotSync()
         }
         .onChange(of: appSession.profile.presence) { previous, presence in
             guard appSession.signedIn else {
@@ -1384,11 +1378,11 @@ struct AppRootView: View {
                 await syncSocialOwnedData()
             }
         }
-        
+        )
     }
 
-    private var lifecycleAccountContent: some View {
-        
+    private var lifecycleAccountContent: AnyView {
+        AnyView(
             lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
@@ -1504,6 +1498,11 @@ struct AppRootView: View {
         .onChange(of: homeAssistant.shareGoals) { _, _ in
             scheduleHomeAssistantSnapshotSync()
         }
+        .onChange(of: homeAssistant.syncMode) { _, _ in
+            scheduleHomeAssistantSnapshotSync(
+                force: true
+            )
+        }
         .onChange(of: appSession.onboardingCompleted) { _, completed in
             guard completed else { return }
             scheduleNotificationPermissionPrimerIfNeeded()
@@ -1517,7 +1516,7 @@ struct AppRootView: View {
                 AthleteToolsRuntimeObserver()
             }
         }
-        
+        )
     }
 
     private var lifecycleContent: some View {
@@ -2936,7 +2935,10 @@ struct AppRootView: View {
         guard force ||
                 now.timeIntervalSince(
                     lastHomeAssistantLiveWorkoutSyncAt
-                ) >= 5
+                ) >=
+                    homeAssistant
+                        .syncMode
+                        .liveWorkoutInterval
         else {
             return
         }
@@ -3013,7 +3015,10 @@ struct AppRootView: View {
         guard force ||
                 now.timeIntervalSince(
                     lastHomeAssistantStrengthSyncAt
-                ) >= 1
+                ) >=
+                    homeAssistant
+                        .syncMode
+                        .liveStrengthInterval
         else {
             return
         }
@@ -3347,18 +3352,49 @@ struct AppRootView: View {
     }
 
     @MainActor
-    private func scheduleHomeAssistantSnapshotSync() {
+    private func scheduleHomeAssistantSnapshotSync(
+        force: Bool = false
+    ) {
         homeAssistantSnapshotSyncTask?
             .cancel()
 
+        guard homeAssistant.isConnected,
+              appSession.signedIn
+        else {
+            return
+        }
+
+        let mode = homeAssistant.syncMode
+        let elapsed =
+            Date().timeIntervalSince(
+                lastHomeAssistantSnapshotSyncAt
+            )
+        let intervalDelay =
+            force
+                ? 0
+                : max(
+                    mode.routineSnapshotMinimumInterval -
+                        elapsed,
+                    0
+                )
+        let delay =
+            max(
+                mode.coalescingDelay,
+                intervalDelay
+            )
+
         homeAssistantSnapshotSyncTask =
             Task { @MainActor in
-                try? await Task.sleep(
-                    for:
-                        .milliseconds(
-                            250
+                if delay > 0 {
+                    try? await Task.sleep(
+                        for: .milliseconds(
+                            Int(
+                                (delay * 1_000)
+                                    .rounded(.up)
+                            )
                         )
-                )
+                    )
+                }
 
                 guard !Task.isCancelled
                 else {
@@ -3477,6 +3513,9 @@ struct AppRootView: View {
             strengthWorkout.activeWorkout,
             force: true
         )
+
+        lastHomeAssistantSnapshotSyncAt =
+            Date()
     }
 
     private func homeAssistantPlannedOccurrences()
