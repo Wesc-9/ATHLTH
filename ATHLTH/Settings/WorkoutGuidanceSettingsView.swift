@@ -259,6 +259,44 @@ struct ATHLTHRouteGuardianSettingsView: View {
     }
 }
 
+private enum GhostRaceUpdatePreset:
+    String,
+    CaseIterable,
+    Identifiable
+{
+    case quiet
+    case normal
+    case competition
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .quiet:
+            return ATHLTHLocalization.choose(
+                english: "Quiet",
+                norwegian: "Rolig"
+            )
+        case .normal:
+            return ATHLTHLocalization.choose(
+                english: "Normal",
+                norwegian: "Normal"
+            )
+        case .competition:
+            return ATHLTHLocalization.choose(
+                english: "Competition",
+                norwegian: "Konkurranse"
+            )
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english: "Custom",
+                norwegian: "Egendefinert"
+            )
+        }
+    }
+}
+
 struct ATHLTHGhostUpdatesSettingsView: View {
     @EnvironmentObject private var settings:
         AppSettingsStore
@@ -267,21 +305,66 @@ struct ATHLTHGhostUpdatesSettingsView: View {
         Form {
             Section {
                 Toggle(
-                    "Ghost Updates",
+                    ATHLTHLocalization.choose(
+                        english: "Ghost Updates",
+                        norwegian: "Ghost-oppdateringer"
+                    ),
                     isOn:
                         $settings
                             .ghostRaceAudioEnabled
                 )
             } footer: {
                 Text(
-                    "Ghost remains visible even when spoken updates are off. These settings apply to iPhone and Apple Watch."
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Ghost remains visible even when updates are off. These settings apply to iPhone and Apple Watch.",
+                        norwegian:
+                            "Ghost er fortsatt synlig selv om oppdateringer er av. Innstillingene gjelder både iPhone og Apple Watch."
+                    )
                 )
             }
 
             if settings.ghostRaceAudioEnabled {
-                Section("Periodic race status") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Update style",
+                        norwegian: "Oppdateringsstil"
+                    )
+                ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Preset",
+                            norwegian: "Oppsett"
+                        ),
+                        selection: presetBinding
+                    ) {
+                        ForEach(
+                            GhostRaceUpdatePreset
+                                .allCases
+                        ) { preset in
+                            Text(preset.title)
+                                .tag(preset)
+                        }
+                    }
+
+                    Text(presetDescription)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Periodic race status",
+                        norwegian: "Fast løpsstatus"
+                    )
+                ) {
                     Toggle(
-                        "Every distance interval",
+                        ATHLTHLocalization.choose(
+                            english: "Every distance interval",
+                            norwegian: "Etter fast avstand"
+                        ),
                         isOn:
                             $settings
                                 .ghostRaceAudioUseDistance
@@ -290,7 +373,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     if settings
                         .ghostRaceAudioUseDistance {
                         Picker(
-                            "Distance interval",
+                            ATHLTHLocalization.choose(
+                                english: "Distance interval",
+                                norwegian: "Avstandsintervall"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioDistanceIntervalKilometers
@@ -307,7 +393,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     }
 
                     Toggle(
-                        "Every time interval",
+                        ATHLTHLocalization.choose(
+                            english: "Every time interval",
+                            norwegian: "Etter fast tid"
+                        ),
                         isOn:
                             $settings
                                 .ghostRaceAudioUseTime
@@ -316,7 +405,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     if settings
                         .ghostRaceAudioUseTime {
                         Picker(
-                            "Time interval",
+                            ATHLTHLocalization.choose(
+                                english: "Time interval",
+                                norwegian: "Tidsintervall"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioTimeIntervalMinutes
@@ -333,7 +425,28 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     }
 
                     Picker(
-                        "Periodic delivery",
+                        ATHLTHLocalization.choose(
+                            english: "Status includes",
+                            norwegian: "Status inneholder"
+                        ),
+                        selection:
+                            $settings
+                                .ghostRaceStatusDetailMode
+                    ) {
+                        ForEach(
+                            GhostRaceStatusDetailMode
+                                .allCases
+                        ) { mode in
+                            Text(mode.title)
+                                .tag(mode)
+                        }
+                    }
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Periodic delivery",
+                            norwegian: "Levering"
+                        ),
                         selection:
                             $settings
                                 .ghostRaceAudioDelivery
@@ -348,9 +461,74 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     }
                 }
 
-                Section("Lead changes") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Race events",
+                        norwegian: "Løpshendelser"
+                    )
+                ) {
                     Toggle(
-                        "Extra lead-change alerts",
+                        ATHLTHLocalization.choose(
+                            english: "Overtake alerts",
+                            norwegian: "Forbikjøringsvarsler"
+                        ),
+                        isOn:
+                            $settings
+                                .ghostRaceAnnounceOvertakes
+                    )
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Final phase alert",
+                            norwegian: "Sluttfasevarsel"
+                        ),
+                        isOn:
+                            $settings
+                                .ghostRaceFinalPhaseEnabled
+                    )
+
+                    if settings
+                        .ghostRaceFinalPhaseEnabled {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Final phase starts",
+                                norwegian: "Sluttfasen starter"
+                            ),
+                            selection:
+                                $settings
+                                    .ghostRaceFinalPhaseStartMeters
+                        ) {
+                            Text("200 m")
+                                .tag(200.0)
+                            Text("500 m")
+                                .tag(500.0)
+                            Text("1 km")
+                                .tag(1_000.0)
+                        }
+                    }
+
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Live connection alerts",
+                            norwegian: "Live-tilkoblingsvarsler"
+                        ),
+                        isOn:
+                            $settings
+                                .ghostRaceLiveConnectionAlerts
+                    )
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Advanced lead changes",
+                        norwegian: "Avanserte ledelsesendringer"
+                    )
+                ) {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Extra lead-change alerts",
+                            norwegian: "Ekstra ledelsesvarsler"
+                        ),
                         isOn:
                             $settings
                                 .ghostRaceAudioAnnounceLeadChanges
@@ -359,7 +537,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                     if settings
                         .ghostRaceAudioAnnounceLeadChanges {
                         Picker(
-                            "Change threshold",
+                            ATHLTHLocalization.choose(
+                                english: "Change threshold",
+                                norwegian: "Endringsterskel"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioLeadChangeMeters
@@ -375,7 +556,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                         }
 
                         Picker(
-                            "Normal lead change",
+                            ATHLTHLocalization.choose(
+                                english: "Normal lead change",
+                                norwegian: "Normal ledelsesendring"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioLeadChangeDelivery
@@ -390,7 +574,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                         }
 
                         Picker(
-                            "Important change",
+                            ATHLTHLocalization.choose(
+                                english: "Important change",
+                                norwegian: "Viktig endring"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioImportantLeadChangeMeters
@@ -406,7 +593,10 @@ struct ATHLTHGhostUpdatesSettingsView: View {
                         }
 
                         Picker(
-                            "Important delivery",
+                            ATHLTHLocalization.choose(
+                                english: "Important delivery",
+                                norwegian: "Viktig levering"
+                            ),
                             selection:
                                 $settings
                                     .ghostRaceAudioImportantLeadChangeDelivery
@@ -424,15 +614,206 @@ struct ATHLTHGhostUpdatesSettingsView: View {
 
                 Section {
                     Text(
-                        "Distance and time intervals are the normal Ghost cadence. Lead-change alerts are optional extra events between those intervals. Small GPS changes around neck-and-neck are ignored, and extra alerts are rate-limited."
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Distance/time is the normal cadence. Overtakes, final phase and optional lead changes are separate events between those updates. Small GPS movement around neck-and-neck is filtered automatically.",
+                            norwegian:
+                                "Avstand/tid er den normale rytmen. Forbikjøring, sluttfase og valgfrie ledelsesendringer er egne hendelser mellom disse oppdateringene. Små GPS-svingninger rundt helt jevnt filtreres automatisk."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
             }
         }
-        .navigationTitle("Ghost Updates")
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Ghost Updates",
+                norwegian: "Ghost-oppdateringer"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var presetBinding:
+        Binding<GhostRaceUpdatePreset> {
+        Binding(
+            get: { currentPreset },
+            set: { applyPreset($0) }
+        )
+    }
+
+    private var currentPreset:
+        GhostRaceUpdatePreset {
+        let distance =
+            settings
+                .ghostRaceAudioUseDistance
+        let time =
+            settings
+                .ghostRaceAudioUseTime
+        let km =
+            settings
+                .ghostRaceAudioDistanceIntervalKilometers
+        let leads =
+            settings
+                .ghostRaceAudioAnnounceLeadChanges
+        let overtakes =
+            settings
+                .ghostRaceAnnounceOvertakes
+        let finalPhase =
+            settings
+                .ghostRaceFinalPhaseEnabled
+        let finalMeters =
+            settings
+                .ghostRaceFinalPhaseStartMeters
+
+        if distance &&
+            !time &&
+            abs(km - 1.0) < 0.01 &&
+            !leads &&
+            !overtakes &&
+            !finalPhase {
+            return .quiet
+        }
+
+        if distance &&
+            !time &&
+            abs(km - 1.0) < 0.01 &&
+            !leads &&
+            overtakes &&
+            finalPhase &&
+            abs(finalMeters - 500) < 1 {
+            return .normal
+        }
+
+        if distance &&
+            !time &&
+            abs(km - 0.5) < 0.01 &&
+            leads &&
+            overtakes &&
+            finalPhase &&
+            abs(finalMeters - 1_000) < 1 {
+            return .competition
+        }
+
+        return .custom
+    }
+
+    private var presetDescription:
+        String {
+        switch currentPreset {
+        case .quiet:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Only calm periodic status updates.",
+                norwegian:
+                    "Kun rolige, faste statusoppdateringer."
+            )
+        case .normal:
+            return ATHLTHLocalization.choose(
+                english:
+                    "1 km status, overtakes and a 500 m final-phase alert.",
+                norwegian:
+                    "Status hver kilometer, forbikjøringer og sluttfase ved 500 meter."
+            )
+        case .competition:
+            return ATHLTHLocalization.choose(
+                english:
+                    "More active racing: 500 m status, overtakes, final phase and meaningful lead changes.",
+                norwegian:
+                    "Mer aktiv konkurranse: status hver 500 meter, forbikjøringer, sluttfase og tydelige ledelsesendringer."
+            )
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Uses your custom Ghost settings below.",
+                norwegian:
+                    "Bruker dine egendefinerte Ghost-innstillinger under."
+            )
+        }
+    }
+
+    private func applyPreset(
+        _ preset: GhostRaceUpdatePreset
+    ) {
+        guard preset != .custom else {
+            return
+        }
+
+        settings.ghostRaceStatusDetailMode =
+            .both
+        settings.ghostRaceAudioUseDistance =
+            true
+        settings.ghostRaceAudioUseTime =
+            false
+        settings.ghostRaceAudioDelivery =
+            .voice
+        settings.ghostRaceLiveConnectionAlerts =
+            true
+        settings.ghostRaceAudioLeadChangeDelivery =
+            .haptic
+        settings
+            .ghostRaceAudioImportantLeadChangeDelivery =
+            .both
+
+        switch preset {
+        case .quiet:
+            settings
+                .ghostRaceAudioDistanceIntervalKilometers =
+                1.0
+            settings
+                .ghostRaceAnnounceOvertakes =
+                false
+            settings
+                .ghostRaceFinalPhaseEnabled =
+                false
+            settings
+                .ghostRaceAudioAnnounceLeadChanges =
+                false
+
+        case .normal:
+            settings
+                .ghostRaceAudioDistanceIntervalKilometers =
+                1.0
+            settings
+                .ghostRaceAnnounceOvertakes =
+                true
+            settings
+                .ghostRaceFinalPhaseEnabled =
+                true
+            settings
+                .ghostRaceFinalPhaseStartMeters =
+                500
+            settings
+                .ghostRaceAudioAnnounceLeadChanges =
+                false
+
+        case .competition:
+            settings
+                .ghostRaceAudioDistanceIntervalKilometers =
+                0.5
+            settings
+                .ghostRaceAnnounceOvertakes =
+                true
+            settings
+                .ghostRaceFinalPhaseEnabled =
+                true
+            settings
+                .ghostRaceFinalPhaseStartMeters =
+                1_000
+            settings
+                .ghostRaceAudioAnnounceLeadChanges =
+                true
+            settings
+                .ghostRaceAudioLeadChangeMeters =
+                50
+            settings
+                .ghostRaceAudioImportantLeadChangeMeters =
+                100
+
+        case .custom:
+            break
+        }
     }
 }
 
