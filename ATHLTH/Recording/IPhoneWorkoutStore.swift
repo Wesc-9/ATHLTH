@@ -129,6 +129,7 @@ struct PhoneWorkout: Codable, Identifiable {
         WatchRouteAlertConfiguration? = nil
     var ghostAudioConfiguration:
         WatchGhostRaceAudioConfiguration? = nil
+    var ghostOpponentName: String? = nil
     var ghostRaceTitle: String? = nil
     var ghostDistanceDeltaMeters: Double? = nil
     var ghostTimeDeltaSeconds: TimeInterval? = nil
@@ -322,6 +323,8 @@ final class IPhoneWorkoutStore:
                     active
                         .ghostAudioConfiguration
             )
+            ghostOpponentName =
+                active.ghostOpponentName
             guidancePriorityGate.reset()
         }
 
@@ -1575,6 +1578,10 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        ghostOpponentName =
+            workout.ghostOpponentName ??
+            ghostOpponentName
+
         if let configuration {
             workout.ghostAudioConfiguration =
                 configuration
@@ -1629,6 +1636,8 @@ final class IPhoneWorkoutStore:
             ).isEmpty
                 ? nil
                 : title
+        workout.ghostOpponentName =
+            ghostOpponentName
 
         workout.ghostRaceTitle = title
         workout.ghostDistanceDeltaMeters =
@@ -1664,6 +1673,19 @@ final class IPhoneWorkoutStore:
             trimmed?.isEmpty == false
                 ? trimmed
                 : nil
+
+        if var workout = active {
+            workout.ghostOpponentName =
+                ghostOpponentName
+            if ghostOpponentName != nil {
+                workout.ghostRaceTitle =
+                    ghostOpponentName
+            }
+            active = workout
+            persistActiveCheckpoint(
+                force: true
+            )
+        }
     }
 
     func applyLiveGhostConnectionState(
