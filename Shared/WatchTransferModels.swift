@@ -1087,6 +1087,40 @@ struct WatchGhostRaceTimingPoint: Codable, Hashable {
     var cumulativeMeters: Double
 }
 
+enum GhostRaceStatusDetailMode:
+    String,
+    Codable,
+    CaseIterable,
+    Hashable,
+    Identifiable
+{
+    case distance
+    case time
+    case both
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .distance:
+            return ATHLTHLocalization.choose(
+                english: "Distance",
+                norwegian: "Avstand"
+            )
+        case .time:
+            return ATHLTHLocalization.choose(
+                english: "Time",
+                norwegian: "Tid"
+            )
+        case .both:
+            return ATHLTHLocalization.choose(
+                english: "Distance + time",
+                norwegian: "Avstand + tid"
+            )
+        }
+    }
+}
+
 struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
     var enabled: Bool
     var distanceIntervalMeters: Double?
@@ -1101,6 +1135,41 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
     var leadChangeDelivery: WatchAlertDelivery? = nil
     var importantLeadChangeDelivery: WatchAlertDelivery? = nil
     var importantLeadChangeMeters: Double? = nil
+
+    // Optional additions keep queued/persisted payloads from older builds
+    // decodable across iPhone and Apple Watch.
+    var statusDetailMode: GhostRaceStatusDetailMode? = nil
+    var announceOvertakes: Bool? = nil
+    var finalPhaseEnabled: Bool? = nil
+    var finalPhaseStartMeters: Double? = nil
+    var liveConnectionAlerts: Bool? = nil
+
+    var resolvedStatusDetailMode:
+        GhostRaceStatusDetailMode {
+        statusDetailMode ?? .both
+    }
+
+    var shouldAnnounceOvertakes: Bool {
+        announceOvertakes ?? false
+    }
+
+    var shouldAnnounceFinalPhase: Bool {
+        finalPhaseEnabled ?? false
+    }
+
+    var resolvedFinalPhaseStartMeters: Double {
+        min(
+            max(
+                finalPhaseStartMeters ?? 500,
+                200
+            ),
+            1_000
+        )
+    }
+
+    var shouldAnnounceLiveConnectionChanges: Bool {
+        liveConnectionAlerts ?? false
+    }
 
     var resolvedPeriodicDelivery:
         WatchAlertDelivery {
@@ -1163,7 +1232,12 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         periodicDelivery: .haptic,
         leadChangeDelivery: .haptic,
         importantLeadChangeDelivery: .haptic,
-        importantLeadChangeMeters: 50
+        importantLeadChangeMeters: 50,
+        statusDetailMode: .both,
+        announceOvertakes: false,
+        finalPhaseEnabled: false,
+        finalPhaseStartMeters: 500,
+        liveConnectionAlerts: false
     )
 
     static let standard = WatchGhostRaceAudioConfiguration(
@@ -1176,7 +1250,12 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         periodicDelivery: .voice,
         leadChangeDelivery: .haptic,
         importantLeadChangeDelivery: .both,
-        importantLeadChangeMeters: 50
+        importantLeadChangeMeters: 50,
+        statusDetailMode: .both,
+        announceOvertakes: true,
+        finalPhaseEnabled: true,
+        finalPhaseStartMeters: 500,
+        liveConnectionAlerts: true
     )
 }
 
