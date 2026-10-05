@@ -3197,6 +3197,10 @@ struct DirectMessageThreadView: View {
             .hidden,
             for: .navigationBar
         )
+        .toolbar(
+            .hidden,
+            for: .tabBar
+        )
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
