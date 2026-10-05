@@ -2565,6 +2565,7 @@ struct PerformanceStatsView: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
+                    .scaleEffect(1.10)
                     .frame(
                         maxWidth: .infinity
                     )
@@ -2852,10 +2853,11 @@ struct PerformanceStatsView: View {
             ZStack(
                 alignment: .bottomLeading
             ) {
-                Image("GoalStrength")
+                Image("StrengthPostWorkoutHero")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
+                    .scaleEffect(1.08)
                     .frame(
                         maxWidth: .infinity
                     )
@@ -8896,6 +8898,7 @@ struct ProfileRecordShowcasePickerView:
                 Image("GoalProgress")
                     .resizable()
                     .scaledToFill()
+                    .scaleEffect(1.10)
                     .frame(
                         width:
                             proxy.size
