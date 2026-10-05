@@ -542,157 +542,338 @@ struct RecoverySuggestedTodayCard: View {
 
 struct RecoveryCoachView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session:
+        AppSessionStore
 
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
 
     @State private var question = ""
-    @State private var answer: String?
+    @State private var messages:
+        [RecoveryCoachMessage] = []
+    @State private var quickQuestions:
+        [String] = []
     @State private var isAsking = false
     @State private var errorMessage: String?
+    @State private var didLoadConversation =
+        false
 
     private let service = RecoveryAIService()
+    private let bottomAnchorID =
+        "athlth-recovery-coach-bottom"
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ATHLTHCard {
-                        Label(
-                            "ATHLTH Coach",
-                            systemImage: "sparkles"
-                        )
-                        .font(.title3.weight(.bold))
-
-                        Text(insight.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 6)
-                    }
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text(recoveryAIText("Try asking", "Prøv å spørre"))
-                            .font(.headline)
-
-                        ForEach(
-                            insight.quickQuestions.prefix(3),
-                            id: \.self
-                        ) { suggestion in
-                            Button {
-                                question = suggestion
-                                Task {
-                                    await ask(suggestion)
-                                }
-                            } label: {
-                                HStack {
-                                    Text(suggestion)
-                                        .font(.subheadline)
-                                        .foregroundStyle(
-                                            ATHLTHTheme.primaryText
-                                        )
-
-                                    Spacer()
-
-                                    Image(systemName: "arrow.up.right")
-                                        .font(.caption.bold())
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(12)
-                                .background(
-                                    Color.primary.opacity(0.035),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 14,
-                                        style: .continuous
-                                    )
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    if isAsking {
-                        HStack {
-                            Spacer()
-                            ProgressView(recoveryAIText("ATHLTH is thinking…", "ATHLTH tenker…"))
-                            Spacer()
-                        }
-                        .padding(.vertical, 20)
-                    }
-
-                    if let answer {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(
+                        alignment: .leading,
+                        spacing: 14
+                    ) {
                         ATHLTHCard {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                    .foregroundStyle(.indigo)
-                                Text("ATHLTH")
-                                    .font(.caption.weight(.bold))
-                                    .tracking(1.2)
-                            }
+                            Label(
+                                "ATHLTH Coach",
+                                systemImage: "sparkles"
+                            )
+                            .font(
+                                .title3
+                                    .weight(.bold)
+                            )
 
-                            Text(answer)
+                            Text(insight.summary)
                                 .font(.subheadline)
                                 .foregroundStyle(
-                                    ATHLTHTheme.primaryText
+                                    .secondary
                                 )
-                                .lineSpacing(3)
-                                .fixedSize(
-                                    horizontal: false,
-                                    vertical: true
-                                )
-                                .padding(.top, 7)
+                                .padding(.top, 6)
                         }
-                    }
 
-                    if let errorMessage {
-                        Text(errorMessage)
+                        if messages.isEmpty {
+                            Text(
+                                recoveryAIText(
+                                    "Ask a question to start a conversation. Coach remembers the conversation on this device.",
+                                    "Still et spørsmål for å starte en samtale. Coach husker samtalen på denne enheten."
+                                )
+                            )
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                        } else {
+                            ForEach(messages) {
+                                message in
+                                coachMessageBubble(
+                                    message
+                                )
+                            }
+                        }
+
+                        if isAsking {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(
+                                        .small
+                                    )
+
+                                Text(
+                                    recoveryAIText(
+                                        "ATHLTH is thinking…",
+                                        "ATHLTH tenker…"
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                            .padding(
+                                .horizontal,
+                                12
+                            )
+                            .padding(
+                                .vertical,
+                                10
+                            )
+                            .background(
+                                Color.primary
+                                    .opacity(0.035),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            16,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .red
+                                )
+                                .padding(
+                                    .horizontal,
+                                    4
+                                )
+                        }
+
+                        Color.clear
+                            .frame(height: 1)
+                            .id(bottomAnchorID)
+                    }
+                    .padding()
+                }
+                .onChange(
+                    of: messages.count
+                ) { _, _ in
+                    withAnimation(
+                        .easeOut(
+                            duration: 0.20
+                        )
+                    ) {
+                        proxy.scrollTo(
+                            bottomAnchorID,
+                            anchor: .bottom
+                        )
                     }
                 }
-                .padding()
+                .onChange(
+                    of: isAsking
+                ) { _, asking in
+                    guard asking else {
+                        return
+                    }
+
+                    withAnimation(
+                        .easeOut(
+                            duration: 0.20
+                        )
+                    ) {
+                        proxy.scrollTo(
+                            bottomAnchorID,
+                            anchor: .bottom
+                        )
+                    }
+                }
+                .task {
+                    loadConversationIfNeeded()
+
+                    await MainActor.run {
+                        proxy.scrollTo(
+                            bottomAnchorID,
+                            anchor: .bottom
+                        )
+                    }
+                }
             }
             .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 9) {
-                    TextField(
-                        recoveryAIText("Ask about today's recovery…", "Spør om dagens restitusjon…"),
-                        text: $question,
-                        axis: .vertical
-                    )
-                    .lineLimit(1...4)
-                    .textFieldStyle(.roundedBorder)
+                VStack(spacing: 8) {
+                    if !quickQuestions.isEmpty {
+                        ScrollView(
+                            .horizontal,
+                            showsIndicators: false
+                        ) {
+                            HStack(spacing: 8) {
+                                ForEach(
+                                    quickQuestions,
+                                    id: \.self
+                                ) {
+                                    suggestion in
+                                    Button {
+                                        Task {
+                                            await ask(
+                                                suggestion
+                                            )
+                                        }
+                                    } label: {
+                                        HStack(
+                                            spacing: 6
+                                        ) {
+                                            Image(
+                                                systemName:
+                                                    "sparkles"
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 11,
+                                                    weight:
+                                                        .semibold
+                                                )
+                                            )
 
-                    Button {
-                        Task {
-                            await ask(question)
+                                            Text(
+                                                suggestion
+                                            )
+                                            .font(
+                                                .caption
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+                                            .lineLimit(1)
+                                        }
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                        .padding(
+                                            .horizontal,
+                                            12
+                                        )
+                                        .frame(
+                                            height: 36
+                                        )
+                                        .background(
+                                            Color.primary
+                                                .opacity(
+                                                    0.045
+                                                ),
+                                            in:
+                                                Capsule()
+                                        )
+                                    }
+                                    .buttonStyle(
+                                        .plain
+                                    )
+                                    .disabled(
+                                        isAsking
+                                    )
+                                }
+                            }
+                            .padding(
+                                .horizontal
+                            )
                         }
-                    } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 38, height: 38)
+                    }
+
+                    HStack(spacing: 9) {
+                        TextField(
+                            recoveryAIText(
+                                "Ask ATHLTH Coach…",
+                                "Spør ATHLTH Coach…"
+                            ),
+                            text: $question,
+                            axis: .vertical
+                        )
+                        .lineLimit(1...4)
+                        .textFieldStyle(
+                            .roundedBorder
+                        )
+                        .submitLabel(.send)
+                        .onSubmit {
+                            Task {
+                                await ask(
+                                    question
+                                )
+                            }
+                        }
+
+                        Button {
+                            Task {
+                                await ask(
+                                    question
+                                )
+                            }
+                        } label: {
+                            Image(
+                                systemName:
+                                    "arrow.up"
+                            )
+                            .font(
+                                .system(
+                                    size: 15,
+                                    weight: .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .frame(
+                                width: 38,
+                                height: 38
+                            )
                             .background(
-                                ATHLTHTheme.accentDeep,
+                                ATHLTHTheme
+                                    .accentDeep,
                                 in: Circle()
                             )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            question
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                                .isEmpty ||
+                            isAsking
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .disabled(
-                        question
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            )
-                            .isEmpty || isAsking
-                    )
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .background(.ultraThinMaterial)
+                .padding(.vertical, 9)
+                .background(
+                    .ultraThinMaterial
+                )
             }
-            .navigationTitle("ATHLTH Coach")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(
+                "ATHLTH Coach"
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(recoveryAIText("Done", "Ferdig")) {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        recoveryAIText(
+                            "Done",
+                            "Ferdig"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
@@ -700,32 +881,372 @@ struct RecoveryCoachView: View {
         }
     }
 
+    @ViewBuilder
+    private func coachMessageBubble(
+        _ message: RecoveryCoachMessage
+    ) -> some View {
+        HStack(alignment: .bottom) {
+            if message.role == .user {
+                Spacer(minLength: 54)
+            }
+
+            if message.role == .assistant {
+                Image(
+                    systemName: "sparkles"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(.indigo)
+                .frame(
+                    width: 28,
+                    height: 28
+                )
+                .background(
+                    Color.indigo
+                        .opacity(0.08),
+                    in: Circle()
+                )
+            }
+
+            Text(message.text)
+                .font(.subheadline)
+                .foregroundStyle(
+                    message.role == .user
+                        ? Color.white
+                        : ATHLTHTheme
+                            .primaryText
+                )
+                .lineSpacing(3)
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+                .padding(
+                    .horizontal,
+                    13
+                )
+                .padding(
+                    .vertical,
+                    10
+                )
+                .background(
+                    message.role == .user
+                        ? AnyShapeStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        : AnyShapeStyle(
+                            Color.primary
+                                .opacity(
+                                    0.045
+                                )
+                        ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                )
+
+            if message.role ==
+                .assistant {
+                Spacer(minLength: 54)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @MainActor
+    private func loadConversationIfNeeded() {
+        guard !didLoadConversation else {
+            return
+        }
+        didLoadConversation = true
+
+        let currentSignature =
+            try? RecoveryAIService
+                .cacheSignature(
+                    for: context
+                )
+
+        if let saved =
+                RecoveryCoachConversationPersistence
+                    .load(
+                        userID:
+                            session
+                                .profile
+                                .userID
+                    ) {
+            messages =
+                saved.messages
+
+            if saved.contextSignature ==
+                currentSignature,
+               !saved.quickQuestions.isEmpty {
+                quickQuestions =
+                    normalizedQuestions(
+                        saved
+                            .quickQuestions
+                    )
+            } else {
+                quickQuestions =
+                    contextAwareQuestions()
+                persistConversation(
+                    contextSignature:
+                        currentSignature
+                )
+            }
+        } else {
+            quickQuestions =
+                contextAwareQuestions()
+            persistConversation(
+                contextSignature:
+                    currentSignature
+            )
+        }
+    }
+
     @MainActor
     private func ask(
         _ rawQuestion: String
     ) async {
-        let clean = rawQuestion
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        let clean =
+            rawQuestion
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
 
-        guard !clean.isEmpty else {
+        guard !clean.isEmpty,
+              !isAsking
+        else {
             return
         }
 
-        question = clean
+        let priorHistory =
+            messages
+        messages.append(
+            RecoveryCoachMessage(
+                role: .user,
+                text: clean
+            )
+        )
+
+        question = ""
         isAsking = true
-        answer = nil
         errorMessage = nil
-        defer { isAsking = false }
+        persistConversation()
+        defer {
+            isAsking = false
+        }
 
         do {
-            answer = try await service.ask(
-                clean,
-                context: context
+            let reply =
+                try await service.ask(
+                    clean,
+                    context: context,
+                    history:
+                        priorHistory
+                )
+
+            messages.append(
+                RecoveryCoachMessage(
+                    role: .assistant,
+                    text:
+                        reply.answer
+                )
             )
+
+            let nextQuestions =
+                normalizedQuestions(
+                    reply
+                        .quickQuestions
+                )
+
+            quickQuestions =
+                nextQuestions.isEmpty
+                    ? contextAwareQuestions()
+                    : nextQuestions
+
+            persistConversation()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
+            quickQuestions =
+                contextAwareQuestions()
+            persistConversation()
         }
+    }
+
+    private func normalizedQuestions(
+        _ questions: [String]
+    ) -> [String] {
+        let asked =
+            Set(
+                messages
+                    .filter {
+                        $0.role == .user
+                    }
+                    .suffix(12)
+                    .map {
+                        $0.text
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .lowercased()
+                    }
+            )
+
+        var seen = Set<String>()
+        var result: [String] = []
+
+        for question in questions {
+            let clean =
+                question
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+            let key =
+                clean.lowercased()
+
+            guard !clean.isEmpty,
+                  !asked.contains(key),
+                  seen.insert(key)
+                    .inserted
+            else {
+                continue
+            }
+
+            result.append(clean)
+
+            if result.count == 3 {
+                break
+            }
+        }
+
+        return result
+    }
+
+    private func contextAwareQuestions()
+        -> [String] {
+        var candidates =
+            insight.quickQuestions
+
+        if let sleep =
+                context.sleepSeconds,
+           let baseline =
+                context
+                    .baselineSleepSeconds,
+           baseline > 0,
+           sleep <
+                baseline * 0.90 {
+            candidates.insert(
+                recoveryAIText(
+                    "How should shorter sleep affect today's training?",
+                    "Hvordan bør kortere søvn påvirke treningen i dag?"
+                ),
+                at: 0
+            )
+        }
+
+        if let baseline =
+                context
+                    .chronicWeeklyAverageMinutes,
+           baseline > 0,
+           context
+                .acuteTrainingMinutes >
+                baseline * 1.30 {
+            candidates.insert(
+                recoveryAIText(
+                    "Is my recent training load too high?",
+                    "Er treningsbelastningen min for høy nå?"
+                ),
+                at: 0
+            )
+        }
+
+        if let leastRecovered =
+                context.muscles
+                    .min(
+                        by: {
+                            $0.recoveryPercent <
+                            $1.recoveryPercent
+                        }
+                    ),
+           leastRecovered
+                .recoveryPercent < 70 {
+            candidates.insert(
+                recoveryAIText(
+                    "How should I train around my least recovered muscles?",
+                    "Hvordan bør jeg trene med de minst restituerte musklene?"
+                ),
+                at: 0
+            )
+        }
+
+        if let stress =
+                context.checkIn.stress,
+           stress >= 4 {
+            candidates.insert(
+                recoveryAIText(
+                    "Should high stress change today's workout?",
+                    "Bør høyt stress endre dagens økt?"
+                ),
+                at: 0
+            )
+        }
+
+        candidates.append(
+            recoveryAIText(
+                "What should I prioritize for better recovery tonight?",
+                "Hva bør jeg prioritere for bedre restitusjon i kveld?"
+            )
+        )
+        candidates.append(
+            recoveryAIText(
+                "What is the most important signal in my data right now?",
+                "Hva er det viktigste signalet i dataene mine akkurat nå?"
+            )
+        )
+
+        return normalizedQuestions(
+            candidates
+        )
+    }
+
+    @MainActor
+    private func persistConversation(
+        contextSignature:
+            String? = nil
+    ) {
+        let signature =
+            contextSignature ??
+            (
+                try? RecoveryAIService
+                    .cacheSignature(
+                        for: context
+                    )
+            )
+
+        RecoveryCoachConversationPersistence
+            .save(
+                RecoveryCoachConversationState(
+                    messages: messages,
+                    quickQuestions:
+                        quickQuestions,
+                    contextSignature:
+                        signature
+                ),
+                userID:
+                    session.profile
+                        .userID
+            )
     }
 }
