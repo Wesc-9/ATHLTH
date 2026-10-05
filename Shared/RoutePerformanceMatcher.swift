@@ -290,10 +290,14 @@ enum RoutePerformanceMatcher {
         }
 
         if let last = locations.last,
-           samples.last?.distance(
-                from: last
-           ) ?? .greatestFiniteMagnitude >
-                1 {
+           (
+                samples.last?
+                    .distance(
+                        from: last
+                    ) ??
+                Double
+                    .greatestFiniteMagnitude
+           ) > 1 {
             samples.append(last)
         }
 
