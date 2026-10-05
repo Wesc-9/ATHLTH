@@ -134,7 +134,7 @@ struct MessageInboxView: View {
                             )
                     )
 
-                    LazyVStack(spacing: 10) {
+                    LazyVStack(spacing: 12) {
                         if shouldShowCoachConversation &&
                             coachPinned {
                             coachInboxLink
@@ -4327,15 +4327,43 @@ struct DirectMessageThreadView: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 38, height: 38)
-                            .background(ATHLTHTheme.vitalitySoft, in: Circle())
+                            .frame(width: 44, height: 44)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .background(
+                                Color.white
+                                    .opacity(0.86),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        ATHLTHTheme
+                                            .border,
+                                        lineWidth: 0.8
+                                    )
+                            }
                     }
                     .buttonStyle(.plain)
                     .disabled(conversationID == nil)
                 }
 
                 TextField(
-                    isOutgoingRequest ? "Write one message request" : "Message",
+                    isOutgoingRequest
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Write one message request",
+                            norwegian:
+                                "Skriv én meldingsforespørsel"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Write a message…",
+                            norwegian:
+                                "Skriv en melding …"
+                        ),
                     text: $text,
                     axis: .vertical
                 )
@@ -4346,25 +4374,42 @@ struct DirectMessageThreadView: View {
                             await send()
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .padding(
+                        .horizontal,
+                        15
+                    )
+                    .padding(
+                        .vertical,
+                        11
+                    )
                     .background(
-                        Color.white.opacity(0.84),
-                        in: RoundedRectangle(
-                            cornerRadius: 18,
-                            style: .continuous
-                        )
+                        Color.white
+                            .opacity(0.93),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 20,
+                                style: .continuous
+                            )
                     )
                     .overlay {
                         RoundedRectangle(
-                            cornerRadius: 18,
+                            cornerRadius: 20,
                             style: .continuous
                         )
                         .stroke(
-                            ATHLTHTheme.border,
+                            Color.white
+                                .opacity(0.92),
                             lineWidth: 0.8
                         )
                     }
+                    .shadow(
+                        color:
+                            ATHLTHTheme
+                                .accentDeep
+                                .opacity(0.035),
+                        radius: 8,
+                        y: 3
+                    )
 
                 Button {
                     Task { await send() }
@@ -4372,27 +4417,40 @@ struct DirectMessageThreadView: View {
                     if isSending {
                         ProgressView()
                             .tint(.white)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 44, height: 44)
                     }
                 }
-                .background(ATHLTHTheme.vitality, in: Circle())
+                .background(
+                    ATHLTHTheme.vitality,
+                    in: Circle()
+                )
                 .buttonStyle(.plain)
                 .disabled(!canSend || isSending)
                 .opacity(canSend ? 1 : 0.45)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(
+                .horizontal,
+                14
+            )
+            .padding(
+                .bottom,
+                9
+            )
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .background(
-            .ultraThinMaterial
+        .padding(
+            .top,
+            9
         )
+        .padding(
+            .bottom,
+            4
+        )
+        .athlthConversationComposerChrome()
     }
 
     private var mentionSuggestions: [ATHLTHMentionSuggestion] {
@@ -5514,15 +5572,76 @@ private struct MessageBubble: View {
                     }
                 }
 
-                if let body = message.body, !body.isEmpty {
+                if let body = message.body,
+                   !body.isEmpty {
                     Text(body)
                         .font(.body)
-                        .foregroundStyle(isMine ? Color.white : ATHLTHTheme.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .foregroundStyle(
+                            isMine
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .primaryText
+                        )
+                        .lineSpacing(2)
+                        .padding(
+                            .horizontal,
+                            15
+                        )
+                        .padding(
+                            .vertical,
+                            11
+                        )
                         .background(
-                            isMine ? ATHLTHTheme.vitality : Color.white,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            isMine
+                                ? AnyShapeStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme
+                                                .vitality,
+                                            ATHLTHTheme
+                                                .accent
+                                                .opacity(0.92)
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
+                                    )
+                                )
+                                : AnyShapeStyle(
+                                    Color.white
+                                        .opacity(0.96)
+                                ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 20,
+                                    style: .continuous
+                                )
+                        )
+                        .overlay {
+                            if !isMine {
+                                RoundedRectangle(
+                                    cornerRadius: 20,
+                                    style: .continuous
+                                )
+                                .stroke(
+                                    Color.white
+                                        .opacity(0.92),
+                                    lineWidth: 0.8
+                                )
+                            }
+                        }
+                        .shadow(
+                            color:
+                                isMine
+                                    ? ATHLTHTheme
+                                        .vitality
+                                        .opacity(0.08)
+                                    : ATHLTHTheme
+                                        .accentDeep
+                                        .opacity(0.04),
+                            radius: 8,
+                            y: 3
                         )
                 }
 
