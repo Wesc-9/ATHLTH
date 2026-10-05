@@ -1033,23 +1033,6 @@ struct RunQuickStartSheet: View {
     @State private var spotifyAutoplay = false
     @State private var showingSpotifyPicker = false
 
-    private var canStart: Bool {
-        if captureDevice == .appleWatch,
-           !watchConnected,
-           !ATHLTHDeviceRole.isIPad {
-            return false
-        }
-
-        switch mode {
-        case .free:
-            return true
-        case .route:
-            return selectedRoute != nil
-        case .structured:
-            return selectedWorkout != nil
-        }
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -2031,37 +2014,42 @@ struct RunQuickStartSheet: View {
                 captureDevice: .iPhone
             ))
 
-            Button {
-                submitQuickRun(
-                    captureDevice: .appleWatch
+            HStack {
+                Spacer(minLength: 24)
+
+                Button {
+                    submitQuickRun(
+                        captureDevice: .appleWatch
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Send to Apple Watch",
+                            norwegian: "Send til Apple Watch"
+                        ),
+                        systemImage: "applewatch"
+                    )
+                    .font(
+                        .footnote
+                            .weight(.semibold)
+                    )
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(ATHLTHTheme.accentDeep)
+                .disabled(
+                    !canSubmitQuickRun(
+                        captureDevice: .appleWatch
+                    )
                 )
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Send to Apple Watch",
-                        norwegian: "Send til Apple Watch"
-                    ),
-                    systemImage: "applewatch"
+                .opacity(
+                    watchConnected
+                        ? 1
+                        : 0.55
                 )
-                .font(
-                    .subheadline
-                        .weight(.semibold)
-                )
-                .frame(maxWidth: .infinity)
+
+                Spacer(minLength: 24)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(ATHLTHTheme.accentDeep)
-            .disabled(
-                !canSubmitQuickRun(
-                    captureDevice: .appleWatch
-                )
-            )
-            .opacity(
-                watchConnected
-                    ? 1
-                    : 0.55
-            )
         }
     }
 
