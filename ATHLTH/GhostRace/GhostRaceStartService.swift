@@ -244,10 +244,12 @@ enum GhostRaceStartService {
                             }
                     )
 
-                if settings.ghostRaceAudioEnabled {
-                    coach.distanceIntervalMeters = nil
-                    coach.timeIntervalSeconds = nil
-                }
+                let ghostAudio =
+                    coexistingGhostAudio(
+                        settings
+                            .ghostRaceAudioConfiguration,
+                        audioCoach: coach
+                    )
 
                 phoneWorkout.start(
                     walking: false,
@@ -259,8 +261,7 @@ enum GhostRaceStartService {
                         settings
                             .routeAlertConfiguration,
                     ghostUpdates:
-                        settings
-                            .ghostRaceAudioConfiguration
+                        ghostAudio
                 )
                 return
             }
@@ -280,12 +281,7 @@ enum GhostRaceStartService {
                     )
             }
 
-            try await watchConnection
-                .startWorkoutOnWatch(
-                    .running
-                )
-
-            var liveCoach =
+            let liveCoach =
                 settings.audioCoachConfiguration(
                     enabled:
                         settings
@@ -299,32 +295,88 @@ enum GhostRaceStartService {
                             )
                         }
                 )
-            if settings.ghostRaceAudioEnabled {
-                liveCoach.distanceIntervalMeters = nil
-                liveCoach.timeIntervalSeconds = nil
-            }
 
+            let runningTransfer =
+                WatchRunningWorkoutTransfer(
+                    title:
+                        "Live Ghost · \(title)",
+                    steps: [],
+                    routeAlerts:
+                        settings
+                            .routeAlertConfiguration
+                )
+
+            // Send ATHLTH guidance before HealthKit starts the Watch session.
+            // This removes the launch race where the first kilometre could
+            // begin with the Watch still holding an older/disabled coach config.
             watchConnection
                 .sendAudioCoachConfiguration(
                     liveCoach
                 )
-
             watchConnection
                 .sendRunningWorkout(
-                    WatchRunningWorkoutTransfer(
-                        title:
-                            "Live Ghost · \(title)",
-                        steps: [],
-                        routeAlerts:
-                            settings
-                                .routeAlertConfiguration
-                    )
+                    runningTransfer
+                )
+
+            try await watchConnection
+                .startWorkoutOnWatch(
+                    .running
+                )
+
+            // Re-send after launch as a durable fallback while WCSession
+            // reachability is settling.
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    liveCoach
+                )
+            watchConnection
+                .sendRunningWorkout(
+                    runningTransfer
                 )
         } catch {
             watchConnection
                 .sendWorkoutRouteSelection(nil)
             throw error
         }
+    }
+
+    static func coexistingGhostAudio(
+        _ ghostAudio:
+            WatchGhostRaceAudioConfiguration?,
+        audioCoach:
+            WatchAudioCoachConfiguration
+    ) -> WatchGhostRaceAudioConfiguration? {
+        guard var ghostAudio
+        else {
+            return nil
+        }
+
+        let coachHasPeriodicCue =
+            audioCoach.enabled &&
+            (
+                (audioCoach
+                    .distanceIntervalMeters ??
+                    0) > 0 ||
+                (audioCoach
+                    .timeIntervalSeconds ??
+                    0) > 0
+            )
+
+        if coachHasPeriodicCue,
+           ghostAudio.enabled,
+           ghostAudio
+            .resolvedPeriodicDelivery
+            .usesVoice {
+            // If both fire on the same kilometre the higher-priority Ghost
+            // cue wins and the user's ordinary Audio Coach metric cue gets
+            // dropped by the guidance priority gate. Keep Ghost's periodic
+            // awareness as a haptic, while lead changes and important race
+            // events keep their configured voice/haptic delivery.
+            ghostAudio.periodicDelivery =
+                .haptic
+        }
+
+        return ghostAudio
     }
 
     static func preparedTransfer(
@@ -417,7 +469,7 @@ enum GhostRaceStartService {
         }
 
         do {
-            var standardAudioCoach =
+            let standardAudioCoach =
                 settings.audioCoachConfiguration(
                     enabled:
                         settings
@@ -427,13 +479,13 @@ enum GhostRaceStartService {
                             .distanceKilometers *
                             1_000
                 )
-
-            if settings.ghostRaceAudioEnabled {
-                standardAudioCoach
-                    .distanceIntervalMeters = nil
-                standardAudioCoach
-                    .timeIntervalSeconds = nil
-            }
+            let ghostAudio =
+                coexistingGhostAudio(
+                    settings
+                        .ghostRaceAudioConfiguration,
+                    audioCoach:
+                        standardAudioCoach
+                )
 
             if captureDevice == .iPhone {
                 guard let phoneWorkout else {
@@ -469,8 +521,7 @@ enum GhostRaceStartService {
                         settings
                             .routeAlertConfiguration,
                     ghostUpdates:
-                        settings
-                            .ghostRaceAudioConfiguration
+                        ghostAudio
                 )
                 return
             }
@@ -545,34 +596,44 @@ enum GhostRaceStartService {
                             .routeDistanceMeters,
                     points: watchPoints,
                     audio:
-                        settings
-                            .ghostRaceAudioConfiguration
+                        ghostAudio
                 )
             )
+
+            let runningTransfer =
+                WatchRunningWorkoutTransfer(
+                    title:
+                        "Ghost Race · \(title)",
+                    steps: [],
+                    routeAlerts:
+                        settings
+                            .routeAlertConfiguration
+                )
+
+            // Audio Coach owns the user's requested periodic metric cadence.
+            // Ghost keeps haptic periodic status plus important lead-change
+            // alerts so the two systems do not talk over one another.
+            watchConnection
+                .sendAudioCoachConfiguration(
+                    standardAudioCoach
+                )
+            watchConnection
+                .sendRunningWorkout(
+                    runningTransfer
+                )
 
             try await watchConnection
                 .startWorkoutOnWatch(
                     .running
                 )
 
-            // Periodic Ghost status replaces routine coach intervals.
-            // Structured and critical guidance remain available.
-
             watchConnection
                 .sendAudioCoachConfiguration(
                     standardAudioCoach
                 )
-
             watchConnection
                 .sendRunningWorkout(
-                    WatchRunningWorkoutTransfer(
-                        title:
-                            "Ghost Race · \(title)",
-                        steps: [],
-                        routeAlerts:
-                            settings
-                                .routeAlertConfiguration
-                    )
+                    runningTransfer
                 )
         } catch {
             ghostRace.cancel()
