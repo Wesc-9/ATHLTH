@@ -88,6 +88,9 @@ struct MessageInboxView: View {
         MessageInboxFilter = .priority
     @State private var selectedWorkoutInvite:
         SocialWorkoutInviteDisplay?
+    @State private var coachPinned = true
+    @State private var coachConversationState:
+        RecoveryCoachConversationState?
 
     var body: some View {
         ScrollView {
@@ -112,7 +115,8 @@ struct MessageInboxView: View {
                     inboxErrorCard(error)
                 }
 
-                if !displayedPersonItems.isEmpty {
+                if !displayedPersonItems.isEmpty ||
+                    shouldShowCoachConversation {
                     inboxSectionLabel(
                         normalizedSearch.isEmpty
                             ? selectedFilter.title
@@ -121,10 +125,21 @@ struct MessageInboxView: View {
                                 english: "RESULTS",
                                 norwegian: "RESULTATER"
                             ),
-                        count: displayedPersonItems.count
+                        count:
+                            displayedPersonItems.count +
+                            (
+                                shouldShowCoachConversation
+                                    ? 1
+                                    : 0
+                            )
                     )
 
                     LazyVStack(spacing: 10) {
+                        if shouldShowCoachConversation &&
+                            coachPinned {
+                            coachInboxLink
+                        }
+
                         ForEach(displayedPersonItems) { item in
                             Group {
                                 if let workoutInvite =
@@ -236,6 +251,11 @@ struct MessageInboxView: View {
                                 }
                             }
                         }
+
+                        if shouldShowCoachConversation &&
+                            !coachPinned {
+                            coachInboxLink
+                        }
                     }
                 }
 
@@ -263,12 +283,16 @@ struct MessageInboxView: View {
             await messaging.refresh()
         }
         .task {
+            refreshCoachInboxState()
             await social.refresh(
                 challengeStore: challenges
             )
             await messaging.refresh()
             messaging.loadPinnedConversations()
             await realtime.refreshOnlineUsers()
+        }
+        .onAppear {
+            refreshCoachInboxState()
         }
         .sheet(
             item: $selectedWorkoutInvite
@@ -1202,7 +1226,138 @@ struct MessageInboxView: View {
     }
 
     private var shouldShowEmptyState: Bool {
-        displayedPersonItems.isEmpty
+        displayedPersonItems.isEmpty &&
+        !shouldShowCoachConversation
+    }
+
+    private var shouldShowCoachConversation:
+        Bool {
+        guard selectedFilter == .priority ||
+                selectedFilter == .direct
+        else {
+            return false
+        }
+
+        guard !normalizedSearch.isEmpty
+        else {
+            return true
+        }
+
+        let searchable = [
+            "athlth coach",
+            "coach",
+            recoveryAIText(
+                "personal training coach",
+                "personlig treningscoach"
+            ),
+            coachPreviewText
+        ]
+        .joined(separator: " ")
+        .lowercased()
+
+        return searchable.contains(
+            normalizedSearch
+        )
+    }
+
+    private var coachPreviewText:
+        String {
+        if let latest =
+                coachConversationState?
+                    .messages.last {
+            return latest.text
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Your personal training and recovery coach.",
+            norwegian:
+                "Din personlige trenings- og restitusjonscoach."
+        )
+    }
+
+    private var coachLatestActivityAt:
+        Date? {
+        coachConversationState?
+            .messages
+            .last?
+            .createdAt
+    }
+
+    @ViewBuilder
+    private var coachInboxLink:
+        some View {
+        NavigationLink {
+            RecoveryCoachInboxDestinationView()
+        } label: {
+            RecoveryCoachInboxRow(
+                preview:
+                    coachPreviewText,
+                timestamp:
+                    coachLatestActivityAt,
+                isPinned:
+                    coachPinned
+            )
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                withAnimation(
+                    .easeInOut(
+                        duration: 0.18
+                    )
+                ) {
+                    coachPinned.toggle()
+                    RecoveryCoachInboxPreferences
+                        .setPinned(
+                            coachPinned,
+                            userID:
+                                session
+                                    .profile
+                                    .userID
+                        )
+                }
+            } label: {
+                Label(
+                    coachPinned
+                        ? ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Unpin conversation",
+                                norwegian:
+                                    "Løsne samtalen"
+                            )
+                        : ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Pin conversation",
+                                norwegian:
+                                    "Fest samtalen"
+                            ),
+                    systemImage:
+                        coachPinned
+                            ? "pin.slash"
+                            : "pin.fill"
+                )
+            }
+        }
+    }
+
+    private func refreshCoachInboxState() {
+        coachPinned =
+            RecoveryCoachInboxPreferences
+                .isPinned(
+                    userID:
+                        session.profile
+                            .userID
+                )
+        coachConversationState =
+            RecoveryCoachConversationPersistence
+                .load(
+                    userID:
+                        session.profile
+                            .userID
+                )
     }
 
     private var incomingChallengeRequests:
