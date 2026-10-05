@@ -808,7 +808,9 @@ final class CommunityEventStore: ObservableObject {
                 return
             }
 
-            events = loadedEvents
+            if events != loadedEvents {
+                events = loadedEvents
+            }
             lastRefreshAt = Date()
             errorMessage = nil
         } catch is CancellationError {
