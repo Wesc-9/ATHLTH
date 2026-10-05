@@ -1057,6 +1057,10 @@ struct RecoveryCoachView: View {
             .hidden,
             for: .navigationBar
         )
+        .toolbar(
+            .hidden,
+            for: .tabBar
+        )
         .onAppear {
             coachPinned =
                 RecoveryCoachInboxPreferences
