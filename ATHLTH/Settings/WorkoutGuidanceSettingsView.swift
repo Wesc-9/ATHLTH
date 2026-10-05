@@ -163,8 +163,12 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
             return "Silent · live comparison still stays visible"
         }
 
-        return
-            "Race status + meaningful lead changes"
+        return ATHLTHLocalization.choose(
+            english:
+                "Race status + selected race events",
+            norwegian:
+                "Løpsstatus + valgte løpshendelser"
+        )
     }
 }
 
