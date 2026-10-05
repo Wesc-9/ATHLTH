@@ -1117,6 +1117,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     let scrollFadeTransition: Bool
     let pullDownFadeBridge: Bool
     let sheetOverlapOverride: CGFloat?
+    let transitionFadeHeightOverride: CGFloat?
     private let hero: Hero
     private let content: Content
 
@@ -1164,6 +1165,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         scrollFadeTransition: Bool = false,
         pullDownFadeBridge: Bool = false,
         sheetOverlapOverride: CGFloat? = nil,
+        transitionFadeHeightOverride: CGFloat? = nil,
         @ViewBuilder hero: () -> Hero,
         @ViewBuilder content: () -> Content
     ) {
@@ -1174,6 +1176,8 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         self.pullDownFadeBridge = pullDownFadeBridge
         self.sheetOverlapOverride =
             sheetOverlapOverride
+        self.transitionFadeHeightOverride =
+            transitionFadeHeightOverride
         self.hero = hero()
         self.content = content()
     }
@@ -1214,7 +1218,11 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
-                            .frame(height: immersiveTransition ? 82 : 40)
+                            .frame(
+                                height:
+                                    transitionFadeHeightOverride ??
+                                    (immersiveTransition ? 82 : 40)
+                            )
                             .allowsHitTesting(false)
                         }
                     }
