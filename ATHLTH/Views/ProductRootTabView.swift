@@ -10594,6 +10594,8 @@ struct ATHLTHProfileView: View {
         ProfilePerformanceStats?
     @State private var personalRecords:
         [HealthPersonalRecord] = []
+    @State private var profilePerformanceWorkoutHistory:
+        [WorkoutSummary] = []
     @State private var loadingProfileData = false
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
@@ -11709,7 +11711,9 @@ struct ATHLTHProfileView: View {
                     strengthRepRecords:
                         strengthWorkout.repPersonalRecords,
                     performanceWorkouts:
-                        health.workouts,
+                        profilePerformanceWorkoutHistory.isEmpty
+                            ? health.workouts
+                            : profilePerformanceWorkoutHistory,
                     strengthWorkouts:
                         strengthWorkout.workoutHistory
                 )
@@ -12443,22 +12447,33 @@ struct ATHLTHProfileView: View {
                         forceRefresh:
                             forceRefresh
                     )
+            async let historyTask =
+                try? health
+                    .performanceWorkoutHistory(
+                        forceRefresh:
+                            forceRefresh
+                    )
 
             let (
                 loadedStats,
-                loadedRecords
+                loadedRecords,
+                loadedHistory
             ) = await (
                 statsTask,
-                recordsTask
+                recordsTask,
+                historyTask
             )
 
             performanceStats =
                 loadedStats
             personalRecords =
                 loadedRecords ?? []
+            profilePerformanceWorkoutHistory =
+                loadedHistory ?? []
         } else {
             performanceStats = nil
             personalRecords = []
+            profilePerformanceWorkoutHistory = []
         }
 
         await trophyStore.refresh(
