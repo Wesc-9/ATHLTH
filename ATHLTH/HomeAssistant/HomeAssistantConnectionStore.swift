@@ -1863,12 +1863,13 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
         if pairing.webhookURL != localURL,
            pairing.webhookURL != alternateURL {
-            anySucceeded =
-                anySucceeded ||
+            let succeeded =
                 await testWebhookRoute(
                     pairing.webhookURL,
                     pairing: pairing
                 )
+            anySucceeded =
+                anySucceeded || succeeded
         }
 
         lastConnectionTestSucceeded =
