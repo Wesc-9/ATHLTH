@@ -1700,6 +1700,9 @@ struct PerformanceStatsView: View {
             )
             .resizable()
             .scaledToFill()
+            // Crop slightly further into the artwork so no light/white
+            // source-image edge can appear along the top or bottom.
+            .scaleEffect(1.12)
             .frame(maxWidth: .infinity)
             .frame(height: 94)
             .clipped()
@@ -1842,8 +1845,8 @@ struct PerformanceStatsView: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.58),
-                lineWidth: 0.8
+                Color.primary.opacity(0.035),
+                lineWidth: 0.6
             )
         }
     }
