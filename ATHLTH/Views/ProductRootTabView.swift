@@ -10605,7 +10605,11 @@ struct ATHLTHProfileView: View {
             accent:
                 ATHLTHTheme.premiumGold.opacity(0.34),
             immersiveTransition: true,
-            sheetOverlapOverride: 12
+            // Keep the rounded content sheet below the stat row. The short
+            // fade is limited to the hero's bottom breathing space so the
+            // white transition no longer washes over the four stat cards.
+            sheetOverlapOverride: 0,
+            transitionFadeHeightOverride: 22
         ) {
             profileHero
         } content: {
