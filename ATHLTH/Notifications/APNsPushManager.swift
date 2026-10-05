@@ -19,15 +19,35 @@ final class APNsPushManager: ObservableObject {
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
+    private var lastSystemRegistrationRequestAt: Date?
+
+    private static let storedTokenKey =
+        "athlth.apns.deviceToken.v1"
 
     private init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
+        self.deviceTokenHex =
+            UserDefaults.standard.string(
+                forKey: Self.storedTokenKey
+            )
     }
 
     func receive(deviceToken: Data) {
-        deviceTokenHex = deviceToken
-            .map { String(format: "%02x", $0) }
-            .joined()
+        let token =
+            deviceToken
+                .map {
+                    String(
+                        format: "%02x",
+                        $0
+                    )
+                }
+                .joined()
+
+        deviceTokenHex = token
+        UserDefaults.standard.set(
+            token,
+            forKey: Self.storedTokenKey
+        )
 
         Task {
             await syncCurrentToken()
@@ -40,10 +60,22 @@ final class APNsPushManager: ObservableObject {
     }
 
     func syncCurrentToken() async {
-        guard let userID = client.auth.currentUser?.id,
-              let token = deviceTokenHex,
+        guard let userID =
+                client.auth.currentUser?.id
+        else {
+            ensureSystemRegistration()
+            return
+        }
+
+        guard let token =
+                deviceTokenHex,
               !token.isEmpty
         else {
+            // registerForRemoteNotifications() is safe to call repeatedly.
+            // This recovers installations where the first APNs callback
+            // happened before auth/startup was ready or was missed after an
+            // app update. The delegate callback calls syncCurrentToken again.
+            ensureSystemRegistration()
             return
         }
 
@@ -74,6 +106,26 @@ final class APNsPushManager: ObservableObject {
             isRegisteredWithBackend = false
             lastRegistrationError = error.localizedDescription
         }
+    }
+
+    func ensureSystemRegistration(
+        force: Bool = false
+    ) {
+        let now = Date()
+
+        if !force,
+           let last =
+                lastSystemRegistrationRequestAt,
+           now.timeIntervalSince(last) <
+                15 {
+            return
+        }
+
+        lastSystemRegistrationRequestAt =
+            now
+
+        UIApplication.shared
+            .registerForRemoteNotifications()
     }
 
     func syncNotificationPreferences(
