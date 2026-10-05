@@ -617,6 +617,40 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 challengeStore: challenges
             )
         }
+        .task(
+            id:
+                outgoingPendingDirectDuel?
+                    .id
+        ) {
+            guard
+                outgoingPendingDirectDuel != nil
+            else {
+                return
+            }
+
+            while !Task.isCancelled,
+                  outgoingPendingDirectDuel != nil {
+                try? await Task.sleep(
+                    for: .seconds(4)
+                )
+
+                guard !Task.isCancelled
+                else {
+                    return
+                }
+
+                await social.refresh(
+                    challengeStore:
+                        challenges
+                )
+            }
+        }
+        .refreshable {
+            await social.refresh(
+                challengeStore: challenges
+            )
+            await loadSelectedFriend()
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Choose a direct duel",
