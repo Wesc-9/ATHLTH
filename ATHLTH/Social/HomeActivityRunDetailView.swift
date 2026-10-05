@@ -585,13 +585,23 @@ struct HomeActivityRunDetailView: View {
                             true,
                            let rank =
                             ownLeaderboardRank {
+                            let isThisRunPB =
+                                ownLeaderboardBest?
+                                    .workoutID ==
+                                linkedRouteAttempt?
+                                    .workoutID
+
                             Label(
                                 ATHLTHLocalization
                                     .format(
                                         english:
-                                            "#%d of %d",
+                                            isThisRunPB
+                                                ? "This run: #%d of %d"
+                                                : "Your PB: #%d of %d",
                                         norwegian:
-                                            "#%d av %d",
+                                            isThisRunPB
+                                                ? "Denne økten: #%d av %d"
+                                                : "Din PB: #%d av %d",
                                         rank,
                                         leaderboardEntries
                                             .count
