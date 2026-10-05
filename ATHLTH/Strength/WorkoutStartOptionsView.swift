@@ -181,19 +181,10 @@ struct WorkoutStartOptionsView: View {
                 VStack(spacing: 12) {
                     strengthIntroCard
 
-                    if trackingMode == .advanced {
-                        exerciseSelectionCard
-                            .transition(
-                                .opacity
-                                    .combined(
-                                        with:
-                                            .move(
-                                                edge:
-                                                    .top
-                                            )
-                                    )
-                            )
-                    }
+                    // Exercise planning belongs in both Basic and Advanced.
+                    // Advanced should add optional workout controls, not hide the
+                    // core ability to build the strength session before starting.
+                    exerciseSelectionCard
 
                     ATHLTHCard {
                         HStack(spacing: 8) {
