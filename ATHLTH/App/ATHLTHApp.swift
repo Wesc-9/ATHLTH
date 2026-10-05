@@ -1025,6 +1025,13 @@ struct AppRootView: View {
             }
 
             Task {
+                // Re-register/sync APNs on every foreground activation.
+                // This is intentionally independent of the heavier lifecycle
+                // refresh throttle so a missed/failed device registration
+                // repairs itself as soon as ATHLTH becomes active again.
+                await APNsPushManager.shared
+                    .syncCurrentToken()
+
                 if ATHLTHDeviceRole.isIPhone {
                     await deviceRelay
                         .refreshPending {
