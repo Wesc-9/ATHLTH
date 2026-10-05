@@ -148,38 +148,56 @@ struct RouteLibraryListView: View {
 
     var body: some View {
         List {
-            Section {
-                Picker("Sort by", selection: $sort) {
-                    ForEach(RouteLibrarySort.allCases) { option in
-                        Text(option.rawValue).tag(option)
-                    }
-                }
-                Picker("Route length", selection: $lengthFilter) {
-                    Text("Any length").tag(0)
-                    Text("Under 5 km").tag(1)
-                    Text("5–10 km").tag(2)
-                    Text("10–21.1 km").tag(3)
-                    Text("21.1 km and more").tag(4)
-                }
-
-                Toggle(isOn: $favoritesOnly) {
-                    Label(
-                        "Favorites only",
-                        systemImage: "star.fill"
+            if source == .mine {
+                mineFilterCard
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: 8,
+                            leading: 16,
+                            bottom: 8,
+                            trailing: 16
+                        )
                     )
-                }
-                .tint(ATHLTHTheme.accent)
-
-                if sort == .nearest {
-                    if locationStore.isUpdating {
-                        ProgressView("Finding your location…")
-                    } else if locationStore.location == nil {
-                        Text("Location is unavailable. Routes are shown by name until your position is available.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Use my location") { locationStore.refresh() }
+                    .listRowBackground(
+                        Color.clear
+                    )
+                    .listRowSeparator(
+                        .hidden
+                    )
+            } else {
+                Section {
+                    Picker("Sort by", selection: $sort) {
+                        ForEach(RouteLibrarySort.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
                     }
-                    Text("Nearest is the straight-line distance to the route's centre, not travel distance to its start.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Picker("Route length", selection: $lengthFilter) {
+                        Text("Any length").tag(0)
+                        Text("Under 5 km").tag(1)
+                        Text("5–10 km").tag(2)
+                        Text("10–21.1 km").tag(3)
+                        Text("21.1 km and more").tag(4)
+                    }
+
+                    Toggle(isOn: $favoritesOnly) {
+                        Label(
+                            "Favorites only",
+                            systemImage: "star.fill"
+                        )
+                    }
+                    .tint(ATHLTHTheme.accent)
+
+                    if sort == .nearest {
+                        if locationStore.isUpdating {
+                            ProgressView("Finding your location…")
+                        } else if locationStore.location == nil {
+                            Text("Location is unavailable. Routes are shown by name until your position is available.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Button("Use my location") { locationStore.refresh() }
+                        }
+                        Text("Nearest is the straight-line distance to the route's centre, not travel distance to its start.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -206,105 +224,7 @@ struct RouteLibraryListView: View {
                     )
             ) {
                 ForEach(entries) { entry in
-                    HStack(spacing: 8) {
-                        NavigationLink {
-                            if source == .mine,
-                               let route = session.savedRoutes.first(
-                                where: { $0.id == entry.id }
-                               ) {
-                                RouteDetailView(route: route)
-                            } else {
-                                RouteLibraryDetailLoader(
-                                    routeID: entry.id
-                                )
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(entry.title)
-                                    .font(.headline)
-
-                                HStack(spacing: 10) {
-                                    Text(
-                                        settings.measurementPreference
-                                            .distance(
-                                                fromKilometers:
-                                                    entry.distanceKilometers
-                                            )
-                                    )
-                                    if let elevation =
-                                            entry.elevationGainMeters {
-                                        Text(
-                                            ATHLTHLocalization.format(
-                                                "%d m ascent",
-                                                Int(elevation)
-                                            )
-                                        )
-                                    }
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                                if let start = entry.startName,
-                                   !start.isEmpty {
-                                    Text(start)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                if sort == .nearest,
-                                   let distance = entry.distance(
-                                    from: locationStore.location
-                                   ) {
-                                    Label(
-                                        ATHLTHLocalization.format(
-                                            "%@ away",
-                                            settings
-                                                .measurementPreference
-                                                .distance(
-                                                    fromKilometers:
-                                                        distance
-                                                )
-                                        ),
-                                        systemImage: "location"
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        ATHLTHTheme.accent
-                                    )
-                                }
-                            }
-                            .padding(.vertical, 5)
-                        }
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                recents.markUsed(
-                                    .route,
-                                    itemID: entry.id.uuidString,
-                                    title: entry.title,
-                                    subtitle:
-                                        settings.measurementPreference
-                                            .distance(
-                                                fromKilometers:
-                                                    entry.distanceKilometers
-                                            ),
-                                    icon: "map.fill"
-                                )
-                            }
-                        )
-
-                        LibraryFavoriteButton(
-                            kind: .route,
-                            itemID: entry.id.uuidString,
-                            title: entry.title,
-                            subtitle:
-                                settings.measurementPreference
-                                    .distance(
-                                        fromKilometers:
-                                            entry.distanceKilometers
-                                    ),
-                            icon: "map.fill"
-                        )
-                    }
+                    routeRow(entry)
                 }
                 if source == .database && hasMore {
                     Button("Load more routes") { Task { await loadCatalog(reset: false) } }
@@ -326,6 +246,12 @@ struct RouteLibraryListView: View {
                 }
             }
         }
+        .modifier(
+            RouteLibraryGhostSurfaceModifier(
+                enabled:
+                    source == .mine
+            )
+        )
         .navigationTitle(
             source == .mine
                 ? ATHLTHLocalization.string(
@@ -361,6 +287,530 @@ struct RouteLibraryListView: View {
             if value == .nearest { locationStore.refresh() }
         }
         .onDisappear { locationStore.stop() }
+    }
+
+    private var mineFilterCard: some View {
+        ATHLTHCard {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text(
+                        ATHLTHLocalization.string(
+                            "Sort by"
+                        )
+                    )
+                    .font(.body)
+
+                    Spacer()
+
+                    Picker(
+                        "Sort by",
+                        selection: $sort
+                    ) {
+                        ForEach(
+                            RouteLibrarySort
+                                .allCases
+                        ) { option in
+                            Text(
+                                option.rawValue
+                            )
+                            .tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+                .padding(.vertical, 2)
+
+                Divider()
+                    .padding(.vertical, 12)
+
+                HStack(spacing: 12) {
+                    Text(
+                        ATHLTHLocalization.string(
+                            "Route length"
+                        )
+                    )
+
+                    Spacer()
+
+                    Picker(
+                        "Route length",
+                        selection:
+                            $lengthFilter
+                    ) {
+                        Text("Any length")
+                            .tag(0)
+                        Text("Under 5 km")
+                            .tag(1)
+                        Text("5–10 km")
+                            .tag(2)
+                        Text("10–21.1 km")
+                            .tag(3)
+                        Text("21.1 km and more")
+                            .tag(4)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+
+                Divider()
+                    .padding(.vertical, 12)
+
+                Toggle(
+                    isOn:
+                        $favoritesOnly
+                ) {
+                    Label(
+                        ATHLTHLocalization.string(
+                            "Favorites only"
+                        ),
+                        systemImage:
+                            "star.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+
+                if sort == .nearest {
+                    Divider()
+                        .padding(.vertical, 12)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        if locationStore
+                            .isUpdating {
+                            ProgressView(
+                                "Finding your location…"
+                            )
+                        } else if locationStore
+                            .location == nil {
+                            Text(
+                                "Location is unavailable. Routes are shown by name until your position is available."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+
+                            Button(
+                                "Use my location"
+                            ) {
+                                locationStore
+                                    .refresh()
+                            }
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                        }
+
+                        Text(
+                            "Nearest is the straight-line distance to the route's centre, not travel distance to its start."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+                }
+            }
+        }
+        .athlthLightweightCardChrome()
+    }
+
+    @ViewBuilder
+    private func routeRow(
+        _ entry: RouteLibraryEntry
+    ) -> some View {
+        if source == .mine,
+           let route =
+                session.savedRoutes
+                    .first(
+                        where: {
+                            $0.id ==
+                            entry.id
+                        }
+                    ) {
+            mineRouteCard(
+                entry: entry,
+                route: route
+            )
+            .listRowInsets(
+                EdgeInsets(
+                    top: 8,
+                    leading: 16,
+                    bottom: 8,
+                    trailing: 16
+                )
+            )
+            .listRowBackground(
+                Color.clear
+            )
+            .listRowSeparator(
+                .hidden
+            )
+        } else {
+            databaseRouteRow(
+                entry
+            )
+        }
+    }
+
+    private func mineRouteCard(
+        entry: RouteLibraryEntry,
+        route: TrainingRoute
+    ) -> some View {
+        ATHLTHCard {
+            ZStack(
+                alignment: .topTrailing
+            ) {
+                NavigationLink {
+                    RouteDetailView(
+                        route: route
+                    )
+                } label: {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 13
+                    ) {
+                        RouteMapSnapshotThumbnail(
+                            route: route,
+                            height: 118
+                        )
+
+                        HStack(
+                            alignment: .center,
+                            spacing: 12
+                        ) {
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 5
+                            ) {
+                                HStack(
+                                    spacing: 6
+                                ) {
+                                    Image(
+                                        systemName:
+                                            "figure.run"
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+
+                                    Text(
+                                        "ROUTE"
+                                    )
+                                    .font(
+                                        .caption2
+                                            .weight(
+                                                .bold
+                                            )
+                                    )
+                                    .tracking(1.2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                }
+
+                                Text(
+                                    entry.title
+                                )
+                                .font(
+                                    .headline
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(2)
+
+                                HStack(
+                                    spacing: 8
+                                ) {
+                                    Text(
+                                        settings
+                                            .measurementPreference
+                                            .distance(
+                                                fromKilometers:
+                                                    entry
+                                                        .distanceKilometers
+                                            )
+                                    )
+
+                                    if let elevation =
+                                            entry
+                                                .elevationGainMeters {
+                                        Text("·")
+                                        Text(
+                                            ATHLTHLocalization
+                                                .format(
+                                                    "%d m ascent",
+                                                    Int(
+                                                        elevation
+                                                    )
+                                                )
+                                        )
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                                if let start =
+                                        entry.startName,
+                                   !start.isEmpty {
+                                    Text(start)
+                                        .font(
+                                            .caption
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                        .lineLimit(1)
+                                }
+
+                                if sort == .nearest,
+                                   let distance =
+                                        entry.distance(
+                                            from:
+                                                locationStore
+                                                    .location
+                                        ) {
+                                    Label(
+                                        ATHLTHLocalization
+                                            .format(
+                                                "%@ away",
+                                                settings
+                                                    .measurementPreference
+                                                    .distance(
+                                                        fromKilometers:
+                                                            distance
+                                                    )
+                                            ),
+                                        systemImage:
+                                            "location"
+                                    )
+                                    .font(
+                                        .caption
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+                                }
+                            }
+
+                            Spacer(
+                                minLength: 8
+                            )
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                                    .opacity(0.65)
+                            )
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(
+                    TapGesture()
+                        .onEnded {
+                            markRecent(
+                                entry
+                            )
+                        }
+                )
+
+                LibraryFavoriteButton(
+                    kind: .route,
+                    itemID:
+                        entry.id
+                            .uuidString,
+                    title:
+                        entry.title,
+                    subtitle:
+                        settings
+                            .measurementPreference
+                            .distance(
+                                fromKilometers:
+                                    entry
+                                        .distanceKilometers
+                            ),
+                    icon: "map.fill"
+                )
+                .padding(10)
+            }
+        }
+        .athlthLightweightCardChrome()
+    }
+
+    private func databaseRouteRow(
+        _ entry: RouteLibraryEntry
+    ) -> some View {
+        HStack(spacing: 8) {
+            NavigationLink {
+                RouteLibraryDetailLoader(
+                    routeID: entry.id
+                )
+            } label: {
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(entry.title)
+                        .font(.headline)
+
+                    HStack(spacing: 10) {
+                        Text(
+                            settings
+                                .measurementPreference
+                                .distance(
+                                    fromKilometers:
+                                        entry
+                                            .distanceKilometers
+                                )
+                        )
+
+                        if let elevation =
+                                entry
+                                    .elevationGainMeters {
+                            Text(
+                                ATHLTHLocalization
+                                    .format(
+                                        "%d m ascent",
+                                        Int(
+                                            elevation
+                                        )
+                                    )
+                            )
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                    if let start =
+                            entry.startName,
+                       !start.isEmpty {
+                        Text(start)
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+
+                    if sort == .nearest,
+                       let distance =
+                            entry.distance(
+                                from:
+                                    locationStore
+                                        .location
+                            ) {
+                        Label(
+                            ATHLTHLocalization
+                                .format(
+                                    "%@ away",
+                                    settings
+                                        .measurementPreference
+                                        .distance(
+                                            fromKilometers:
+                                                distance
+                                        )
+                                ),
+                            systemImage:
+                                "location"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.accent
+                        )
+                    }
+                }
+                .padding(.vertical, 5)
+            }
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        markRecent(
+                            entry
+                        )
+                    }
+            )
+
+            LibraryFavoriteButton(
+                kind: .route,
+                itemID:
+                    entry.id.uuidString,
+                title: entry.title,
+                subtitle:
+                    settings
+                        .measurementPreference
+                        .distance(
+                            fromKilometers:
+                                entry
+                                    .distanceKilometers
+                        ),
+                icon: "map.fill"
+            )
+        }
+    }
+
+    private func markRecent(
+        _ entry: RouteLibraryEntry
+    ) {
+        recents.markUsed(
+            .route,
+            itemID:
+                entry.id.uuidString,
+            title:
+                entry.title,
+            subtitle:
+                settings
+                    .measurementPreference
+                    .distance(
+                        fromKilometers:
+                            entry
+                                .distanceKilometers
+                    ),
+            icon: "map.fill"
+        )
     }
 
     @MainActor
@@ -433,6 +883,39 @@ struct RouteLibraryDetailLoader: View {
             route = record.trainingRoute
         } catch {
             if !Task.isCancelled { errorMessage = error.localizedDescription }
+        }
+    }
+}
+
+private struct RouteLibraryGhostSurfaceModifier:
+    ViewModifier {
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(
+        content: Content
+    ) -> some View {
+        if enabled {
+            content
+                .listStyle(.plain)
+                .scrollContentBackground(
+                    .hidden
+                )
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme
+                                .canvasTop,
+                            ATHLTHTheme
+                                .canvasBottom
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                )
+        } else {
+            content
         }
     }
 }
