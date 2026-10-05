@@ -142,13 +142,30 @@ final class SupabaseMessagingService: Sendable {
             .eq("recipient_id", value: currentUserID)
             .execute()
 
-        for kind in ["message", "message_request"] {
+        for kind in [
+            "message",
+            "message_request",
+            "message_request_accepted",
+            "mention"
+        ] {
             try await client
                 .from("social_inbox_events")
                 .update(["read_at": readAt])
+                .eq(
+                    "recipient_id",
+                    value: currentUserID
+                )
                 .eq("kind", value: kind)
-                .eq("entity_type", value: "direct_conversation")
-                .eq("entity_id", value: conversationID)
+                .eq(
+                    "entity_type",
+                    value:
+                        "direct_conversation"
+                )
+                .eq(
+                    "entity_id",
+                    value:
+                        conversationID
+                )
                 .execute()
         }
     }
