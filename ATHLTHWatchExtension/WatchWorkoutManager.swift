@@ -181,6 +181,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastGhostAnnouncedLeadMeters: Double?
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
+    private var ghostFinalPhaseAnnounced = false
+    private var lastLiveGhostConnectionText: String?
     private var lastGhostMapPublishedAt: Date?
     private var lastRouteNavigationMapPublishedAt: Date?
     private var offRouteStartedAt: Date?
@@ -392,6 +394,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        ghostFinalPhaseAnnounced = false
+        lastLiveGhostConnectionText = nil
         lastGhostMapPublishedAt = nil
         lastRouteNavigationMapPublishedAt = nil
 
@@ -990,6 +994,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             liveSurfaceContext
                 .liveGhost?
                 .title
+        let previousConnection =
+            liveSurfaceContext
+                .liveGhost?
+                .connectionText
 
         publish {
             self.liveSurfaceContext = context
@@ -1037,6 +1045,21 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .estimatedTimeDeltaSeconds
         }
 
+        let liveAudio =
+            ghostAudioConfiguration(
+                from: liveGhost.audio
+            )
+        announceLiveGhostConnectionChangeIfNeeded(
+            previous: previousConnection,
+            current:
+                liveGhost.connectionText,
+            opponentName:
+                liveGhost.opponentName ??
+                liveGhost.title,
+            configuration:
+                liveAudio
+        )
+
         guard isActive,
               kind == .running,
               let distanceDelta =
@@ -1048,9 +1071,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         evaluateGhostRaceCoach(
             configuration:
-                ghostAudioConfiguration(
-                    from: liveGhost.audio
-                ),
+                liveAudio,
             userDistance:
                 distanceMeters,
             distanceDelta:
@@ -2237,6 +2258,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        ghostFinalPhaseAnnounced = false
+        lastLiveGhostConnectionText = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
