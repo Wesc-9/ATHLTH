@@ -236,6 +236,9 @@ final class IPhoneWorkoutStore:
     private var lastGhostAnnouncedLeadMeters: Double?
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
+    private var ghostFinalPhaseAnnounced = false
+    private var liveGhostOpponentName: String?
+    private var lastLiveGhostConnectionText: String?
     private var lastActiveCheckpointWriteAt: Date?
     private var livePresentationRetryTask: Task<Void, Never>?
     private let activeCheckpointInterval: TimeInterval = 5
@@ -1572,6 +1575,8 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        liveGhostOpponentName = nil
+
         if let configuration {
             workout.ghostAudioConfiguration =
                 configuration
@@ -1617,6 +1622,13 @@ final class IPhoneWorkoutStore:
         else {
             return
         }
+
+        liveGhostOpponentName =
+            title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+                ? nil
+                : title
 
         workout.ghostRaceTitle = title
         workout.ghostDistanceDeltaMeters =
@@ -1771,6 +1783,9 @@ final class IPhoneWorkoutStore:
         lastGhostAnnouncedLeadMeters = nil
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
+        ghostFinalPhaseAnnounced = false
+        liveGhostOpponentName = nil
+        lastLiveGhostConnectionText = nil
 
         if let interval =
                 configuration?
@@ -1981,7 +1996,42 @@ final class IPhoneWorkoutStore:
                 updatedNext
         }
 
-        if periodic {
+        var finalPhaseRemainingMeters:
+            Double?
+
+        if configuration
+                .shouldAnnounceFinalPhase,
+           !ghostFinalPhaseAnnounced,
+           let totalDistance =
+                workout
+                    .plannedRouteDistanceKilometers
+                    .map({
+                        max(
+                            $0 * 1_000,
+                            0
+                        )
+                    }),
+           totalDistance > 0 {
+            let remaining =
+                max(
+                    totalDistance -
+                        workout.distanceMeters,
+                    0
+                )
+
+            if remaining > 0 &&
+                remaining <=
+                    configuration
+                        .resolvedFinalPhaseStartMeters {
+                ghostFinalPhaseAnnounced =
+                    true
+                finalPhaseRemainingMeters =
+                    remaining
+            }
+        }
+
+        if periodic ||
+            finalPhaseRemainingMeters != nil {
             deliverGhostUpdate(
                 distanceDelta: distanceDelta,
                 timeDelta: timeDelta,
@@ -1990,7 +2040,9 @@ final class IPhoneWorkoutStore:
                         .resolvedPeriodicDelivery,
                 priority:
                     .ghostPeriodic,
-                workout: workout
+                workout: workout,
+                finalPhaseRemainingMeters:
+                    finalPhaseRemainingMeters
             )
             lastGhostAnnouncedLeadMeters =
                 distanceDelta
@@ -2002,8 +2054,12 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        guard configuration
-                .announceLeadChanges,
+        guard (
+            configuration
+                .announceLeadChanges ||
+            configuration
+                .shouldAnnounceOvertakes
+        ),
               elapsed >= 20
         else {
             return
@@ -2023,17 +2079,27 @@ final class IPhoneWorkoutStore:
                 abs(distanceDelta - $0)
             } ?? 0
         let movedEnough =
+            configuration
+                .announceLeadChanges &&
             change >=
-            max(
-                configuration
-                    .leadChangeThresholdMeters,
-                10
-            )
+                max(
+                    configuration
+                        .leadChangeThresholdMeters,
+                    10
+                )
+        let overtakeDue =
+            configuration
+                .shouldAnnounceOvertakes &&
+            signChanged
         let important =
-            signChanged ||
-            change >=
+            overtakeDue ||
+            (
                 configuration
-                    .resolvedImportantLeadChangeMeters
+                    .announceLeadChanges &&
+                change >=
+                    configuration
+                        .resolvedImportantLeadChangeMeters
+            )
         let requiredCooldown =
             important
                 ? configuration
@@ -2047,7 +2113,7 @@ final class IPhoneWorkoutStore:
             } ?? true
 
         guard cooldownSatisfied &&
-                (signChanged || movedEnough)
+                (overtakeDue || movedEnough)
         else {
             if lastGhostAnnouncedLeadMeters ==
                 nil {
@@ -2072,7 +2138,9 @@ final class IPhoneWorkoutStore:
                 important
                     ? .ghostImportant
                     : .ghostPeriodic,
-            workout: workout
+            workout: workout,
+            finalPhaseRemainingMeters:
+                nil
         )
 
         lastGhostAnnouncedLeadMeters =
