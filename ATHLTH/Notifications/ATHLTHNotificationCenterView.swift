@@ -2138,7 +2138,9 @@ private struct NotificationSwipeDeleteContainer<
                 Color.red.opacity(
                     0.08 +
                         (0.10 *
-                            deleteProgress)
+                            Double(
+                                deleteProgress
+                            ))
                 )
             )
 
@@ -2156,7 +2158,9 @@ private struct NotificationSwipeDeleteContainer<
                     Color.red.opacity(
                         0.40 +
                             (0.60 *
-                                revealProgress)
+                                Double(
+                                    revealProgress
+                                ))
                     )
                 )
                 .frame(width: 58)
@@ -2170,7 +2174,9 @@ private struct NotificationSwipeDeleteContainer<
                 .opacity(
                     0.22 +
                         (0.78 *
-                            revealProgress)
+                            Double(
+                                revealProgress
+                            ))
                 )
                 .allowsHitTesting(false)
 
