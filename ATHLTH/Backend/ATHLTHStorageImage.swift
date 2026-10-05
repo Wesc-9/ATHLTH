@@ -285,21 +285,31 @@ struct ATHLTHStorageImage<Content: View>: View {
                 return
             }
 
-            var request =
-                URLRequest(
-                    url: resolved
-                )
-            if isPrivate {
-                request.cachePolicy =
-                    .reloadIgnoringLocalCacheData
-            }
-
-            let (data, _) =
-                try await URLSession
-                    .shared
-                    .data(
-                        for: request
+            let data: Data
+            if resolved.isFileURL {
+                data =
+                    try Data(
+                        contentsOf: resolved,
+                        options: .mappedIfSafe
                     )
+            } else {
+                var request =
+                    URLRequest(
+                        url: resolved
+                    )
+                if isPrivate {
+                    request.cachePolicy =
+                        .reloadIgnoringLocalCacheData
+                }
+
+                let response =
+                    try await URLSession
+                        .shared
+                        .data(
+                            for: request
+                        )
+                data = response.0
+            }
 
             let prepared =
                 await Task.detached(
