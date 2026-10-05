@@ -1265,6 +1265,9 @@ struct WatchGhostRaceTransfer: Codable, Hashable {
     var routeDistanceMeters: Double
     var points: [WatchGhostRaceTimingPoint]
     var audio: WatchGhostRaceAudioConfiguration? = nil
+    // Present only when the reference belongs to another ATHLTH user.
+    // Replay/target ghosts leave this nil and retain generic Ghost wording.
+    var opponentName: String? = nil
 }
 
 struct WatchWorkoutMirrorCommand: Codable, Hashable {
