@@ -1615,47 +1615,53 @@ private struct CommunityReferenceFriendsCard: View {
         ) ?? .distantPast
     }
 
-    private var currentKilometers: Double {
-        ownWorkouts
-            .filter {
-                $0.startDate >= threshold &&
-                $0.activity == .running
-            }
-            .compactMap(\.distanceMeters)
-            .reduce(0, +) / 1_000
+    private var currentWeekWorkouts:
+        [WorkoutSummary] {
+        ownWorkouts.filter {
+            $0.startDate >= threshold
+        }
+    }
+
+    private var currentActivityPoints: Double {
+        activityPoints(
+            workouts:
+                currentWeekWorkouts.count,
+            activeMinutes:
+                currentWeekWorkouts
+                    .reduce(0) {
+                        $0 + $1.duration
+                    } / 60
+        )
     }
 
     private var currentWorkoutCount: Int {
-        ownWorkouts.filter {
-            $0.startDate >= threshold &&
-            $0.activity == .running
-        }.count
+        currentWeekWorkouts.count
     }
 
     private var topFriend: SocialProfileCard? {
         friends.max {
-            friendKilometers($0) <
-                friendKilometers($1)
+            friendActivityPoints($0) <
+                friendActivityPoints($1)
         }
     }
 
-    private var totalKilometers: Double {
+    private var totalPoints: Double {
         let friendValue =
             topFriend.map {
-                friendKilometers($0)
+                friendActivityPoints($0)
             } ?? 0
 
-        return currentKilometers +
+        return currentActivityPoints +
             friendValue
     }
 
     private var currentShare: Double {
-        guard totalKilometers > 0 else {
+        guard totalPoints > 0 else {
             return 0.5
         }
 
-        return currentKilometers /
-            totalKilometers
+        return currentActivityPoints /
+            totalPoints
     }
 
     var body: some View {
@@ -1732,8 +1738,8 @@ private struct CommunityReferenceFriendsCard: View {
                             currentAvatarURL,
                         fallback:
                             currentDisplayName,
-                        kilometers:
-                            currentKilometers,
+                        points:
+                            currentActivityPoints,
                         workouts:
                             currentWorkoutCount,
                         ringTint: .green
@@ -1780,8 +1786,8 @@ private struct CommunityReferenceFriendsCard: View {
                         fallback:
                             topFriend
                                 .resolvedName,
-                        kilometers:
-                            friendKilometers(
+                        points:
+                            friendActivityPoints(
                                 topFriend
                             ),
                         workouts:
@@ -1909,7 +1915,7 @@ private struct CommunityReferenceFriendsCard: View {
         name: String,
         avatarURL: URL?,
         fallback: String,
-        kilometers: Double,
+        points: Double,
         workouts: Int,
         ringTint: Color
     ) -> some View {
@@ -1942,10 +1948,14 @@ private struct CommunityReferenceFriendsCard: View {
                     .lineLimit(1)
 
                 Text(
-                    String(
-                        format:
-                            "%.1f km",
-                        kilometers
+                    ATHLTHLocalization.format(
+                        english:
+                            "%d pts",
+                        norwegian:
+                            "%d poeng",
+                        Int(
+                            points.rounded()
+                        )
                     )
                 )
                 .font(
@@ -1991,23 +2001,30 @@ private struct CommunityReferenceFriendsCard: View {
             $0.activity.createdAt >=
                 threshold &&
             $0.activity.kind ==
-                "workout" &&
-            isRunning(
-                $0.activity
-            )
+                "workout"
         }
     }
 
-    private func friendKilometers(
+    private func friendActivityPoints(
         _ friend: SocialProfileCard
     ) -> Double {
-        friendActivities(friend)
-            .reduce(0) {
-                $0 +
-                runningKilometers(
-                    $1.activity
-                )
-            }
+        let activities =
+            friendActivities(friend)
+        let minutes =
+            activities
+                .compactMap {
+                    durationSeconds(
+                        $0.activity
+                    )
+                }
+                .reduce(0, +) / 60
+
+        return activityPoints(
+            workouts:
+                activities.count,
+            activeMinutes:
+                minutes
+        )
     }
 
     private func friendWorkoutCount(
@@ -2016,32 +2033,41 @@ private struct CommunityReferenceFriendsCard: View {
         friendActivities(friend).count
     }
 
-    private func isRunning(
-        _ activity: SocialActivityRecord
-    ) -> Bool {
-        let kind =
-            activity.metadata?["kind"]?
-                .lowercased() ?? ""
+    private func activityPoints(
+        workouts: Int,
+        activeMinutes: Double
+    ) -> Double {
+        let count =
+            max(workouts, 0)
+        let cappedMinutes =
+            min(
+                max(
+                    activeMinutes,
+                    0
+                ),
+                Double(count) * 120
+            )
 
-        return kind.contains("run") ||
-            activity.title
-                .lowercased()
-                .contains("run")
+        return
+            Double(count) * 20 +
+            cappedMinutes / 5
     }
 
-    private func runningKilometers(
-        _ activity: SocialActivityRecord
-    ) -> Double {
-        if let raw =
-            activity
-                .metadata?[
-                    "distance_meters"
+    private func durationSeconds(
+        _ activity:
+            SocialActivityRecord
+    ) -> Double? {
+        guard let raw =
+                activity.metadata?[
+                    "duration_seconds"
                 ],
-           let meters = Double(raw) {
-            return meters / 1_000
+              let value =
+                Double(raw)
+        else {
+            return nil
         }
 
-        return 0
+        return max(value, 0)
     }
 }
 
