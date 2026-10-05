@@ -1723,8 +1723,16 @@ struct AppRootView: View {
         // Keychain-backed session can survive an uninstall. Never use that
         // orphaned session to bypass the account/onboarding screen.
         guard appSession.signedIn else {
-            await accountService
-                .discardUnexpectedPersistedSession()
+            // Do not clear a Supabase session from the signed-out startup
+            // path. Email confirmation can launch ATHLTH through
+            // athlth://auth/confirm while this startup task is running. The
+            // callback establishes the new session before applying the
+            // backend bootstrap, and clearing here can race with that flow:
+            // AppSession becomes signed in while Supabase has already been
+            // downgraded to the anonymous publishable-key role.
+            //
+            // Stale Keychain sessions are still cleared immediately before
+            // interactive authentication by SupabaseAccountService.
             startupAuthenticationResolved = true
             return
         }
