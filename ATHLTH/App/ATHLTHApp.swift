@@ -430,6 +430,9 @@ struct AppRootView: View {
                     spotifyAutoplay:
                         envelope.spotifyAutoplay,
                     friends: [],
+                    socialMode:
+                        payload
+                            .resolvedParticipationMode,
                     gearIDs:
                         Set(envelope.gearIDs)
                 )
@@ -473,6 +476,9 @@ struct AppRootView: View {
                     spotifyAutoplay:
                         envelope.spotifyAutoplay,
                     friends: [],
+                    socialMode:
+                        payload
+                            .resolvedParticipationMode,
                     gearIDs:
                         Set(envelope.gearIDs)
                 )
@@ -521,6 +527,9 @@ struct AppRootView: View {
                         trackingMode:
                             trackingMode,
                         selectedFriends: [],
+                        participationMode:
+                            payload
+                                .resolvedParticipationMode,
                         audioCoach:
                             envelope.watchAudioCoach ??
                             advanced
