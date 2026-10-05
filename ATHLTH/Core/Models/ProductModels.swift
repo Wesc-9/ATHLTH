@@ -293,6 +293,15 @@ struct ExerciseSnapshot: Codable, Hashable {
     var equipment: [String]
     var imageURL: URL?
     var videoURL: URL? = nil
+
+    var displayName: String {
+        ATHLTHLocalization.choose(
+            english: name,
+            norwegian:
+                ATHLTHExerciseNameLocalization
+                    .norwegianName(for: name)
+        )
+    }
 }
 
 struct Exercise: Identifiable, Codable, Hashable {
@@ -307,6 +316,28 @@ struct Exercise: Identifiable, Codable, Hashable {
     var imageURL: URL?
     var isVisibleOutsideOwnerLibrary: Bool
     var videoURL: URL? = nil
+
+    var displayName: String {
+        guard origin != .custom else {
+            return name
+        }
+
+        return ATHLTHLocalization.choose(
+            english: name,
+            norwegian:
+                ATHLTHExerciseNameLocalization
+                    .norwegianName(for: name)
+        )
+    }
+
+    var searchNames: [String] {
+        guard origin != .custom else {
+            return [name]
+        }
+
+        return ATHLTHExerciseNameLocalization
+            .searchTerms(for: name)
+    }
 
     var snapshot: ExerciseSnapshot {
         ExerciseSnapshot(
