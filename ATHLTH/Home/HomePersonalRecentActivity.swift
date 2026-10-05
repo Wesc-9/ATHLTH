@@ -2681,10 +2681,12 @@ struct HomePersonalActivityHistoryView:
     @State private var type:
         HomeActivityTypeFilter = .all
     @State private var loading = false
+    private let showOnlyMine: Bool
 
     init(
         showOnlyMine: Bool = false
     ) {
+        self.showOnlyMine = showOnlyMine
         _scope = State(
             initialValue:
                 showOnlyMine
@@ -2706,15 +2708,19 @@ struct HomePersonalActivityHistoryView:
         allItems.filter { item in
             let scopeMatch: Bool
 
-            switch scope {
-            case .all:
-                scopeMatch = true
-            case .mine:
-                scopeMatch =
-                    item.isMine
-            case .following:
-                scopeMatch =
-                    !item.isMine
+            if showOnlyMine {
+                scopeMatch = item.isMine
+            } else {
+                switch scope {
+                case .all:
+                    scopeMatch = true
+                case .mine:
+                    scopeMatch =
+                        item.isMine
+                case .following:
+                    scopeMatch =
+                        !item.isMine
+                }
             }
 
             return scopeMatch &&
@@ -2737,7 +2743,9 @@ struct HomePersonalActivityHistoryView:
                 LazyVStack(
                     spacing: 14
                 ) {
-                    scopeBar
+                    if !showOnlyMine {
+                        scopeBar
+                    }
                     typeBar
 
                     if loading &&
@@ -2788,15 +2796,21 @@ struct HomePersonalActivityHistoryView:
         )
         .task {
             await load()
-            await social
-                .refreshActivityHistoryFeed()
+
+            if !showOnlyMine {
+                await social
+                    .refreshActivityHistoryFeed()
+            }
         }
         .refreshable {
             await load(
                 forceRefresh: true
             )
-            await social
-                .refreshActivityHistoryFeed()
+
+            if !showOnlyMine {
+                await social
+                    .refreshActivityHistoryFeed()
+            }
         }
     }
 
