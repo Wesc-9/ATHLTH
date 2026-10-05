@@ -147,4 +147,36 @@ final class StrengthMuscleProfileTests: XCTestCase {
             )
         }
     }
+
+    func testNorwegianExerciseNameLocalization() {
+        XCTAssertEqual(
+            ATHLTHExerciseNameLocalization
+                .norwegianName(for: "Bench Press"),
+            "Benkpress"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseNameLocalization
+                .norwegianName(for: "Romanian Deadlift"),
+            "Rumensk markløft"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseNameLocalization
+                .norwegianName(
+                    for: "Dumbbell Lateral Raise"
+                ),
+            "Manual sidehev"
+        )
+    }
+
+    func testExerciseNameSearchTermsIncludeNorwegianAndEnglish() {
+        let terms =
+            ATHLTHExerciseNameLocalization
+                .searchTerms(for: "Bench Press")
+                .map { $0.lowercased() }
+
+        XCTAssertTrue(terms.contains("bench press"))
+        XCTAssertTrue(terms.contains("benkpress"))
+        XCTAssertTrue(terms.contains("benk"))
+    }
+
 }
