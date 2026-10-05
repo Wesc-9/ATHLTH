@@ -435,6 +435,39 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
     }
 
+    func sendPreparedWorkout(
+        _ workout: WatchPreparedWorkoutTransfer
+    ) {
+        guard
+            let session,
+            session.activationState == .activated,
+            let data = try? JSONEncoder().encode(workout)
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchPreparedWorkoutTransport.kind,
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt:
+                workout.updatedAt.timeIntervalSince1970
+        ]
+
+        // A prepared workout must survive the phone being put away before
+        // START is pressed on Watch. Queue a durable copy and also use the
+        // immediate path when Watch is reachable.
+        session.transferUserInfo(payload)
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        }
+    }
+
     func sendAudioCoachConfiguration(
         _ configuration: WatchAudioCoachConfiguration
     ) {
