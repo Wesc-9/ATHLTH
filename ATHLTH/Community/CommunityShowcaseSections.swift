@@ -393,17 +393,22 @@ private struct CommunityMatchupStats {
     let challenges: Double?
 
     var calculatedActivityPoints: Double? {
-        guard let workouts,
-              let activeMinutes else {
+        if let activityPoints {
+            return activityPoints
+        }
+
+        guard let workouts else {
             return nil
         }
 
-        // Balanced across training types: completing a workout matters,
-        // while duration contributes with a per-workout cap so long sessions
-        // cannot dominate the matchup.
+        // Completing a workout always counts. Duration adds a capped bonus
+        // when it is available, so hidden/missing duration data does not make
+        // an athlete disappear from the points matchup.
+        let minutes =
+            max(activeMinutes ?? 0, 0)
         let cappedMinutes =
             min(
-                max(activeMinutes, 0),
+                minutes,
                 max(workouts, 0) * 120
             )
 
@@ -413,9 +418,119 @@ private struct CommunityMatchupStats {
     }
 }
 
+private enum CommunityDirectDuelMetric:
+    String,
+    CaseIterable,
+    Identifiable {
+    case runningDistance
+    case strengthVolume
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .runningDistance:
+            return ATHLTHLocalization.choose(
+                english: "Running · distance",
+                norwegian: "Løping · distanse"
+            )
+        case .strengthVolume:
+            return ATHLTHLocalization.choose(
+                english: "Strength · volume",
+                norwegian: "Styrke · volum"
+            )
+        }
+    }
+
+    var requestTitle: String {
+        switch self {
+        case .runningDistance:
+            return ATHLTHLocalization.choose(
+                english: "H2H · Running",
+                norwegian: "H2H · Løping"
+            )
+        case .strengthVolume:
+            return ATHLTHLocalization.choose(
+                english: "H2H · Strength",
+                norwegian: "H2H · Styrke"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .runningDistance:
+            return ATHLTHLocalization.choose(
+                english: "Most verified distance over 7 days",
+                norwegian: "Flest verifiserte kilometer på 7 dager"
+            )
+        case .strengthVolume:
+            return ATHLTHLocalization.choose(
+                english: "Highest verified strength volume over 7 days",
+                norwegian: "Høyest verifisert styrkevolum på 7 dager"
+            )
+        }
+    }
+
+    var sport: ATHLTHChallengeSport {
+        switch self {
+        case .runningDistance:
+            return .running
+        case .strengthVolume:
+            return .strength
+        }
+    }
+
+    var scoring: ATHLTHChallengeScoring {
+        switch self {
+        case .runningDistance:
+            return .mostDistance
+        case .strengthVolume:
+            return .workoutVolume
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .runningDistance:
+            return "figure.run"
+        case .strengthVolume:
+            return "dumbbell.fill"
+        }
+    }
+
+    func format(
+        _ score: Double?
+    ) -> String {
+        guard let score else {
+            return "—"
+        }
+
+        switch self {
+        case .runningDistance:
+            return String(
+                format: "%.1f km",
+                score / 1_000
+            )
+        case .strengthVolume:
+            if score >= 1_000 {
+                return String(
+                    format: "%.1f t",
+                    score / 1_000
+                )
+            }
+            return String(
+                format: "%.0f kg",
+                score
+            )
+        }
+    }
+}
+
 struct CommunityFriendsVsFriendsDetailView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var challenges: ChallengeStore
 
     let currentUserID: UUID
     let currentDisplayName: String
@@ -433,6 +548,9 @@ struct CommunityFriendsVsFriendsDetailView: View {
         [SocialActivityRecord] = []
     @State private var loadingFriend = false
     @State private var showingChallenge = false
+    @State private var showingDirectDuelPicker = false
+    @State private var creatingDirectDuel = false
+    @State private var directDuelError: String?
 
     private var selectedFriend: SocialProfileCard? {
         guard let selectedFriendID else {
@@ -460,6 +578,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 } else {
                     friendPicker
                     matchupHero
+                    primaryScoreCard
                     periodPicker
                     metricCard
                     contextCard
@@ -494,6 +613,75 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
         .task(id: selectedFriendID) {
             await loadSelectedFriend()
+            await social.refresh(
+                challengeStore: challenges
+            )
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Choose a direct duel",
+                norwegian: "Velg direkte duell"
+            ),
+            isPresented:
+                $showingDirectDuelPicker,
+            titleVisibility: .visible
+        ) {
+            ForEach(
+                CommunityDirectDuelMetric
+                    .allCases
+            ) { metric in
+                Button(
+                    metric.title
+                ) {
+                    Task {
+                        await createDirectDuel(
+                            metric
+                        )
+                    }
+                }
+            }
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel",
+                    norwegian: "Avbryt"
+                ),
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Your friend receives a request. Activity points remain the default until the duel is accepted.",
+                    norwegian:
+                        "Vennen din får en forespørsel. Aktivitetspoeng er standard helt til duellen er godtatt."
+                )
+            )
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Head-to-head",
+                norwegian: "Head-to-head"
+            ),
+            isPresented:
+                Binding(
+                    get: {
+                        directDuelError != nil
+                    },
+                    set: { shown in
+                        if !shown {
+                            directDuelError = nil
+                        }
+                    }
+                )
+        ) {
+            Button("OK") {
+                directDuelError = nil
+            }
+        } message: {
+            Text(
+                directDuelError ?? ""
+            )
         }
         .sheet(
             isPresented:
@@ -667,6 +855,270 @@ struct CommunityFriendsVsFriendsDetailView: View {
         )
     }
 
+    private var primaryScoreCard:
+        some View {
+        let mine =
+            primaryScoreValues.mine
+        let theirs =
+            primaryScoreValues.theirs
+
+        return VStack(spacing: 12) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        primaryScoreTitle
+                    )
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .tracking(0.9)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                    Text(
+                        primaryScoreSubtitle
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                Spacer()
+
+                if activeDirectDuel != nil {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "ACTIVE DUEL",
+                            norwegian: "AKTIV DUELL"
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .padding(
+                        .vertical,
+                        5
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in: Capsule()
+                    )
+                }
+            }
+
+            HStack(
+                alignment: .firstTextBaseline
+            ) {
+                Text(
+                    primaryScoreText(
+                        mine
+                    )
+                )
+                .font(
+                    .system(
+                        size: 28,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    scoreTint(
+                        mine,
+                        versus: theirs
+                    )
+                )
+
+                Spacer()
+
+                Text("VS")
+                    .font(
+                        .caption.weight(
+                            .heavy
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+
+                Spacer()
+
+                Text(
+                    primaryScoreText(
+                        theirs
+                    )
+                )
+                .font(
+                    .system(
+                        size: 28,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .monospacedDigit()
+                .foregroundStyle(
+                    scoreTint(
+                        theirs,
+                        versus: mine
+                    )
+                )
+            }
+
+            Button {
+                showingDirectDuelPicker =
+                    true
+            } label: {
+                HStack(spacing: 8) {
+                    if creatingDirectDuel {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(
+                            systemName:
+                                activeDirectDuel == nil
+                                    ? "scope"
+                                    : "arrow.triangle.2.circlepath"
+                        )
+                    }
+
+                    Text(
+                        directDuelButtonTitle
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Spacer()
+
+                    if !creatingDirectDuel {
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(
+                            .caption.bold()
+                        )
+                    }
+                }
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style:
+                                .continuous
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                selectedFriend == nil ||
+                creatingDirectDuel ||
+                outgoingPendingDirectDuel != nil
+            )
+
+            if let pending =
+                    outgoingPendingDirectDuel,
+               let metric =
+                    directMetric(
+                        for: pending
+                    ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Request sent · waiting for (firstName(selectedFriend?.resolvedName ?? "friend")) · (metric.title)",
+                        norwegian:
+                            "Forespørsel sendt · venter på (firstName(selectedFriend?.resolvedName ?? "venn")) · (metric.title)"
+                    ),
+                    systemImage: "clock.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            } else if let pending =
+                        incomingPendingDirectDuel,
+                      let metric =
+                        directMetric(
+                            for: pending
+                        ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Incoming request · (metric.title) · respond in Inbox",
+                        norwegian:
+                            "Ny forespørsel · (metric.title) · svar i innboksen"
+                    ),
+                    systemImage:
+                        "tray.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .premiumGold
+                )
+            }
+        }
+        .padding(18)
+        .background(
+            Color.white.opacity(0.94),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.045),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    0.03
+                ),
+            radius: 12,
+            y: 5
+        )
+    }
+
     private var periodPicker: some View {
         Picker(
             "Period",
@@ -692,21 +1144,9 @@ struct CommunityFriendsVsFriendsDetailView: View {
 
                 metricRow(
                     ATHLTHLocalization.choose(
-                        english: "Activity points",
-                        norwegian: "Aktivitetspoeng"
+                        english: "Workouts",
+                        norwegian: "Økter"
                     ),
-                    icon: "bolt.circle.fill",
-                    mine:
-                        mine.calculatedActivityPoints,
-                    theirs:
-                        theirs.calculatedActivityPoints,
-                    format: pointsText
-                )
-
-                Divider()
-
-                metricRow(
-                    "Workouts",
                     icon:
                         "figure.run.circle.fill",
                     mine: mine.workouts,
@@ -717,7 +1157,10 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 Divider()
 
                 metricRow(
-                    "Running",
+                    ATHLTHLocalization.choose(
+                        english: "Running",
+                        norwegian: "Løping"
+                    ),
                     icon: "figure.run",
                     mine:
                         mine.runningKilometers,
@@ -730,7 +1173,10 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 Divider()
 
                 metricRow(
-                    "Active time",
+                    ATHLTHLocalization.choose(
+                        english: "Active time",
+                        norwegian: "Aktiv tid"
+                    ),
                     icon: "clock.fill",
                     mine:
                         mine.activeMinutes,
@@ -743,7 +1189,10 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     Divider()
 
                     metricRow(
-                        "Strength",
+                        ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        ),
                         icon:
                             "dumbbell.fill",
                         mine:
@@ -770,7 +1219,10 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     Divider()
 
                     metricRow(
-                        "Challenges",
+                        ATHLTHLocalization.choose(
+                            english: "Challenges",
+                            norwegian: "Challenges"
+                        ),
                         icon: "trophy.fill",
                         mine:
                             mine.challenges,
@@ -940,6 +1392,445 @@ struct CommunityFriendsVsFriendsDetailView: View {
             color: Color.black.opacity(0.03),
             radius: 12,
             y: 5
+        )
+    }
+
+    private var directDuelChallenges:
+        [ATHLTHChallenge] {
+        guard let selectedFriend else {
+            return []
+        }
+
+        return challenges
+            .visibleChallenges
+            .filter { challenge in
+                guard
+                    challenge.status !=
+                        .cancelled,
+                    challenge.status !=
+                        .completed,
+                    challenge.rules
+                        .headToHeadMetricRaw !=
+                        nil
+                else {
+                    return false
+                }
+
+                let userIDs =
+                    Set(
+                        challenge
+                            .participants
+                            .compactMap(
+                                \.userID
+                            )
+                    )
+
+                return userIDs.contains(
+                    currentUserID
+                ) &&
+                    userIDs.contains(
+                        selectedFriend.userID
+                    )
+            }
+            .sorted {
+                $0.createdAt >
+                    $1.createdAt
+            }
+    }
+
+    private var activeDirectDuel:
+        ATHLTHChallenge? {
+        guard let selectedFriend else {
+            return nil
+        }
+
+        return directDuelChallenges
+            .first { challenge in
+                let mine =
+                    challenge.participants
+                        .first {
+                            $0.userID ==
+                                currentUserID
+                        }
+                let theirs =
+                    challenge.participants
+                        .first {
+                            $0.userID ==
+                                selectedFriend
+                                    .userID
+                        }
+
+                return
+                    (mine?.state ==
+                        .creator ||
+                     mine?.state ==
+                        .accepted) &&
+                    (theirs?.state ==
+                        .creator ||
+                     theirs?.state ==
+                        .accepted)
+            }
+    }
+
+    private var outgoingPendingDirectDuel:
+        ATHLTHChallenge? {
+        guard let selectedFriend else {
+            return nil
+        }
+
+        return directDuelChallenges
+            .first { challenge in
+                challenge.creatorID ==
+                    currentUserID &&
+                challenge.participants
+                    .contains {
+                        $0.userID ==
+                            selectedFriend
+                                .userID &&
+                        $0.state ==
+                            .invited
+                    }
+            }
+    }
+
+    private var incomingPendingDirectDuel:
+        ATHLTHChallenge? {
+        guard let selectedFriend else {
+            return nil
+        }
+
+        return directDuelChallenges
+            .first { challenge in
+                challenge.creatorID ==
+                    selectedFriend
+                        .userID &&
+                challenge.participants
+                    .contains {
+                        $0.userID ==
+                            currentUserID &&
+                        $0.state ==
+                            .invited
+                    }
+            }
+    }
+
+    private var primaryScoreValues:
+        (mine: Double?, theirs: Double?) {
+        guard let duel =
+                activeDirectDuel
+        else {
+            return (
+                currentStats
+                    .calculatedActivityPoints,
+                friendStats
+                    .calculatedActivityPoints
+            )
+        }
+
+        let leaderboard =
+            challenges.leaderboard(
+                for: duel.id
+            )
+
+        return (
+            leaderboard
+                .first {
+                    $0.participant
+                        .userID ==
+                        currentUserID
+                }?
+                .score,
+            leaderboard
+                .first {
+                    $0.participant
+                        .userID ==
+                        selectedFriend?
+                            .userID
+                }?
+                .score
+        )
+    }
+
+    private var primaryScoreTitle:
+        String {
+        guard let duel =
+                activeDirectDuel,
+              let metric =
+                directMetric(
+                    for: duel
+                )
+        else {
+            return ATHLTHLocalization.choose(
+                english:
+                    "ACTIVITY POINTS",
+                norwegian:
+                    "AKTIVITETSPOENG"
+            )
+        }
+
+        return metric.title
+            .uppercased()
+    }
+
+    private var primaryScoreSubtitle:
+        String {
+        if let duel =
+                activeDirectDuel,
+           let endsAt =
+                duel.rules.endsAt {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Direct duel · until (endsAt.formatted(date: .abbreviated, time: .omitted))",
+                norwegian:
+                    "Direkte duell · til (endsAt.formatted(date: .abbreviated, time: .omitted))"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "(period.title) · all workout types count",
+            norwegian:
+                "(period.title) · alle treningsformer teller"
+        )
+    }
+
+    private var directDuelButtonTitle:
+        String {
+        if outgoingPendingDirectDuel != nil {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Request sent · waiting",
+                norwegian:
+                    "Forespørsel sendt · venter"
+            )
+        }
+
+        if activeDirectDuel != nil {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Request another duel category",
+                norwegian:
+                    "Be om en annen duellgren"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Duel in a specific category",
+            norwegian:
+                "Dueller på en bestemt gren"
+        )
+    }
+
+    private func directMetric(
+        for challenge:
+            ATHLTHChallenge
+    ) -> CommunityDirectDuelMetric? {
+        guard let raw =
+                challenge.rules
+                    .headToHeadMetricRaw
+        else {
+            return nil
+        }
+
+        return
+            CommunityDirectDuelMetric(
+                rawValue: raw
+            )
+    }
+
+    private func primaryScoreText(
+        _ value: Double?
+    ) -> String {
+        if let duel =
+                activeDirectDuel,
+           let metric =
+                directMetric(
+                    for: duel
+                ) {
+            return metric.format(
+                value
+            )
+        }
+
+        return pointsText(
+            value
+        )
+    }
+
+    private func scoreTint(
+        _ value: Double?,
+        versus other: Double?
+    ) -> Color {
+        guard let value,
+              let other,
+              value > other
+        else {
+            return ATHLTHTheme
+                .primaryText
+        }
+
+        return ATHLTHTheme
+            .vitality
+    }
+
+    @MainActor
+    private func createDirectDuel(
+        _ metric:
+            CommunityDirectDuelMetric
+    ) async {
+        guard
+            !creatingDirectDuel,
+            let selectedFriend
+        else {
+            return
+        }
+
+        if outgoingPendingDirectDuel != nil {
+            directDuelError =
+                ATHLTHLocalization.choose(
+                    english:
+                        "A direct duel request is already waiting for this athlete.",
+                    norwegian:
+                        "En direkte duellforespørsel venter allerede på svar fra denne utøveren."
+                )
+            return
+        }
+
+        creatingDirectDuel = true
+        defer {
+            creatingDirectDuel = false
+        }
+
+        let now = Date()
+        let end =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 7,
+                to: now
+            ) ??
+            now.addingTimeInterval(
+                7 * 86_400
+            )
+
+        let creator =
+            ChallengeParticipant(
+                userID:
+                    currentUserID,
+                displayName:
+                    currentDisplayName
+                        .isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "You",
+                            norwegian: "Deg"
+                        )
+                        : currentDisplayName,
+                state: .creator
+            )
+
+        let invitee =
+            ChallengeParticipant(
+                userID:
+                    selectedFriend
+                        .userID,
+                username:
+                    selectedFriend
+                        .username,
+                displayName:
+                    selectedFriend
+                        .resolvedName,
+                state: .invited
+            )
+
+        let rules =
+            ATHLTHChallengeRules(
+                scoring:
+                    metric.scoring,
+                verificationPolicy:
+                    .verifiedRequired,
+                targetDistanceMeters:
+                    nil,
+                targetDurationSeconds:
+                    nil,
+                timeBasis: .elapsed,
+                route: nil,
+                gpsRequired: false,
+                minimumRouteMatchPercent:
+                    nil,
+                distanceTolerancePercent:
+                    nil,
+                startFinishToleranceMeters:
+                    nil,
+                routeDirection: nil,
+                attemptPolicy: .best,
+                maximumAttempts: nil,
+                allowTreadmill: true,
+                allowTargetGhost: false,
+                allowLiveGhost: false,
+                exerciseName: nil,
+                fixedWeightKilograms:
+                    nil,
+                heartRateZone: nil,
+                heartRateAggregation:
+                    nil,
+                summary:
+                    metric.subtitle,
+                coverArtworkName:
+                    nil,
+                coverImageURL: nil,
+                headToHeadMetricRaw:
+                    metric.rawValue,
+                startsAt: now,
+                endsAt: end,
+                allowMultipleAttempts:
+                    true,
+                lockRulesAtStart: true,
+                meetup: nil
+            )
+
+        let challenge =
+            ATHLTHChallenge(
+                creatorID:
+                    currentUserID,
+                title:
+                    metric.requestTitle,
+                sport:
+                    metric.sport,
+                participants: [
+                    creator,
+                    invitee
+                ],
+                rules: rules,
+                visibility: .friends
+            )
+
+        challenges.add(
+            challenge
+        )
+
+        let synced =
+            await social.syncChallenge(
+                challenge
+            )
+
+        guard synced else {
+            challenges.remove(
+                challenge.id
+            )
+            directDuelError =
+                social.errorMessage ??
+                ATHLTHLocalization.choose(
+                    english:
+                        "The duel request could not be sent.",
+                    norwegian:
+                        "Duellforespørselen kunne ikke sendes."
+                )
+            return
+        }
+
+        await social.refresh(
+            challengeStore:
+                challenges
         )
     }
 
