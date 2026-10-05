@@ -250,7 +250,7 @@ struct WatchHomeView: View {
                             norwegian: "KLAR"
                         ),
                         systemImage:
-                            "applewatch.radiowaves.left.and.right"
+                            "applewatch"
                     )
                     .font(
                         .system(
