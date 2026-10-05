@@ -566,7 +566,7 @@ struct PlannedWorkoutDetailView: View {
                             )
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(exercise.embeddedExercise.name)
+                            Text(exercise.embeddedExercise.displayName)
                                 .font(.subheadline.weight(.semibold))
 
                             Text(exerciseSummary(exercise))
