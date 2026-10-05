@@ -888,6 +888,7 @@ private struct OfficialWeeklyCoverRecipe {
 
 struct OfficialWeeklyChallengeArtwork: View {
     let challenge: OfficialWeeklyChallenge
+    var preserveOriginalColors = false
 
     private var recipe: OfficialWeeklyCoverRecipe? {
         OfficialWeeklyCoverRecipe(asset: challenge.heroAsset)
@@ -903,7 +904,13 @@ struct OfficialWeeklyChallengeArtwork: View {
     var body: some View {
         Group {
             if let recipe {
-                generatedArtwork(recipe)
+                if preserveOriginalColors {
+                    originalArtwork(
+                        variant: recipe.variant
+                    )
+                } else {
+                    generatedArtwork(recipe)
+                }
             } else if let remoteURL = URL(string: challenge.heroAsset),
                       remoteURL.scheme == "https" ||
                       remoteURL.scheme == "http" {
@@ -928,8 +935,33 @@ struct OfficialWeeklyChallengeArtwork: View {
                     .interpolation(.high)
                     .scaledToFill()
             } else {
-                fallbackArtwork
+                if preserveOriginalColors {
+                    originalArtwork(variant: 1)
+                } else {
+                    fallbackArtwork
+                }
             }
+        }
+    }
+
+    private func originalArtwork(
+        variant: Int
+    ) -> some View {
+        GeometryReader { proxy in
+            Image(
+                semanticBaseImageName(
+                    variant: variant
+                )
+            )
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFill()
+            .frame(
+                width: proxy.size.width,
+                height: proxy.size.height
+            )
+            .clipped()
         }
     }
 
