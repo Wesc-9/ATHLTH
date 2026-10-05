@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 @MainActor
 final class MessagingStore: ObservableObject {
@@ -347,40 +348,41 @@ final class MessagingStore: ObservableObject {
             )
             messagesByConversation[conversationID] = messages
 
-            if let currentUserID,
-               messages.contains(where: {
-                   $0.recipientID == currentUserID && $0.readAt == nil
-               }) {
-                try await service.markConversationRead(conversationID)
-                let markedAt = Date()
-                messagesByConversation[conversationID] = messages.map { message in
-                    guard message.recipientID == currentUserID,
-                          message.readAt == nil
-                    else {
-                        return message
+            if let currentUserID {
+                let hasUnread =
+                    messages.contains {
+                        $0.recipientID ==
+                            currentUserID &&
+                        $0.readAt == nil
                     }
 
-                    return DirectMessageRecord(
-                        id: message.id,
-                        conversationID: message.conversationID,
-                        senderID: message.senderID,
-                        recipientID: message.recipientID,
-                        body: message.body,
-                        attachmentKindRaw: message.attachmentKindRaw,
-                        attachmentTitle: message.attachmentTitle,
-                        attachmentSubtitle: message.attachmentSubtitle,
-                        attachmentPayload: message.attachmentPayload,
-                        shareVersion: message.shareVersion,
-                        sourceObjectID: message.sourceObjectID,
-                        sourceOwnerID: message.sourceOwnerID,
-                        createdAt: message.createdAt,
-                        readAt: markedAt,
-                        deletedAt: message.deletedAt
+                if hasUnread {
+                    try await service
+                        .markConversationRead(
+                            conversationID
+                        )
+
+                    let markedAt = Date()
+                    markConversationReadLocally(
+                        conversationID:
+                            conversationID,
+                        currentUserID:
+                            currentUserID,
+                        markedAt:
+                            markedAt
                     )
                 }
+
+                await clearDeliveredNotifications(
+                    for:
+                        conversationID
+                )
             }
 
-            await refresh()
+            // Force this refresh. A normal refresh may be throttled for
+            // 60 seconds, which previously left the inbox unread badge stuck
+            // after the thread had already been marked read on the backend.
+            await refresh(force: true)
 
             // Full inbox refreshes must not make a just-created pending
             // request disappear locally before its first message is sent.
@@ -399,6 +401,131 @@ final class MessagingStore: ObservableObject {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func markConversationReadLocally(
+        conversationID: UUID,
+        currentUserID: UUID,
+        markedAt: Date
+    ) {
+        func marked(
+            _ message:
+                DirectMessageRecord
+        ) -> DirectMessageRecord {
+            guard message.conversationID ==
+                    conversationID,
+                  message.recipientID ==
+                    currentUserID,
+                  message.readAt == nil
+            else {
+                return message
+            }
+
+            return DirectMessageRecord(
+                id: message.id,
+                conversationID:
+                    message.conversationID,
+                senderID:
+                    message.senderID,
+                recipientID:
+                    message.recipientID,
+                body: message.body,
+                attachmentKindRaw:
+                    message.attachmentKindRaw,
+                attachmentTitle:
+                    message.attachmentTitle,
+                attachmentSubtitle:
+                    message.attachmentSubtitle,
+                attachmentPayload:
+                    message.attachmentPayload,
+                shareVersion:
+                    message.shareVersion,
+                sourceObjectID:
+                    message.sourceObjectID,
+                sourceOwnerID:
+                    message.sourceOwnerID,
+                createdAt:
+                    message.createdAt,
+                readAt: markedAt,
+                deletedAt:
+                    message.deletedAt
+            )
+        }
+
+        if let thread =
+                messagesByConversation[
+                    conversationID
+                ] {
+            messagesByConversation[
+                conversationID
+            ] = thread.map(marked)
+        }
+
+        recentMessages =
+            recentMessages.map(marked)
+    }
+
+    private func clearDeliveredNotifications(
+        for conversationID: UUID
+    ) async {
+        let center =
+            UNUserNotificationCenter
+                .current()
+
+        let delivered:
+            [UNNotification] =
+            await withCheckedContinuation {
+                continuation in
+                center.getDeliveredNotifications {
+                    notifications in
+                    continuation.resume(
+                        returning:
+                            notifications
+                    )
+                }
+            }
+
+        let identifiers =
+            delivered.compactMap {
+                notification -> String?
+                in
+                let userInfo =
+                    notification.request
+                        .content
+                        .userInfo
+
+                guard
+                    userInfo[
+                        "athlth_entity_type"
+                    ] as? String ==
+                        "direct_conversation",
+                    let rawID =
+                        userInfo[
+                            "athlth_entity_id"
+                        ] as? String,
+                    UUID(
+                        uuidString: rawID
+                    ) ==
+                        conversationID
+                else {
+                    return nil
+                }
+
+                return notification
+                    .request
+                    .identifier
+            }
+
+        guard !identifiers.isEmpty
+        else {
+            return
+        }
+
+        center
+            .removeDeliveredNotifications(
+                withIdentifiers:
+                    identifiers
+            )
     }
 
     func messages(in conversationID: UUID) -> [DirectMessageRecord] {
