@@ -3582,7 +3582,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     ghostFinalPhaseAnnounced =
                         true
                     finalPhaseRemainingMeters =
-                        remaining
+                        configuration
+                            .resolvedFinalPhaseStartMeters
                 }
             }
         }
