@@ -826,15 +826,25 @@ struct QuickStartWorkoutDeviceCard: View {
         if ATHLTHDeviceRole.isIPad {
             return ATHLTHLocalization.choose(
                 english:
-                    "Start Apple Watch through the paired iPhone.",
+                    "Send this workout to Apple Watch through the paired iPhone. Start it later on Watch.",
                 norwegian:
-                    "Start Apple Watch via den parede iPhonen."
+                    "Send økten til Apple Watch via den parede iPhonen. Start den senere på Watch."
             )
         }
 
         return watchConnected
-            ? "Record with Apple Watch, including live workout metrics."
-            : "Finish Apple Watch setup in Settings to use this option."
+            ? ATHLTHLocalization.choose(
+                english:
+                    "Send this workout to Apple Watch. Nothing starts until you press START on Watch.",
+                norwegian:
+                    "Send økten til Apple Watch. Ingenting starter før du trykker START på Watch."
+            )
+            : ATHLTHLocalization.choose(
+                english:
+                    "Finish Apple Watch setup in Settings to use this option.",
+                norwegian:
+                    "Fullfør Apple Watch-oppsettet i Innstillinger for å bruke dette valget."
+            )
     }
 
     var body: some View {
@@ -1449,15 +1459,24 @@ struct RunQuickStartSheet: View {
                 ATHLTHDeviceRole.isIPad
                     ? ATHLTHLocalization.choose(
                         english:
-                            "iPad sends the start request through your iPhone. Apple Watch is never paired directly with iPad.",
+                            "iPad sends the workout through your iPhone. Apple Watch keeps it ready until you press START.",
                         norwegian:
-                            "iPad sender startforespørselen via iPhone. Apple Watch pares aldri direkte med iPad."
+                            "iPad sender økten via iPhone. Apple Watch holder den klar til du trykker START."
                     )
-                    : ATHLTHLocalization.choose(
-                        english:
-                            "This choice applies only to this workout.",
-                        norwegian:
-                            "Valget gjelder bare denne økten."
+                    : (
+                        captureDevice == .appleWatch
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Apple Watch keeps the workout ready. Time, distance and HealthKit recording begin only after START.",
+                                norwegian:
+                                    "Apple Watch holder økten klar. Tid, distanse og HealthKit-registrering starter først etter START."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "This choice applies only to this workout.",
+                                norwegian:
+                                    "Valget gjelder bare denne økten."
+                            )
                     )
             )
             .font(.caption2)
@@ -2065,7 +2084,10 @@ struct RunQuickStartSheet: View {
         } label: {
             Label(
                 startButtonTitle,
-                systemImage: "play.fill"
+                systemImage:
+                    captureDevice == .appleWatch
+                        ? "applewatch"
+                        : "play.fill"
             )
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -2109,29 +2131,16 @@ struct RunQuickStartSheet: View {
         if ATHLTHDeviceRole.isIPad {
             return ATHLTHLocalization.choose(
                 english:
-                    "Start Apple Watch via iPhone",
+                    "Send to Apple Watch via iPhone",
                 norwegian:
-                    "Start Apple Watch via iPhone"
+                    "Send til Apple Watch via iPhone"
             )
         }
 
-        switch mode {
-        case .free:
-            return ATHLTHLocalization.choose(
-                english: "Start Free Run on Watch",
-                norwegian: "Start fri løpeøkt på Watch"
-            )
-        case .route:
-            return ATHLTHLocalization.choose(
-                english: "Start Route on Watch",
-                norwegian: "Start rute på Watch"
-            )
-        case .structured:
-            return ATHLTHLocalization.choose(
-                english: "Start Workout on Watch",
-                norwegian: "Start treningsøkt på Watch"
-            )
-        }
+        return ATHLTHLocalization.choose(
+            english: "Send to Apple Watch",
+            norwegian: "Send til Apple Watch"
+        )
     }
 
     private var quickRunGuidanceCard:
