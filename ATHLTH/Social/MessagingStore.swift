@@ -271,10 +271,12 @@ final class MessagingStore: ObservableObject {
                     with: userID
                 )
 
-        // Hydrate the exact row immediately. Do not make the composer depend
-        // on a later full-list refresh: a brand-new pending conversation has
-        // no message/last_message_at yet and can otherwise briefly be absent
-        // from the local list, leaving the first request impossible to send.
+        // Refresh the normal inbox first, then hydrate the exact row last.
+        // A brand-new pending conversation has no message/last_message_at yet;
+        // keeping the exact row as the final source of truth prevents the
+        // first-request composer from falling back to a disabled state.
+        await refresh()
+
         if let conversation =
                 try await service
                     .loadConversation(
@@ -285,7 +287,6 @@ final class MessagingStore: ObservableObject {
             )
         }
 
-        await refresh()
         return conversationID
     }
 
@@ -380,6 +381,18 @@ final class MessagingStore: ObservableObject {
             }
 
             await refresh()
+
+            // Full inbox refreshes must not make a just-created pending
+            // request disappear locally before its first message is sent.
+            if let conversation =
+                    try await service
+                        .loadConversation(
+                            id: conversationID
+                        ) {
+                upsertConversation(
+                    conversation
+                )
+            }
         } catch is CancellationError {
             return
         } catch {
