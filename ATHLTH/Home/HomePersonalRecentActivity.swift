@@ -4696,6 +4696,9 @@ private struct HomeStrengthHeatFigure:
 
 private struct HomePersonalWorkoutVisual:
     View {
+    @EnvironmentObject private var health:
+        HealthKitManager
+
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
@@ -4703,24 +4706,14 @@ private struct HomePersonalWorkoutVisual:
     var precomputedStrengthProfile:
         StrengthMuscleProfile? = nil
 
-    @State private var loadedRoute: [CLLocation] = []
+    @State private var hasLoadedRoute = false
     @State private var routePreviewImage: UIImage?
 
-    private var localRoute:
-        [CLLocation] {
-        phoneWorkout?
+    private var hasLocalRoute:
+        Bool {
+        (phoneWorkout?
             .points
-            .map(\.location) ??
-        []
-    }
-
-    private var resolvedRoute:
-        [CLLocation] {
-        if localRoute.count >= 2 {
-            return localRoute
-        }
-
-        return loadedRoute
+            .count ?? 0) >= 2
     }
 
     private var muscleProfile:
@@ -4844,7 +4837,8 @@ private struct HomePersonalWorkoutVisual:
             .strength {
             strengthBackground
         } else if isOutdoorActivity,
-                  resolvedRoute.count >= 2 {
+                  (hasLocalRoute ||
+                   hasLoadedRoute) {
             routeMap
         } else {
             genericBackground
@@ -4937,8 +4931,12 @@ private struct HomePersonalWorkoutVisual:
         }
 
         let route: [CLLocation]
-        if localRoute.count >= 2 {
-            route = localRoute
+        if let points =
+                phoneWorkout?
+                    .points,
+           points.count >= 2 {
+            route =
+                points.map(\.location)
         } else {
             route = await health.workoutRoute(
                 for: workout.id
@@ -4949,7 +4947,8 @@ private struct HomePersonalWorkoutVisual:
             return
         }
 
-        loadedRoute = route
+        hasLoadedRoute =
+            route.count >= 2
 
         let coordinates =
             HomeActivityRouteSanitizer
