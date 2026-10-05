@@ -2141,20 +2141,26 @@ struct PerformanceStatsView: View {
         return ZStack(
             alignment: .topLeading
         ) {
-            Image(
-                editorialFeaturedAsset(
-                    index
+            GeometryReader { proxy in
+                Image(
+                    editorialFeaturedAsset(
+                        index
+                    )
                 )
-            )
-            .resizable()
-            .scaledToFill()
-            // Crop slightly further into the artwork so no light/white
-            // source-image edge can appear along the top or bottom.
-            .scaleEffect(1.12)
-            .frame(maxWidth: .infinity)
-            .frame(height: 94)
-            .clipped()
-            .opacity(0.34)
+                .resizable()
+                .scaledToFill()
+                // Lock every asset to the exact grid-cell bounds. Different
+                // source aspect ratios must never widen or shrink the card.
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+                // A small crop prevents any light source-image edge from
+                // becoming visible around the rounded card.
+                .scaleEffect(1.08)
+                .clipped()
+                .opacity(0.38)
+            }
 
             LinearGradient(
                 colors: [
@@ -2189,8 +2195,8 @@ struct PerformanceStatsView: View {
                         kind.tint
                     )
                     .frame(
-                        width: 32,
-                        height: 32
+                        width: 26,
+                        height: 26
                     )
                     .background(
                         Color.white
@@ -2218,7 +2224,7 @@ struct PerformanceStatsView: View {
                 Text(kind.title)
                     .font(
                         .system(
-                            size: 11,
+                            size: 9.5,
                             weight: .semibold
                         )
                     )
@@ -2252,7 +2258,7 @@ struct PerformanceStatsView: View {
                     )
                     .font(
                         .system(
-                            size: 18,
+                            size: 15.5,
                             weight: .bold,
                             design: .rounded
                         )
@@ -2276,16 +2282,24 @@ struct PerformanceStatsView: View {
                     } ??
                     kind.shortTitle
                 )
-                .font(.caption2)
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .medium
+                    )
+                )
                 .foregroundStyle(
                     ATHLTHTheme
                         .mutedText
                 )
                 .lineLimit(1)
             }
-            .padding(10)
+            .padding(8)
         }
-        .frame(height: 94)
+        .frame(
+            maxWidth: .infinity
+        )
+        .frame(height: 80)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 20,
@@ -2336,7 +2350,7 @@ struct PerformanceStatsView: View {
                         systemName:
                             "plus.circle.fill"
                     )
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(
                         ATHLTHTheme
                             .accentDeep
@@ -2358,7 +2372,10 @@ struct PerformanceStatsView: View {
                     )
                 }
             }
-            .frame(height: 94)
+            .frame(
+                maxWidth: .infinity
+            )
+            .frame(height: 80)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 20,
