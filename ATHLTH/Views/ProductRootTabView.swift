@@ -682,10 +682,17 @@ struct ATHLTHHomeView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
-                .padding(.bottom, 16)
+                // Let Home's scrolling sheet continue underneath the floating
+                // tab bar instead of ending in a fixed gray bottom rectangle.
+                // Extra inset keeps the final card reachable above the bar.
+                .padding(.bottom, 112)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
             }
+            // Home should underlap the native floating tab bar just like the
+            // other root tabs. Only the scrolling sheet moves behind it; the
+            // system tab bar itself remains unchanged.
+            .ignoresSafeArea(.container, edges: .bottom)
             .sheet(
                 isPresented:
                     $showingGettingStartedPopup
