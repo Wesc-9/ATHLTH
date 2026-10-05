@@ -231,8 +231,21 @@ final class MessagingStore: ObservableObject {
             async let conversationsTask = service.loadConversations()
             async let messagesTask = service.loadRecentMessages()
 
-            conversations = try await conversationsTask
-            recentMessages = try await messagesTask
+            let refreshedConversations =
+                try await conversationsTask
+            let refreshedMessages =
+                try await messagesTask
+
+            if conversations !=
+                refreshedConversations {
+                conversations =
+                    refreshedConversations
+            }
+            if recentMessages !=
+                refreshedMessages {
+                recentMessages =
+                    refreshedMessages
+            }
             lastRefreshAt = Date()
         } catch is CancellationError {
             return
