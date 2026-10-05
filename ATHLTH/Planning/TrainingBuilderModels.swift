@@ -319,7 +319,8 @@ struct ExerciseLibraryEntry: Identifiable, Hashable {
     let imageStartURL: URL?
     let imagePeakURL: URL?
 
-    var name: String { exercise.name }
+    var name: String { exercise.displayName }
+    var canonicalName: String { exercise.name }
 }
 
 
