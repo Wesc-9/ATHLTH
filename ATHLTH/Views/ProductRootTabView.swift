@@ -992,7 +992,10 @@ struct ATHLTHHomeView: View {
     @ViewBuilder
     private var homeProfileShortcut: some View {
         if let avatarURL = session.profile.avatarURL {
-            ATHLTHStorageImage(url: avatarURL) { phase in
+            ATHLTHStorageImage(
+                url: avatarURL,
+                maxPixelSize: 180
+            ) { phase in
                 switch phase {
                 case .success(let image):
                     image
