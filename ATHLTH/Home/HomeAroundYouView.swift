@@ -220,10 +220,13 @@ private struct AroundYouRouteItem: Identifiable {
             return result
         }
 
-        renderCoordinates = sampled(maximumCount: 180)
+        // Map cards do not need the full GPS density. Keeping a compact
+        // display/hit-test sample cuts transient allocations while panning
+        // Explore without changing the stored route itself.
+        renderCoordinates = sampled(maximumCount: 96)
             .map(\.coordinate)
 
-        hitTestLocations = sampled(maximumCount: 140)
+        hitTestLocations = sampled(maximumCount: 64)
             .map {
                 CLLocation(
                     latitude: $0.latitude,
