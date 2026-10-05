@@ -656,9 +656,8 @@ enum WorkoutLaunchCoordinator {
             )
         }()
 
-        // Gear belongs to the next Watch workout, but nothing else begins
-        // here. In particular HealthKit, elapsed time and Spotify stay idle
-        // until the athlete presses START on Apple Watch.
+        // Gear belongs to the next Watch workout. HealthKit, elapsed
+        // time and distance recording remain completely idle here.
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
         )
@@ -682,6 +681,17 @@ enum WorkoutLaunchCoordinator {
                     .treadmill,
                 updatedAt: Date()
             )
+        )
+
+        // Preserve the existing Quick Run music behavior. This is independent
+        // of HealthKit workout timing and does not start the workout itself.
+        startQuickSpotifyIfNeeded(
+            playlist:
+                configuration.spotifyPlaylist,
+            autoplay:
+                configuration.spotifyAutoplay,
+            settings: settings,
+            spotify: spotify
         )
     }
 
