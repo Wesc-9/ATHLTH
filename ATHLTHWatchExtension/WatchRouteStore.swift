@@ -248,6 +248,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
 
         storePreparedWorkout(workout)
+
+        // A prepared workout owns the route selection. This also clears any
+        // stale pending route from an older workout when the new one has no
+        // route, and waits for the correct route file when it is still in
+        // transit.
+        applyRouteSelection(
+            rawRouteID:
+                workout.routeID?
+                    .uuidString ??
+                ""
+        )
     }
 
     private func requestTodayWorkoutSnapshot() {
