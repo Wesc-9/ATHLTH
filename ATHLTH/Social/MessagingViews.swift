@@ -134,7 +134,7 @@ struct MessageInboxView: View {
                             )
                     )
 
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 10) {
                         if shouldShowCoachConversation &&
                             coachPinned {
                             coachInboxLink
