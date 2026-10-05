@@ -1201,6 +1201,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     ) {
                     throw requestError
                 }
+            } catch let error as HomeAssistantConnectionError {
+                if case .webhookRejected = error {
+                    throw error
+                }
+                lastFailure = error
             } catch {
                 lastFailure = error
             }
