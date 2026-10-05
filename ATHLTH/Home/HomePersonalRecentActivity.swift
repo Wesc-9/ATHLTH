@@ -886,18 +886,12 @@ struct HomePersonalRecentActivitySection:
 
 private struct HomePersonalHorizontalWorkoutCard:
     View {
-    @EnvironmentObject private var exerciseLibrary:
-        ExerciseLibraryStore
-
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
 
     var body: some View {
-        let summary =
-            resolvedStrengthSummary
-
-        return VStack(
+        VStack(
             alignment: .leading,
             spacing: 0
         ) {
@@ -910,7 +904,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                 height: 124,
                 precomputedStrengthProfile:
                     workout.activity == .strength
-                        ? summary.profile
+                        ? homeMuscleProfile
                         : nil
             )
 
@@ -964,21 +958,14 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
                     .lineLimit(2)
 
-                Text(
-                    detailText(
-                        summary: summary
-                    )
-                )
+                Text(detailText)
                     .font(.system(size: 10.5))
                     .foregroundStyle(
                         ATHLTHTheme.mutedText
                     )
                     .lineLimit(1)
 
-                if let muscleFocusText =
-                        muscleFocusText(
-                            summary: summary
-                        ) {
+                if let muscleFocusText {
                     HStack(spacing: 6) {
                         Image(
                             systemName:
@@ -1051,20 +1038,40 @@ private struct HomePersonalHorizontalWorkoutCard:
         }
     }
 
-    private var resolvedStrengthSummary:
-        StrengthMuscleSessionSummary {
-        guard let strengthWorkout else {
+    private var homeMuscleProfile:
+        StrengthMuscleProfile {
+        guard let groups =
+                workout
+                    .strengthMuscleGroups,
+              !groups.isEmpty
+        else {
             return .empty
         }
 
-        return StrengthMuscleProfileBuilder
-            .make(
-                workout:
-                    strengthWorkout,
-                library:
-                    exerciseLibrary
-                        .allExercises
-            )
+        var scores:
+            [StrengthMuscleRegion: Double] =
+                [:]
+
+        for raw in groups {
+            for region in
+                StrengthMuscleResolver
+                    .regions(for: raw) {
+                scores[
+                    region,
+                    default: 0
+                ] += 1
+            }
+        }
+
+        return StrengthMuscleProfile(
+            activations:
+                scores.map {
+                    StrengthMuscleActivation(
+                        region: $0.key,
+                        score: $0.value
+                    )
+                }
+        )
     }
 
     private var strengthAccent:
@@ -1076,15 +1083,12 @@ private struct HomePersonalHorizontalWorkoutCard:
         )
     }
 
-    private func muscleFocusText(
-        summary:
-            StrengthMuscleSessionSummary
-    ) -> String? {
+    private var muscleFocusText:
+        String? {
         var titles: [String] = []
 
         for activation in
-            summary
-                .profile
+            homeMuscleProfile
                 .topActivations {
             let title =
                 activation
@@ -1162,20 +1166,13 @@ private struct HomePersonalHorizontalWorkoutCard:
         )
     }
 
-    private func detailText(
-        summary:
-            StrengthMuscleSessionSummary
-    ) -> String {
+    private var detailText:
+        String {
         if workout.activity == .strength {
             let count =
-                max(
-                    summary
-                        .exercises
-                        .count,
-                    workout
-                        .strengthExerciseCount ??
-                    0
-                )
+                workout
+                    .strengthExerciseCount ??
+                0
 
             if count > 0 {
                 return ATHLTHLocalization.format(
@@ -4219,8 +4216,6 @@ private struct HomePersonalWorkoutVisual:
     View {
     @EnvironmentObject private var health:
         HealthKitManager
-    @EnvironmentObject private var exerciseLibrary:
-        ExerciseLibraryStore
     @EnvironmentObject private var settings:
         AppSettingsStore
     @EnvironmentObject private var session:
@@ -4255,27 +4250,8 @@ private struct HomePersonalWorkoutVisual:
 
     private var muscleProfile:
         StrengthMuscleProfile {
-        if let precomputedStrengthProfile,
-           !precomputedStrengthProfile
-                .activations.isEmpty {
+        if let precomputedStrengthProfile {
             return precomputedStrengthProfile
-        }
-
-        if let strengthWorkout {
-            let built =
-                StrengthMuscleProfileBuilder
-                    .make(
-                        workout:
-                            strengthWorkout,
-                        library:
-                            exerciseLibrary
-                                .allExercises
-                    )
-                    .profile
-
-            if !built.activations.isEmpty {
-                return built
-            }
         }
 
         guard let groups =
