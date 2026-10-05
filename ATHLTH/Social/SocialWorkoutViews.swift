@@ -58,7 +58,7 @@ struct WorkoutFriendPicker: View {
                             Button {
                                 if selectedFriendIDs.contains(friend.userID) {
                                     selectedFriendIDs.remove(friend.userID)
-                                } else {
+                                } else if selectedFriendIDs.count < 5 {
                                     selectedFriendIDs.insert(friend.userID)
                                 }
                             } label: {
@@ -88,6 +88,22 @@ struct WorkoutFriendPicker: View {
                                 }
                             }
                             .buttonStyle(.plain)
+                            .disabled(
+                                selectedFriendIDs.count >= 5 &&
+                                !selectedFriendIDs
+                                    .contains(
+                                        friend.userID
+                                    )
+                            )
+                            .opacity(
+                                selectedFriendIDs.count >= 5 &&
+                                !selectedFriendIDs
+                                    .contains(
+                                        friend.userID
+                                    )
+                                    ? 0.48
+                                    : 1
+                            )
                         }
                     }
                     .padding(.vertical, 2)
@@ -111,6 +127,22 @@ struct WorkoutFriendPicker: View {
             )
             .font(.caption2)
             .foregroundStyle(.secondary)
+
+            if selectedFriendIDs.count >= 5 {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Private social workouts support up to 6 athletes including you.",
+                        norwegian:
+                            "Private sosiale økter støtter opptil 6 utøvere inkludert deg."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+            }
         }
     }
 
