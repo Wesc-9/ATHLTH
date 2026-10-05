@@ -1,5 +1,52 @@
 import Foundation
 
+enum TrainTogetherJoinPolicy:
+    String,
+    Codable,
+    Hashable,
+    CaseIterable,
+    Identifiable
+{
+    case request
+    case open
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .request:
+            return ATHLTHLocalization.choose(
+                english: "Request to join",
+                norwegian: "Be om å bli med"
+            )
+        case .open:
+            return ATHLTHLocalization.choose(
+                english: "Open join",
+                norwegian: "Åpen påmelding"
+            )
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .request:
+            return ATHLTHLocalization.choose(
+                english:
+                    "You approve each person before they enter the workout.",
+                norwegian:
+                    "Du godkjenner hver person før de blir med i økten."
+            )
+        case .open:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Anyone can join instantly until the workout is full.",
+                norwegian:
+                    "Alle kan bli med direkte til økten er full."
+            )
+        }
+    }
+}
+
 enum TrainTogetherPostStatus:
     String,
     Codable,
@@ -43,6 +90,10 @@ struct TrainTogetherPost:
     var maxGuests: Int
     var acceptedGuests: Int
     var status: TrainTogetherPostStatus
+    var participationMode:
+        SocialWorkoutParticipationMode?
+    var joinPolicy:
+        TrainTogetherJoinPolicy?
     var workoutPayload:
         SocialWorkoutInvitePayload?
     var sourcePlannedSessionID: UUID?
@@ -77,6 +128,10 @@ struct TrainTogetherPost:
         case acceptedGuests =
             "accepted_guests"
         case status
+        case participationMode =
+            "participation_mode"
+        case joinPolicy =
+            "join_policy"
         case workoutPayload =
             "workout_payload"
         case sourcePlannedSessionID =
@@ -85,6 +140,16 @@ struct TrainTogetherPost:
             "social_workout_session_id"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    var resolvedParticipationMode:
+        SocialWorkoutParticipationMode {
+        participationMode ?? .physical
+    }
+
+    var resolvedJoinPolicy:
+        TrainTogetherJoinPolicy {
+        joinPolicy ?? .request
     }
 
     var spotsLeft: Int {
@@ -215,6 +280,8 @@ struct TrainTogetherPostWrite:
     let maxGuests: Int
     let acceptedGuests: Int
     let status: String
+    let participationMode: String
+    let joinPolicy: String
     let workoutPayload:
         SocialWorkoutInvitePayload?
     let sourcePlannedSessionID: UUID?
@@ -246,6 +313,10 @@ struct TrainTogetherPostWrite:
         case acceptedGuests =
             "accepted_guests"
         case status
+        case participationMode =
+            "participation_mode"
+        case joinPolicy =
+            "join_policy"
         case workoutPayload =
             "workout_payload"
         case sourcePlannedSessionID =
