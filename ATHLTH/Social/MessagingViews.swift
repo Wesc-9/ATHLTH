@@ -3198,27 +3198,57 @@ struct DirectMessageThreadView: View {
     }
 
     private var threadHero: some View {
-        ATHLTHCard {
-            HStack(spacing: 14) {
+        ZStack(alignment: .bottomLeading) {
+            Image("CommunityHero")
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    maxWidth: .infinity
+                )
+                .frame(height: 126)
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black
+                        .opacity(0.05),
+                    Color.black
+                        .opacity(0.62)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            HStack(
+                alignment: .center,
+                spacing: 12
+            ) {
                 SocialAvatar(
                     profile: friend,
-                    size: 54
+                    size: 48
                 )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.84),
+                            lineWidth: 1.5
+                        )
+                }
 
                 VStack(
                     alignment: .leading,
-                    spacing: 4
+                    spacing: 3
                 ) {
                     Text(
                         friend.resolvedName
                     )
                     .font(
-                        .title3
+                        .headline
                             .weight(.bold)
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
+                        .white
                     )
                     .lineLimit(1)
 
@@ -3227,13 +3257,15 @@ struct DirectMessageThreadView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
+                        Color.white
+                            .opacity(0.82)
                     )
                     .lineLimit(1)
                 }
 
-                Spacer(minLength: 8)
+                Spacer(
+                    minLength: 8
+                )
 
                 Image(
                     systemName:
@@ -3241,22 +3273,64 @@ struct DirectMessageThreadView: View {
                 )
                 .font(
                     .system(
-                        size: 17,
+                        size: 15,
                         weight: .semibold
                     )
                 )
-                .foregroundStyle(.white)
+                .foregroundStyle(
+                    .white
+                )
                 .frame(
-                    width: 42,
-                    height: 42
+                    width: 38,
+                    height: 38
                 )
                 .background(
-                    ATHLTHTheme
-                        .vitality,
+                    Color.black
+                        .opacity(0.26),
                     in: Circle()
                 )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.24),
+                            lineWidth: 0.8
+                        )
+                }
             }
+            .padding(
+                .horizontal,
+                15
+            )
+            .padding(
+                .bottom,
+                13
+            )
         }
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.34),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.08),
+            radius: 14,
+            y: 6
+        )
     }
 
     private var threadStatusText: String {
@@ -4273,9 +4347,7 @@ struct DirectMessageThreadView: View {
         .padding(.top, 8)
         .padding(.bottom, 4)
         .background(
-            ATHLTHTheme
-                .canvasBottom
-                .opacity(0.94)
+            .ultraThinMaterial
         )
     }
 
@@ -5405,7 +5477,7 @@ private struct MessageBubble: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(
-                            isMine ? ATHLTHTheme.accent : Color.white,
+                            isMine ? ATHLTHTheme.vitality : Color.white,
                             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                         )
                 }
@@ -5420,9 +5492,7 @@ private struct MessageBubble: View {
                 .foregroundStyle(.tertiary)
             }
 
-            if isMine {
-                senderAvatar(currentUserProfile)
-            } else {
+            if !isMine {
                 Spacer(minLength: 48)
             }
         }
