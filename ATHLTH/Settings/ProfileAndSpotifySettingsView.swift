@@ -11,7 +11,7 @@ struct ATHLTHEditProfileView: View {
     @State private var displayName = ""
     @State private var username = ""
     @State private var bio = ""
-    @State private var selectedTrainingFocus: TrainingFocus?
+    @State private var selectedTrainingFocuses: Set<TrainingFocus> = []
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedAvatarData: Data?
     @State private var usernameAvailable: Bool?
@@ -383,18 +383,28 @@ struct ATHLTHEditProfileView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
                     profileFieldIcon(
-                        selectedTrainingFocus?.systemImage
+                        persistedTrainingFocus?.systemImage
                             ?? "figure.run"
                     )
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Training focus")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Training focus",
+                                norwegian: "Treningsfokus"
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(
-                            selectedTrainingFocus?.subtitle
-                                ?? "Choose what best describes how you train."
+                            persistedTrainingFocus?.subtitle
+                                ?? ATHLTHLocalization.choose(
+                                    english:
+                                        "Choose what best describes how you train.",
+                                    norwegian:
+                                        "Velg det som best beskriver hvordan du trener."
+                                )
                         )
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -403,26 +413,135 @@ struct ATHLTHEditProfileView: View {
 
                     Spacer(minLength: 10)
 
-                    Picker(
-                        "Training focus",
-                        selection: $selectedTrainingFocus
-                    ) {
-                        Text("Not set")
-                            .tag(TrainingFocus?.none)
-
-                        ForEach(TrainingFocus.allCases) { focus in
+                    Menu {
+                        Button {
+                            selectedTrainingFocuses.removeAll()
+                        } label: {
                             Label(
-                                focus.title,
-                                systemImage: focus.systemImage
+                                ATHLTHLocalization.choose(
+                                    english: "Not set",
+                                    norwegian: "Ikke valgt"
+                                ),
+                                systemImage:
+                                    selectedTrainingFocuses.isEmpty
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
                             )
-                            .tag(Optional(focus))
                         }
+
+                        Divider()
+
+                        ForEach(
+                            TrainingFocus.profileSelectionCases
+                        ) { focus in
+                            Button {
+                                toggleTrainingFocus(focus)
+                            } label: {
+                                Label(
+                                    focus.title,
+                                    systemImage:
+                                        selectedTrainingFocuses.contains(focus)
+                                            ? "checkmark.circle.fill"
+                                            : focus.systemImage
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(
+                                persistedTrainingFocus?.title
+                                    ?? ATHLTHLocalization.choose(
+                                        english: "Choose",
+                                        norwegian: "Velg"
+                                    )
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
-                    .pickerStyle(.menu)
-                    .tint(ATHLTHTheme.accentDeep)
+                }
+
+                if selectedTrainingFocuses.contains(.running) ||
+                    selectedTrainingFocuses.contains(.strength) {
+                    HStack(spacing: 8) {
+                        trainingFocusChip(.running)
+                        trainingFocusChip(.strength)
+                    }
                 }
             }
         }
+    }
+
+    private var persistedTrainingFocus: TrainingFocus? {
+        TrainingFocus.persistedProfileFocus(
+            from: selectedTrainingFocuses
+        )
+    }
+
+    private func toggleTrainingFocus(
+        _ focus: TrainingFocus
+    ) {
+        let pairedFocuses: Set<TrainingFocus> = [
+            .running,
+            .strength
+        ]
+
+        if pairedFocuses.contains(focus) {
+            if !selectedTrainingFocuses
+                .isSubset(of: pairedFocuses) {
+                selectedTrainingFocuses = [focus]
+                return
+            }
+
+            if selectedTrainingFocuses.contains(focus) {
+                selectedTrainingFocuses.remove(focus)
+            } else {
+                selectedTrainingFocuses.insert(focus)
+            }
+            return
+        }
+
+        if selectedTrainingFocuses == [focus] {
+            selectedTrainingFocuses.removeAll()
+        } else {
+            selectedTrainingFocuses = [focus]
+        }
+    }
+
+    private func trainingFocusChip(
+        _ focus: TrainingFocus
+    ) -> some View {
+        let selected =
+            selectedTrainingFocuses.contains(focus)
+
+        return Button {
+            toggleTrainingFocus(focus)
+        } label: {
+            Label(
+                focus.title,
+                systemImage: focus.systemImage
+            )
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                selected
+                    ? ATHLTHTheme.accentDeep
+                    : ATHLTHTheme.mutedText
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                selected
+                    ? ATHLTHTheme.accentSoft
+                    : Color.primary.opacity(0.035),
+                in: Capsule()
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var gearCard: some View {
@@ -670,7 +789,12 @@ struct ATHLTHEditProfileView: View {
         displayName = session.profile.displayName
         username = session.profile.username
         bio = session.profile.bio
-        selectedTrainingFocus = session.onboardingProfile?.trainingFocus
+        selectedTrainingFocuses =
+            TrainingFocus.profileSelections(
+                from:
+                    session.onboardingProfile?
+                        .trainingFocus
+            )
         usernameAvailable = nil
     }
 
@@ -749,9 +873,11 @@ struct ATHLTHEditProfileView: View {
 
             session.applyBackendBootstrap(bootstrap)
 
-            if let selectedTrainingFocus {
-                session.setTrainingFocus(selectedTrainingFocus)
-                await social.syncOwnTrainingFocus(selectedTrainingFocus)
+            if let persistedTrainingFocus {
+                session.setTrainingFocus(persistedTrainingFocus)
+                await social.syncOwnTrainingFocus(
+                    persistedTrainingFocus
+                )
             }
 
             selectedAvatarData = nil
