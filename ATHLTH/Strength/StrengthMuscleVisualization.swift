@@ -255,7 +255,9 @@ enum StrengthMuscleProfileBuilder {
 
     static func make(
         workout: StrengthWorkoutLog,
-        library: [ExerciseLibraryEntry]
+        library:
+            @autoclosure () ->
+                [ExerciseLibraryEntry]
     ) -> StrengthMuscleSessionSummary {
         let performed =
             performedExercises(
@@ -292,7 +294,11 @@ enum StrengthMuscleProfileBuilder {
                 [:]
 
         if !legacyLookupNames.isEmpty {
-            for entry in library {
+            // Resolve the full exercise catalog only for genuinely legacy
+            // workout snapshots. Modern logs already carry muscle metadata,
+            // so Home/activity cards avoid sorting/translating the entire
+            // exercise library during SwiftUI scene updates.
+            for entry in library() {
                 let key =
                     normalizedName(
                         entry.exercise.name
