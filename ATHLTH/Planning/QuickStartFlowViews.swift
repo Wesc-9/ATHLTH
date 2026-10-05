@@ -1054,6 +1054,28 @@ struct RunQuickStartSheet: View {
 
                     quickRunGuidanceCard
 
+                    ATHLTHCard {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 14
+                        ) {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs:
+                                    $selectedFriendIDs
+                            )
+
+                            if !selectedFriendIDs
+                                .isEmpty {
+                                Divider()
+
+                                WorkoutSocialModePicker(
+                                    mode:
+                                        $socialMode
+                                )
+                            }
+                        }
+                    }
+
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
                             WorkoutGearSelectionCard(
@@ -1078,28 +1100,6 @@ struct RunQuickStartSheet: View {
                                 showingSpotifyPicker = true
                             }
 
-                            ATHLTHCard {
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 14
-                                ) {
-                                    WorkoutFriendPicker(
-                                        selectedFriendIDs:
-                                            $selectedFriendIDs
-                                    )
-
-                                    if !selectedFriendIDs
-                                        .isEmpty {
-                                        Divider()
-
-                                        WorkoutSocialModePicker(
-                                            mode:
-                                                $socialMode
-                                        )
-                                    }
-                                }
-                            }
                         }
                         .transition(
                             .opacity
@@ -1983,15 +1983,13 @@ struct RunQuickStartSheet: View {
     private var startButton: some View {
         Button {
             let friends =
-                isAdvancedSetup
-                    ? social.trainingPartners
-                        .filter {
-                            selectedFriendIDs
-                                .contains(
-                                    $0.userID
-                                )
-                        }
-                    : []
+                social.trainingPartners
+                    .filter {
+                        selectedFriendIDs
+                            .contains(
+                                $0.userID
+                            )
+                    }
 
             var routeAlerts =
                 routeGuardianDraft
@@ -2609,6 +2607,28 @@ struct WalkQuickStartSheet: View {
                         activity: .walking
                     )
 
+                    ATHLTHCard {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 14
+                        ) {
+                            WorkoutFriendPicker(
+                                selectedFriendIDs:
+                                    $selectedFriendIDs
+                            )
+
+                            if !selectedFriendIDs
+                                .isEmpty {
+                                Divider()
+
+                                WorkoutSocialModePicker(
+                                    mode:
+                                        $socialMode
+                                )
+                            }
+                        }
+                    }
+
                     if isAdvancedSetup {
                         QuickStartAutoPauseCard(
                             preference: $autoPausePreference,
@@ -2696,28 +2716,6 @@ struct WalkQuickStartSheet: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        ATHLTHCard {
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing: 14
-                            ) {
-                                WorkoutFriendPicker(
-                                    selectedFriendIDs:
-                                        $selectedFriendIDs
-                                )
-
-                                if !selectedFriendIDs
-                                    .isEmpty {
-                                    Divider()
-
-                                    WorkoutSocialModePicker(
-                                        mode:
-                                            $socialMode
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     Button {
@@ -2753,9 +2751,7 @@ struct WalkQuickStartSheet: View {
                                     spotifyAutoplay &&
                                     selectedSpotifyPlaylist != nil,
                                 friends:
-                                    isAdvancedSetup
-                                        ? friends
-                                        : [],
+                                    friends,
                                 socialMode:
                                     socialMode,
                                 gearIDs: selectedGearIDs
