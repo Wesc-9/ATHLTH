@@ -3336,6 +3336,10 @@ final class
             3 * 1_024 * 1_024
     }
 
+    func clearCache() {
+        cache.removeAllObjects()
+    }
+
     static func cacheKey(
         coordinates:
             [CLLocationCoordinate2D]
