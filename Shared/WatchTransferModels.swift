@@ -1126,6 +1126,33 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         )
     }
 
+    // Lead-change alerts are event-driven extras on top of the selected
+    // distance/time cadence. Keep them deliberately slower than routine
+    // periodic Ghost status so a 1 km setting still feels like 1 km.
+    var resolvedLeadChangeCooldownSeconds:
+        TimeInterval {
+        90
+    }
+
+    var resolvedImportantLeadChangeCooldownSeconds:
+        TimeInterval {
+        60
+    }
+
+    // Require a meaningful move through the ahead/behind boundary before
+    // treating it as an important overtake. This prevents GPS jitter around
+    // zero from repeatedly producing "ahead/behind" alerts.
+    var resolvedLeadFlipThresholdMeters:
+        Double {
+        min(
+            max(
+                leadChangeThresholdMeters,
+                20
+            ),
+            50
+        )
+    }
+
     static let disabled = WatchGhostRaceAudioConfiguration(
         enabled: false,
         distanceIntervalMeters: nil,
@@ -1143,7 +1170,7 @@ struct WatchGhostRaceAudioConfiguration: Codable, Hashable {
         enabled: true,
         distanceIntervalMeters: 1_000,
         timeIntervalSeconds: nil,
-        announceLeadChanges: true,
+        announceLeadChanges: false,
         leadChangeThresholdMeters: 25,
         delivery: .voice,
         periodicDelivery: .voice,
