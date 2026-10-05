@@ -7176,7 +7176,10 @@ struct ATHLTHRecoveryView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 10)
+                // Pull the first Insights card closer to the hero/sheet
+                // transition. The old positive inset left an unnecessarily
+                // large unused white band below the artwork.
+                .padding(.top, -14)
                 .padding(.bottom, 30)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
