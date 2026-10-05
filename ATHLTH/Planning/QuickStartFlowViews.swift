@@ -333,6 +333,8 @@ struct RunQuickStartConfiguration {
     let spotifyPlaylist: SpotifyPlaylistReference?
     let spotifyAutoplay: Bool
     let friends: [SocialProfileCard]
+    let socialMode:
+        SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
 
     var title: String {
@@ -354,6 +356,8 @@ struct WalkQuickStartConfiguration {
     let spotifyPlaylist: SpotifyPlaylistReference?
     let spotifyAutoplay: Bool
     let friends: [SocialProfileCard]
+    let socialMode:
+        SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
 }
 
@@ -408,7 +412,17 @@ extension RunQuickStartConfiguration {
         return SocialWorkoutInvitePayload(
             workout: snapshot,
             route: resolvedRoute,
-            routeAlerts: routeAlerts
+            routeAlerts: routeAlerts,
+            participationMode:
+                socialMode,
+            maxParticipants:
+                min(
+                    max(
+                        friends.count + 1,
+                        2
+                    ),
+                    6
+                )
         )
     }
 }
@@ -438,7 +452,17 @@ extension WalkQuickStartConfiguration {
             autoPauseEnabled
 
         return SocialWorkoutInvitePayload(
-            workout: snapshot
+            workout: snapshot,
+            participationMode:
+                socialMode,
+            maxParticipants:
+                min(
+                    max(
+                        friends.count + 1,
+                        2
+                    ),
+                    6
+                )
         )
     }
 }
@@ -933,6 +957,9 @@ struct RunQuickStartSheet: View {
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var socialMode:
+        SocialWorkoutParticipationMode =
+            .physical
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var environment: RunEnvironment = .outdoor
@@ -1052,10 +1079,26 @@ struct RunQuickStartSheet: View {
                             }
 
                             ATHLTHCard {
-                                WorkoutFriendPicker(
-                                    selectedFriendIDs:
-                                        $selectedFriendIDs
-                                )
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 14
+                                ) {
+                                    WorkoutFriendPicker(
+                                        selectedFriendIDs:
+                                            $selectedFriendIDs
+                                    )
+
+                                    if !selectedFriendIDs
+                                        .isEmpty {
+                                        Divider()
+
+                                        WorkoutSocialModePicker(
+                                            mode:
+                                                $socialMode
+                                        )
+                                    }
+                                }
                             }
                         }
                         .transition(
@@ -2015,6 +2058,8 @@ struct RunQuickStartSheet: View {
                         spotifyAutoplay &&
                         selectedSpotifyPlaylist != nil,
                     friends: friends,
+                    socialMode:
+                        socialMode,
                     gearIDs: selectedGearIDs
                 )
             )
@@ -2476,6 +2521,9 @@ struct WalkQuickStartSheet: View {
     let onStart: (WalkQuickStartConfiguration) -> Void
 
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var socialMode:
+        SocialWorkoutParticipationMode =
+            .physical
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice = .iPhone
     @State private var audioCoachDraft = AudioCoachDraft()
@@ -2649,9 +2697,26 @@ struct WalkQuickStartSheet: View {
                         }
                         .buttonStyle(.plain)
                         ATHLTHCard {
-                            WorkoutFriendPicker(
-                                selectedFriendIDs: $selectedFriendIDs
-                            )
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 14
+                            ) {
+                                WorkoutFriendPicker(
+                                    selectedFriendIDs:
+                                        $selectedFriendIDs
+                                )
+
+                                if !selectedFriendIDs
+                                    .isEmpty {
+                                    Divider()
+
+                                    WorkoutSocialModePicker(
+                                        mode:
+                                            $socialMode
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -2691,6 +2756,8 @@ struct WalkQuickStartSheet: View {
                                     isAdvancedSetup
                                         ? friends
                                         : [],
+                                socialMode:
+                                    socialMode,
                                 gearIDs: selectedGearIDs
                             )
                         )
