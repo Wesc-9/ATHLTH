@@ -666,13 +666,21 @@ struct ATHLTHGhostUpdatesSettingsView: View {
         let finalMeters =
             settings
                 .ghostRaceFinalPhaseStartMeters
+        let statusMode =
+            settings
+                .ghostRaceStatusDetailMode
+        let connectionAlerts =
+            settings
+                .ghostRaceLiveConnectionAlerts
 
         if distance &&
             !time &&
             abs(km - 1.0) < 0.01 &&
             !leads &&
             !overtakes &&
-            !finalPhase {
+            !finalPhase &&
+            statusMode == .both &&
+            connectionAlerts {
             return .quiet
         }
 
@@ -682,7 +690,9 @@ struct ATHLTHGhostUpdatesSettingsView: View {
             !leads &&
             overtakes &&
             finalPhase &&
-            abs(finalMeters - 500) < 1 {
+            abs(finalMeters - 500) < 1 &&
+            statusMode == .both &&
+            connectionAlerts {
             return .normal
         }
 
@@ -692,7 +702,9 @@ struct ATHLTHGhostUpdatesSettingsView: View {
             leads &&
             overtakes &&
             finalPhase &&
-            abs(finalMeters - 1_000) < 1 {
+            abs(finalMeters - 1_000) < 1 &&
+            statusMode == .both &&
+            connectionAlerts {
             return .competition
         }
 
