@@ -467,7 +467,19 @@ private struct ATHLTHMirroredWorkoutPresenter: View {
             .fullScreenCover(
                 isPresented: $showingLiveWorkout,
                 onDismiss: {
-                    if !workoutMirroring.hasActiveMirroredWorkout {
+                    guard !workoutMirroring
+                        .hasActiveMirroredWorkout
+                    else {
+                        return
+                    }
+
+                    // A completed Watch workout auto-dismisses the live cover.
+                    // Preserve its final snapshot and Ghost result until the
+                    // completion/review pipeline has consumed them. Failed
+                    // mirrors can still be discarded immediately.
+                    if workoutMirroring
+                        .snapshot?
+                        .state == .failed {
                         workoutMirroring.dismissSummary()
 
                         if ghostRace.reference != nil {
