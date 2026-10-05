@@ -104,7 +104,51 @@ enum ATHLTHLocalization {
 // Dynamic public exercise data is stored with a stable English canonical name.
 // Keep localization at the presentation/search layer so workout history,
 // favorites, sync payloads and third-party IDs stay language independent.
+private final class ATHLTHExerciseNameLocalizationCache:
+    @unchecked Sendable {
+    private let lock = NSLock()
+    private var norwegianNames: [String: String] = [:]
+    private var searchTerms: [String: [String]] = [:]
+
+    func norwegianName(
+        for key: String
+    ) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return norwegianNames[key]
+    }
+
+    func storeNorwegianName(
+        _ value: String,
+        for key: String
+    ) {
+        lock.lock()
+        norwegianNames[key] = value
+        lock.unlock()
+    }
+
+    func terms(
+        for key: String
+    ) -> [String]? {
+        lock.lock()
+        defer { lock.unlock() }
+        return searchTerms[key]
+    }
+
+    func storeTerms(
+        _ value: [String],
+        for key: String
+    ) {
+        lock.lock()
+        searchTerms[key] = value
+        lock.unlock()
+    }
+}
+
 enum ATHLTHExerciseNameLocalization {
+    private static let cache =
+        ATHLTHExerciseNameLocalizationCache()
+
     private static let exactNorwegianNames: [String: String] = [
         "bench press": "Benkpress",
         "barbell bench press": "Benkpress med stang",
@@ -336,52 +380,102 @@ enum ATHLTHExerciseNameLocalization {
             return englishName
         }
 
+        if let cached =
+                cache.norwegianName(
+                    for: trimmed
+                ) {
+            return cached
+        }
+
         let key = normalizedKey(trimmed)
-        if let exact = exactNorwegianNames[key] {
-            return exact
-        }
+        let resolved: String
 
-        var translated = trimmed
-        for (english, norwegian) in phraseReplacements {
-            translated = translated.replacingOccurrences(
+        if let exact =
+                exactNorwegianNames[key] {
+            resolved = exact
+        } else {
+            var translated = trimmed
+
+            for (english, norwegian) in
+                phraseReplacements
+            where translated.range(
                 of: english,
-                with: norwegian,
                 options: [.caseInsensitive]
-            )
+            ) != nil {
+                translated =
+                    translated
+                        .replacingOccurrences(
+                            of: english,
+                            with: norwegian,
+                            options: [.caseInsensitive]
+                        )
+            }
+
+            resolved =
+                translated == trimmed
+                    ? trimmed
+                    : capitalizingFirstCharacter(
+                        translated
+                    )
         }
 
-        guard translated != trimmed else {
-            return trimmed
-        }
-
-        return capitalizingFirstCharacter(translated)
+        cache.storeNorwegianName(
+            resolved,
+            for: trimmed
+        )
+        return resolved
     }
 
     static func searchTerms(for englishName: String) -> [String] {
+        if let cached =
+                cache.terms(
+                    for: englishName
+                ) {
+            return cached
+        }
+
         let key = normalizedKey(englishName)
         var values = [
             englishName,
             norwegianName(for: englishName)
         ]
-        values.append(contentsOf: norwegianAliases[key] ?? [])
+        values.append(
+            contentsOf:
+                norwegianAliases[key] ?? []
+        )
 
         var seen = Set<String>()
-        return values.filter { value in
-            let normalized = value
-                .trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                .lowercased()
-            guard !normalized.isEmpty else { return false }
-            return seen.insert(normalized).inserted
-        }
+        let resolved =
+            values.filter { value in
+                let normalized = value
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                    .lowercased()
+                guard !normalized.isEmpty
+                else {
+                    return false
+                }
+                return seen.insert(
+                    normalized
+                ).inserted
+            }
+
+        cache.storeTerms(
+            resolved,
+            for: englishName
+        )
+        return resolved
     }
 
     private static func normalizedKey(_ value: String) -> String {
         value
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-            .split(whereSeparator: { $0.isWhitespace })
+            .split {
+                $0.isWhitespace ||
+                $0 == "-" ||
+                $0 == "_"
+            }
             .map(String.init)
             .joined(separator: " ")
             .lowercased()
