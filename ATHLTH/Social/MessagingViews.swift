@@ -1246,9 +1246,11 @@ struct MessageInboxView: View {
         let searchable = [
             "athlth coach",
             "coach",
-            recoveryAIText(
-                "personal training coach",
-                "personlig treningscoach"
+            ATHLTHLocalization.choose(
+                english:
+                    "personal training coach",
+                norwegian:
+                    "personlig treningscoach"
             ),
             coachPreviewText
         ]
@@ -1736,6 +1738,204 @@ private struct MessagePersonInboxItem: Identifiable {
 
         return dates.max() ??
             .distantPast
+    }
+}
+
+private struct RecoveryCoachInboxRow:
+    View {
+    let preview: String
+    let timestamp: Date?
+    let isPinned: Bool
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(
+                                    red: 0.10,
+                                    green: 0.13,
+                                    blue: 0.19
+                                ),
+                                Color.indigo
+                                    .opacity(0.82)
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        )
+                    )
+
+                Image(
+                    systemName:
+                        "sparkles"
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .white
+                )
+            }
+            .frame(
+                width: 58,
+                height: 58
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.white
+                            .opacity(0.72),
+                        lineWidth: 1.5
+                    )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                HStack(spacing: 7) {
+                    if isPinned {
+                        Image(
+                            systemName:
+                                "pin.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.orange
+                        )
+                    }
+
+                    Text("ATHLTH Coach")
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .lineLimit(1)
+
+                    Text("ATHLTH+")
+                        .font(
+                            .system(
+                                size: 8.5,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .padding(
+                            .horizontal,
+                            6
+                        )
+                        .padding(
+                            .vertical,
+                            3
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .champagneSoft,
+                            in: Capsule()
+                        )
+
+                    Spacer()
+                }
+
+                Text(preview)
+                    .font(
+                        .subheadline
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(2)
+            }
+
+            VStack(
+                alignment: .trailing,
+                spacing: 10
+            ) {
+                if let timestamp {
+                    Text(
+                        timestamp.formatted(
+                            date: .omitted,
+                            time: .shortened
+                        )
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .system(
+                        size: 12,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+        }
+        .padding(
+            .horizontal,
+            14
+        )
+        .padding(
+            .vertical,
+            12
+        )
+        .background(
+            Color.white
+                .opacity(0.72),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.primary
+                    .opacity(0.04),
+                lineWidth: 0.8
+            )
+        }
     }
 }
 
