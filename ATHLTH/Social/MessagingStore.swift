@@ -265,11 +265,56 @@ final class MessagingStore: ObservableObject {
         // If the two athletes have become mutual followers since the request
         // was created, the conversation can be promoted to accepted without
         // forcing a second request.
-        let conversationID = try await service.getOrCreateConversation(
-            with: userID
-        )
+        let conversationID =
+            try await service
+                .getOrCreateConversation(
+                    with: userID
+                )
+
+        // Hydrate the exact row immediately. Do not make the composer depend
+        // on a later full-list refresh: a brand-new pending conversation has
+        // no message/last_message_at yet and can otherwise briefly be absent
+        // from the local list, leaving the first request impossible to send.
+        if let conversation =
+                try await service
+                    .loadConversation(
+                        id: conversationID
+                    ) {
+            upsertConversation(
+                conversation
+            )
+        }
+
         await refresh()
         return conversationID
+    }
+
+    private func upsertConversation(
+        _ conversation:
+            DirectConversationRecord
+    ) {
+        if let index =
+                conversations
+                    .firstIndex(
+                        where: {
+                            $0.id ==
+                                conversation.id
+                        }
+                    ) {
+            conversations[index] =
+                conversation
+        } else {
+            conversations.append(
+                conversation
+            )
+        }
+
+        conversations.sort {
+            ($0.lastMessageAt ??
+                $0.createdAt) >
+            ($1.lastMessageAt ??
+                $1.createdAt)
+        }
     }
 
     func respondToMessageRequest(
