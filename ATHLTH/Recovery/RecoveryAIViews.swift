@@ -862,256 +862,239 @@ struct RecoveryCoachView: View {
         "athlth-recovery-coach-bottom"
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(
-                    alignment: .leading,
-                    spacing: 14
-                ) {
-                    coachInsightCard
-
-                    if messages.isEmpty {
-                        Text(
-                            recoveryAIText(
-                                "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
-                                "Still et spørsmål for å starte en samtale. Coach husker det dere snakker om på denne enheten."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                    } else {
-                        ForEach(messages) {
-                            message in
-                            coachMessageBubble(
-                                message
-                            )
-                        }
-                    }
-
-                    if isAsking {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-
-                            Text(
-                                recoveryAIText(
-                                    "ATHLTH is thinking…",
-                                    "ATHLTH tenker…"
-                                )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
-                        }
-                        .padding(
-                            .horizontal,
-                            12
-                        )
-                        .padding(
-                            .vertical,
-                            10
-                        )
-                        .background(
-                            Color.primary
-                                .opacity(0.035),
-                            in:
-                                RoundedRectangle(
-                                    cornerRadius:
-                                        16,
-                                    style:
-                                        .continuous
-                                )
-                        )
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                            .padding(
-                                .horizontal,
-                                4
-                            )
-                    }
-
-                    Color.clear
-                        .frame(height: 1)
-                        .id(bottomAnchorID)
-                }
-                .padding()
-            }
-            .scrollDismissesKeyboard(
-                .interactively
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.10)
             )
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        Color.indigo
-                            .opacity(0.08)
+
+            VStack(spacing: 0) {
+                coachConversationHero
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .padding(
+                        .top,
+                        8
+                    )
+                    .zIndex(2)
+
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(
+                            alignment: .leading,
+                            spacing: 14
+                        ) {
+                            coachInsightCard
+
+                            if messages.isEmpty {
+                                Text(
+                                    recoveryAIText(
+                                        "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
+                                        "Still et spørsmål for å starte en samtale. Coach husker det dere snakker om på denne enheten."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                                .padding(
+                                    .horizontal,
+                                    4
+                                )
+                            } else {
+                                ForEach(messages) {
+                                    message in
+
+                                    coachMessageBubble(
+                                        message
+                                    )
+                                }
+                            }
+
+                            if isAsking {
+                                HStack(
+                                    spacing: 8
+                                ) {
+                                    ProgressView()
+                                        .controlSize(
+                                            .small
+                                        )
+
+                                    Text(
+                                        recoveryAIText(
+                                            "ATHLTH is thinking…",
+                                            "ATHLTH tenker…"
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                }
+                                .padding(
+                                    .horizontal,
+                                    12
+                                )
+                                .padding(
+                                    .vertical,
+                                    10
+                                )
+                                .background(
+                                    Color.white
+                                        .opacity(0.72),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius: 16,
+                                            style: .continuous
+                                        )
+                                )
+                            }
+
+                            if let errorMessage {
+                                Text(
+                                    errorMessage
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .red
+                                )
+                                .padding(
+                                    .horizontal,
+                                    4
+                                )
+                            }
+
+                            Color.clear
+                                .frame(
+                                    height: 1
+                                )
+                                .id(
+                                    bottomAnchorID
+                                )
+                        }
+                        .padding()
+                    }
+                    .scrollDismissesKeyboard(
+                        .interactively
+                    )
+                    .onChange(
+                        of: messages.count
+                    ) { _, _ in
+                        withAnimation(
+                            .easeOut(
+                                duration:
+                                    0.20
+                            )
+                        ) {
+                            proxy.scrollTo(
+                                bottomAnchorID,
+                                anchor: .bottom
+                            )
+                        }
+                    }
+                    .onChange(
+                        of: isAsking
+                    ) { _, asking in
+                        guard asking else {
+                            return
+                        }
+
+                        withAnimation(
+                            .easeOut(
+                                duration:
+                                    0.20
+                            )
+                        ) {
+                            proxy.scrollTo(
+                                bottomAnchorID,
+                                anchor: .bottom
+                            )
+                        }
+                    }
+                    .task {
+                        loadConversationIfNeeded()
+
+                        await MainActor.run {
+                            proxy.scrollTo(
+                                bottomAnchorID,
+                                anchor: .bottom
+                            )
+                        }
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
                 )
-            )
-            .onChange(
-                of: messages.count
-            ) { _, _ in
-                withAnimation(
-                    .easeOut(
-                        duration: 0.20
-                    )
-                ) {
-                    proxy.scrollTo(
-                        bottomAnchorID,
-                        anchor: .bottom
-                    )
-                }
-            }
-            .onChange(
-                of: isAsking
-            ) { _, asking in
-                guard asking else {
-                    return
-                }
-
-                withAnimation(
-                    .easeOut(
-                        duration: 0.20
-                    )
-                ) {
-                    proxy.scrollTo(
-                        bottomAnchorID,
-                        anchor: .bottom
-                    )
-                }
-            }
-            .task {
-                loadConversationIfNeeded()
-
-                await MainActor.run {
-                    proxy.scrollTo(
-                        bottomAnchorID,
-                        anchor: .bottom
-                    )
-                }
+                .athlthConversationPanelChrome()
+                .padding(
+                    .horizontal,
+                    4
+                )
+                .padding(
+                    .top,
+                    -24
+                )
+                .zIndex(1)
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(
+            edge: .bottom
+        ) {
             coachComposer
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(
             .inline
         )
-        .toolbarBackground(
-            .visible,
+        .toolbar(
+            .hidden,
             for: .navigationBar
         )
-        .toolbarBackground(
-            Color.white.opacity(0.94),
-            for: .navigationBar
-        )
-        .toolbar {
-            ToolbarItem(
-                placement: .principal
-            ) {
-                coachNavigationHeader
-            }
-
-            if showsDoneButton {
-                ToolbarItem(
-                    placement:
-                        .confirmationAction
-                ) {
-                    Button(
-                        recoveryAIText(
-                            "Done",
-                            "Ferdig"
-                        )
-                    ) {
-                        dismiss()
-                    }
-                }
-            } else {
-                ToolbarItem(
-                    placement:
-                        .confirmationAction
-                ) {
-                    Menu {
-                        Button {
-                            coachPinned.toggle()
-                            RecoveryCoachInboxPreferences
-                                .setPinned(
-                                    coachPinned,
-                                    userID:
-                                        session
-                                            .profile
-                                            .userID
-                                )
-                        } label: {
-                            Label(
-                                coachPinned
-                                    ? recoveryAIText(
-                                        "Unpin conversation",
-                                        "Løsne samtalen"
-                                    )
-                                    : recoveryAIText(
-                                        "Pin conversation",
-                                        "Fest samtalen"
-                                    ),
-                                systemImage:
-                                    coachPinned
-                                        ? "pin.slash"
-                                        : "pin.fill"
-                            )
-                        }
-                    } label: {
-                        Image(
-                            systemName:
-                                "ellipsis"
-                        )
-                        .font(
-                            .system(
-                                size: 17,
-                                weight: .semibold
-                            )
-                        )
-                        .frame(
-                            width: 34,
-                            height: 34
-                        )
-                        .contentShape(
-                            Circle()
-                        )
-                    }
-                }
-            }
-        }
         .onAppear {
             coachPinned =
                 RecoveryCoachInboxPreferences
                     .isPinned(
                         userID:
-                            session.profile
+                            session
+                                .profile
                                 .userID
                     )
         }
     }
 
-    private var coachNavigationHeader:
+    private var coachConversationHero:
         some View {
-        HStack(spacing: 8) {
+        ATHLTHConversationHero(
+            title:
+                "ATHLTH Coach",
+            subtitle:
+                recoveryAIText(
+                    "Your personal training coach",
+                    "Din personlige treningscoach"
+                ),
+            onBack: {
+                dismiss()
+            }
+        ) {
             ZStack {
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [
                                 Color(
-                                    red: 0.10,
-                                    green: 0.13,
-                                    blue: 0.19
+                                    red: 0.09,
+                                    green: 0.12,
+                                    blue: 0.18
                                 ),
-                                Color.indigo
-                                    .opacity(0.82)
+                                ATHLTHTheme
+                                    .accentDeep
                             ],
                             startPoint:
                                 .topLeading,
@@ -1126,66 +1109,105 @@ struct RecoveryCoachView: View {
                 )
                 .font(
                     .system(
-                        size: 13,
-                        weight: .semibold
+                        size: 16,
+                        weight:
+                            .semibold
                     )
                 )
                 .foregroundStyle(
                     .white
                 )
             }
-            .frame(
-                width: 34,
-                height: 34
-            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.white
+                            .opacity(0.86),
+                        lineWidth: 1.4
+                    )
+            }
+        } trailing: {
+            Menu {
+                Button {
+                    coachPinned.toggle()
 
-            VStack(
-                alignment: .leading,
-                spacing: 1
-            ) {
-                Text("ATHLTH Coach")
-                    .font(
-                        .system(
-                            size: 14,
-                            weight: .bold
+                    RecoveryCoachInboxPreferences
+                        .setPinned(
+                            coachPinned,
+                            userID:
+                                session
+                                    .profile
+                                    .userID
                         )
+                } label: {
+                    Label(
+                        coachPinned
+                            ? recoveryAIText(
+                                "Unpin conversation",
+                                "Løsne samtalen"
+                            )
+                            : recoveryAIText(
+                                "Pin conversation",
+                                "Fest samtalen"
+                            ),
+                        systemImage:
+                            coachPinned
+                                ? "pin.slash"
+                                : "pin.fill"
                     )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
+                }
 
-                HStack(spacing: 4) {
-                    Text(
+                Button(
+                    role: .destructive
+                ) {
+                    messages
+                        .removeAll()
+                    quickQuestions =
+                        contextAwareQuestions()
+                    errorMessage = nil
+                    persistConversation()
+                } label: {
+                    Label(
                         recoveryAIText(
-                            "Online",
-                            "På nett"
-                        )
+                            "Start new conversation",
+                            "Start ny samtale"
+                        ),
+                        systemImage:
+                            "bubble.left.and.exclamationmark.bubble.right"
                     )
-                    .font(
-                        .system(
-                            size: 10.5,
-                            weight: .medium
-                        )
+                }
+            } label: {
+                Image(
+                    systemName:
+                        "ellipsis"
+                )
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .bold
                     )
-                    .foregroundStyle(
-                        .secondary
-                    )
-
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    .ultraThinMaterial,
+                    in: Circle()
+                )
+                .overlay {
                     Circle()
-                        .fill(
-                            Color.green
-                        )
-                        .frame(
-                            width: 5,
-                            height: 5
+                        .stroke(
+                            Color.white
+                                .opacity(0.30),
+                            lineWidth: 0.8
                         )
                 }
             }
         }
-        .accessibilityElement(
-            children: .combine
-        )
     }
 
     private var coachInsightCard:
