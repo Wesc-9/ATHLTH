@@ -1696,14 +1696,22 @@ struct RecoveryCoachView: View {
                             .primaryText
                     )
                     .frame(
-                        width: 42,
-                        height: 42
+                        width: 44,
+                        height: 44
                     )
                     .background(
-                        Color.primary
-                            .opacity(0.055),
+                        Color.white
+                            .opacity(0.86),
                         in: Circle()
                     )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                ATHLTHTheme
+                                    .border,
+                                lineWidth: 0.8
+                            )
+                    }
                 }
                 .buttonStyle(.plain)
 
@@ -1726,32 +1734,40 @@ struct RecoveryCoachView: View {
                 }
                 .padding(
                     .horizontal,
-                    14
+                    15
                 )
                 .padding(
                     .vertical,
-                    10
+                    11
                 )
                 .background(
                     Color.white
-                        .opacity(0.86),
+                        .opacity(0.93),
                     in:
                         RoundedRectangle(
-                            cornerRadius: 18,
+                            cornerRadius: 20,
                             style: .continuous
                         )
                 )
                 .overlay {
                     RoundedRectangle(
-                        cornerRadius: 18,
+                        cornerRadius: 20,
                         style: .continuous
                     )
                     .stroke(
-                        Color.primary
-                            .opacity(0.06),
+                        Color.white
+                            .opacity(0.92),
                         lineWidth: 0.8
                     )
                 }
+                .shadow(
+                    color:
+                        ATHLTHTheme
+                            .accentDeep
+                            .opacity(0.035),
+                    radius: 8,
+                    y: 3
+                )
 
                 Button {
                     Task {
@@ -1774,8 +1790,8 @@ struct RecoveryCoachView: View {
                         .white
                     )
                     .frame(
-                        width: 42,
-                        height: 42
+                        width: 44,
+                        height: 44
                     )
                     .background(
                         ATHLTHTheme
@@ -1804,12 +1820,16 @@ struct RecoveryCoachView: View {
                         : 1
                 )
             }
-            .padding(.horizontal)
+            .padding(
+                .horizontal,
+                14
+            )
         }
-        .padding(.vertical, 9)
-        .background(
-            .ultraThinMaterial
+        .padding(
+            .vertical,
+            9
         )
+        .athlthConversationComposerChrome()
     }
 
     @ViewBuilder
@@ -1872,30 +1892,64 @@ struct RecoveryCoachView: View {
                     )
                     .padding(
                         .horizontal,
-                        13
+                        15
                     )
                     .padding(
                         .vertical,
-                        10
+                        11
                     )
                     .background(
                         message.role == .user
                             ? AnyShapeStyle(
-                                ATHLTHTheme
-                                    .vitality
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme
+                                            .vitality,
+                                        ATHLTHTheme
+                                            .accent
+                                            .opacity(0.92)
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                )
                             )
                             : AnyShapeStyle(
                                 Color.white
-                                    .opacity(
-                                        0.82
-                                    )
+                                    .opacity(0.96)
                             ),
                         in:
                             RoundedRectangle(
-                                cornerRadius: 18,
+                                cornerRadius: 20,
                                 style:
                                     .continuous
                             )
+                    )
+                    .overlay {
+                        if message.role != .user {
+                            RoundedRectangle(
+                                cornerRadius: 20,
+                                style: .continuous
+                            )
+                            .stroke(
+                                Color.white
+                                    .opacity(0.92),
+                                lineWidth: 0.8
+                            )
+                        }
+                    }
+                    .shadow(
+                        color:
+                            message.role == .user
+                                ? ATHLTHTheme
+                                    .vitality
+                                    .opacity(0.08)
+                                : ATHLTHTheme
+                                    .accentDeep
+                                    .opacity(0.04),
+                        radius: 8,
+                        y: 3
                     )
 
                 Text(
