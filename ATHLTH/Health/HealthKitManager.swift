@@ -99,12 +99,18 @@ final class HealthKitManager: ObservableObject {
 
         private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
+    private var workoutObjectCacheOrder: [UUID] = []
+    private static let workoutObjectCacheLimit = 128
+
     private var observerQueries: [HKObserverQuery] = []
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var workoutRouteCache:
         [UUID: (route: [CLLocation], generatedAt: Date)] = [:]
+    private var workoutRouteCacheOrder: [UUID] = []
+    private static let workoutRouteCacheLimit = 8
+
     private var profilePerformanceCache: (stats: ProfilePerformanceStats, generatedAt: Date)?
     private var runningRoutePerformanceCache:
         [UUID: RunningRoutePerformanceEntry] = [:]
@@ -289,14 +295,18 @@ final class HealthKitManager: ObservableObject {
                 }
 
                 for id in deletedIDs {
-                    workoutObjects[id] = nil
+                    removeCachedWorkoutObject(
+                        id
+                    )
                 }
             }
 
             let mode = externalWorkoutImportMode
 
             for workout in changes.workouts {
-                workoutObjects[workout.uuid] = workout
+                cacheWorkoutObject(
+                    workout
+                )
 
                 if isATHLTHWorkout(workout) {
                     if !workouts.contains(where: { $0.id == workout.uuid }) {
@@ -1140,15 +1150,9 @@ final class HealthKitManager: ObservableObject {
             if workouts != summaries {
                 workouts = summaries
             }
-            workoutObjects =
-                fetchedWorkouts.reduce(
-                    into: [:]
-                ) {
-                    result,
-                    workout in
-                    result[workout.uuid] =
-                        workout
-                }
+            replaceWorkoutObjectCache(
+                with: fetchedWorkouts
+            )
             completedRead = true
         }
 
@@ -1300,7 +1304,9 @@ final class HealthKitManager: ObservableObject {
             let workout = try await builder.finishWorkout()
 
             if let workout {
-                workoutObjects[workout.uuid] = workout
+                cacheWorkoutObject(
+                    workout
+                )
 
                 let summary = WorkoutSummary(workout: workout)
                 workouts.removeAll { $0.id == summary.id }
@@ -1320,9 +1326,9 @@ final class HealthKitManager: ObservableObject {
     func workoutHistory() async throws -> [WorkoutSummary] {
         let fetched = try await fetchAllWorkoutsCached()
 
-        for workout in fetched {
-            workoutObjects[workout.uuid] = workout
-        }
+        cacheWorkoutObjects(
+            fetched
+        )
 
         return fetched
             .map(WorkoutSummary.init)
@@ -3551,13 +3557,18 @@ final class HealthKitManager: ObservableObject {
         } else {
             workout = try? await workoutForChallenge(uuid: workoutID)
             if let workout {
-                workoutObjects[workout.uuid] = workout
+                cacheWorkoutObject(
+                    workout
+                )
             }
         }
 
         guard let workout else { return [] }
         let route = (try? await fetchRoute(for: workout)) ?? []
-        workoutRouteCache[workoutID] = (route, Date())
+        cacheWorkoutRoute(
+            route,
+            for: workoutID
+        )
         return route
     }
 
@@ -3569,7 +3580,9 @@ final class HealthKitManager: ObservableObject {
         } else {
             workout = try? await workoutForChallenge(uuid: workoutID)
             if let workout {
-                workoutObjects[workout.uuid] = workout
+                cacheWorkoutObject(
+                    workout
+                )
             }
         }
 
@@ -3681,7 +3694,9 @@ final class HealthKitManager: ObservableObject {
                 uuid: summary.id
             )
             if let workout {
-                workoutObjects[workout.uuid] = workout
+                cacheWorkoutObject(
+                    workout
+                )
             }
         }
 
@@ -4178,9 +4193,9 @@ final class HealthKitManager: ObservableObject {
                 !ignoredExternalWorkoutIDs.contains($0.uuid)
         }
 
-        for workout in matching {
-            workoutObjects[workout.uuid] = workout
-        }
+        cacheWorkoutObjects(
+            matching
+        )
 
         pendingWorkoutImports = matching
             .map(makePendingWorkoutImport)
@@ -4239,9 +4254,113 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    private func cacheWorkoutObject(
+        _ workout: HKWorkout
+    ) {
+        let id = workout.uuid
+
+        workoutObjectCacheOrder
+            .removeAll {
+                $0 == id
+            }
+        workoutObjects[id] =
+            workout
+        workoutObjectCacheOrder
+            .append(id)
+
+        while workoutObjectCacheOrder
+            .count >
+            Self.workoutObjectCacheLimit {
+            let evicted =
+                workoutObjectCacheOrder
+                    .removeFirst()
+            workoutObjects[
+                evicted
+            ] = nil
+        }
+    }
+
+    private func cacheWorkoutObjects(
+        _ workouts: [HKWorkout]
+    ) {
+        for workout in
+            workouts
+                .prefix(
+                    Self.workoutObjectCacheLimit
+                )
+                .reversed() {
+            cacheWorkoutObject(
+                workout
+            )
+        }
+    }
+
+    private func replaceWorkoutObjectCache(
+        with workouts: [HKWorkout]
+    ) {
+        workoutObjects
+            .removeAll(
+                keepingCapacity: true
+            )
+        workoutObjectCacheOrder
+            .removeAll(
+                keepingCapacity: true
+            )
+        cacheWorkoutObjects(
+            workouts
+        )
+    }
+
+    private func removeCachedWorkoutObject(
+        _ id: UUID
+    ) {
+        workoutObjects[id] = nil
+        workoutObjectCacheOrder
+            .removeAll {
+                $0 == id
+            }
+    }
+
+    private func cacheWorkoutRoute(
+        _ route: [CLLocation],
+        for workoutID: UUID
+    ) {
+        workoutRouteCacheOrder
+            .removeAll {
+                $0 == workoutID
+            }
+        workoutRouteCache[
+            workoutID
+        ] = (
+            route,
+            Date()
+        )
+        workoutRouteCacheOrder
+            .append(
+                workoutID
+            )
+
+        while workoutRouteCacheOrder
+            .count >
+            Self.workoutRouteCacheLimit {
+            let evicted =
+                workoutRouteCacheOrder
+                    .removeFirst()
+            workoutRouteCache[
+                evicted
+            ] = nil
+        }
+    }
+
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
-        workoutRouteCache.removeAll(keepingCapacity: true)
+        workoutRouteCache.removeAll(
+            keepingCapacity: false
+        )
+        workoutRouteCacheOrder
+            .removeAll(
+                keepingCapacity: false
+            )
         profilePerformanceCache = nil
         personalRecordsCache = nil
         recoveryTrendCache.removeAll()
@@ -4480,9 +4599,9 @@ final class HealthKitManager: ObservableObject {
         let fetched = try await fetchAllWorkouts()
         allWorkoutsCache = (fetched, Date())
 
-        for workout in fetched {
-            workoutObjects[workout.uuid] = workout
-        }
+        cacheWorkoutObjects(
+            fetched
+        )
 
         return fetched
     }
