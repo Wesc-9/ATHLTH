@@ -713,7 +713,7 @@ struct ATHLTHHomeView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
+                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             let didStart =
@@ -722,6 +722,7 @@ struct ATHLTHHomeView: View {
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
+                                participationMode: socialMode,
                                 audioCoach: audioCoach,
                                 advancedConfiguration:
                                     advancedConfiguration,
@@ -820,13 +821,7 @@ struct ATHLTHHomeView: View {
                         defaultTracking:
                             settings
                                 .defaultStrengthTracking
-                    ) {
-                        configuredWorkout,
-                        captureDevice,
-                        trackingMode,
-                        selectedFriends,
-                        audioCoach,
-                        advancedConfiguration in
+                    ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
 
                         Task { @MainActor in
                             do {
@@ -839,9 +834,9 @@ struct ATHLTHHomeView: View {
                                                 captureDevice,
                                             trackingMode:
                                                 trackingMode,
-                                            selectedFriends:
-                                                selectedFriends,
-                                            audioCoach:
+                                            selectedFriends: selectedFriends,
+                                participationMode: socialMode,
+                                audioCoach:
                                                 audioCoach,
                                             advancedConfiguration:
                                                 advancedConfiguration,
@@ -4692,7 +4687,7 @@ struct ATHLTHTrainView: View {
                     watchConnected: watchConnection.isReady,
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
-                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, audioCoach, advancedConfiguration in
+                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
                     Task { @MainActor in
                         do {
                             let didStart =
@@ -4701,6 +4696,7 @@ struct ATHLTHTrainView: View {
                                 captureDevice: captureDevice,
                                 trackingMode: trackingMode,
                                 selectedFriends: selectedFriends,
+                                participationMode: socialMode,
                                 audioCoach: audioCoach,
                                 advancedConfiguration:
                                     advancedConfiguration,
@@ -4841,13 +4837,7 @@ struct ATHLTHTrainView: View {
                     defaultTracking:
                         settings
                             .defaultStrengthTracking
-                ) {
-                    configuredWorkout,
-                    captureDevice,
-                    trackingMode,
-                    selectedFriends,
-                    audioCoach,
-                    advancedConfiguration in
+                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
 
                     Task { @MainActor in
                         do {
@@ -4860,9 +4850,9 @@ struct ATHLTHTrainView: View {
                                             captureDevice,
                                         trackingMode:
                                             trackingMode,
-                                        selectedFriends:
-                                            selectedFriends,
-                                        audioCoach:
+                                        selectedFriends: selectedFriends,
+                                participationMode: socialMode,
+                                audioCoach:
                                             audioCoach,
                                         advancedConfiguration:
                                             advancedConfiguration,
