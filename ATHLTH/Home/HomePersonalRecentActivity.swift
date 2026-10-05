@@ -2585,9 +2585,7 @@ private struct HomeFollowingWorkoutArtwork:
                 HomeStrengthMuscleArtwork(
                     profile:
                         strengthMuscleProfile,
-                    height: height,
-                    figureStyle:
-                        .neutral
+                    height: height
                 )
             } else {
                 genericArtwork
@@ -4195,9 +4193,6 @@ private struct HomeStrengthMuscleArtwork:
     View {
     let profile: StrengthMuscleProfile
     let height: CGFloat
-    var figureStyle:
-        StrengthBodyPresentation =
-            .neutral
 
     private let activationTint =
         Color(
@@ -4206,91 +4201,116 @@ private struct HomeStrengthMuscleArtwork:
             blue: 0.23
         )
 
+    private var activationByRegion:
+        [StrengthMuscleRegion: Double] {
+        let maximum =
+            profile.activations
+                .map(\.score)
+                .max() ?? 0
+
+        guard maximum > 0 else {
+            return [:]
+        }
+
+        return Dictionary(
+            uniqueKeysWithValues:
+                profile.activations.map {
+                    activation in
+                    (
+                        activation.region,
+                        min(
+                            max(
+                                activation.score /
+                                    maximum,
+                                0
+                            ),
+                            1
+                        )
+                    )
+                }
+        )
+    }
+
     var body: some View {
+        let activations =
+            activationByRegion
+
         GeometryReader { proxy in
             ZStack {
                 LinearGradient(
                     colors: [
                         Color(
-                            red: 0.995,
-                            green: 0.985,
-                            blue: 0.972
+                            red: 0.992,
+                            green: 0.987,
+                            blue: 0.980
                         ),
                         Color(
-                            red: 0.985,
-                            green: 0.956,
-                            blue: 0.930
+                            red: 0.967,
+                            green: 0.963,
+                            blue: 0.956
                         )
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
 
-                RadialGradient(
-                    colors: [
-                        activationTint.opacity(0.13),
-                        activationTint.opacity(0.035),
-                        Color.clear
-                    ],
-                    center: UnitPoint(
-                        x: 0.52,
-                        y: 0.60
-                    ),
-                    startRadius: 4,
-                    endRadius: max(
-                        proxy.size.width * 0.58,
-                        118
-                    )
-                )
-
                 RoundedRectangle(
-                    cornerRadius: 48,
+                    cornerRadius: 38,
                     style: .continuous
                 )
-                .fill(Color.white.opacity(0.22))
-                .frame(
-                    width: min(
-                        proxy.size.width * 0.88,
-                        196
-                    ),
-                    height: max(
-                        height * 0.86,
-                        104
+                .fill(
+                    Color.white.opacity(
+                        0.58
                     )
                 )
-                .blur(radius: 0.5)
-
-                StrengthMuscleMapView(
-                    profile: profile,
-                    compact: true,
-                    figureStyle: figureStyle,
-                    activationTint: activationTint
-                )
                 .frame(
-                    width: min(
-                        max(
-                            height * 1.68,
-                            176
+                    width:
+                        min(
+                            proxy.size.width -
+                                16,
+                            208
                         ),
-                        proxy.size.width - 10
-                    ),
-                    height: max(
-                        height + 34,
-                        144
-                    )
+                    height:
+                        max(
+                            height - 12,
+                            104
+                        )
                 )
-                .offset(y: 14)
-                .opacity(1.0)
+
+                HStack(spacing: 13) {
+                    HomeStrengthHeatFigure(
+                        side: .front,
+                        activations:
+                            activations,
+                        tint:
+                            activationTint
+                    )
+
+                    HomeStrengthHeatFigure(
+                        side: .back,
+                        activations:
+                            activations,
+                        tint:
+                            activationTint
+                    )
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+                .padding(.top, 7)
+                .padding(.horizontal, 18)
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.16),
-                        Color.clear,
-                        Color.black.opacity(0.018)
+                        Color.white
+                            .opacity(0.16),
+                        Color.clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .allowsHitTesting(false)
             }
             .frame(
                 width: proxy.size.width,
@@ -4300,6 +4320,375 @@ private struct HomeStrengthMuscleArtwork:
         }
         .frame(height: height)
         .clipped()
+        .accessibilityHidden(true)
+    }
+}
+
+private enum HomeStrengthHeatFigureSide {
+    case front
+    case back
+}
+
+private struct HomeStrengthHeatFigure:
+    View {
+    let side: HomeStrengthHeatFigureSide
+    let activations:
+        [StrengthMuscleRegion: Double]
+    let tint: Color
+
+    private let bodyFill =
+        Color(
+            red: 0.82,
+            green: 0.83,
+            blue: 0.83
+        )
+
+    private let bodyStroke =
+        Color.black.opacity(0.09)
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+
+            ZStack {
+                baseBody(
+                    in: size
+                )
+
+                ForEach(
+                    highlightedRegions,
+                    id: \.self
+                ) { region in
+                    if let intensity =
+                            activations[
+                                region
+                            ],
+                       intensity > 0.08 {
+                        heatMark(
+                            for: region,
+                            intensity:
+                                intensity,
+                            in: size
+                        )
+                    }
+                }
+            }
+            .frame(
+                width: size.width,
+                height: size.height
+            )
+        }
+        .aspectRatio(
+            0.52,
+            contentMode: .fit
+        )
+    }
+
+    private var highlightedRegions:
+        [StrengthMuscleRegion] {
+        switch side {
+        case .front:
+            return [
+                .chest,
+                .frontDelts,
+                .sideDelts,
+                .biceps,
+                .forearms,
+                .abs,
+                .obliques,
+                .serratus,
+                .hipFlexors,
+                .innerThigh,
+                .quads,
+                .shins
+            ]
+
+        case .back:
+            return [
+                .rearDelts,
+                .triceps,
+                .forearms,
+                .traps,
+                .lats,
+                .upperBack,
+                .lowerBack,
+                .glutes,
+                .outerHip,
+                .hamstrings,
+                .calves
+            ]
+        }
+    }
+
+    @ViewBuilder
+    private func baseBody(
+        in size: CGSize
+    ) -> some View {
+        let w = size.width
+        let h = size.height
+
+        Group {
+            Circle()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.22,
+                    height: w * 0.22
+                )
+                .position(
+                    x: w * 0.50,
+                    y: h * 0.09
+                )
+
+            Capsule()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.38,
+                    height: h * 0.35
+                )
+                .position(
+                    x: w * 0.50,
+                    y: h * 0.33
+                )
+
+            Capsule()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.13,
+                    height: h * 0.38
+                )
+                .rotationEffect(
+                    .degrees(-7)
+                )
+                .position(
+                    x: w * 0.25,
+                    y: h * 0.35
+                )
+
+            Capsule()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.13,
+                    height: h * 0.38
+                )
+                .rotationEffect(
+                    .degrees(7)
+                )
+                .position(
+                    x: w * 0.75,
+                    y: h * 0.35
+                )
+
+            Capsule()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.16,
+                    height: h * 0.47
+                )
+                .rotationEffect(
+                    .degrees(2.5)
+                )
+                .position(
+                    x: w * 0.39,
+                    y: h * 0.73
+                )
+
+            Capsule()
+                .fill(bodyFill)
+                .frame(
+                    width: w * 0.16,
+                    height: h * 0.47
+                )
+                .rotationEffect(
+                    .degrees(-2.5)
+                )
+                .position(
+                    x: w * 0.61,
+                    y: h * 0.73
+                )
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 30,
+                style: .continuous
+            )
+            .stroke(
+                bodyStroke,
+                lineWidth: 0.7
+            )
+            .opacity(0)
+        }
+    }
+
+    @ViewBuilder
+    private func heatMark(
+        for region:
+            StrengthMuscleRegion,
+        intensity: Double,
+        in size: CGSize
+    ) -> some View {
+        let placement =
+            placement(
+                for: region
+            )
+        let opacity =
+            0.22 +
+            (0.62 * intensity)
+
+        Capsule()
+            .fill(
+                tint.opacity(opacity)
+            )
+            .frame(
+                width:
+                    size.width *
+                    placement.width,
+                height:
+                    size.height *
+                    placement.height
+            )
+            .rotationEffect(
+                .degrees(
+                    placement.rotation
+                )
+            )
+            .position(
+                x:
+                    size.width *
+                    placement.x,
+                y:
+                    size.height *
+                    placement.y
+            )
+    }
+
+    private func placement(
+        for region:
+            StrengthMuscleRegion
+    ) -> (
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        height: CGFloat,
+        rotation: Double
+    ) {
+        switch region {
+        case .chest:
+            return (
+                0.50, 0.27,
+                0.31, 0.08, 0
+            )
+        case .frontDelts:
+            return (
+                0.30, 0.24,
+                0.14, 0.07, -12
+            )
+        case .sideDelts:
+            return (
+                0.70, 0.24,
+                0.14, 0.07, 12
+            )
+        case .rearDelts:
+            return (
+                0.69, 0.24,
+                0.16, 0.07, 10
+            )
+        case .biceps:
+            return (
+                0.25, 0.38,
+                0.10, 0.14, -5
+            )
+        case .triceps:
+            return (
+                0.75, 0.38,
+                0.10, 0.15, 5
+            )
+        case .forearms:
+            return (
+                side == .front
+                    ? 0.76
+                    : 0.24,
+                0.51,
+                0.09, 0.14,
+                side == .front
+                    ? 7
+                    : -7
+            )
+        case .traps:
+            return (
+                0.50, 0.24,
+                0.22, 0.08, 0
+            )
+        case .lats:
+            return (
+                0.50, 0.37,
+                0.32, 0.15, 0
+            )
+        case .upperBack:
+            return (
+                0.50, 0.31,
+                0.25, 0.11, 0
+            )
+        case .lowerBack:
+            return (
+                0.50, 0.49,
+                0.20, 0.12, 0
+            )
+        case .abs:
+            return (
+                0.50, 0.43,
+                0.14, 0.20, 0
+            )
+        case .obliques:
+            return (
+                0.35, 0.45,
+                0.10, 0.17, -6
+            )
+        case .serratus:
+            return (
+                0.65, 0.36,
+                0.08, 0.12, 8
+            )
+        case .glutes:
+            return (
+                0.50, 0.58,
+                0.28, 0.11, 0
+            )
+        case .outerHip:
+            return (
+                0.68, 0.60,
+                0.11, 0.11, 8
+            )
+        case .innerThigh:
+            return (
+                0.50, 0.70,
+                0.12, 0.20, 0
+            )
+        case .hipFlexors:
+            return (
+                0.50, 0.57,
+                0.18, 0.09, 0
+            )
+        case .quads:
+            return (
+                0.39, 0.72,
+                0.12, 0.22, 2
+            )
+        case .hamstrings:
+            return (
+                0.61, 0.72,
+                0.12, 0.22, -2
+            )
+        case .calves:
+            return (
+                0.61, 0.88,
+                0.10, 0.16, -2
+            )
+        case .shins:
+            return (
+                0.39, 0.88,
+                0.09, 0.16, 2
+            )
+        }
     }
 }
 
@@ -4307,13 +4696,6 @@ private struct HomeStrengthMuscleArtwork:
 
 private struct HomePersonalWorkoutVisual:
     View {
-    @EnvironmentObject private var health:
-        HealthKitManager
-    @EnvironmentObject private var settings:
-        AppSettingsStore
-    @EnvironmentObject private var session:
-        AppSessionStore
-
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
@@ -4381,41 +4763,6 @@ private struct HomePersonalWorkoutVisual:
                     )
                 }
         )
-    }
-
-    private var strengthFigureStyle:
-        StrengthBodyPresentation {
-        switch settings
-            .strengthFigurePreference {
-        case .female:
-            return .female
-
-        case .male:
-            return .male
-
-        case .neutral:
-            return .neutral
-
-        case .automatic:
-            let healthSex =
-                session
-                    .onboardingProfile?
-                    .healthSex ??
-                health
-                    .personalDetails
-                    .healthSex
-
-            switch healthSex {
-            case .female:
-                return .female
-            case .male:
-                return .male
-            case .other,
-                 .preferNotToSay,
-                 .none:
-                return .neutral
-            }
-        }
     }
 
     var body: some View {
@@ -4508,9 +4855,7 @@ private struct HomePersonalWorkoutVisual:
         some View {
         HomeStrengthMuscleArtwork(
             profile: muscleProfile,
-            height: height,
-            figureStyle:
-                strengthFigureStyle
+            height: height
         )
     }
 
