@@ -121,6 +121,13 @@ struct ATHLTHLiveGhostAudioContext:
     var leadChangeDeliveryRawValue: String
     var importantLeadChangeDeliveryRawValue: String
     var importantLeadChangeMeters: Double
+
+    // Optional additions preserve decoding of older live-context payloads.
+    var statusDetailModeRawValue: String? = nil
+    var announceOvertakes: Bool? = nil
+    var finalPhaseEnabled: Bool? = nil
+    var finalPhaseStartMeters: Double? = nil
+    var liveConnectionAlerts: Bool? = nil
 }
 
 struct ATHLTHLiveGhostContext: Codable, Hashable {
