@@ -111,6 +111,27 @@ final class SupabaseRouteAttemptService {
             .value
     }
 
+    func load(
+        workoutID: UUID
+    ) async throws -> RouteAttemptRecord? {
+        let rows:
+            [RouteAttemptRecord] =
+            try await client
+                .from(
+                    "route_attempt_leaderboard"
+                )
+                .select()
+                .eq(
+                    "workout_id",
+                    value: workoutID
+                )
+                .limit(1)
+                .execute()
+                .value
+
+        return rows.first
+    }
+
     func upsert(
         routeID: UUID,
         userID: UUID,
