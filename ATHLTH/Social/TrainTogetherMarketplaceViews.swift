@@ -2279,6 +2279,12 @@ struct TrainTogetherPostCreateView:
     @State private var level = "all"
     @State private var broadArea = ""
     @State private var note = ""
+    @State private var participationMode:
+        SocialWorkoutParticipationMode =
+            .physical
+    @State private var joinPolicy:
+        TrainTogetherJoinPolicy =
+            .request
     @State private var maxGuests = 1
     @State private var meetingName = ""
     @State private var meetingDetails = ""
@@ -2497,15 +2503,18 @@ struct TrainTogetherPostCreateView:
                         .tag("advanced")
                 }
 
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "City / broad area",
-                        norwegian:
-                            "By / område"
-                    ),
-                    text: $broadArea
-                )
+                if participationMode ==
+                    .physical {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "City / broad area",
+                            norwegian:
+                                "By / område"
+                        ),
+                        text: $broadArea
+                    )
+                }
 
                 TextField(
                     ATHLTHLocalization.choose(
@@ -2529,10 +2538,62 @@ struct TrainTogetherPostCreateView:
                     ),
                     value:
                         $maxGuests,
-                    in: 1...10
+                    in: 1...5
                 )
             }
 
+            Section {
+                WorkoutSocialModePicker(
+                    mode:
+                        $participationMode
+                )
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Who can join?",
+                        norwegian:
+                            "Hvem kan bli med?"
+                    ),
+                    selection:
+                        $joinPolicy
+                ) {
+                    ForEach(
+                        TrainTogetherJoinPolicy
+                            .allCases
+                    ) { policy in
+                        Text(policy.title)
+                            .tag(policy)
+                    }
+                }
+
+                Text(joinPolicy.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Social workout",
+                        norwegian:
+                            "Sosial økt"
+                    )
+                )
+            } footer: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Request to join is recommended for public workouts. Open join lets people enter instantly until the workout is full.",
+                        norwegian:
+                            "«Be om å bli med» anbefales for offentlige økter. «Åpen påmelding» lar folk bli med direkte til økten er full."
+                    )
+                )
+            }
+
+            if participationMode ==
+                .physical {
             Section {
                 TextField(
                     ATHLTHLocalization.choose(
@@ -2574,6 +2635,7 @@ struct TrainTogetherPostCreateView:
                             "Kun området vises i listen. Nøyaktig møtested vises først etter at du har godkjent noen."
                     )
                 )
+            }
             }
         }
         .navigationTitle(
@@ -2699,7 +2761,11 @@ struct TrainTogetherPostCreateView:
 
         return
             !cleanTitle.isEmpty &&
-            cleanArea.count >= 2 &&
+            (
+                participationMode ==
+                    .remote ||
+                cleanArea.count >= 2
+            ) &&
             scheduledStart >
                 Date()
                     .addingTimeInterval(
@@ -2748,10 +2814,17 @@ struct TrainTogetherPostCreateView:
                     .whitespacesAndNewlines
             )
         let cleanArea =
-            broadArea.trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
+            participationMode ==
+                .remote
+                ? ATHLTHLocalization.choose(
+                    english: "Online",
+                    norwegian: "På avstand"
+                )
+                : broadArea
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
 
         var workout =
             selectedWorkout ??
@@ -2808,7 +2881,17 @@ struct TrainTogetherPostCreateView:
                 route: route,
                 routeAlerts:
                     workout
-                        .routeAlertConfiguration
+                        .routeAlertConfiguration,
+                participationMode:
+                    participationMode,
+                maxParticipants:
+                    min(
+                        max(
+                            maxGuests + 1,
+                            2
+                        ),
+                        6
+                    )
             )
 
         let post =
@@ -2867,6 +2950,12 @@ struct TrainTogetherPostCreateView:
                     maxGuests,
                 acceptedGuests: 0,
                 status: "open",
+                participationMode:
+                    participationMode
+                        .rawValue,
+                joinPolicy:
+                    joinPolicy
+                        .rawValue,
                 workoutPayload:
                     payload,
                 sourcePlannedSessionID:
@@ -2887,7 +2976,9 @@ struct TrainTogetherPostCreateView:
                 )
 
         let meetup =
-            TrainTogetherMeetupWrite(
+            participationMode ==
+                .physical
+                ? TrainTogetherMeetupWrite(
                 postID: postID,
                 creatorID:
                     session
@@ -2908,6 +2999,7 @@ struct TrainTogetherPostCreateView:
                                 .prefix(600)
                         )
             )
+                : nil
 
         Task {
             if await marketplace
