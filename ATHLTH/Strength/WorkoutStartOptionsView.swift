@@ -16,6 +16,7 @@ struct WorkoutStartOptionsView: View {
         WorkoutCaptureDevice,
         StrengthTrackingMode,
         [SocialProfileCard],
+        SocialWorkoutParticipationMode,
         WatchAudioCoachConfiguration,
         StrengthAdvancedConfiguration
     ) -> Void
@@ -23,6 +24,9 @@ struct WorkoutStartOptionsView: View {
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var trackingMode: StrengthTrackingMode
     @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var socialMode:
+        SocialWorkoutParticipationMode =
+            .physical
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var audioCoachLoaded = false
     @State private var strengthAudioCoach =
@@ -61,6 +65,7 @@ struct WorkoutStartOptionsView: View {
             WorkoutCaptureDevice,
             StrengthTrackingMode,
             [SocialProfileCard],
+            SocialWorkoutParticipationMode,
             WatchAudioCoachConfiguration,
             StrengthAdvancedConfiguration
         ) -> Void
@@ -493,10 +498,26 @@ struct WorkoutStartOptionsView: View {
                 NavigationStack {
                     ScrollView {
                         ATHLTHCard {
-                            WorkoutFriendPicker(
-                                selectedFriendIDs:
-                                    $selectedFriendIDs
-                            )
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 14
+                            ) {
+                                WorkoutFriendPicker(
+                                    selectedFriendIDs:
+                                        $selectedFriendIDs
+                                )
+
+                                if !selectedFriendIDs
+                                    .isEmpty {
+                                    Divider()
+
+                                    WorkoutSocialModePicker(
+                                        mode:
+                                            $socialMode
+                                    )
+                                }
+                            }
                         }
                         .padding(16)
                     }
@@ -637,6 +658,7 @@ struct WorkoutStartOptionsView: View {
                 captureDevice,
                 trackingMode,
                 selectedFriends,
+                socialMode,
                 watchAudioCoach,
                 advancedConfiguration
             )
