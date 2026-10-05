@@ -2812,11 +2812,13 @@ struct ATHLTHGhostRuntimeObserver: View {
         comparison:
             ATHLTHLiveGhostComparison
     ) -> ATHLTHLiveGhostContext {
-        ATHLTHLiveGhostContext(
-            title:
-                opponentName(
-                    session
-                ),
+        let name =
+            opponentName(
+                session
+            )
+
+        return ATHLTHLiveGhostContext(
+            title: name,
             distanceDeltaMeters:
                 comparison
                     .signedDistanceMeters,
@@ -2825,6 +2827,18 @@ struct ATHLTHGhostRuntimeObserver: View {
                     .estimatedTimeDeltaSeconds,
             updatedAt:
                 comparison.updatedAt,
+            opponentName: name,
+            opponentDistanceMeters:
+                comparison
+                    .opponentDistanceMeters,
+            ownProgressPercent:
+                comparison
+                    .ownRouteProgressPercent,
+            opponentProgressPercent:
+                comparison
+                    .opponentRouteProgressPercent,
+            connectionText:
+                liveGhostConnectionText,
             audio:
                 liveGhostAudioContext
         )
@@ -2864,8 +2878,39 @@ struct ATHLTHGhostRuntimeObserver: View {
                     .rawValue,
             importantLeadChangeMeters:
                 audio
-                    .resolvedImportantLeadChangeMeters
+                    .resolvedImportantLeadChangeMeters,
+            statusDetailModeRawValue:
+                audio
+                    .resolvedStatusDetailMode
+                    .rawValue,
+            announceOvertakes:
+                audio
+                    .shouldAnnounceOvertakes,
+            finalPhaseEnabled:
+                audio
+                    .shouldAnnounceFinalPhase,
+            finalPhaseStartMeters:
+                audio
+                    .resolvedFinalPhaseStartMeters,
+            liveConnectionAlerts:
+                audio
+                    .shouldAnnounceLiveConnectionChanges
         )
+    }
+
+    private var liveGhostConnectionText:
+        String {
+        switch realtime
+            .liveGhostConnectionState {
+        case .live:
+            return "LIVE"
+        case .delayed:
+            return "DELAYED"
+        case .reconnecting:
+            return "RECONNECTING"
+        case .waiting:
+            return "WAITING"
+        }
     }
 
     private func opponentName(
