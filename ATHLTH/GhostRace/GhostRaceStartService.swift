@@ -43,6 +43,7 @@ enum GhostRaceStartService {
         reference: GhostRaceReference,
         ownerID: UUID,
         comparisonRouteID: UUID? = nil,
+        opponentName: String? = nil,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
@@ -58,6 +59,8 @@ enum GhostRaceStartService {
             ownerID: ownerID,
             comparisonRouteID:
                 comparisonRouteID,
+            opponentName:
+                opponentName,
             ghostRace: ghostRace,
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
@@ -448,6 +451,7 @@ enum GhostRaceStartService {
         title: String,
         ownerID: UUID,
         comparisonRouteID: UUID? = nil,
+        opponentName: String? = nil,
         ghostRace: GhostRaceStore,
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore?,
@@ -523,6 +527,10 @@ enum GhostRaceStartService {
                     ghostUpdates:
                         ghostAudio
                 )
+                phoneWorkout
+                    .configureGhostOpponentName(
+                        opponentName
+                    )
                 return
             }
 
@@ -596,7 +604,9 @@ enum GhostRaceStartService {
                             .routeDistanceMeters,
                     points: watchPoints,
                     audio:
-                        ghostAudio
+                        ghostAudio,
+                    opponentName:
+                        opponentName
                 )
             )
 
