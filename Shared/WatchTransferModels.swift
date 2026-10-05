@@ -795,6 +795,23 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
 }
 
 
+struct WatchPreparedWorkoutTransfer: Codable, Hashable {
+    var id: UUID
+    var title: String
+    var summary: String
+    var kind: WatchWorkoutKind
+    var routeID: UUID?
+    var runningWorkout: WatchRunningWorkoutTransfer?
+    var audioCoach: WatchAudioCoachConfiguration?
+    var ghostRace: WatchGhostRaceTransfer? = nil
+    var indoor: Bool? = nil
+    var updatedAt: Date
+}
+
+enum WatchPreparedWorkoutTransport {
+    static let kind = "preparedWorkout"
+}
+
 struct WatchTodayWorkoutTransfer: Codable, Hashable {
     var planID: UUID
     var workoutID: UUID
