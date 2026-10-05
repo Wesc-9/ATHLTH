@@ -6376,7 +6376,9 @@ struct CommunityGroupDetailView: View {
                     VStack(spacing: 0) {
                         groupHeader(
                             topInset:
-                                geometry.safeAreaInsets.top
+                                geometry.safeAreaInsets.top,
+                            availableWidth:
+                                geometry.size.width
                         )
 
                         groupAreaPicker
@@ -6414,7 +6416,9 @@ struct CommunityGroupDetailView: View {
                         LazyVStack(spacing: 0) {
                             groupHeader(
                                 topInset:
-                                    geometry.safeAreaInsets.top
+                                    geometry.safeAreaInsets.top,
+                                availableWidth:
+                                    geometry.size.width
                             )
 
                             VStack(spacing: 12) {
@@ -6694,7 +6698,8 @@ struct CommunityGroupDetailView: View {
     }
 
     private func groupHeader(
-        topInset: CGFloat
+        topInset: CGFloat,
+        availableWidth: CGFloat
     ) -> some View {
         ZStack(alignment: .bottomLeading) {
             groupHeroBackground
@@ -6859,8 +6864,10 @@ struct CommunityGroupDetailView: View {
                         detailGroupImage
                     }
                     .buttonStyle(.plain)
+                    .layoutPriority(1)
                 } else {
                     detailGroupImage
+                        .layoutPriority(1)
                 }
 
                 VStack(
@@ -6949,15 +6956,26 @@ struct CommunityGroupDetailView: View {
                         }
                     }
                 }
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .clipped()
 
                 Spacer(minLength: 0)
             }
+            // Constrain the identity row to the physical viewport. Without an
+            // explicit width, long Club copy/chips can give the HStack a wider
+            // ideal size inside ScrollView, which centers the row and pushes
+            // the Club profile image partly off the left edge.
             .frame(
-                maxWidth: .infinity,
+                width: max(
+                    availableWidth - 36,
+                    0
+                ),
                 alignment: .leading
             )
-            .padding(.leading, 28)
-            .padding(.trailing, 18)
+            .padding(.horizontal, 18)
             .padding(.bottom, 18)
         }
         .frame(
@@ -7014,6 +7032,8 @@ struct CommunityGroupDetailView: View {
         Label(title, systemImage: icon)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.white.opacity(0.92))
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(
@@ -7087,7 +7107,6 @@ struct CommunityGroupDetailView: View {
             }
         }
         .frame(width: 76, height: 76)
-        .fixedSize()
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 20,
