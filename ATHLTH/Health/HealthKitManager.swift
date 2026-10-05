@@ -818,8 +818,23 @@ final class HealthKitManager: ObservableObject {
                 return
             }
 
-            let fullRefresh = self.backgroundRefreshNeedsFull
-            self.backgroundRefreshNeedsFull = false
+            let previousWorkouts =
+                self.workouts
+            let previousSleep =
+                self.sleep
+            let previousHeart =
+                self.heart
+            let previousTraining =
+                self.training
+            let previousRecovery =
+                self.recovery
+            let previousPersonalDetails =
+                self.personalDetails
+
+            let fullRefresh =
+                self.backgroundRefreshNeedsFull
+            self.backgroundRefreshNeedsFull =
+                false
 
             if fullRefresh {
                 await self.refreshAll()
@@ -827,7 +842,22 @@ final class HealthKitManager: ObservableObject {
                 await self.refreshHealthSignals()
             }
 
-            if let handler =
+            let healthSnapshotChanged =
+                previousWorkouts !=
+                    self.workouts ||
+                previousSleep !=
+                    self.sleep ||
+                previousHeart !=
+                    self.heart ||
+                previousTraining !=
+                    self.training ||
+                previousRecovery !=
+                    self.recovery ||
+                previousPersonalDetails !=
+                    self.personalDetails
+
+            if healthSnapshotChanged,
+               let handler =
                     self.backgroundRefreshDidComplete {
                 await handler()
             }
