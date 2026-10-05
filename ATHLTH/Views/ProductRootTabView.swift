@@ -10703,7 +10703,50 @@ struct ATHLTHProfileView: View {
                         alignment: .bottom,
                         spacing: 14
                     ) {
-                        profileAvatar
+                        ZStack(alignment: .bottomTrailing) {
+                            profileAvatar
+
+                            NavigationLink {
+                                ATHLTHEditProfileView()
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(
+                                        .system(
+                                            size: 12,
+                                            weight: .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(.white)
+                                    .frame(
+                                        width: 30,
+                                        height: 30
+                                    )
+                                    .background(
+                                        Color.black.opacity(0.34),
+                                        in: Circle()
+                                    )
+                                    .overlay {
+                                        Circle()
+                                            .stroke(
+                                                Color.white.opacity(0.42),
+                                                lineWidth: 0.8
+                                            )
+                                    }
+                                    .shadow(
+                                        color: Color.black.opacity(0.16),
+                                        radius: 4,
+                                        y: 2
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "Edit Profile",
+                                    norwegian: "Rediger profil"
+                                )
+                            )
+                            .offset(x: 2, y: 2)
+                        }
 
                         VStack(
                             alignment: .leading,
@@ -10809,41 +10852,6 @@ struct ATHLTHProfileView: View {
             alignment: .topTrailing
         ) {
             HStack(spacing: 10) {
-                NavigationLink {
-                    ATHLTHEditProfileView()
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(
-                            .system(
-                                size: 16,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            Color.black.opacity(0.30),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.30),
-                                    lineWidth: 0.8
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Edit Profile",
-                        norwegian: "Rediger profil"
-                    )
-                )
-
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
