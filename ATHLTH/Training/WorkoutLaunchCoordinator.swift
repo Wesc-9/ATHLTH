@@ -861,6 +861,9 @@ enum WorkoutLaunchCoordinator {
         captureDevice: WorkoutCaptureDevice,
         trackingMode: StrengthTrackingMode,
         selectedFriends: [SocialProfileCard],
+        participationMode:
+            SocialWorkoutParticipationMode =
+                .physical,
         audioCoach: WatchAudioCoachConfiguration,
         advancedConfiguration:
             StrengthAdvancedConfiguration,
@@ -893,7 +896,18 @@ enum WorkoutLaunchCoordinator {
                         strengthAdvancedConfiguration:
                             trackingMode == .advanced
                                 ? inviteAdvancedConfiguration
-                                : nil
+                                : nil,
+                        participationMode:
+                            participationMode,
+                        maxParticipants:
+                            min(
+                                max(
+                                    selectedFriends
+                                        .count + 1,
+                                    2
+                                ),
+                                6
+                            )
                     ),
                 creatorCaptureDevice: captureDevice
             ) else {
