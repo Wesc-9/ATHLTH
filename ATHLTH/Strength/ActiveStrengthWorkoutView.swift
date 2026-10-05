@@ -10,7 +10,10 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var social: SocialStore
 
+    @StateObject private var socialCompanion =
+        SocialWorkoutCompanionStore()
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
     @State private var watchFinishTimeoutTask:
@@ -451,6 +454,62 @@ struct ActiveStrengthWorkoutView: View {
             ) { _, newValue in
                 scheduleRestCues(
                     for: newValue
+                )
+            }
+        }
+        .task(
+            id:
+                social
+                    .currentJoinedWorkoutSessionID ??
+                social
+                    .activeWorkoutSession?
+                    .id
+        ) {
+            guard
+                let sessionID =
+                    social
+                        .currentJoinedWorkoutSessionID ??
+                    social
+                        .activeWorkoutSession?
+                        .id,
+                let userID =
+                    social.currentUserID
+            else {
+                return
+            }
+
+            while !Task.isCancelled {
+                guard let workout =
+                        strength.activeWorkout
+                else {
+                    return
+                }
+
+                await socialCompanion
+                    .publishStrength(
+                        sessionID:
+                            sessionID,
+                        userID:
+                            userID,
+                        displayName:
+                            appSession
+                                .profile
+                                .displayName,
+                        workout:
+                            workout,
+                        currentExerciseIndex:
+                            strength
+                                .currentExerciseIndex,
+                        currentSetIndex:
+                            strength
+                                .currentSetIndex,
+                        isResting:
+                            strength
+                                .isResting
+                    )
+
+                try? await Task.sleep(
+                    for: .seconds(3)
                 )
             }
         }
