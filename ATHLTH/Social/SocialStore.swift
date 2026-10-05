@@ -176,25 +176,56 @@ final class SocialStore: ObservableObject {
                 !blockedIDs.contains($0.userID)
             }
 
-            visibleProfiles = visibleCards
-            followerIDs = Set(followerRows.map(\.followerID))
+            let refreshedFollowerIDs =
+                Set(
+                    followerRows.map(\.followerID)
+                )
                 .subtracting(blockedIDs)
-            followingIDs = Set(followingRows.map(\.followingID))
+            let refreshedFollowingIDs =
+                Set(
+                    followingRows.map(\.followingID)
+                )
                 .subtracting(blockedIDs)
+            let refreshedFeed =
+                feed.filter { item in
+                    item.activity.actorID ==
+                        currentUserID ||
+                    refreshedFollowingIDs
+                        .contains(
+                            item.activity.actorID
+                        )
+                }
+
+            if visibleProfiles != visibleCards {
+                visibleProfiles = visibleCards
+            }
+            if followerIDs != refreshedFollowerIDs {
+                followerIDs = refreshedFollowerIDs
+            }
+            if followingIDs != refreshedFollowingIDs {
+                followingIDs = refreshedFollowingIDs
+            }
 
             applyRelationships(
                 cards: visibleCards,
                 requests: requests
             )
 
-            self.privacy = privacy
-            self.feed = feed.filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
+            if self.privacy != privacy {
+                self.privacy = privacy
             }
-            blockedUsers = blocked
-            mutedUserIDs = muted
-            inboxEvents = inbox
+            if self.feed != refreshedFeed {
+                self.feed = refreshedFeed
+            }
+            if blockedUsers != blocked {
+                blockedUsers = blocked
+            }
+            if mutedUserIDs != muted {
+                mutedUserIDs = muted
+            }
+            if inboxEvents != inbox {
+                inboxEvents = inbox
+            }
             applyWorkoutSessions(
                 sessions: workoutSessions,
                 participants: workoutParticipants,
@@ -315,13 +346,36 @@ final class SocialStore: ObservableObject {
             let loadedFeed = try await feedTask
             let loadedInbox = try await inboxTask
 
-            followingIDs = Set(followingRows.map(\.followingID))
-            privacy = loadedPrivacy
-            feed = loadedFeed.filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
+            let refreshedFollowingIDs =
+                Set(
+                    followingRows.map(
+                        \.followingID
+                    )
+                )
+            let refreshedFeed =
+                loadedFeed.filter { item in
+                    item.activity.actorID ==
+                        currentUserID ||
+                    refreshedFollowingIDs
+                        .contains(
+                            item.activity.actorID
+                        )
+                }
+
+            if followingIDs !=
+                refreshedFollowingIDs {
+                followingIDs =
+                    refreshedFollowingIDs
             }
-            inboxEvents = loadedInbox
+            if privacy != loadedPrivacy {
+                privacy = loadedPrivacy
+            }
+            if feed != refreshedFeed {
+                feed = refreshedFeed
+            }
+            if inboxEvents != loadedInbox {
+                inboxEvents = loadedInbox
+            }
             lastHomeFeedRefreshAt = Date()
 
             if let notificationStore {
@@ -363,18 +417,38 @@ final class SocialStore: ObservableObject {
 
         do {
             if followingIDs.isEmpty {
-                let followingRows = try await service.loadFollowing(
-                    for: currentUserID
-                )
-                followingIDs = Set(
-                    followingRows.map(\.followingID)
-                )
+                let followingRows =
+                    try await service
+                        .loadFollowing(
+                            for: currentUserID
+                        )
+                let refreshedFollowingIDs =
+                    Set(
+                        followingRows.map(
+                            \.followingID
+                        )
+                    )
+                if followingIDs !=
+                    refreshedFollowingIDs {
+                    followingIDs =
+                        refreshedFollowingIDs
+                }
             }
 
-            let refreshedFeed = try await service.loadFeed(limit: 18)
-            feed = refreshedFeed.filter { item in
-                item.activity.actorID == currentUserID ||
-                followingIDs.contains(item.activity.actorID)
+            let loadedFeed =
+                try await service.loadFeed(
+                    limit: 18
+                )
+            let refreshedFeed =
+                loadedFeed.filter { item in
+                    item.activity.actorID ==
+                        currentUserID ||
+                    followingIDs.contains(
+                        item.activity.actorID
+                    )
+                }
+            if feed != refreshedFeed {
+                feed = refreshedFeed
             }
             lastHomeFeedRefreshAt = Date()
         } catch {
@@ -2586,42 +2660,84 @@ final class SocialStore: ObservableObject {
         requests: [SocialFriendRequestRecord]
     ) {
         guard let currentUserID else {
-            incomingRequests = []
-            outgoingRequests = []
+            if !incomingRequests.isEmpty {
+                incomingRequests = []
+            }
+            if !outgoingRequests.isEmpty {
+                outgoingRequests = []
+            }
             return
         }
 
-        let cardByID = Dictionary(uniqueKeysWithValues: cards.map { ($0.userID, $0) })
+        let cardByID = Dictionary(
+            uniqueKeysWithValues:
+                cards.map {
+                    ($0.userID, $0)
+                }
+        )
 
-        incomingRequests = requests
-            .filter {
-                $0.status == .pending &&
-                $0.recipientID == currentUserID
-            }
-            .compactMap { request in
-                guard let profile = cardByID[request.senderID] else { return nil }
-                return SocialFriendRequestDisplay(
-                    request: request,
-                    profile: profile,
-                    isIncoming: true
-                )
-            }
-            .sorted { $0.request.createdAt > $1.request.createdAt }
+        let refreshedIncoming =
+            requests
+                .filter {
+                    $0.status == .pending &&
+                    $0.recipientID ==
+                        currentUserID
+                }
+                .compactMap { request in
+                    guard let profile =
+                            cardByID[
+                                request.senderID
+                            ]
+                    else {
+                        return nil
+                    }
+                    return SocialFriendRequestDisplay(
+                        request: request,
+                        profile: profile,
+                        isIncoming: true
+                    )
+                }
+                .sorted {
+                    $0.request.createdAt >
+                        $1.request.createdAt
+                }
 
-        outgoingRequests = requests
-            .filter {
-                $0.status == .pending &&
-                $0.senderID == currentUserID
-            }
-            .compactMap { request in
-                guard let profile = cardByID[request.recipientID] else { return nil }
-                return SocialFriendRequestDisplay(
-                    request: request,
-                    profile: profile,
-                    isIncoming: false
-                )
-            }
-            .sorted { $0.request.createdAt > $1.request.createdAt }
+        let refreshedOutgoing =
+            requests
+                .filter {
+                    $0.status == .pending &&
+                    $0.senderID ==
+                        currentUserID
+                }
+                .compactMap { request in
+                    guard let profile =
+                            cardByID[
+                                request.recipientID
+                            ]
+                    else {
+                        return nil
+                    }
+                    return SocialFriendRequestDisplay(
+                        request: request,
+                        profile: profile,
+                        isIncoming: false
+                    )
+                }
+                .sorted {
+                    $0.request.createdAt >
+                        $1.request.createdAt
+                }
+
+        if incomingRequests !=
+            refreshedIncoming {
+            incomingRequests =
+                refreshedIncoming
+        }
+        if outgoingRequests !=
+            refreshedOutgoing {
+            outgoingRequests =
+                refreshedOutgoing
+        }
     }
 
     private func importInboxEvents(
