@@ -101,6 +101,27 @@ enum ATHLTHLocalization {
 }
 
 
+private final class ATHLTHExerciseNameTranslationCache:
+    @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String: String] = [:]
+
+    func value(for key: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return values[key]
+    }
+
+    func store(
+        _ value: String,
+        for key: String
+    ) {
+        lock.lock()
+        values[key] = value
+        lock.unlock()
+    }
+}
+
 // Dynamic public exercise data is stored with a stable English canonical name.
 // Keep localization at the presentation/search layer so workout history,
 // favorites, sync payloads and third-party IDs stay language independent.
@@ -146,6 +167,9 @@ private final class ATHLTHExerciseNameLocalizationCache:
 }
 
 enum ATHLTHExerciseNameLocalization {
+    private static let translationCache =
+        ATHLTHExerciseNameTranslationCache()
+
     private static let cache =
         ATHLTHExerciseNameLocalizationCache()
 
