@@ -143,6 +143,49 @@ private struct RecoveryAIAnswer: Decodable {
     let quickQuestions: [String]?
 }
 
+enum RecoveryCoachInboxPreferences {
+    private static func pinKey(
+        userID: UUID
+    ) -> String {
+        "athlth.recoveryCoach.inboxPinned." +
+        userID.uuidString
+    }
+
+    static func isPinned(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        let key = pinKey(userID: userID)
+
+        guard defaults.object(
+            forKey: key
+        ) != nil
+        else {
+            // Coach starts pinned for every account,
+            // but the user can explicitly unpin it.
+            return true
+        }
+
+        return defaults.bool(
+            forKey: key
+        )
+    }
+
+    static func setPinned(
+        _ pinned: Bool,
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.set(
+            pinned,
+            forKey:
+                pinKey(
+                    userID: userID
+                )
+        )
+    }
+}
+
 enum RecoveryCoachConversationPersistence {
     private static let maxStoredMessages = 200
 
