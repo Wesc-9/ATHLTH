@@ -3118,57 +3118,82 @@ struct DirectMessageThreadView: View {
     @State private var savedFeedback: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            threadHero
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
-
-            if let conversationID {
-                messagesView(conversationID)
-            } else if let loadError {
-                ContentUnavailableView(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Messages unavailable",
-                        norwegian:
-                            "Meldinger utilgjengelig"
-                    ),
-                    systemImage:
-                        "exclamationmark.bubble",
-                    description:
-                        Text(loadError)
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
-            } else {
-                ProgressView(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Opening conversation…",
-                        norwegian:
-                            "Åpner samtalen…"
-                    )
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity
-                )
-            }
-        }
-        .background(
+        ZStack {
             ATHLTHPremiumCanvas(
                 accent:
                     ATHLTHTheme
                         .vitality
-                        .opacity(0.14)
+                        .opacity(0.12)
             )
-        )
+
+            VStack(spacing: 0) {
+                threadHero
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .padding(
+                        .top,
+                        8
+                    )
+                    .zIndex(2)
+
+                Group {
+                    if let conversationID {
+                        messagesView(
+                            conversationID
+                        )
+                    } else if let loadError {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Messages unavailable",
+                                norwegian:
+                                    "Meldinger utilgjengelig"
+                            ),
+                            systemImage:
+                                "exclamationmark.bubble",
+                            description:
+                                Text(loadError)
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                    } else {
+                        ProgressView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Opening conversation…",
+                                norwegian:
+                                    "Åpner samtalen…"
+                            )
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                    }
+                }
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+                .athlthConversationPanelChrome()
+                .padding(
+                    .horizontal,
+                    4
+                )
+                .padding(
+                    .top,
+                    -24
+                )
+                .zIndex(1)
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(
+        .toolbar(
             .hidden,
             for: .navigationBar
         )
@@ -3184,13 +3209,24 @@ struct DirectMessageThreadView: View {
         .alert(
             "Saved to ATHLTH",
             isPresented: Binding(
-                get: { savedFeedback != nil },
-                set: { if !$0 { savedFeedback = nil } }
+                get: {
+                    savedFeedback != nil
+                },
+                set: {
+                    if !$0 {
+                        savedFeedback = nil
+                    }
+                }
             )
         ) {
-            Button("OK", role: .cancel) {}
+            Button(
+                "OK",
+                role: .cancel
+            ) {}
         } message: {
-            Text(savedFeedback ?? "")
+            Text(
+                savedFeedback ?? ""
+            )
         }
         .task(id: friend.userID) {
             await openAndPoll()
@@ -3198,139 +3234,147 @@ struct DirectMessageThreadView: View {
     }
 
     private var threadHero: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 126)
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.black
-                        .opacity(0.05),
-                    Color.black
-                        .opacity(0.62)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
+        ATHLTHConversationHero(
+            title:
+                friend.resolvedName,
+            subtitle:
+                threadStatusText,
+            onBack: {
+                dismiss()
+            }
+        ) {
+            SocialAvatar(
+                profile: friend,
+                size: 44
             )
-
-            HStack(
-                alignment: .center,
-                spacing: 12
-            ) {
-                SocialAvatar(
-                    profile: friend,
-                    size: 48
-                )
-                .overlay {
-                    Circle()
-                        .stroke(
-                            Color.white
-                                .opacity(0.84),
-                            lineWidth: 1.5
-                        )
-                }
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        friend.resolvedName
-                    )
-                    .font(
-                        .headline
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .lineLimit(1)
-
-                    Text(
-                        threadStatusText
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
+            .overlay {
+                Circle()
+                    .stroke(
                         Color.white
-                            .opacity(0.82)
+                            .opacity(0.86),
+                        lineWidth: 1.4
                     )
-                    .lineLimit(1)
+            }
+        } trailing: {
+            Menu {
+                if let conversationID {
+                    Button {
+                        messaging
+                            .togglePinned(
+                                conversationID
+                            )
+                    } label: {
+                        Label(
+                            messaging
+                                .isPinned(
+                                    conversationID
+                                )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Unpin conversation",
+                                        norwegian:
+                                            "Løsne samtalen"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Pin conversation",
+                                        norwegian:
+                                            "Fest samtalen"
+                                    ),
+                            systemImage:
+                                messaging
+                                    .isPinned(
+                                        conversationID
+                                    )
+                                    ? "pin.slash"
+                                    : "pin.fill"
+                        )
+                    }
+
+                    Button {
+                        messaging
+                            .toggleArchived(
+                                conversationID
+                            )
+                    } label: {
+                        Label(
+                            messaging
+                                .isArchived(
+                                    conversationID
+                                )
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Restore conversation",
+                                        norwegian:
+                                            "Gjenopprett samtalen"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Archive conversation",
+                                        norwegian:
+                                            "Arkiver samtalen"
+                                    ),
+                            systemImage:
+                                messaging
+                                    .isArchived(
+                                        conversationID
+                                    )
+                                    ? "tray.and.arrow.up"
+                                    : "archivebox"
+                        )
+                    }
                 }
 
-                Spacer(
-                    minLength: 8
-                )
-
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Block",
+                        norwegian: "Blokker"
+                    ),
+                    role: .destructive
+                ) {
+                    Task {
+                        await social.block(
+                            friend.userID
+                        )
+                        dismiss()
+                    }
+                }
+            } label: {
                 Image(
                     systemName:
-                        threadStatusIcon
+                        "ellipsis"
                 )
                 .font(
                     .system(
-                        size: 15,
-                        weight: .semibold
+                        size: 17,
+                        weight: .bold
                     )
                 )
                 .foregroundStyle(
                     .white
                 )
                 .frame(
-                    width: 38,
-                    height: 38
+                    width: 42,
+                    height: 42
                 )
                 .background(
-                    Color.black
-                        .opacity(0.26),
+                    .ultraThinMaterial,
                     in: Circle()
                 )
                 .overlay {
                     Circle()
                         .stroke(
                             Color.white
-                                .opacity(0.24),
+                                .opacity(0.30),
                             lineWidth: 0.8
                         )
                 }
             }
-            .padding(
-                .horizontal,
-                15
-            )
-            .padding(
-                .bottom,
-                13
-            )
         }
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white
-                    .opacity(0.34),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.08),
-            radius: 14,
-            y: 6
-        )
     }
 
     private var threadStatusText: String {
