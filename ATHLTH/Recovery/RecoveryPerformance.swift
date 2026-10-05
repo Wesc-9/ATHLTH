@@ -22,22 +22,10 @@ enum RecoveryDerivedSnapshotBuilder {
         sorenessRatings: [String: RecoverySorenessLevel],
         activityLoad: RecoveryTrainingLoadSummary
     ) async -> RecoveryDerivedSnapshot {
-        // Muscle recovery only uses the recent 35-day baseline.
-        // Trim old strength history before handing work to the detached task
-        // so long-term users do not repeatedly walk their entire workout log.
-        let historyCutoff =
-            Date().addingTimeInterval(
-                -35 * 86_400
-            )
-        let recentHistory =
-            history.filter {
-                $0.isFinished &&
-                $0.startedAt >=
-                    historyCutoff
-            }
-
+        // Keep the caller lightweight. The history array is copy-on-write;
+        // filtering the recovery window happens entirely off the main actor.
         let payload = RecoveryComputationPayload(
-            history: recentHistory,
+            history: history,
             sorenessRatings: sorenessRatings,
             activityLoad: activityLoad
         )
@@ -51,7 +39,7 @@ enum RecoveryDerivedSnapshotBuilder {
         }
 
         return await Task.detached(
-            priority: .userInitiated
+            priority: .utility
         ) {
             let baselineStart =
                 Date().addingTimeInterval(
