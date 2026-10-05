@@ -237,7 +237,7 @@ final class IPhoneWorkoutStore:
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
     private var ghostFinalPhaseAnnounced = false
-    private var liveGhostOpponentName: String?
+    private var ghostOpponentName: String?
     private var lastLiveGhostConnectionText: String?
     private var lastActiveCheckpointWriteAt: Date?
     private var livePresentationRetryTask: Task<Void, Never>?
@@ -1575,8 +1575,6 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        liveGhostOpponentName = nil
-
         if let configuration {
             workout.ghostAudioConfiguration =
                 configuration
@@ -1623,7 +1621,7 @@ final class IPhoneWorkoutStore:
             return
         }
 
-        liveGhostOpponentName =
+        ghostOpponentName =
             title.trimmingCharacters(
                 in: .whitespacesAndNewlines
             ).isEmpty
@@ -1649,6 +1647,21 @@ final class IPhoneWorkoutStore:
         active = workout
         persistActiveCheckpoint()
         syncLiveActivity()
+    }
+
+    func configureGhostOpponentName(
+        _ name: String?
+    ) {
+        let trimmed =
+            name?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        ghostOpponentName =
+            trimmed?.isEmpty == false
+                ? trimmed
+                : nil
     }
 
     func applyLiveGhostConnectionState(
@@ -1861,7 +1874,7 @@ final class IPhoneWorkoutStore:
         lastGhostLeadAlertAt = nil
         lastGhostLeadSign = 0
         ghostFinalPhaseAnnounced = false
-        liveGhostOpponentName = nil
+        ghostOpponentName = nil
         lastLiveGhostConnectionText = nil
 
         if let interval =
@@ -2251,7 +2264,7 @@ final class IPhoneWorkoutStore:
             mode != .distance &&
             timeDelta != nil
         let opponent =
-            liveGhostOpponentName?
+            ghostOpponentName?
                 .trimmingCharacters(
                     in: .whitespacesAndNewlines
                 )
