@@ -183,6 +183,8 @@ struct ProductRootTabView: View {
                                     ATHLTHTheme
                                         .mutedText
                                 )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
 
                                 Text(
                                     ATHLTHLocalization.choose(
@@ -404,11 +406,22 @@ struct ProductRootTabView: View {
                         !$0.isReady
                     }
                 ) {
+            let firstName =
+                waiting
+                    .displayNameSnapshot
+                    .split(
+                        separator: " "
+                    )
+                    .first
+                    .map(String.init) ??
+                waiting
+                    .displayNameSnapshot
+
             return ATHLTHLocalization.choose(
                 english:
-                    "WAITING FOR (waiting.displayNameSnapshot.uppercased())",
+                    "WAITING FOR \(firstName.uppercased())",
                 norwegian:
-                    "VENTER PÅ (waiting.displayNameSnapshot.uppercased())"
+                    "VENTER PÅ \(firstName.uppercased())"
             )
         }
 
