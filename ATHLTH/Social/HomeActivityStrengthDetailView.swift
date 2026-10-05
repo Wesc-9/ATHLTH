@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -104,6 +105,8 @@ struct HomeActivityStrengthDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 overviewCard
+
+                workoutHeroCard
 
                 if workout.allowsTrainingPlaceCheckIn {
                     WorkoutPlaceCheckInSection(
@@ -331,6 +334,327 @@ struct HomeActivityStrengthDetailView: View {
                 lineWidth: 1
             )
         }
+    }
+
+    // The detail hero uses the media for the exercise that best represents
+    // this completed session. Home deliberately keeps the lightweight
+    // anatomical doll so the activity stream remains fast and scannable.
+    private var representativeExerciseEntry:
+        ExerciseLibraryEntry? {
+        guard let strengthWorkout =
+                resolvedStrengthWorkout
+        else {
+            return nil
+        }
+
+        let performed =
+            strengthWorkout.exercises
+                .filter {
+                    $0.isCompleted ||
+                    $0.sets.contains(
+                        where: \.isCompleted
+                    )
+                }
+                .sorted { lhs, rhs in
+                    let lhsSets =
+                        lhs.sets
+                            .filter(
+                                \.countsTowardTrainingLoad
+                            )
+                            .count
+                    let rhsSets =
+                        rhs.sets
+                            .filter(
+                                \.countsTowardTrainingLoad
+                            )
+                            .count
+
+                    return lhsSets > rhsSets
+                }
+
+        guard !performed.isEmpty else {
+            return nil
+        }
+
+        let catalog =
+            exerciseLibrary
+                .allExercises
+
+        for loggedExercise in performed {
+            if let plannedID =
+                    loggedExercise
+                        .plannedExerciseID,
+               let exact =
+                    catalog.first(
+                        where: {
+                            $0.id ==
+                                plannedID
+                        }
+                    ) {
+                return exact
+            }
+
+            let loggedName =
+                loggedExercise
+                    .exercise
+                    .name
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+
+            guard !loggedName.isEmpty else {
+                continue
+            }
+
+            if let named =
+                catalog.first(
+                    where: { entry in
+                        entry.canonicalName
+                            .localizedCaseInsensitiveCompare(
+                                loggedName
+                            ) ==
+                            .orderedSame ||
+                        entry.name
+                            .localizedCaseInsensitiveCompare(
+                                loggedName
+                            ) ==
+                            .orderedSame
+                    }
+                ) {
+                return named
+            }
+        }
+
+        return nil
+    }
+
+    private var representativeExerciseName:
+        String? {
+        guard let strengthWorkout =
+                resolvedStrengthWorkout
+        else {
+            return nil
+        }
+
+        return strengthWorkout.exercises
+            .filter {
+                $0.isCompleted ||
+                $0.sets.contains(
+                    where: \.isCompleted
+                )
+            }
+            .max { lhs, rhs in
+                lhs.sets
+                    .filter(
+                        \.countsTowardTrainingLoad
+                    )
+                    .count <
+                rhs.sets
+                    .filter(
+                        \.countsTowardTrainingLoad
+                    )
+                    .count
+            }?
+            .exercise
+            .name
+    }
+
+    private var workoutHeroImageURL:
+        URL? {
+        guard let entry =
+                representativeExerciseEntry
+        else {
+            return nil
+        }
+
+        return entry.imagePeakURL ??
+            entry.imageStartURL ??
+            entry.exercise.imageURL
+    }
+
+    private var workoutHeroFocusText:
+        String {
+        if let focus =
+                muscleSummary
+                    .profile
+                    .topActivations
+                    .first?
+                    .region
+                    .activityDisplayTitle {
+            return focus.uppercased()
+        }
+
+        if let bodyPart =
+                representativeExerciseEntry?
+                    .bodyPart?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+           !bodyPart.isEmpty {
+            return bodyPart.uppercased()
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "STRENGTH",
+            norwegian: "STYRKE"
+        )
+    }
+
+    private var workoutHeroMetricText:
+        String {
+        var values: [String] = [
+            workoutHeroFocusText
+        ]
+
+        if muscleSummary.totalSets > 0 {
+            values.append(
+                ATHLTHLocalization.format(
+                    english: "%d SETS",
+                    norwegian: "%d SETT",
+                    muscleSummary.totalSets
+                )
+            )
+        }
+
+        if muscleSummary.totalReps > 0 {
+            values.append(
+                ATHLTHLocalization.format(
+                    english: "%d REPS",
+                    norwegian: "%d REPS",
+                    muscleSummary.totalReps
+                )
+            )
+        }
+
+        return values.joined(
+            separator: " · "
+        )
+    }
+
+    private var workoutHeroCard:
+        some View {
+        ZStack(alignment: .bottomLeading) {
+            workoutHeroArtwork
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(0.04),
+                    Color.black.opacity(0.48)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                if let exerciseName =
+                        representativeExerciseName,
+                   !exerciseName.isEmpty {
+                    Text(exerciseName)
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            Color.white
+                                .opacity(0.92)
+                        )
+                        .lineLimit(1)
+                }
+
+                Text(workoutHeroMetricText)
+                    .font(
+                        .system(
+                            size: 13,
+                            weight: .bold,
+                            design: .rounded
+                        )
+                    )
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        Color.white
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(16)
+        }
+        .frame(height: 206)
+        .frame(
+            maxWidth: .infinity
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.border,
+                lineWidth: 1
+            )
+        }
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            workoutHeroMetricText
+        )
+    }
+
+    @ViewBuilder
+    private var workoutHeroArtwork:
+        some View {
+        if let url =
+                workoutHeroImageURL {
+            if url.isFileURL,
+               let image =
+                UIImage(
+                    contentsOfFile:
+                        url.path
+                ) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ATHLTHStorageImage(
+                    url: url
+                ) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+
+                    default:
+                        workoutHeroFallback
+                    }
+                }
+            }
+        } else {
+            workoutHeroFallback
+        }
+    }
+
+    private var workoutHeroFallback:
+        some View {
+        Image(
+            "StrengthPostWorkoutHero"
+        )
+        .resizable()
+        .scaledToFill()
     }
 
     private var muscleMapCard: some View {
