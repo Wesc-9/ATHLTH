@@ -372,6 +372,8 @@ final class ChallengeStore: ObservableObject {
                 switch challenge.sport {
                 case .running:
                     return result.kind == .running
+                case .walking:
+                    return result.kind == .walking
                 case .heartRate:
                     return result.healthKitWorkoutUUID != nil
                 case .strength:
@@ -416,7 +418,7 @@ final class ChallengeStore: ObservableObject {
             }
 
             switch challenge.sport {
-            case .running:
+            case .running, .walking:
                 let evidence =
                     await health.challengeRunningEvidence(
                         for: result,
