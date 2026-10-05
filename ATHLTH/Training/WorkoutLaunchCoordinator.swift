@@ -547,43 +547,43 @@ enum WorkoutLaunchCoordinator {
                 code: 2,
                 userInfo: [
                     NSLocalizedDescriptionKey:
-                        "Apple Watch is not ready to start this run."
+                        "Apple Watch is not ready to receive this run."
                 ]
             )
         }
 
+        // Keep route geometry on the existing file-transfer path. The Watch
+        // keeps the prepared workout card disabled until a referenced route
+        // has actually arrived, so START can never launch with missing route
+        // data.
         if let selectedRoute {
             try watchConnection.sendRoute(
                 selectedRoute
             )
-            watchConnection
-                .sendWorkoutRouteSelection(
-                    selectedRoute.id
-                )
-        } else {
-            watchConnection
-                .sendWorkoutRouteSelection(nil)
         }
 
-        if let ghostRace,
-           configuration
-                .ghostTargetDurationSeconds != nil,
-           let transfer =
-                GhostRaceStartService
-                    .preparedTransfer(
-                        ghostRace: ghostRace,
-                        audio:
-                            resolvedGhostUpdates ??
-                            .disabled
-                    ) {
-            watchConnection
-                .sendGhostRace(transfer)
-        }
+        let preparedGhostRace:
+            WatchGhostRaceTransfer? = {
+            guard let ghostRace,
+                  configuration
+                    .ghostTargetDurationSeconds != nil
+            else {
+                return nil
+            }
+
+            return GhostRaceStartService
+                .preparedTransfer(
+                    ghostRace: ghostRace,
+                    audio:
+                        resolvedGhostUpdates ??
+                        .disabled
+                )
+        }()
 
         var watchRunningWorkout =
             structuredWorkout ??
             WatchRunningWorkoutTransfer(
-                title: "",
+                title: configuration.title,
                 steps: [],
                 routeAlerts:
                     configuration
@@ -608,10 +608,9 @@ enum WorkoutLaunchCoordinator {
                     )
                     : nil
 
-        // When this Watch workout was launched from iPhone, keep spoken
-        // guidance on iPhone while it remains reachable. This preserves the
-        // user's Spotify/AirPods route. The same configuration remains on
-        // Watch, which becomes the automatic voice fallback out of range.
+        // The configuration is stored with the prepared workout. If iPhone is
+        // still reachable after START, Audio Coach may use the phone audio
+        // route; Watch remains the fallback when the phone is unavailable.
         var watchAudioCoach =
             resolvedAudioCoach
 
@@ -629,65 +628,61 @@ enum WorkoutLaunchCoordinator {
                 .clearIPhoneAudioCoach()
         }
 
-        // Deliver ATHLTH-specific run state before asking HealthKit to launch
-        // the Watch. This avoids a launch race where the workout session starts
-        // before intervals or alerts have arrived.
-        watchConnection
-            .sendAudioCoachConfiguration(
-                watchAudioCoach
-            )
-        watchConnection
-            .sendRunningWorkout(
-                watchRunningWorkout
-            )
+        let preparedSummary: String = {
+            if let workout =
+                    configuration.workout {
+                return workout.summary
+            }
 
-        do {
-            try await watchConnection
-                .startWorkoutOnWatch(
-                    .running,
-                    indoor:
-                        configuration.environment ==
-                        .treadmill
+            if let selectedRoute {
+                return String(
+                    format: "%.1f km",
+                    selectedRoute
+                        .distanceKilometers
                 )
-        } catch {
-            workoutMirroring?
-                .clearIPhoneAudioCoach()
-            throw error
-        }
+            }
 
+            return ATHLTHLocalization.choose(
+                english:
+                    configuration.environment ==
+                        .treadmill
+                        ? "Treadmill · ready to start"
+                        : "Outdoor · ready to start",
+                norwegian:
+                    configuration.environment ==
+                        .treadmill
+                        ? "Tredemølle · klar til start"
+                        : "Utendørs · klar til start"
+            )
+        }()
+
+        // Gear belongs to the next Watch workout, but nothing else begins
+        // here. In particular HealthKit, elapsed time and Spotify stay idle
+        // until the athlete presses START on Apple Watch.
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
         )
-        startQuickSpotifyIfNeeded(
-            playlist:
-                configuration.spotifyPlaylist,
-            autoplay:
-                configuration.spotifyAutoplay,
-            settings: settings,
-            spotify: spotify
+
+        watchConnection.sendPreparedWorkout(
+            WatchPreparedWorkoutTransfer(
+                id: UUID(),
+                title: configuration.title,
+                summary: preparedSummary,
+                kind: .running,
+                routeID:
+                    selectedRoute?.id,
+                runningWorkout:
+                    watchRunningWorkout,
+                audioCoach:
+                    watchAudioCoach,
+                ghostRace:
+                    preparedGhostRace,
+                indoor:
+                    configuration.environment ==
+                    .treadmill,
+                updatedAt: Date()
+            )
         )
-
-        // Launch can briefly change WCSession reachability. Re-send the small
-        // configuration payload after launch; the connection store queues a
-        // durable fallback if the immediate message cannot be delivered.
-        watchConnection
-            .sendAudioCoachConfiguration(
-                watchAudioCoach
-            )
-        watchConnection
-            .sendRunningWorkout(
-                watchRunningWorkout
-            )
-
-        if let selectedRoute {
-            watchConnection
-                .sendWorkoutRouteSelection(
-                    selectedRoute.id
-                )
-        } else {
-            watchConnection
-                .sendWorkoutRouteSelection(nil)
-        }
     }
 
     static func startWalkQuick(
