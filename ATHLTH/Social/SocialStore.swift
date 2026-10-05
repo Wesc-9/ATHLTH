@@ -19,6 +19,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var activeWorkoutSession: SocialWorkoutSessionRecord?
     @Published private(set) var activeWorkoutParticipants: [SocialWorkoutParticipantRecord] = []
     @Published private(set) var coordinatedLobbySessionID: UUID?
+    @Published private(set) var isCoordinatedLobbyMinimized = false
     @Published private(set) var currentJoinedWorkoutSessionID: UUID?
     @Published private(set) var privacy: SocialPrivacySettings?
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
@@ -964,6 +965,7 @@ final class SocialStore: ObservableObject {
             activeWorkoutSession = nil
             activeWorkoutParticipants = []
             coordinatedLobbySessionID = nil
+            isCoordinatedLobbyMinimized = false
             currentJoinedWorkoutSessionID = nil
             return true
         }
@@ -998,6 +1000,7 @@ final class SocialStore: ObservableObject {
 
             activeWorkoutSession = session
             coordinatedLobbySessionID = session.id
+            isCoordinatedLobbyMinimized = false
             try await refreshWorkoutLobby(sessionID: session.id)
 
             if let creatorCaptureDevice,
@@ -1016,12 +1019,31 @@ final class SocialStore: ObservableObject {
             )
         } catch is CancellationError {
             coordinatedLobbySessionID = nil
+            isCoordinatedLobbyMinimized = false
             return false
         } catch {
             coordinatedLobbySessionID = nil
+            isCoordinatedLobbyMinimized = false
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func minimizeCoordinatedLobby() {
+        guard coordinatedLobbySessionID != nil else {
+            return
+        }
+
+        isCoordinatedLobbyMinimized = true
+    }
+
+    func presentCoordinatedLobby() {
+        guard coordinatedLobbySessionID != nil else {
+            isCoordinatedLobbyMinimized = false
+            return
+        }
+
+        isCoordinatedLobbyMinimized = false
     }
 
     func refreshWorkoutLobby(
@@ -1137,6 +1159,7 @@ final class SocialStore: ObservableObject {
                 else {
                     if coordinatedLobbySessionID == sessionID {
                         coordinatedLobbySessionID = nil
+                        isCoordinatedLobbyMinimized = false
                     }
                     return false
                 }
@@ -1156,6 +1179,7 @@ final class SocialStore: ObservableObject {
                 else {
                     if coordinatedLobbySessionID == sessionID {
                         coordinatedLobbySessionID = nil
+                        isCoordinatedLobbyMinimized = false
                     }
                     return false
                 }
@@ -1180,6 +1204,7 @@ final class SocialStore: ObservableObject {
 
                     if coordinatedLobbySessionID == sessionID {
                         coordinatedLobbySessionID = nil
+                        isCoordinatedLobbyMinimized = false
                     }
                     return true
                 }
@@ -1307,6 +1332,7 @@ final class SocialStore: ObservableObject {
             self.activeWorkoutSession = nil
             activeWorkoutParticipants = []
             coordinatedLobbySessionID = nil
+            isCoordinatedLobbyMinimized = false
             workoutSessions.removeAll {
                 $0.id == activeWorkoutSession.id
             }
@@ -2872,6 +2898,7 @@ final class SocialStore: ObservableObject {
         activeWorkoutSession = nil
         activeWorkoutParticipants = []
         coordinatedLobbySessionID = nil
+        isCoordinatedLobbyMinimized = false
         currentJoinedWorkoutSessionID = nil
         privacy = nil
         workoutMedia = []
