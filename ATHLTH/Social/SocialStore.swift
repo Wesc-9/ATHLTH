@@ -1014,6 +1014,18 @@ final class SocialStore: ObservableObject {
                 try await refreshWorkoutLobby(sessionID: session.id)
             }
 
+            if invitePayload?
+                .resolvedParticipationMode ==
+                .remote {
+                // Remote social workouts share the workout and live status,
+                // but each athlete starts independently.
+                currentJoinedWorkoutSessionID =
+                    session.id
+                coordinatedLobbySessionID = nil
+                isCoordinatedLobbyMinimized = false
+                return true
+            }
+
             return await waitForCoordinatedWorkoutStart(
                 sessionID: session.id
             )
@@ -1182,6 +1194,22 @@ final class SocialStore: ObservableObject {
                         isCoordinatedLobbyMinimized = false
                     }
                     return false
+                }
+
+                if session.invitePayload?
+                    .resolvedParticipationMode ==
+                    .remote,
+                   currentParticipant.readyAt != nil {
+                    currentJoinedWorkoutSessionID =
+                        sessionID
+
+                    if coordinatedLobbySessionID ==
+                        sessionID {
+                        coordinatedLobbySessionID = nil
+                        isCoordinatedLobbyMinimized = false
+                    }
+
+                    return true
                 }
 
                 if let startAt = session.coordinatedStartAt {
