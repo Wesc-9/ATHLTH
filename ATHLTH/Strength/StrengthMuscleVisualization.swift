@@ -578,7 +578,30 @@ enum StrengthMuscleProfileBuilder {
     }
 }
 
+private final class StrengthMuscleNormalizationCache:
+    @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [String: String] = [:]
+
+    func value(for raw: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return values[raw]
+    }
+
+    func store(
+        _ value: String,
+        for raw: String
+    ) {
+        lock.lock()
+        values[raw] = value
+        lock.unlock()
+    }
+}
+
 enum StrengthMuscleResolver {
+    private static let normalizationCache =
+        StrengthMuscleNormalizationCache()
     static func regions(
         for raw: String
     ) -> [StrengthMuscleRegion] {
@@ -1098,19 +1121,29 @@ enum StrengthMuscleResolver {
     private static func normalize(
         _ raw: String
     ) -> String {
-        raw
-            .lowercased()
-            .replacingOccurrences(
-                of: "_",
-                with: " "
-            )
-            .replacingOccurrences(
-                of: "-",
-                with: " "
-            )
-            .trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
+        if let cached =
+                normalizationCache.value(
+                    for: raw
+                ) {
+            return cached
+        }
+
+        let normalized =
+            raw
+                .split {
+                    $0.isWhitespace ||
+                    $0 == "_" ||
+                    $0 == "-"
+                }
+                .map(String.init)
+                .joined(separator: " ")
+                .lowercased()
+
+        normalizationCache.store(
+            normalized,
+            for: raw
+        )
+        return normalized
     }
 
     private static func contains(
