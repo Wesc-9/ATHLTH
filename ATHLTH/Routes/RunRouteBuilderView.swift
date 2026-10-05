@@ -92,63 +92,109 @@ struct RunRouteBuilderView: View {
     }
 
     private var hero: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.accent.opacity(0.92),
-                    Color.black.opacity(0.94)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        ATHLTHCard {
+            HStack(
+                alignment: .center,
+                spacing: 14
+            ) {
+                Image(
+                    systemName:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(.title2)
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+                .frame(
+                    width: 48,
+                    height: 48
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in: Circle()
+                )
 
-            ATHLTHMarkShape()
-                .fill(.white.opacity(0.075))
-                .frame(width: 165, height: 122)
-                .rotationEffect(.degrees(-12))
-                .offset(x: 205, y: -30)
+                VStack(
+                    alignment: .leading,
+                    spacing: 4
+                ) {
+                    Text(
+                        "ATHLTH ROUTE BUILDER"
+                    )
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                    )
+                    .tracking(1.4)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text("ATHLTH ROUTE BUILDER")
-                    .font(.caption2.bold())
-                    .tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.68))
-
-                HStack(spacing: 9) {
-                    Text("Build your route")
+                    HStack(spacing: 8) {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Build your route",
+                                    norwegian:
+                                        "Bygg ruten din"
+                                )
+                        )
                         .font(
-                            .system(
-                                size: 24,
-                                weight: .semibold,
-                                design: .rounded
+                            .title3
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                        Text("A → B")
+                            .font(
+                                .caption
+                                    .weight(.bold)
                             )
-                        )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                            .padding(
+                                .horizontal,
+                                8
+                            )
+                            .padding(
+                                .vertical,
+                                4
+                            )
+                            .background(
+                                ATHLTHTheme
+                                    .vitalitySoft,
+                                in: Capsule()
+                            )
+                    }
 
-                    Text("A → B")
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            .white.opacity(0.12),
-                            in: Capsule()
-                        )
-                }
-                .foregroundStyle(.white)
-
-                Text(routeBuilderSubtitle)
+                    Text(
+                        routeBuilderSubtitle
+                    )
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.74))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+                }
+
+                Spacer(
+                    minLength: 0
+                )
             }
-            .padding(20)
         }
-        .frame(height: 168)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 26,
-                style: .continuous
-            )
-        )
+        .athlthLightweightCardChrome()
     }
 
     private var effectiveRouteTitle:
@@ -421,7 +467,7 @@ struct RunRouteBuilderView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
+            .tint(ATHLTHTheme.vitality)
             .disabled(
                 startItem == nil ||
                 endItem == nil ||
@@ -449,7 +495,7 @@ struct RunRouteBuilderView: View {
                                 coordinate:
                                     startItem.placemark.coordinate
                             )
-                            .tint(ATHLTHTheme.accent)
+                            .tint(ATHLTHTheme.vitality)
                         }
 
                         ForEach(
@@ -493,7 +539,7 @@ struct RunRouteBuilderView: View {
                                 selectedAlternative.coordinates
                         )
                         .stroke(
-                            ATHLTHTheme.accent,
+                            ATHLTHTheme.vitality,
                             lineWidth: 6
                         )
                     }
@@ -753,7 +799,7 @@ struct RunRouteBuilderView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
+            .tint(ATHLTHTheme.vitality)
             .disabled(
                 selectedAlternative == nil
             )
@@ -923,8 +969,11 @@ struct RunRouteBuilderView: View {
         .buttonStyle(.plain)
         .padding(12)
         .background(
-            Color(.tertiarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 15)
+            ATHLTHTheme.surfaceStone.opacity(0.78),
+            in: RoundedRectangle(
+                cornerRadius: 15,
+                style: .continuous
+            )
         )
     }
 
