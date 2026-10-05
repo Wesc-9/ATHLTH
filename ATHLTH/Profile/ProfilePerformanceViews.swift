@@ -8155,7 +8155,12 @@ private struct PerformanceMilestonesDetailView:
                             .personalRecords,
                     strengthRepRecords:
                         strengthWorkout
-                            .repPersonalRecords
+                            .repPersonalRecords,
+                    performanceWorkouts:
+                        health.workouts,
+                    strengthWorkouts:
+                        strengthWorkout
+                            .workoutHistory
                 ) != "—"
             }
             .sorted {
@@ -8566,6 +8571,8 @@ struct ProfileRecordShowcasePickerView:
         StrengthWorkoutStore
     @State private var fetchedHealthRecords:
         [HealthPersonalRecord] = []
+    @State private var performanceWorkoutHistory:
+        [WorkoutSummary] = []
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
 
@@ -8574,6 +8581,13 @@ struct ProfileRecordShowcasePickerView:
         healthRecords.isEmpty
             ? fetchedHealthRecords
             : healthRecords
+    }
+
+    private var resolvedPerformanceWorkouts:
+        [WorkoutSummary] {
+        performanceWorkoutHistory.isEmpty
+            ? health.workouts
+            : performanceWorkoutHistory
     }
 
     private var selection:
@@ -8613,7 +8627,7 @@ struct ProfileRecordShowcasePickerView:
                 strengthWorkout
                     .repPersonalRecords,
             performanceWorkouts:
-                health.workouts,
+                resolvedPerformanceWorkouts,
             strengthWorkouts:
                 strengthWorkout
                     .workoutHistory
@@ -8834,21 +8848,40 @@ struct ProfileRecordShowcasePickerView:
             }
         }
         .task {
-            guard healthRecords
-                    .isEmpty,
-                  fetchedHealthRecords
-                    .isEmpty,
-                  health
-                    .hasRequestedAuthorization
+            guard health.hasRequestedAuthorization
             else {
                 return
             }
 
-            fetchedHealthRecords =
-                (
-                    try? await health
-                        .personalRecords()
-                ) ?? []
+            async let recordsTask:
+                [HealthPersonalRecord]? =
+                    healthRecords.isEmpty &&
+                    fetchedHealthRecords.isEmpty
+                    ? try? health.personalRecords()
+                    : nil
+            async let historyTask:
+                [WorkoutSummary]? =
+                    performanceWorkoutHistory.isEmpty
+                    ? try? health
+                        .performanceWorkoutHistory()
+                    : nil
+
+            let (
+                loadedRecords,
+                loadedHistory
+            ) = await (
+                recordsTask,
+                historyTask
+            )
+
+            if let loadedRecords {
+                fetchedHealthRecords =
+                    loadedRecords
+            }
+            if let loadedHistory {
+                performanceWorkoutHistory =
+                    loadedHistory
+            }
         }
     }
 
