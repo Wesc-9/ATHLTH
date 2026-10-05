@@ -39,10 +39,28 @@ enum RecoveryDerivedSnapshotBuilder {
         return await Task.detached(
             priority: .userInitiated
         ) {
-            RecoveryDerivedSnapshot(
+            let baselineStart =
+                Date().addingTimeInterval(
+                    -35 * 86_400
+                )
+
+            // StrengthWorkoutStore keeps history newest-first.
+            // Stop as soon as we reach data older than the recovery
+            // baseline instead of walking the user's full workout archive.
+            let recentHistory =
+                Array(
+                    payload.history
+                        .prefix {
+                            $0.startedAt >=
+                                baselineStart
+                        }
+                )
+                .filter(\.isFinished)
+
+            return RecoveryDerivedSnapshot(
                 statuses:
                     MuscleRecoveryEngine.statuses(
-                        history: payload.history,
+                        history: recentHistory,
                         sorenessRatings:
                             payload.sorenessRatings,
                         activityLoad:
@@ -52,7 +70,7 @@ enum RecoveryDerivedSnapshotBuilder {
                     MuscleRecoveryEngine
                         .unmappedExerciseNames(
                             history:
-                                payload.history
+                                recentHistory
                         )
             )
         }.value
