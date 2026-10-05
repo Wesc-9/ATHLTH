@@ -1250,6 +1250,122 @@ struct ChallengeCreationView: View {
                     vertical: true
                 )
 
+                if !preselectedFriends.isEmpty &&
+                    preselectedRouteID == nil {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 9
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "CHOOSE ACTIVITY",
+                                norwegian:
+                                    "VELG AKTIVITET"
+                            )
+                        )
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .tracking(1.1)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        HStack(spacing: 8) {
+                            ForEach(
+                                challengeSportOptions
+                            ) { option in
+                                Button {
+                                    sport = option
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(
+                                            systemName:
+                                                option
+                                                    .systemImage
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+
+                                        Text(
+                                            option.title
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(
+                                            0.75
+                                        )
+                                    }
+                                    .foregroundStyle(
+                                        sport == option
+                                            ? Color.white
+                                            : ATHLTHTheme
+                                                .accentDeep
+                                    )
+                                    .frame(
+                                        maxWidth:
+                                            .infinity
+                                    )
+                                    .frame(height: 40)
+                                    .background(
+                                        sport == option
+                                            ? ATHLTHTheme
+                                                .vitality
+                                            : ATHLTHTheme
+                                                .surfaceSage
+                                                .opacity(
+                                                    0.76
+                                                ),
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    13,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                13,
+                                            style:
+                                                .continuous
+                                        )
+                                        .stroke(
+                                            sport == option
+                                                ? ATHLTHTheme
+                                                    .vitality
+                                                    .opacity(
+                                                        0.35
+                                                    )
+                                                : Color
+                                                    .black
+                                                    .opacity(
+                                                        0.04
+                                                    ),
+                                            lineWidth:
+                                                0.8
+                                        )
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
                 HStack(spacing: 8) {
                     creationHeroChip(
                         title: sport.title,
