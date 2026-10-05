@@ -2154,8 +2154,7 @@ struct HomeHealthMetricDetailView:
 
                 ATHLTHCard {
                     HStack(
-                        alignment:
-                            .firstTextBaseline
+                        alignment: .top
                     ) {
                         VStack(
                             alignment:
@@ -2186,20 +2185,53 @@ struct HomeHealthMetricDetailView:
                                 )
                         }
 
-                        Spacer()
+                        Spacer(minLength: 16)
 
-                        Text(selectedRange.title)
-                            .font(
-                                .system(
-                                    size: 9,
-                                    weight: .bold
+                        VStack(
+                            alignment: .trailing,
+                            spacing: 3
+                        ) {
+                            Text(selectedRange.title)
+                                .font(
+                                    .system(
+                                        size: 9,
+                                        weight: .bold
+                                    )
+                                )
+                                .tracking(1.1)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .accentDeep
+                                )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Average",
+                                    norwegian: "Gjennomsnitt"
                                 )
                             )
-                            .tracking(1.1)
+                            .font(.caption)
                             .foregroundStyle(
                                 ATHLTHTheme
-                                    .accentDeep
+                                    .mutedText
                             )
+
+                            Text(averageValueText)
+                                .font(
+                                    .system(
+                                        size: 20,
+                                        weight: .semibold,
+                                        design:
+                                            .rounded
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                        }
                     }
 
                     Picker(
@@ -2491,6 +2523,35 @@ struct HomeHealthMetricDetailView:
             return "—"
         }
 
+        return formattedMetricValue(value)
+    }
+
+    private var averageValueText:
+        String {
+        let values =
+            points
+                .compactMap(\.value)
+                .filter {
+                    $0.isFinite &&
+                        $0 >= 0
+                }
+
+        guard !values.isEmpty else {
+            return "—"
+        }
+
+        let average =
+            values.reduce(0, +) /
+                Double(values.count)
+
+        return formattedMetricValue(
+            average
+        )
+    }
+
+    private func formattedMetricValue(
+        _ value: Double
+    ) -> String {
         switch kind {
         case .sleep:
             let totalMinutes =
