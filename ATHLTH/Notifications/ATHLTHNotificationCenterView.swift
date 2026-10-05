@@ -1132,17 +1132,6 @@ struct ATHLTHNotificationCenterView: View {
                     }
                 }
 
-                Button(role: .destructive) {
-                    notifications.delete(item.id)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Delete",
-                            norwegian: "Slett"
-                        ),
-                        systemImage: "trash"
-                    )
-                }
             }
         } else {
             Group {
@@ -1207,17 +1196,6 @@ struct ATHLTHNotificationCenterView: View {
                     }
                 }
 
-                Button(role: .destructive) {
-                    notifications.delete(item.id)
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Delete",
-                            norwegian: "Slett"
-                        ),
-                        systemImage: "trash"
-                    )
-                }
             }
         }
     }
@@ -1398,14 +1376,13 @@ struct ATHLTHNotificationCenterView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(15)
         .background {
             ZStack {
-                ATHLTHTheme.card.opacity(
-                    item.isUnread ? 0.99 : 0.93
-                )
-
                 if item.isUnread {
+                    ATHLTHTheme.card.opacity(0.99)
+
                     LinearGradient(
                         colors: [
                             tint.opacity(0.055),
@@ -1414,6 +1391,12 @@ struct ATHLTHNotificationCenterView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
+                } else {
+                    // Read notifications deliberately lose their category tint.
+                    // The neutral surface makes it obvious they no longer need
+                    // attention while keeping the content fully legible.
+                    Color(uiColor: .systemGray6)
+                        .opacity(0.96)
                 }
             }
             .clipShape(
@@ -2097,23 +2080,51 @@ private struct NotificationSwipeDeleteContainer<
         self.content = content
     }
 
-    @State private var restingOffset:
-        CGFloat = 0
     @GestureState private var dragOffset:
         CGFloat = 0
+    @State private var containerWidth:
+        CGFloat = 320
 
-    private let revealWidth:
-        CGFloat = 78
+    // A deliberate horizontal gesture is required before a card moves.
+    // This keeps normal vertical scrolling responsive even when the finger
+    // travels slightly sideways.
+    private let horizontalIntentRatio:
+        CGFloat = 1.55
+    private let fullSwipeFraction:
+        CGFloat = 0.68
+    private let revealDistance:
+        CGFloat = 88
 
     private var effectiveOffset:
         CGFloat {
         min(
             max(
-                restingOffset +
-                    dragOffset,
-                -revealWidth
+                dragOffset,
+                -max(containerWidth, 1)
             ),
             0
+        )
+    }
+
+    private var revealProgress:
+        CGFloat {
+        min(
+            abs(effectiveOffset) /
+                revealDistance,
+            1
+        )
+    }
+
+    private var deleteProgress:
+        CGFloat {
+        min(
+            abs(effectiveOffset) /
+                max(
+                    containerWidth *
+                        fullSwipeFraction,
+                    1
+                ),
+            1
         )
     }
 
@@ -2123,68 +2134,81 @@ private struct NotificationSwipeDeleteContainer<
                 cornerRadius: 22,
                 style: .continuous
             )
-            .fill(Color.red)
-
-            Button(
-                role: .destructive
-            ) {
-                onDelete()
-            } label: {
-                VStack(spacing: 4) {
-                    Image(
-                        systemName:
-                            "trash.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .semibold
-                        )
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Delete",
-                            norwegian: "Slett"
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .semibold
-                        )
-                    )
-                }
-                .foregroundStyle(.white)
-                .frame(
-                    width: revealWidth
+            .fill(
+                Color.red.opacity(
+                    0.08 +
+                        (0.10 *
+                            deleteProgress)
                 )
-                .frame(
-                    maxHeight: .infinity
+            )
+
+            Image(systemName: "trash.fill")
+                .font(
+                    .system(
+                        size:
+                            17 +
+                            (3 *
+                                revealProgress),
+                        weight: .semibold
+                    )
                 )
-            }
-            .buttonStyle(.plain)
+                .foregroundStyle(
+                    Color.red.opacity(
+                        0.40 +
+                            (0.60 *
+                                revealProgress)
+                    )
+                )
+                .frame(width: 58)
+                .frame(maxHeight: .infinity)
+                .padding(.trailing, 4)
+                .scaleEffect(
+                    0.84 +
+                        (0.16 *
+                            revealProgress)
+                )
+                .opacity(
+                    0.22 +
+                        (0.78 *
+                            revealProgress)
+                )
+                .allowsHitTesting(false)
 
             content()
-                .offset(
-                    x: effectiveOffset
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
                 )
-                .contentShape(
-                    Rectangle()
-                )
+                .offset(x: effectiveOffset)
+                .contentShape(Rectangle())
                 .simultaneousGesture(
                     DragGesture(
-                        minimumDistance: 12
+                        minimumDistance: 20
                     )
                     .updating(
                         $dragOffset
                     ) { value, state, _ in
-                        guard abs(
-                            value.translation.width
-                        ) >
+                        let horizontal =
                             abs(
-                                value.translation.height
+                                value
+                                    .translation
+                                    .width
                             )
+                        let vertical =
+                            abs(
+                                value
+                                    .translation
+                                    .height
+                            )
+
+                        guard value.translation
+                            .width < 0,
+                              horizontal >
+                                max(
+                                    18,
+                                    vertical *
+                                        horizontalIntentRatio
+                                )
                         else {
                             return
                         }
@@ -2193,46 +2217,89 @@ private struct NotificationSwipeDeleteContainer<
                             value.translation.width
                     }
                     .onEnded { value in
-                        guard abs(
-                            value.translation.width
-                        ) >
+                        let horizontal =
                             abs(
-                                value.translation.height
+                                min(
+                                    value
+                                        .translation
+                                        .width,
+                                    0
+                                )
                             )
+                        let vertical =
+                            abs(
+                                value
+                                    .translation
+                                    .height
+                            )
+
+                        guard value.translation
+                            .width < 0,
+                              horizontal >
+                                max(
+                                    18,
+                                    vertical *
+                                        horizontalIntentRatio
+                                )
                         else {
                             return
                         }
 
-                        if value.translation.width <
-                            -140 {
-                            onDelete()
+                        let predicted =
+                            abs(
+                                min(
+                                    value
+                                        .predictedEndTranslation
+                                        .width,
+                                    0
+                                )
+                            )
+                        let width =
+                            max(
+                                containerWidth,
+                                1
+                            )
+
+                        let crossedFullSwipe =
+                            horizontal >=
+                                width *
+                                fullSwipeFraction
+                        let committedFlick =
+                            horizontal >=
+                                width * 0.44 &&
+                            predicted >=
+                                width * 0.86
+
+                        guard crossedFullSwipe ||
+                                committedFlick
+                        else {
                             return
                         }
 
-                        withAnimation(
-                            .snappy(
-                                duration: 0.18
-                            )
-                        ) {
-                            restingOffset =
-                                value.translation.width <
-                                    -34
-                                    ? -revealWidth
-                                    : 0
-                        }
+                        UIImpactFeedbackGenerator(
+                            style: .light
+                        )
+                        .impactOccurred()
+
+                        onDelete()
                     }
                 )
-                .onTapGesture {
-                    if restingOffset != 0 {
-                        withAnimation(
-                            .snappy(
-                                duration: 0.16
-                            )
-                        ) {
-                            restingOffset = 0
-                        }
+        }
+        .frame(maxWidth: .infinity)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        containerWidth =
+                            proxy.size.width
                     }
-                }
+                    .onChange(
+                        of: proxy.size.width
+                    ) { _, newWidth in
+                        containerWidth =
+                            newWidth
+                    }
+            }
         }
         .clipShape(
             RoundedRectangle(
