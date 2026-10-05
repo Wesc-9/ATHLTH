@@ -82,7 +82,19 @@ final class StrengthWorkoutStore: ObservableObject {
         defer { loadingAccount = false }
         accountID = userID
         completedWorkout = nil
-        workoutHistory = userID.flatMap { AccountLocalStorage.read([StrengthWorkoutLog].self, name: "strengthHistory", userID: $0) } ?? []
+        workoutHistory =
+            (
+                userID.flatMap {
+                    AccountLocalStorage.read(
+                        [StrengthWorkoutLog].self,
+                        name: "strengthHistory",
+                        userID: $0
+                    )
+                } ?? []
+            )
+            .sorted {
+                $0.startedAt > $1.startedAt
+            }
         let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
         activeWorkout = checkpoint?.workout
         if let workout = activeWorkout,
