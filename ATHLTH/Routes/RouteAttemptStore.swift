@@ -161,6 +161,18 @@ final class RouteAttemptStore: ObservableObject {
 
     private let service: SupabaseRouteAttemptService
     private var latestRefreshRequestID = UUID()
+    private let routeMetricVersion = 2
+
+    private func metricVersionKey(
+        routeID: UUID,
+        userID: UUID,
+        workoutID: UUID
+    ) -> String {
+        "athlth.routeMetrics.v\(routeMetricVersion)." +
+        routeID.uuidString.lowercased() + "." +
+        userID.uuidString.lowercased() + "." +
+        workoutID.uuidString.lowercased()
+    }
 
     init(
         service: SupabaseRouteAttemptService =
@@ -243,18 +255,72 @@ final class RouteAttemptStore: ObservableObject {
                     .map(\.workoutID)
             )
 
-            for workout in candidates
-            where !existingWorkoutIDs.contains(workout.id) {
-                guard let analysis = await health.routePerformance(
-                    for: workout,
-                    against: route
-                ) else {
+            // Existing rows were produced by the older one-way matcher. Add
+            // those workouts back to this pass even when they fall outside
+            // the normal "new candidate" limit, then recalculate each once
+            // with the stricter route-metric version.
+            let existingSummaries =
+                health.workouts.filter {
+                    existingWorkoutIDs
+                        .contains($0.id)
+                }
+
+            var workByID:
+                [UUID: WorkoutSummary] = [:]
+
+            for workout in existingSummaries {
+                workByID[workout.id] =
+                    workout
+            }
+
+            for workout in candidates {
+                workByID[workout.id] =
+                    workout
+            }
+
+            let orderedWorkouts =
+                workByID.values.sorted {
+                    $0.startDate >
+                    $1.startDate
+                }
+
+            for workout in orderedWorkouts {
+                let isExisting =
+                    existingWorkoutIDs
+                        .contains(workout.id)
+                let metricKey =
+                    metricVersionKey(
+                        routeID: route.id,
+                        userID: userID,
+                        workoutID:
+                            workout.id
+                    )
+                let alreadyCurrent =
+                    UserDefaults.standard
+                        .bool(
+                            forKey:
+                                metricKey
+                        )
+
+                if isExisting &&
+                    alreadyCurrent {
+                    continue
+                }
+
+                guard let analysis =
+                        await health
+                            .routePerformance(
+                                for: workout,
+                                against: route
+                            )
+                else {
                     continue
                 }
 
                 let distanceRatio =
                     analysis.distanceMeters > 0
-                        ? analysis.distanceMeters / routeMeters
+                        ? analysis.distanceMeters /
+                            routeMeters
                         : 1
 
                 let likelyRouteAttempt =
@@ -264,7 +330,13 @@ final class RouteAttemptStore: ObservableObject {
                     distanceRatio >= 0.55 &&
                     distanceRatio <= 1.55
 
-                guard likelyRouteAttempt else {
+                // An existing attempt is already known to belong to this
+                // route. Always update its metrics, even if the corrected
+                // score falls below the discovery threshold. Otherwise old
+                // inflated values such as 89% would remain visible forever.
+                guard isExisting ||
+                        likelyRouteAttempt
+                else {
                     continue
                 }
 
@@ -272,6 +344,11 @@ final class RouteAttemptStore: ObservableObject {
                     routeID: route.id,
                     userID: userID,
                     analysis: analysis
+                )
+
+                UserDefaults.standard.set(
+                    true,
+                    forKey: metricKey
                 )
             }
 
