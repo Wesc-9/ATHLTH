@@ -743,8 +743,6 @@ final class GhostRaceStore: ObservableObject {
         let routeDistance =
             max(
                 reference.routeDistanceMeters,
-                reference.points.last?
-                    .cumulativeMeters ?? 0,
                 1
             )
         let expectedDistance =
