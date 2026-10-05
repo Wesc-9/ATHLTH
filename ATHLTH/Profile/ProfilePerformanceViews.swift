@@ -8855,34 +8855,21 @@ struct ProfileRecordShowcasePickerView:
                 return
             }
 
-            async let recordsTask:
-                [HealthPersonalRecord]? =
-                    healthRecords.isEmpty &&
-                    fetchedHealthRecords.isEmpty
-                    ? try? health.personalRecords()
-                    : nil
-            async let historyTask:
-                [WorkoutSummary]? =
-                    performanceWorkoutHistory.isEmpty
-                    ? try? health
-                        .performanceWorkoutHistory()
-                    : nil
-
-            let (
-                loadedRecords,
-                loadedHistory
-            ) = await (
-                recordsTask,
-                historyTask
-            )
-
-            if let loadedRecords {
+            if healthRecords.isEmpty &&
+                fetchedHealthRecords.isEmpty {
                 fetchedHealthRecords =
-                    loadedRecords
+                    (
+                        try? await health
+                            .personalRecords()
+                    ) ?? []
             }
-            if let loadedHistory {
+
+            if performanceWorkoutHistory.isEmpty {
                 performanceWorkoutHistory =
-                    loadedHistory
+                    (
+                        try? await health
+                            .performanceWorkoutHistory()
+                    ) ?? []
             }
         }
     }
