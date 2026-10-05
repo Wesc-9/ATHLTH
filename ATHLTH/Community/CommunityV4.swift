@@ -1273,7 +1273,8 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             OfficialWeeklyChallengeArtwork(
-                challenge: challenge
+                challenge: challenge,
+                preserveOriginalColors: true
             )
 
             VStack(
