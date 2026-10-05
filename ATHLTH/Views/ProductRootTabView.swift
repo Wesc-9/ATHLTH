@@ -137,92 +137,220 @@ struct ProductRootTabView: View {
                 .frame(width: 0, height: 0)
         }
         .overlay(alignment: .top) {
-            if workoutMirroring
-                    .hasActiveMirroredWorkout,
-               workoutMirroring
-                    .isUserMinimized {
-                Button {
-                    workoutMirroring
-                        .presentWorkout()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(
-                            systemName:
-                                "figure.run"
-                        )
-                        .font(
-                            .system(
-                                size: 20,
-                                weight:
-                                    .semibold
+            VStack(spacing: 8) {
+                if social
+                        .isCoordinatedLobbyMinimized,
+                   social
+                        .coordinatedLobbySessionID != nil {
+                    Button {
+                        social
+                            .presentCoordinatedLobby()
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(
+                                systemName:
+                                    "person.2.fill"
                             )
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Return to Apple Watch workout",
-                                norwegian:
-                                    "Tilbake til Apple Watch-økt"
-                            )
-                        )
-                        .font(
-                            .headline
-                                .weight(
-                                    .semibold
+                            .font(
+                                .system(
+                                    size: 19,
+                                    weight:
+                                        .semibold
                                 )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 1
+                            ) {
+                                Text(
+                                    minimizedLobbyStatusText
+                                )
+                                .font(
+                                    .system(
+                                        size: 10,
+                                        weight:
+                                            .bold
+                                    )
+                                )
+                                .tracking(0.8)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Return to Train Together",
+                                        norwegian:
+                                            "Returner til Tren sammen"
+                                    )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                            }
+
+                            Spacer(minLength: 4)
+
+                            Image(
+                                systemName:
+                                    "chevron.up"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+                        .padding(
+                            .horizontal,
+                            18
                         )
-                    }
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .padding(
-                        .horizontal,
-                        22
-                    )
-                    .frame(height: 58)
-                    .background(
-                        .regularMaterial,
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(
+                        .frame(
+                            width: 340,
+                            height: 62
+                        )
+                        .background(
+                            .regularMaterial,
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    ATHLTHTheme
+                                        .vitality
+                                        .opacity(
+                                            0.15
+                                        ),
+                                    lineWidth:
+                                        0.8
+                                )
+                        }
+                        .shadow(
+                            color:
                                 Color.black
                                     .opacity(
-                                        0.05
+                                        0.10
                                     ),
-                                lineWidth:
-                                    0.8
-                            )
+                            radius: 14,
+                            y: 6
+                        )
                     }
-                    .shadow(
-                        color:
-                            Color.black
-                                .opacity(
-                                    0.10
-                                ),
-                        radius: 14,
-                        y: 6
+                    .buttonStyle(.plain)
+                    .transition(
+                        .move(edge: .top)
+                            .combined(
+                                with:
+                                    .opacity
+                            )
                     )
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 8)
-                .transition(
-                    .move(edge: .top)
-                        .combined(
-                            with:
-                                .opacity
+
+                if workoutMirroring
+                        .hasActiveMirroredWorkout,
+                   workoutMirroring
+                        .isUserMinimized {
+                    Button {
+                        workoutMirroring
+                            .presentWorkout()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(
+                                systemName:
+                                    "figure.run"
+                            )
+                            .font(
+                                .system(
+                                    size: 20,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Return to Apple Watch workout",
+                                    norwegian:
+                                        "Tilbake til Apple Watch-økt"
+                                )
+                            )
+                            .font(
+                                .headline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                        }
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
                         )
-                )
-                .zIndex(50)
+                        .padding(
+                            .horizontal,
+                            22
+                        )
+                        .frame(height: 58)
+                        .background(
+                            .regularMaterial,
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.black
+                                        .opacity(
+                                            0.05
+                                        ),
+                                    lineWidth:
+                                        0.8
+                                )
+                        }
+                        .shadow(
+                            color:
+                                Color.black
+                                    .opacity(
+                                        0.10
+                                    ),
+                            radius: 14,
+                            y: 6
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .transition(
+                        .move(edge: .top)
+                            .combined(
+                                with:
+                                    .opacity
+                            )
+                    )
+                }
             }
+            .padding(.top, 8)
+            .zIndex(50)
         }
         .fullScreenCover(
             isPresented: Binding(
                 get: {
-                    social.coordinatedLobbySessionID != nil
+                    social.coordinatedLobbySessionID != nil &&
+                    !social.isCoordinatedLobbyMinimized
                 },
                 set: { _ in }
             )
@@ -235,6 +363,61 @@ struct ProductRootTabView: View {
                 .environmentObject(social)
             }
         }
+    }
+
+    private var minimizedLobbyStatusText:
+        String {
+        guard let sessionID =
+                social
+                    .coordinatedLobbySessionID
+        else {
+            return ATHLTHLocalization.choose(
+                english: "WAITING",
+                norwegian: "VENTER"
+            )
+        }
+
+        let participants =
+            (
+                social
+                    .activeWorkoutParticipants
+                    .isEmpty
+                    ? social
+                        .workoutParticipants
+                    : social
+                        .activeWorkoutParticipants
+            )
+            .filter {
+                $0.sessionID ==
+                    sessionID &&
+                $0.userID !=
+                    social.currentUserID &&
+                $0.workoutStartedAt ==
+                    nil &&
+                $0.state !=
+                    .declined
+            }
+
+        if let waiting =
+                participants.first(
+                    where: {
+                        !$0.isReady
+                    }
+                ) {
+            return ATHLTHLocalization.choose(
+                english:
+                    "WAITING FOR (waiting.displayNameSnapshot.uppercased())",
+                norwegian:
+                    "VENTER PÅ (waiting.displayNameSnapshot.uppercased())"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "EVERYONE IS READY",
+            norwegian:
+                "ALLE ER KLARE"
+        )
     }
 }
 
