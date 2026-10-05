@@ -287,6 +287,39 @@ private enum HomePersonalWorkoutCatalog {
         }
     }
 
+    static func mergeRecent(
+        healthSummaries: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog],
+        phoneHistory: [PhoneWorkout],
+        limitPerSource: Int = 24
+    ) -> [SocialPublishableWorkout] {
+        let limit = max(limitPerSource, 6)
+
+        return merge(
+            healthSummaries:
+                Array(
+                    healthSummaries
+                        .prefix(limit)
+                ),
+            strengthHistory:
+                Array(
+                    strengthHistory
+                        .lazy
+                        .filter(\.isFinished)
+                        .prefix(limit)
+                ),
+            phoneHistory:
+                Array(
+                    phoneHistory
+                        .lazy
+                        .filter {
+                            $0.end != nil
+                        }
+                        .prefix(limit)
+                )
+        )
+    }
+
     static func strengthWorkout(
         for workout:
             SocialPublishableWorkout,
@@ -397,6 +430,18 @@ private enum HomeActivityStreamBuilder {
 
 // MARK: - Home section
 
+private struct HomeRecentActivityRevision:
+    Hashable {
+    let healthCount: Int
+    let healthFirstID: UUID?
+    let strengthCount: Int
+    let strengthFirstID: UUID?
+    let strengthFirstEnd: Date?
+    let phoneCount: Int
+    let phoneFirstID: UUID?
+    let phoneFirstEnd: Date?
+}
+
 struct HomePersonalRecentActivitySection:
     View {
     @EnvironmentObject private var health:
@@ -408,19 +453,31 @@ struct HomePersonalRecentActivitySection:
     @EnvironmentObject private var social:
         SocialStore
 
-    private var myWorkouts:
-        [SocialPublishableWorkout] {
-        HomePersonalWorkoutCatalog
-            .merge(
-                healthSummaries:
-                    health.workouts,
-                strengthHistory:
-                    strength
-                        .workoutHistory,
-                phoneHistory:
-                    phoneWorkout
-                        .history
-            )
+    @State private var myWorkouts:
+        [SocialPublishableWorkout] = []
+
+    private var recentRevision:
+        HomeRecentActivityRevision {
+        HomeRecentActivityRevision(
+            healthCount:
+                health.workouts.count,
+            healthFirstID:
+                health.workouts.first?.id,
+            strengthCount:
+                strength.workoutHistory.count,
+            strengthFirstID:
+                strength.workoutHistory.first?.id,
+            strengthFirstEnd:
+                strength.workoutHistory
+                    .first?
+                    .endedAt,
+            phoneCount:
+                phoneWorkout.history.count,
+            phoneFirstID:
+                phoneWorkout.history.first?.id,
+            phoneFirstEnd:
+                phoneWorkout.history.first?.end
+        )
     }
 
     private var stream:
@@ -514,6 +571,28 @@ struct HomePersonalRecentActivitySection:
                     .viewAligned
                 )
             }
+        }
+        .task(id: recentRevision) {
+            rebuildRecentWorkouts()
+        }
+    }
+
+    private func rebuildRecentWorkouts() {
+        let refreshed =
+            HomePersonalWorkoutCatalog
+                .mergeRecent(
+                    healthSummaries:
+                        health.workouts,
+                    strengthHistory:
+                        strength
+                            .workoutHistory,
+                    phoneHistory:
+                        phoneWorkout
+                            .history
+                )
+
+        if refreshed != myWorkouts {
+            myWorkouts = refreshed
         }
     }
 
@@ -891,7 +970,12 @@ private struct HomePersonalHorizontalWorkoutCard:
     let phoneWorkout: PhoneWorkout?
 
     var body: some View {
-        VStack(
+        let muscleProfile =
+            workout.activity == .strength
+                ? homeMuscleProfile
+                : .empty
+
+        return VStack(
             alignment: .leading,
             spacing: 0
         ) {
@@ -904,7 +988,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                 height: 124,
                 precomputedStrengthProfile:
                     workout.activity == .strength
-                        ? homeMuscleProfile
+                        ? muscleProfile
                         : nil
             )
 
@@ -965,7 +1049,10 @@ private struct HomePersonalHorizontalWorkoutCard:
                     )
                     .lineLimit(1)
 
-                if let muscleFocusText {
+                if let muscleFocusText =
+                        muscleFocusText(
+                            from: muscleProfile
+                        ) {
                     HStack(spacing: 6) {
                         Image(
                             systemName:
@@ -1083,13 +1170,13 @@ private struct HomePersonalHorizontalWorkoutCard:
         )
     }
 
-    private var muscleFocusText:
-        String? {
+    private func muscleFocusText(
+        from profile: StrengthMuscleProfile
+    ) -> String? {
         var titles: [String] = []
 
         for activation in
-            homeMuscleProfile
-                .topActivations {
+            profile.topActivations {
             let title =
                 activation
                     .region
