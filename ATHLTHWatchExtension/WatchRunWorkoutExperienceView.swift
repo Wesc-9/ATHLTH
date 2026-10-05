@@ -16,6 +16,8 @@ struct WatchRunWorkoutExperienceView: View {
     @State private var confirmingEnd = false
     @State private var ghostMapPosition:
         MapCameraPosition = .automatic
+    @State private var navigationMapPosition:
+        MapCameraPosition = .automatic
 
     var body: some View {
         Group {
@@ -35,11 +37,17 @@ struct WatchRunWorkoutExperienceView: View {
                     routePage
                         .tag(2)
 
+                    if workoutManager
+                        .plannedRoute != nil {
+                        navigationPage
+                            .tag(3)
+                    }
+
                     WatchSpotifyRemotePage()
-                        .tag(3)
+                        .tag(4)
 
                     controlsPage
-                        .tag(4)
+                        .tag(5)
                 }
                 .tabViewStyle(
                     .verticalPage
@@ -2110,6 +2118,571 @@ struct WatchRunWorkoutExperienceView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Route navigation
+
+    private var navigationPage: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                pageLabel(
+                    "NAVIGATION",
+                    icon:
+                        "location.north.fill"
+                )
+
+                if let userCoordinate =
+                        navigationUserCoordinate,
+                   navigationRouteCoordinates
+                    .count >= 2 {
+                    Map(
+                        position:
+                            $navigationMapPosition,
+                        interactionModes: []
+                    ) {
+                        MapPolyline(
+                            coordinates:
+                                navigationRouteCoordinates
+                        )
+                        .stroke(
+                            WatchTheme.accent,
+                            style:
+                                StrokeStyle(
+                                    lineWidth: 6,
+                                    lineCap: .round,
+                                    lineJoin: .round
+                                )
+                        )
+
+                        Annotation(
+                            "You",
+                            coordinate:
+                                userCoordinate,
+                            anchor: .center
+                        ) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        Color.white
+                                    )
+                                    .frame(
+                                        width: 28,
+                                        height: 28
+                                    )
+
+                                Image(
+                                    systemName:
+                                        "location.north.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 14,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    Color(
+                                        red: 0.10,
+                                        green: 0.14,
+                                        blue: 0.20
+                                    )
+                                )
+                                .rotationEffect(
+                                    .degrees(
+                                        workoutManager
+                                            .routeNavigationCourseDegrees ??
+                                        0
+                                    )
+                                )
+                            }
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        WatchTheme
+                                            .accent,
+                                        lineWidth: 2
+                                    )
+                            }
+                            .shadow(
+                                color:
+                                    Color.black
+                                        .opacity(0.18),
+                                radius: 2,
+                                y: 1
+                            )
+                        }
+
+                        if let finish =
+                                navigationFinishCoordinate,
+                           (
+                                workoutManager
+                                    .routeRemainingMeters ??
+                                .greatestFiniteMagnitude
+                           ) <= 550 {
+                            Annotation(
+                                "Finish",
+                                coordinate:
+                                    finish,
+                                anchor: .center
+                            ) {
+                                Image(
+                                    systemName:
+                                        "flag.checkered"
+                                )
+                                .font(
+                                    .system(
+                                        size: 12,
+                                        weight: .bold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .frame(
+                                    width: 25,
+                                    height: 25
+                                )
+                                .background(
+                                    Color.black
+                                        .opacity(0.82),
+                                    in: Circle()
+                                )
+                            }
+                        }
+                    }
+                    .mapStyle(
+                        .standard(
+                            pointsOfInterest:
+                                .excludingAll
+                        )
+                    )
+                    .frame(height: 132)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                        .stroke(
+                            WatchTheme.border,
+                            lineWidth: 1
+                        )
+                    }
+                    .overlay(
+                        alignment:
+                            .topLeading
+                    ) {
+                        Text(
+                            navigationStatusText
+                        )
+                        .font(
+                            .system(
+                                size: 8,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .padding(
+                            .horizontal,
+                            8
+                        )
+                        .padding(
+                            .vertical,
+                            5
+                        )
+                        .background(
+                            navigationStatusTint
+                                .opacity(0.90),
+                            in: Capsule()
+                        )
+                        .padding(6)
+                    }
+                    .onAppear {
+                        updateNavigationMapCamera()
+                    }
+                    .onChange(
+                        of:
+                            workoutManager
+                                .routeNavigationRevision
+                    ) { _, _ in
+                        updateNavigationMapCamera()
+                    }
+                } else {
+                    VStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(
+                                .small
+                            )
+
+                        Text(
+                            "Finding your position…"
+                        )
+                        .font(
+                            .system(
+                                size: 10,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            WatchTheme.muted
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 112
+                    )
+                    .watchSurface(
+                        radius: 18
+                    )
+                }
+
+                HStack(spacing: 7) {
+                    metricTile(
+                        title: "REMAINING",
+                        value:
+                            remainingDistanceText,
+                        suffix: "",
+                        icon:
+                            "flag.checkered"
+                    )
+
+                    metricTile(
+                        title: "OFF ROUTE",
+                        value:
+                            routeDeviationText,
+                        suffix: "",
+                        icon:
+                            "location.triangle.fill"
+                    )
+                }
+
+                Text(
+                    navigationInstructionText
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    navigationStatusTint
+                )
+                .multilineTextAlignment(
+                    .center
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+                .padding(
+                    .horizontal,
+                    8
+                )
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var navigationUserCoordinate:
+        CLLocationCoordinate2D? {
+        guard let latitude =
+                workoutManager
+                    .routeNavigationLatitude,
+              let longitude =
+                workoutManager
+                    .routeNavigationLongitude
+        else {
+            return nil
+        }
+
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+
+        return CLLocationCoordinate2DIsValid(
+            coordinate
+        )
+            ? coordinate
+            : nil
+    }
+
+    private var navigationRouteCoordinates:
+        [CLLocationCoordinate2D] {
+        guard let route =
+                workoutManager
+                    .plannedRoute
+        else {
+            return []
+        }
+
+        let points =
+            route.points.sorted {
+                $0.sequence <
+                $1.sequence
+            }
+
+        guard points.count >= 2,
+              let nearestIndex =
+                workoutManager
+                    .routeNavigationNearestPointIndex
+        else {
+            return points
+                .prefix(40)
+                .map {
+                    CLLocationCoordinate2D(
+                        latitude:
+                            $0.latitude,
+                        longitude:
+                            $0.longitude
+                    )
+                }
+        }
+
+        let routeDistance =
+            max(
+                route
+                    .distanceKilometers *
+                    1_000,
+                1
+            )
+        let averageSpacing =
+            max(
+                routeDistance /
+                Double(
+                    max(
+                        points.count - 1,
+                        1
+                    )
+                ),
+                1
+            )
+        let behindCount =
+            max(
+                Int(
+                    ceil(
+                        55 /
+                        averageSpacing
+                    )
+                ),
+                2
+            )
+        let aheadCount =
+            max(
+                Int(
+                    ceil(
+                        450 /
+                        averageSpacing
+                    )
+                ),
+                12
+            )
+        let lower =
+            max(
+                nearestIndex -
+                behindCount,
+                0
+            )
+        let upper =
+            min(
+                nearestIndex +
+                aheadCount,
+                points.count - 1
+            )
+
+        guard lower <= upper
+        else {
+            return []
+        }
+
+        return points[
+            lower...upper
+        ]
+        .map {
+            CLLocationCoordinate2D(
+                latitude:
+                    $0.latitude,
+                longitude:
+                    $0.longitude
+            )
+        }
+    }
+
+    private var navigationFinishCoordinate:
+        CLLocationCoordinate2D? {
+        guard let point =
+                workoutManager
+                    .plannedRoute?
+                    .points
+                    .max(
+                        by: {
+                            $0.sequence <
+                            $1.sequence
+                        }
+                    )
+        else {
+            return nil
+        }
+
+        return CLLocationCoordinate2D(
+            latitude:
+                point.latitude,
+            longitude:
+                point.longitude
+        )
+    }
+
+    private var navigationStatusText:
+        String {
+        guard let deviation =
+                workoutManager
+                    .routeDeviationMeters
+        else {
+            return "ROUTE"
+        }
+
+        if deviation >
+            workoutManager
+                .routeAlertConfiguration
+                .deviationMeters {
+            return "OFF ROUTE"
+        }
+
+        return "ON ROUTE"
+    }
+
+    private var navigationStatusTint:
+        Color {
+        guard let deviation =
+                workoutManager
+                    .routeDeviationMeters
+        else {
+            return WatchTheme.accent
+        }
+
+        return deviation >
+            workoutManager
+                .routeAlertConfiguration
+                .deviationMeters
+            ? .orange
+            : WatchTheme.accent
+    }
+
+    private var navigationInstructionText:
+        String {
+        guard let deviation =
+                workoutManager
+                    .routeDeviationMeters
+        else {
+            return "Follow the highlighted route."
+        }
+
+        if deviation >
+            workoutManager
+                .routeAlertConfiguration
+                .deviationMeters {
+            return "Move back toward the highlighted route."
+        }
+
+        return "Follow the highlighted route ahead."
+    }
+
+    private func updateNavigationMapCamera() {
+        guard let user =
+                navigationUserCoordinate
+        else {
+            return
+        }
+
+        let coordinates =
+            [user] +
+            navigationRouteCoordinates
+
+        guard !coordinates.isEmpty
+        else {
+            return
+        }
+
+        let latitudes =
+            coordinates.map(
+                \.latitude
+            )
+        let longitudes =
+            coordinates.map(
+                \.longitude
+            )
+
+        guard let minLatitude =
+                latitudes.min(),
+              let maxLatitude =
+                latitudes.max(),
+              let minLongitude =
+                longitudes.min(),
+              let maxLongitude =
+                longitudes.max()
+        else {
+            return
+        }
+
+        let center =
+            CLLocationCoordinate2D(
+                latitude:
+                    (
+                        minLatitude +
+                        maxLatitude
+                    ) / 2,
+                longitude:
+                    (
+                        minLongitude +
+                        maxLongitude
+                    ) / 2
+            )
+        let latitudeSpan =
+            max(
+                (
+                    maxLatitude -
+                    minLatitude
+                ) * 1.42,
+                0.0012
+            )
+        let longitudeSpan =
+            max(
+                (
+                    maxLongitude -
+                    minLongitude
+                ) * 1.42,
+                0.0015
+            )
+
+        withAnimation(
+            .easeInOut(
+                duration: 0.24
+            )
+        ) {
+            navigationMapPosition =
+                .region(
+                    MKCoordinateRegion(
+                        center:
+                            center,
+                        span:
+                            MKCoordinateSpan(
+                                latitudeDelta:
+                                    latitudeSpan,
+                                longitudeDelta:
+                                    longitudeSpan
+                            )
+                    )
+                )
+        }
     }
 
     // MARK: - Page 3: route, Route Guardian and Ghost
