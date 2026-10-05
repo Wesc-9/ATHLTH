@@ -1161,6 +1161,59 @@ final class TrophyStore: ObservableObject {
         }
     }
 
+    func replaceShowcase(
+        _ currentTrophyID: String,
+        with replacementTrophyID: String
+    ) {
+        guard currentTrophyID != replacementTrophyID,
+              let index =
+                showcaseIDs.firstIndex(
+                    of: currentTrophyID
+                ),
+              !showcaseIDs.contains(
+                    replacementTrophyID
+              ),
+              trophies.contains(
+                    where: {
+                        $0.id ==
+                            replacementTrophyID &&
+                        $0.isUnlocked
+                    }
+              )
+        else {
+            return
+        }
+
+        showcaseIDs[index] =
+            replacementTrophyID
+        hasInitializedShowcase = true
+        showcaseUpdatedAt = Date()
+        persist()
+
+        guard activeUserID != nil
+        else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            if let cloudDate =
+                    try? await self
+                        .cloud
+                        .saveCabinet(
+                            self
+                                .showcaseIDs
+                        ) {
+                self.showcaseUpdatedAt =
+                    cloudDate
+                self.persist()
+            }
+        }
+    }
+
     func dismissCurrentReveal() {
         if !revealQueue.isEmpty {
             revealQueue.removeFirst()
