@@ -1749,52 +1749,22 @@ private struct RecoveryCoachInboxRow:
 
     var body: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(
-                                    red: 0.10,
-                                    green: 0.13,
-                                    blue: 0.19
-                                ),
-                                Color.indigo
-                                    .opacity(0.82)
-                            ],
-                            startPoint:
-                                .topLeading,
-                            endPoint:
-                                .bottomTrailing
+            Image("ATHLTHCoachAvatar")
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: 58,
+                    height: 58
+                )
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.78),
+                            lineWidth: 1.5
                         )
-                    )
-
-                Image(
-                    systemName:
-                        "sparkles"
-                )
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    .white
-                )
-            }
-            .frame(
-                width: 58,
-                height: 58
-            )
-            .overlay {
-                Circle()
-                    .stroke(
-                        Color.white
-                            .opacity(0.72),
-                        lineWidth: 1.5
-                    )
-            }
+                }
 
             VStack(
                 alignment: .leading,
