@@ -527,6 +527,21 @@ private enum CommunityDirectDuelMetric:
     }
 }
 
+private enum CommunityMatchupMetricKind {
+    case workouts
+    case running
+    case activeTime
+    case strength
+    case personalRecords
+    case challenges
+}
+
+private enum CommunityMatchupMetricEmphasis {
+    case normal
+    case highlighted
+    case dimmed
+}
+
 struct CommunityFriendsVsFriendsDetailView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
@@ -582,6 +597,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     periodPicker
                     metricCard
                     contextCard
+                    pointsExplainerCard
                 }
             }
             .padding(.horizontal, 22)
@@ -814,78 +830,182 @@ struct CommunityFriendsVsFriendsDetailView: View {
     }
 
     private var matchupHero: some View {
-        HStack(spacing: 18) {
-            matchupPerson(
-                name:
-                    currentDisplayName
-                        .isEmpty
-                        ? "You"
-                        : currentDisplayName,
-                avatarURL:
-                    currentAvatarURL,
-                label: "YOU"
-            )
-
-            VStack(spacing: 6) {
-                Text("VS")
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .black,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-
-                Image(
-                    systemName:
-                        "bolt.fill"
+        VStack(spacing: 16) {
+            HStack {
+                Label(
+                    "HEAD-TO-HEAD",
+                    systemImage:
+                        "bolt.horizontal.circle.fill"
                 )
-                .font(.caption)
-                .foregroundStyle(.orange)
+                .font(.caption.bold())
+                .tracking(0.8)
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+
+                Spacer()
+
+                Text(
+                    activeDirectDuel == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "ACTIVITY SCORE",
+                            norwegian: "AKTIVITETSSCORE"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "DIRECT DUEL",
+                            norwegian: "DIREKTE DUELL"
+                        )
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(0.8)
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    9
+                )
+                .padding(
+                    .vertical,
+                    5
+                )
+                .background(
+                    Color.white
+                        .opacity(0.74),
+                    in: Capsule()
+                )
             }
 
-            if let selectedFriend {
+            HStack(spacing: 18) {
                 matchupPerson(
                     name:
-                        selectedFriend
-                            .resolvedName,
+                        currentDisplayName
+                            .isEmpty
+                            ? "You"
+                            : currentDisplayName,
                     avatarURL:
-                        selectedFriend
-                            .avatarURL
-                            .flatMap(
-                                URL.init(string:)
-                            ),
-                    label: "FRIEND"
+                        currentAvatarURL,
+                    label: "YOU"
                 )
+
+                VStack(spacing: 7) {
+                    Text("VS")
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .black,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .frame(
+                            width: 48,
+                            height: 48
+                        )
+                        .background(
+                            Color.white
+                                .opacity(0.82),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    ATHLTHTheme
+                                        .vitality
+                                        .opacity(
+                                            0.20
+                                        ),
+                                    lineWidth: 1
+                                )
+                        }
+                        .shadow(
+                            color:
+                                ATHLTHTheme
+                                    .vitality
+                                    .opacity(
+                                        0.12
+                                    ),
+                            radius: 12
+                        )
+
+                    Image(
+                        systemName:
+                            "bolt.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                }
+
+                if let selectedFriend {
+                    matchupPerson(
+                        name:
+                            selectedFriend
+                                .resolvedName,
+                        avatarURL:
+                            selectedFriend
+                                .avatarURL
+                                .flatMap(
+                                    URL.init(string:)
+                                ),
+                        label: "FRIEND"
+                    )
+                }
             }
         }
-        .padding(.vertical, 18)
-        .padding(.horizontal, 16)
+        .padding(18)
         .frame(maxWidth: .infinity)
         .background(
-            Color.white.opacity(0.94),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.98),
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.075),
+                    ATHLTHTheme
+                        .accentSoft
+                        .opacity(0.42)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
+                ATHLTHTheme
+                    .vitality
+                    .opacity(0.14),
+                lineWidth: 0.9
             )
         }
         .shadow(
-            color: Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            color:
+                Color.black
+                    .opacity(0.045),
+            radius: 16,
+            y: 7
         )
     }
 
@@ -1126,30 +1246,54 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
         .padding(18)
         .background(
-            Color.white.opacity(0.94),
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.985),
+                    activeDirectDuel == nil
+                        ? ATHLTHTheme
+                            .accentSoft
+                            .opacity(0.34)
+                        : ATHLTHTheme
+                            .vitality
+                            .opacity(0.10),
+                    Color.white
+                        .opacity(0.94)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
             in:
                 RoundedRectangle(
-                    cornerRadius: 22,
+                    cornerRadius: 24,
                     style: .continuous
                 )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
+                activeDirectDuel == nil
+                    ? ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.08)
+                    : ATHLTHTheme
+                        .vitality
+                        .opacity(0.18),
+                lineWidth: 0.9
             )
         }
         .shadow(
             color:
                 Color.black.opacity(
-                    0.03
+                    0.04
                 ),
-            radius: 12,
-            y: 5
+            radius: 14,
+            y: 6
         )
     }
 
@@ -1172,6 +1316,8 @@ struct CommunityFriendsVsFriendsDetailView: View {
     private var metricCard: some View {
         let mine = currentStats
         let theirs = friendStats
+        let directMetric =
+            activeDirectMetric
 
         return VStack(spacing: 0) {
                 matchupHeader
@@ -1185,26 +1331,72 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         "figure.run.circle.fill",
                     mine: mine.workouts,
                     theirs: theirs.workouts,
-                    format: countText
+                    format: countText,
+                    emphasis:
+                        metricEmphasis(
+                            for: .workouts
+                        )
                 )
 
                 Divider()
+                    .opacity(
+                        directMetric == nil
+                            ? 1
+                            : 0.36
+                    )
 
-                metricRow(
-                    ATHLTHLocalization.choose(
-                        english: "Running",
-                        norwegian: "Løping"
-                    ),
-                    icon: "figure.run",
-                    mine:
-                        mine.runningKilometers,
-                    theirs:
-                        theirs
-                            .runningKilometers,
-                    format: distanceText
-                )
+                if directMetric ==
+                    .runningDistance {
+                    metricRow(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Running · duel",
+                            norwegian:
+                                "Løping · duell"
+                        ),
+                        icon: "figure.run",
+                        mine:
+                            primaryScoreValues
+                                .mine
+                                .map {
+                                    $0 / 1_000
+                                },
+                        theirs:
+                            primaryScoreValues
+                                .theirs
+                                .map {
+                                    $0 / 1_000
+                                },
+                        format: distanceText,
+                        emphasis:
+                            .highlighted
+                    )
+                } else {
+                    metricRow(
+                        ATHLTHLocalization.choose(
+                            english: "Running",
+                            norwegian: "Løping"
+                        ),
+                        icon: "figure.run",
+                        mine:
+                            mine.runningKilometers,
+                        theirs:
+                            theirs
+                                .runningKilometers,
+                        format: distanceText,
+                        emphasis:
+                            metricEmphasis(
+                                for: .running
+                            )
+                    )
+                }
 
                 Divider()
+                    .opacity(
+                        directMetric == nil
+                            ? 1
+                            : 0.36
+                    )
 
                 metricRow(
                     ATHLTHLocalization.choose(
@@ -1216,28 +1408,74 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         mine.activeMinutes,
                     theirs:
                         theirs.activeMinutes,
-                    format: minutesText
+                    format: minutesText,
+                    emphasis:
+                        metricEmphasis(
+                            for: .activeTime
+                        )
                 )
+
+                if period != .allTime ||
+                    directMetric ==
+                        .strengthVolume {
+                    Divider()
+                        .opacity(
+                            directMetric == nil
+                                ? 1
+                                : 0.36
+                        )
+
+                    if directMetric ==
+                        .strengthVolume {
+                        metricRow(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Strength volume · duel",
+                                norwegian:
+                                    "Styrkevolum · duell"
+                            ),
+                            icon:
+                                "dumbbell.fill",
+                            mine:
+                                primaryScoreValues
+                                    .mine,
+                            theirs:
+                                primaryScoreValues
+                                    .theirs,
+                            format:
+                                strengthVolumeText,
+                            emphasis:
+                                .highlighted
+                        )
+                    } else {
+                        metricRow(
+                            ATHLTHLocalization.choose(
+                                english: "Strength",
+                                norwegian: "Styrke"
+                            ),
+                            icon:
+                                "dumbbell.fill",
+                            mine:
+                                mine.strengthWorkouts,
+                            theirs:
+                                theirs
+                                    .strengthWorkouts,
+                            format: countText,
+                            emphasis:
+                                metricEmphasis(
+                                    for: .strength
+                                )
+                        )
+                    }
+                }
 
                 if period != .allTime {
                     Divider()
-
-                    metricRow(
-                        ATHLTHLocalization.choose(
-                            english: "Strength",
-                            norwegian: "Styrke"
-                        ),
-                        icon:
-                            "dumbbell.fill",
-                        mine:
-                            mine.strengthWorkouts,
-                        theirs:
-                            theirs
-                                .strengthWorkouts,
-                        format: countText
-                    )
-
-                    Divider()
+                        .opacity(
+                            directMetric == nil
+                                ? 1
+                                : 0.36
+                        )
 
                     metricRow(
                         "PRs",
@@ -1247,10 +1485,20 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         theirs:
                             theirs
                                 .personalRecords,
-                        format: countText
+                        format: countText,
+                        emphasis:
+                            metricEmphasis(
+                                for:
+                                    .personalRecords
+                            )
                     )
 
                     Divider()
+                        .opacity(
+                            directMetric == nil
+                                ? 1
+                                : 0.36
+                        )
 
                     metricRow(
                         ATHLTHLocalization.choose(
@@ -1262,13 +1510,29 @@ struct CommunityFriendsVsFriendsDetailView: View {
                             mine.challenges,
                         theirs:
                             theirs.challenges,
-                        format: countText
+                        format: countText,
+                        emphasis:
+                            metricEmphasis(
+                                for: .challenges
+                            )
                     )
                 }
             }
         .padding(18)
         .background(
-            Color.white.opacity(0.94),
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.97),
+                    ATHLTHTheme
+                        .surfaceStone
+                        .opacity(0.72)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 22,
                 style: .continuous
@@ -1427,6 +1691,196 @@ struct CommunityFriendsVsFriendsDetailView: View {
             radius: 12,
             y: 5
         )
+    }
+
+    private var pointsExplainerCard:
+        some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "HOW ACTIVITY POINTS WORK",
+                            norwegian:
+                                "SLIK FÅR DU AKTIVITETSPOENG"
+                        ),
+                        systemImage:
+                            "bolt.fill"
+                    )
+                    .font(
+                        .caption.weight(
+                            .bold
+                        )
+                    )
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+
+                    Spacer()
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Activity points are the default Head-to-head score, so running, strength, walking and other workouts can compete on the same scale.",
+                        norwegian:
+                            "Aktivitetspoeng er standardscoren i Head-to-head, slik at løping, styrke, gange og andre økter kan konkurrere på samme skala."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+
+                pointRuleRow(
+                    icon:
+                        "checkmark.circle.fill",
+                    value:
+                        "+20",
+                    detail:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "points per completed workout",
+                            norwegian:
+                                "poeng per gjennomført økt"
+                        )
+                )
+
+                pointRuleRow(
+                    icon: "clock.fill",
+                    value: "+1",
+                    detail:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "point for every 5 active minutes",
+                            norwegian:
+                                "poeng for hver 5. aktive minutt"
+                        )
+                )
+
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The time bonus is capped at 120 active minutes per workout.",
+                        norwegian:
+                            "Tidsbonusen stopper ved 120 aktive minutter per økt."
+                    ),
+                    systemImage:
+                        "hourglass.bottomhalf.filled"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+                if activeDirectDuel != nil {
+                    Divider()
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "A confirmed direct duel replaces the headline score with the selected category. Activity points are still calculated in the background.",
+                            norwegian:
+                                "En godkjent direkte duell erstatter hovedscoren med valgt gren. Aktivitetspoengene beregnes fortsatt i bakgrunnen."
+                        )
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                }
+            }
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius:
+                    ATHLTHTheme
+                        .cornerRadius,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme
+                    .vitality
+                    .opacity(0.10),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func pointRuleRow(
+        icon: String,
+        value: String,
+        detail: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                ATHLTHTheme
+                    .vitalitySoft,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 11,
+                        style:
+                            .continuous
+                    )
+            )
+
+            Text(value)
+                .font(
+                    .headline
+                        .monospacedDigit()
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .frame(
+                    width: 42,
+                    alignment: .leading
+                )
+
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+            Spacer(minLength: 0)
+        }
     }
 
     private var directDuelChallenges:
@@ -1626,6 +2080,47 @@ struct CommunityFriendsVsFriendsDetailView: View {
             norwegian:
                 "\(period.title) · alle treningsformer teller"
         )
+    }
+
+    private var activeDirectMetric:
+        CommunityDirectDuelMetric? {
+        guard let duel =
+                activeDirectDuel
+        else {
+            return nil
+        }
+
+        return directMetric(
+            for: duel
+        )
+    }
+
+    private func metricEmphasis(
+        for kind:
+            CommunityMatchupMetricKind
+    ) -> CommunityMatchupMetricEmphasis {
+        guard let metric =
+                activeDirectMetric
+        else {
+            return .normal
+        }
+
+        switch (metric, kind) {
+        case (
+            .runningDistance,
+            .running
+        ):
+            return .highlighted
+
+        case (
+            .strengthVolume,
+            .strength
+        ):
+            return .highlighted
+
+        default:
+            return .dimmed
+        }
     }
 
     private var directDuelButtonTitle:
@@ -2088,20 +2583,30 @@ struct CommunityFriendsVsFriendsDetailView: View {
         icon: String,
         mine: Double?,
         theirs: Double?,
-        format: (Double?) -> String
+        format: (Double?) -> String,
+        emphasis:
+            CommunityMatchupMetricEmphasis =
+                .normal
     ) -> some View {
         HStack(spacing: 10) {
             Text(format(mine))
                 .font(
-                    .subheadline
-                        .monospacedDigit()
-                        .weight(.bold)
+                    emphasis == .highlighted
+                        ? .headline
+                            .monospacedDigit()
+                            .weight(.bold)
+                        : .subheadline
+                            .monospacedDigit()
+                            .weight(.bold)
                 )
                 .foregroundStyle(
-                    metricTint(
-                        mine,
-                        versus: theirs
-                    )
+                    emphasis == .highlighted
+                        ? ATHLTHTheme
+                            .vitality
+                        : metricTint(
+                            mine,
+                            versus: theirs
+                        )
                 )
                 .frame(
                     width: 82,
@@ -2116,14 +2621,25 @@ struct CommunityFriendsVsFriendsDetailView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        emphasis == .highlighted
+                            ? ATHLTHTheme
+                                .vitality
+                            : ATHLTHTheme
+                                .accentDeep
                     )
 
                 Text(title)
-                    .font(.caption)
+                    .font(
+                        emphasis == .highlighted
+                            ? .caption
+                                .weight(.bold)
+                            : .caption
+                    )
                     .foregroundStyle(
-                        .secondary
+                        emphasis == .highlighted
+                            ? ATHLTHTheme
+                                .primaryText
+                            : Color.secondary
                     )
             }
             .frame(
@@ -2132,22 +2648,68 @@ struct CommunityFriendsVsFriendsDetailView: View {
 
             Text(format(theirs))
                 .font(
-                    .subheadline
-                        .monospacedDigit()
-                        .weight(.bold)
+                    emphasis == .highlighted
+                        ? .headline
+                            .monospacedDigit()
+                            .weight(.bold)
+                        : .subheadline
+                            .monospacedDigit()
+                            .weight(.bold)
                 )
                 .foregroundStyle(
-                    metricTint(
-                        theirs,
-                        versus: mine
-                    )
+                    emphasis == .highlighted
+                        ? ATHLTHTheme
+                            .vitality
+                        : metricTint(
+                            theirs,
+                            versus: mine
+                        )
                 )
                 .frame(
                     width: 82,
                     alignment: .trailing
                 )
         }
+        .padding(
+            .horizontal,
+            emphasis == .highlighted
+                ? 10
+                : 0
+        )
         .padding(.vertical, 11)
+        .background {
+            if emphasis == .highlighted {
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+                .fill(
+                    ATHLTHTheme
+                        .vitalitySoft
+                        .opacity(0.78)
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(
+                                0.16
+                            ),
+                        lineWidth: 0.8
+                    )
+                }
+            }
+        }
+        .opacity(
+            emphasis == .dimmed
+                ? 0.38
+                : 1
+        )
     }
 
     private func metricTint(
@@ -2195,6 +2757,27 @@ struct CommunityFriendsVsFriendsDetailView: View {
 
         return String(
             format: "%.1f km",
+            value
+        )
+    }
+
+    private func strengthVolumeText(
+        _ value: Double?
+    ) -> String {
+        guard let value else {
+            return "—"
+        }
+
+        if value >= 1_000 {
+            return String(
+                format:
+                    "%.1f t",
+                value / 1_000
+            )
+        }
+
+        return String(
+            format: "%.0f kg",
             value
         )
     }
