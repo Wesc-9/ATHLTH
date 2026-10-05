@@ -4116,7 +4116,10 @@ private struct CommunityEventFeedCoverView:
                         ],
                    let url =
                         URL(string: rawURL) {
-                    ATHLTHStorageImage(url: url) {
+                    ATHLTHStorageImage(
+                        url: url,
+                        maxPixelSize: 900
+                    ) {
                         phase in
                         switch phase {
                         case .success(
@@ -4594,7 +4597,18 @@ private struct CommunityReferenceAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        ATHLTHStorageImage(url: url) { phase in
+        ATHLTHStorageImage(
+            url: url,
+            maxPixelSize:
+                max(
+                    Int(
+                        ceil(
+                            size * 3
+                        )
+                    ),
+                    160
+                )
+        ) { phase in
             switch phase {
             case .success(let image):
                 image
@@ -6614,7 +6628,16 @@ private struct CommunityV4Avatar: View {
                     string: raw
                ) {
                 ATHLTHStorageImage(
-                    url: url
+                    url: url,
+                    maxPixelSize:
+                        max(
+                            Int(
+                                ceil(
+                                    size * 3
+                                )
+                            ),
+                            160
+                        )
                 ) { phase in
                     switch phase {
                     case .success(
