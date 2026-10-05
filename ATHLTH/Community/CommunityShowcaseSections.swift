@@ -1056,9 +1056,9 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 Label(
                     ATHLTHLocalization.choose(
                         english:
-                            "Request sent · waiting for (firstName(selectedFriend?.resolvedName ?? "friend")) · (metric.title)",
+                            "Request sent · waiting for \(firstName(selectedFriend?.resolvedName ?? "friend")) · \(metric.title)",
                         norwegian:
-                            "Forespørsel sendt · venter på (firstName(selectedFriend?.resolvedName ?? "venn")) · (metric.title)"
+                            "Forespørsel sendt · venter på \(firstName(selectedFriend?.resolvedName ?? "venn")) · \(metric.title)"
                     ),
                     systemImage: "clock.fill"
                 )
@@ -1076,9 +1076,9 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 Label(
                     ATHLTHLocalization.choose(
                         english:
-                            "Incoming request · (metric.title) · respond in Inbox",
+                            "Incoming request · \(metric.title) · respond in Inbox",
                         norwegian:
-                            "Ny forespørsel · (metric.title) · svar i innboksen"
+                            "Ny forespørsel · \(metric.title) · svar i innboksen"
                     ),
                     systemImage:
                         "tray.fill"
@@ -1580,17 +1580,17 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 duel.rules.endsAt {
             return ATHLTHLocalization.choose(
                 english:
-                    "Direct duel · until (endsAt.formatted(date: .abbreviated, time: .omitted))",
+                    "Direct duel · until \(endsAt.formatted(date: .abbreviated, time: .omitted))",
                 norwegian:
-                    "Direkte duell · til (endsAt.formatted(date: .abbreviated, time: .omitted))"
+                    "Direkte duell · til \(endsAt.formatted(date: .abbreviated, time: .omitted))"
             )
         }
 
         return ATHLTHLocalization.choose(
             english:
-                "(period.title) · all workout types count",
+                "\(period.title) · all workout types count",
             norwegian:
-                "(period.title) · alle treningsformer teller"
+                "\(period.title) · alle treningsformer teller"
         )
     }
 
