@@ -14,9 +14,6 @@ struct RecoveryAIInsightCard: View {
     let insight: RecoveryAIInsight
     let context: RecoveryAIContext
     let isLoading: Bool
-    let onScoreDetails: () -> Void
-    let onAdjustTraining: () -> Void
-    let onAskATHLTH: () -> Void
 
     var body: some View {
         ATHLTHCard {
