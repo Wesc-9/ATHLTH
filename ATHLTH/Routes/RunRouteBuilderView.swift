@@ -35,8 +35,9 @@ struct RunRouteBuilderView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 hero
+                routeNameCard
                 endpointsCard
 
                 if isCalculating {
@@ -59,7 +60,17 @@ struct RunRouteBuilderView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.canvasTop,
+                    ATHLTHTheme.canvasBottom
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .navigationTitle("Create Running Route")
         .navigationBarTitleDisplayMode(.inline)
         .alert("ATHLTH", isPresented: Binding(
@@ -140,6 +151,167 @@ struct RunRouteBuilderView: View {
         )
     }
 
+    private var effectiveRouteTitle:
+        String {
+        let custom =
+            title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        if !custom.isEmpty {
+            return custom
+        }
+
+        if startItem != nil,
+           endItem != nil {
+            return "\(startDisplayName) → \(endDisplayName)"
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Running route",
+            norwegian: "Løperute"
+        )
+    }
+
+    private var automaticRouteTitle:
+        String? {
+        guard startItem != nil,
+              endItem != nil
+        else {
+            return nil
+        }
+
+        return "\(startDisplayName) → \(endDisplayName)"
+    }
+
+    private var routeNameCard: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 10) {
+                Image(
+                    systemName:
+                        "character.cursor.ibeam"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+                .frame(
+                    width: 34,
+                    height: 34
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Route name",
+                            norwegian: "Rutenavn"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Optional",
+                            norwegian: "Valgfritt"
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer()
+            }
+
+            TextField(
+                ATHLTHLocalization.choose(
+                    english: "Give the route a name",
+                    norwegian: "Gi ruten et navn"
+                ),
+                text: $title
+            )
+            .textInputAutocapitalization(
+                .words
+            )
+            .padding(
+                .horizontal,
+                13
+            )
+            .frame(height: 46)
+            .background(
+                ATHLTHTheme
+                    .surfaceStone
+                    .opacity(0.78),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+            )
+
+            if let automaticRouteTitle {
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Leave empty to use “%@”.",
+                        norwegian:
+                            "La feltet stå tomt for å bruke «%@».",
+                        automaticRouteTitle
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(2)
+            } else {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "If left empty, the start and finish addresses become the route name.",
+                        norwegian:
+                            "Hvis feltet er tomt, brukes start- og sluttadressen som rutenavn."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
+        }
+        .padding()
+        .routeBuilderCard()
+    }
+
     private var endpointsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -174,7 +346,6 @@ struct RunRouteBuilderView: View {
             ) { item in
                 startItem = item
                 startSearch.clear()
-                inferTitle()
                 Task { await calculateRoutesIfReady() }
             }
 
@@ -214,8 +385,7 @@ struct RunRouteBuilderView: View {
                     startItem = endItem
                     endItem = oldStart
                     viaPoints.reverse()
-                    inferTitle()
-                    Task {
+                        Task {
                         await calculateRoutesIfReady(force: true)
                     }
                 } label: {
@@ -236,7 +406,6 @@ struct RunRouteBuilderView: View {
             ) { item in
                 endItem = item
                 endSearch.clear()
-                inferTitle()
                 Task { await calculateRoutesIfReady() }
             }
 
@@ -534,9 +703,6 @@ struct RunRouteBuilderView: View {
             Text("Save Route")
                 .font(.headline)
 
-            TextField("Route name", text: $title)
-                .textFieldStyle(.roundedBorder)
-
             Picker("Visibility", selection: $visibility) {
                 Text("Private").tag(ProfileVisibility.privateOnly)
                 Text("Friends").tag(ProfileVisibility.friends)
@@ -589,8 +755,7 @@ struct RunRouteBuilderView: View {
             .buttonStyle(.borderedProminent)
             .tint(ATHLTHTheme.accent)
             .disabled(
-                selectedAlternative == nil ||
-                title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                selectedAlternative == nil
             )
         }
         .padding()
@@ -919,17 +1084,6 @@ struct RunRouteBuilderView: View {
         )
     }
 
-    private func inferTitle() {
-        guard title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              startItem != nil,
-              endItem != nil
-        else {
-            return
-        }
-
-        title = "\(startDisplayName) → \(endDisplayName)"
-    }
-
     private func updateMapRegion(for alternative: RunRouteAlternative) {
         guard !alternative.coordinates.isEmpty else { return }
 
@@ -977,7 +1131,7 @@ struct RunRouteBuilderView: View {
         let route = TrainingRoute(
             id: UUID(),
             ownerID: session.profile.userID,
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: effectiveRouteTitle,
             visibility: visibility,
             coordinates: coordinates,
             distanceKilometers: selectedAlternative.distanceMeters / 1_000,
@@ -1098,8 +1252,11 @@ private struct RunRouteSearchField: View {
             }
             .padding(12)
             .background(
-                Color(.tertiarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 15)
+                ATHLTHTheme.surfaceStone.opacity(0.78),
+                in: RoundedRectangle(
+                    cornerRadius: 15,
+                    style: .continuous
+                )
             )
 
             if !model.suggestions.isEmpty {
@@ -1136,8 +1293,11 @@ private struct RunRouteSearchField: View {
                     }
                 }
                 .background(
-                    Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 15)
+                    ATHLTHTheme.card,
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
                 )
             }
         }
@@ -1381,13 +1541,49 @@ private extension TimeInterval {
 private extension View {
     func routeBuilderCard() -> some View {
         self
-            .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            .background {
+                RoundedRectangle(
+                    cornerRadius:
+                        ATHLTHTheme
+                            .cornerRadius,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.card,
+                            ATHLTHTheme
+                                .cardWarm
+                                .opacity(0.62)
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    )
+                )
             }
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius:
+                        ATHLTHTheme
+                            .cornerRadius,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white
+                        .opacity(0.72),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.045),
+                radius: 9,
+                x: 0,
+                y: 4
+            )
     }
 }
