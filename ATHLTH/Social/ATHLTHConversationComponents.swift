@@ -142,11 +142,16 @@ struct ATHLTHConversationHero<
                 10
             )
             .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 24,
+                        style: .continuous
+                    )
+            )
+            .background(
                 Color.black
-                    .opacity(0.10)
-                    .background(
-                        .ultraThinMaterial
-                    ),
+                    .opacity(0.10),
                 in:
                     RoundedRectangle(
                         cornerRadius: 24,
