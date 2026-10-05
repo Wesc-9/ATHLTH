@@ -3903,7 +3903,18 @@ struct SocialAvatar: View {
         Group {
             if let avatarURL = profile.avatarURL,
                let url = URL(string: avatarURL) {
-                ATHLTHStorageImage(url: url) { phase in
+                ATHLTHStorageImage(
+                    url: url,
+                    maxPixelSize:
+                        max(
+                            Int(
+                                ceil(
+                                    size * 3
+                                )
+                            ),
+                            160
+                        )
+                ) { phase in
                     switch phase {
                     case .success(let image):
                         image
