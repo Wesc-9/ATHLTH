@@ -14,6 +14,8 @@ struct WatchRunWorkoutExperienceView: View {
 
     @State private var selectedPage = 0
     @State private var confirmingEnd = false
+    @State private var ghostMapPosition:
+        MapCameraPosition = .automatic
 
     var body: some View {
         Group {
@@ -2123,7 +2125,17 @@ struct WatchRunWorkoutExperienceView: View {
                     icon: "map.fill"
                 )
 
-                if routeCoordinates.count >= 2 {
+                if let userCoordinate =
+                        ghostMapUserCoordinate,
+                   let ghostCoordinate =
+                        ghostMapGhostCoordinate {
+                    ghostProximityMap(
+                        userCoordinate:
+                            userCoordinate,
+                        ghostCoordinate:
+                            ghostCoordinate
+                    )
+                } else if routeCoordinates.count >= 2 {
                     Map {
                         MapPolyline(
                             coordinates:
@@ -2245,6 +2257,333 @@ struct WatchRunWorkoutExperienceView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
+        }
+    }
+
+    private func ghostProximityMap(
+        userCoordinate:
+            CLLocationCoordinate2D,
+        ghostCoordinate:
+            CLLocationCoordinate2D
+    ) -> some View {
+        Map(
+            position:
+                $ghostMapPosition,
+            interactionModes: []
+        ) {
+            Annotation(
+                "You",
+                coordinate:
+                    userCoordinate,
+                anchor:
+                    .center
+            ) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            Color(
+                                red: 0.10,
+                                green: 0.14,
+                                blue: 0.20
+                            )
+                        )
+                        .frame(
+                            width: 22,
+                            height: 22
+                        )
+
+                    Circle()
+                        .stroke(
+                            Color.white,
+                            lineWidth: 2
+                        )
+                        .frame(
+                            width: 22,
+                            height: 22
+                        )
+                }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(0.18),
+                    radius: 2,
+                    y: 1
+                )
+            }
+
+            Annotation(
+                "Ghost",
+                coordinate:
+                    ghostCoordinate,
+                anchor:
+                    .center
+            ) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            WatchTheme.accent
+                        )
+                        .frame(
+                            width: 23,
+                            height: 23
+                        )
+
+                    Image(
+                        systemName:
+                            "figure.run"
+                    )
+                    .font(
+                        .system(
+                            size: 11,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                }
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white,
+                            lineWidth: 1.5
+                        )
+                }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(0.16),
+                    radius: 2,
+                    y: 1
+                )
+            }
+        }
+        .mapStyle(
+            .standard(
+                pointsOfInterest:
+                    .excludingAll
+            )
+        )
+        .frame(height: 112)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                WatchTheme.border,
+                lineWidth: 1
+            )
+        }
+        .overlay(
+            alignment:
+                .bottomLeading
+        ) {
+            HStack(spacing: 8) {
+                ghostMapLegendItem(
+                    title: "You",
+                    icon:
+                        "circle.fill",
+                    tint:
+                        Color(
+                            red: 0.10,
+                            green: 0.14,
+                            blue: 0.20
+                        )
+                )
+
+                ghostMapLegendItem(
+                    title: "Ghost",
+                    icon:
+                        "figure.run",
+                    tint:
+                        WatchTheme.accent
+                )
+            }
+            .padding(
+                .horizontal,
+                7
+            )
+            .padding(
+                .vertical,
+                5
+            )
+            .background(
+                .ultraThinMaterial,
+                in: Capsule()
+            )
+            .padding(6)
+        }
+        .onAppear {
+            updateGhostMapCamera(
+                user:
+                    userCoordinate,
+                ghost:
+                    ghostCoordinate
+            )
+        }
+        .onChange(
+            of:
+                workoutManager
+                    .ghostMapRevision
+        ) { _, _ in
+            guard let user =
+                    ghostMapUserCoordinate,
+                  let ghost =
+                    ghostMapGhostCoordinate
+            else {
+                return
+            }
+
+            updateGhostMapCamera(
+                user: user,
+                ghost: ghost
+            )
+        }
+    }
+
+    private func ghostMapLegendItem(
+        title: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        Label {
+            Text(title)
+                .font(
+                    .system(
+                        size: 7.5,
+                        weight: .semibold
+                    )
+                )
+        } icon: {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 7,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                tint
+            )
+        }
+        .foregroundStyle(
+            WatchTheme.textPrimary
+        )
+    }
+
+    private var ghostMapUserCoordinate:
+        CLLocationCoordinate2D? {
+        guard let latitude =
+                workoutManager
+                    .ghostMapUserLatitude,
+              let longitude =
+                workoutManager
+                    .ghostMapUserLongitude
+        else {
+            return nil
+        }
+
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+
+        return CLLocationCoordinate2DIsValid(
+            coordinate
+        )
+            ? coordinate
+            : nil
+    }
+
+    private var ghostMapGhostCoordinate:
+        CLLocationCoordinate2D? {
+        guard let latitude =
+                workoutManager
+                    .ghostMapLatitude,
+              let longitude =
+                workoutManager
+                    .ghostMapLongitude
+        else {
+            return nil
+        }
+
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+
+        return CLLocationCoordinate2DIsValid(
+            coordinate
+        )
+            ? coordinate
+            : nil
+    }
+
+    private func updateGhostMapCamera(
+        user: CLLocationCoordinate2D,
+        ghost: CLLocationCoordinate2D
+    ) {
+        let center =
+            CLLocationCoordinate2D(
+                latitude:
+                    (
+                        user.latitude +
+                        ghost.latitude
+                    ) / 2,
+                longitude:
+                    (
+                        user.longitude +
+                        ghost.longitude
+                    ) / 2
+            )
+
+        let latitudeSpan =
+            max(
+                abs(
+                    user.latitude -
+                    ghost.latitude
+                ) * 1.9,
+                0.0014
+            )
+        let longitudeSpan =
+            max(
+                abs(
+                    user.longitude -
+                    ghost.longitude
+                ) * 1.9,
+                0.0018
+            )
+
+        withAnimation(
+            .easeInOut(
+                duration: 0.28
+            )
+        ) {
+            ghostMapPosition =
+                .region(
+                    MKCoordinateRegion(
+                        center:
+                            center,
+                        span:
+                            MKCoordinateSpan(
+                                latitudeDelta:
+                                    latitudeSpan,
+                                longitudeDelta:
+                                    longitudeSpan
+                            )
+                    )
+                )
         }
     }
 
