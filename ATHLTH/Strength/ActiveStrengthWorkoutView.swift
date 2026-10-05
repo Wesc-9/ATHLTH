@@ -596,9 +596,9 @@ struct ActiveStrengthWorkoutView: View {
 
         strengthCoach.speak(
             english:
-                "Next exercise. \(exercise.exercise.name).",
+                "Next exercise. \(exercise.exercise.displayName).",
             norwegian:
-                "Neste øvelse. \(exercise.exercise.name).",
+                "Neste øvelse. \(exercise.exercise.displayName).",
             configuration:
                 configuration.audioCoach
         )
@@ -1218,7 +1218,7 @@ struct ActiveStrengthWorkoutView: View {
                     )
 
                     Text(
-                        exercise.exercise.name
+                        exercise.exercise.displayName
                     )
                     .font(
                         .title2
@@ -2605,7 +2605,7 @@ struct ActiveStrengthWorkoutView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(workout.exercises) { exercise in
-                        Label(exercise.exercise.name, systemImage: "dumbbell")
+                        Label(exercise.exercise.displayName, systemImage: "dumbbell")
                             .font(.subheadline)
                     }
                 }
@@ -2640,7 +2640,7 @@ struct ActiveStrengthWorkoutView: View {
                         ))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(exercise.exercise.name)
+                    Text(exercise.exercise.displayName)
                         .font(.title2.weight(.bold))
                     Text(exercise.exercise.primaryMuscles.joined(separator: " · "))
                         .font(.subheadline)
@@ -3193,7 +3193,7 @@ struct ActiveStrengthWorkoutView: View {
                         exerciseID:
                             exercise.id,
                         exerciseName:
-                            exercise.exercise.name,
+                            exercise.exercise.displayName,
                         exercise:
                             exercise.exercise,
                         set: set
@@ -3788,7 +3788,7 @@ struct ActiveStrengthWorkoutView: View {
                 StrengthSetResultEditTarget(
                     exerciseID: exercise.id,
                     exerciseName:
-                        exercise.exercise.name,
+                        exercise.exercise.displayName,
                     exercise:
                         exercise.exercise,
                     set: set
@@ -4876,7 +4876,7 @@ private struct StrengthExerciseSwapView: View {
     private var candidates: [ExerciseLibraryEntry] {
         entries
             .filter { entry in
-                guard entry.name
+                guard entry.canonicalName
                     .localizedCaseInsensitiveCompare(
                         current.exercise.name
                     ) != .orderedSame
@@ -5351,7 +5351,7 @@ private struct StrengthExerciseRestEditorView: View {
         NavigationStack {
             Form {
                 Section(
-                    exercise.exercise.name
+                    exercise.exercise.displayName
                 ) {
                     Stepper(
                         value: $seconds,
