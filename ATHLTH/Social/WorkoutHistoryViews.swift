@@ -941,6 +941,22 @@ private struct WorkoutLocationMapCard: View {
     }
 }
 
+private struct PostWorkoutGhostSplit:
+    Identifiable,
+    Hashable {
+    let kilometer: Int
+    let userSplitSeconds: TimeInterval
+    let ghostSplitSeconds: TimeInterval
+
+    var id: Int { kilometer }
+
+    var signedSegmentDeltaSeconds:
+        TimeInterval {
+        ghostSplitSeconds -
+        userSplitSeconds
+    }
+}
+
 struct PostWorkoutReviewView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var social: SocialStore
@@ -950,6 +966,8 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
+    @EnvironmentObject private var ghostRace:
+        GhostRaceStore
 
     let workout: SocialPublishableWorkout
     let wasAutoPublished: Bool
@@ -986,6 +1004,17 @@ struct PostWorkoutReviewView: View {
                 VStack(spacing: 14) {
                     summaryCard
                     resultStrip
+
+                    if let result =
+                            relevantGhostResult,
+                       let reference =
+                            ghostRace.reference {
+                        ghostRaceReviewCard(
+                            result: result,
+                            reference: reference
+                        )
+                    }
+
                     reflectionCard
 
                     sectionLabel(
@@ -1867,6 +1896,1085 @@ struct PostWorkoutReviewView: View {
         case .achievement:
             return .purple
         }
+    }
+
+    private var relevantGhostResult:
+        GhostRaceResult? {
+        guard workout.activity == .running,
+              let result =
+                ghostRace.result,
+              ghostRace.reference != nil
+        else {
+            return nil
+        }
+
+        // sourceWorkoutID belongs to the Ghost reference, not the run that
+        // just finished. Match the result to the review by finish time and
+        // final elapsed time so an older Ghost result can never leak into a
+        // later ordinary workout review.
+        let finishDelta =
+            abs(
+                result.finishedAt
+                    .timeIntervalSince(
+                        workout.endDate
+                    )
+            )
+        let durationDelta =
+            abs(
+                result.elapsedTime -
+                workout.duration
+            )
+
+        guard finishDelta <= 15 * 60,
+              durationDelta <=
+                max(
+                    180,
+                    workout.duration *
+                        0.25
+                )
+        else {
+            return nil
+        }
+
+        return result
+    }
+
+    private func ghostRaceReviewCard(
+        result: GhostRaceResult,
+        reference: GhostRaceReference
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 16
+        ) {
+            HStack(
+                alignment: .top,
+                spacing: 12
+            ) {
+                Image(
+                    systemName:
+                        "figure.run.circle.fill"
+                )
+                .font(
+                    .system(
+                        size: 19,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    completionAccent
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    completionAccent
+                        .opacity(0.09),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text("GHOST RACE")
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .tracking(1.7)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                    Text(
+                        ghostResultHeadline(
+                            result
+                        )
+                    )
+                    .font(
+                        .title3
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Text(
+                        ghostResultSubtitle(
+                            result,
+                            reference:
+                                reference
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+
+                Spacer(
+                    minLength: 4
+                )
+
+                Text(
+                    ghostOverallDeltaText(
+                        result
+                    )
+                )
+                .font(
+                    .headline
+                        .monospacedDigit()
+                )
+                .foregroundStyle(
+                    ghostResultTint(
+                        result
+                    )
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .frame(
+                    minHeight: 34
+                )
+                .background(
+                    ghostResultTint(
+                        result
+                    )
+                    .opacity(0.09),
+                    in: Capsule()
+                )
+            }
+
+            HStack(spacing: 8) {
+                ghostMetric(
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Your time",
+                                norwegian:
+                                    "Din tid"
+                            ),
+                    value:
+                        durationText(
+                            workout.duration
+                        )
+                )
+
+                ghostMetric(
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Ghost time",
+                                norwegian:
+                                    "Ghost-tid"
+                            ),
+                    value:
+                        durationText(
+                            result
+                                .referenceDuration
+                        )
+                )
+
+                ghostMetric(
+                    title:
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Lead changes",
+                                norwegian:
+                                    "Lederskifter"
+                            ),
+                    value:
+                        "\(result.leadChangeCount)"
+                )
+            }
+
+            if result.maximumLeadMeters > 1 ||
+                result.maximumDeficitMeters > 1 {
+                HStack(spacing: 8) {
+                    if result.maximumLeadMeters >
+                        1 {
+                        Label(
+                            ATHLTHLocalization
+                                .format(
+                                    english:
+                                        "Max lead %@",
+                                    norwegian:
+                                        "Maks foran %@",
+                                    compactGhostDistance(
+                                        result
+                                            .maximumLeadMeters
+                                    )
+                                ),
+                            systemImage:
+                                "arrow.up.right"
+                        )
+                        .foregroundStyle(
+                            .green
+                        )
+                    }
+
+                    if result.maximumDeficitMeters >
+                        1 {
+                        Label(
+                            ATHLTHLocalization
+                                .format(
+                                    english:
+                                        "Max behind %@",
+                                    norwegian:
+                                        "Maks bak %@",
+                                    compactGhostDistance(
+                                        result
+                                            .maximumDeficitMeters
+                                    )
+                                ),
+                            systemImage:
+                                "arrow.down.right"
+                        )
+                        .foregroundStyle(
+                            .orange
+                        )
+                    }
+
+                    Spacer(
+                        minLength: 0
+                    )
+                }
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+            }
+
+            let splits =
+                ghostSplitComparisons(
+                    reference:
+                        reference
+                )
+
+            if !splits.isEmpty {
+                Divider()
+                    .opacity(0.60)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "KILOMETER BY KILOMETER",
+                                    norwegian:
+                                        "KILOMETER FOR KILOMETER"
+                                )
+                        )
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .tracking(1.35)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Spacer()
+
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "You · Ghost",
+                                    norwegian:
+                                        "Du · Ghost"
+                                )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    ForEach(splits) {
+                        split in
+                        ghostSplitRow(
+                            split
+                        )
+
+                        if split.id !=
+                            splits.last?.id {
+                            Divider()
+                                .opacity(
+                                    0.45
+                                )
+                        }
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [
+                    completionAccent
+                        .opacity(0.055),
+                    Color.white
+                        .opacity(0.96)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 26,
+                style: .continuous
+            )
+            .stroke(
+                completionAccent
+                    .opacity(0.11),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func ghostMetric(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 3
+        ) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                        .monospacedDigit()
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.75
+                )
+        }
+        .padding(
+            .horizontal,
+            11
+        )
+        .padding(
+            .vertical,
+            9
+        )
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .background(
+            Color.primary
+                .opacity(0.035),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func ghostSplitRow(
+        _ split: PostWorkoutGhostSplit
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(
+                "\(split.kilometer) km"
+            )
+            .font(
+                .subheadline
+                    .weight(.bold)
+            )
+            .frame(
+                width: 48,
+                alignment: .leading
+            )
+
+            Text(
+                splitPaceText(
+                    split.userSplitSeconds
+                )
+            )
+            .font(
+                .subheadline
+                    .weight(.semibold)
+                    .monospacedDigit()
+            )
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+
+            Text(
+                splitPaceText(
+                    split.ghostSplitSeconds
+                )
+            )
+            .font(
+                .caption
+                    .monospacedDigit()
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+            .frame(
+                width: 62,
+                alignment: .trailing
+            )
+
+            Text(
+                ghostSplitDeltaText(
+                    split
+                        .signedSegmentDeltaSeconds
+                )
+            )
+            .font(
+                .caption
+                    .weight(.bold)
+                    .monospacedDigit()
+            )
+            .foregroundStyle(
+                split
+                    .signedSegmentDeltaSeconds >=
+                    0
+                    ? Color.green
+                    : Color.orange
+            )
+            .frame(
+                width: 54,
+                alignment: .trailing
+            )
+        }
+    }
+
+    private func ghostSplitComparisons(
+        reference: GhostRaceReference
+    ) -> [PostWorkoutGhostSplit] {
+        guard completionRoute.count >= 2,
+              let officialDistance =
+                workout.distanceMeters,
+              officialDistance >= 1_000,
+              reference.points.count >= 2
+        else {
+            return []
+        }
+
+        let sortedRoute =
+            completionRoute.sorted {
+                $0.timestamp <
+                $1.timestamp
+            }
+        let rawCumulative =
+            routeCumulativeDistances(
+                sortedRoute
+            )
+        guard let rawTotal =
+                rawCumulative.last,
+              rawTotal > 100
+        else {
+            return []
+        }
+
+        let firstTimestamp =
+            sortedRoute[0].timestamp
+        let timestampSpan =
+            sortedRoute.last?
+                .timestamp
+                .timeIntervalSince(
+                    firstTimestamp
+                ) ?? 0
+
+        let routeDistance =
+            min(
+                officialDistance,
+                reference.points.last?
+                    .cumulativeMeters ??
+                reference
+                    .routeDistanceMeters
+            )
+        let completedKilometers =
+            Int(
+                floor(
+                    routeDistance /
+                    1_000
+                )
+            )
+
+        guard completedKilometers > 0
+        else {
+            return []
+        }
+
+        var result:
+            [PostWorkoutGhostSplit] = []
+        var previousUserElapsed:
+            TimeInterval = 0
+        var previousGhostElapsed:
+            TimeInterval = 0
+
+        for kilometer in
+            1...completedKilometers {
+            let target =
+                Double(kilometer) *
+                1_000
+
+            guard let userElapsed =
+                    userElapsedAtDistance(
+                        target,
+                        locations:
+                            sortedRoute,
+                        rawCumulative:
+                            rawCumulative,
+                        rawTotal:
+                            rawTotal,
+                        officialDistance:
+                            officialDistance,
+                        firstTimestamp:
+                            firstTimestamp,
+                        timestampSpan:
+                            timestampSpan
+                    ),
+                  let ghostElapsed =
+                    ghostElapsedAtDistance(
+                        target,
+                        reference:
+                            reference
+                    )
+            else {
+                continue
+            }
+
+            let userSplit =
+                max(
+                    userElapsed -
+                    previousUserElapsed,
+                    0
+                )
+            let ghostSplit =
+                max(
+                    ghostElapsed -
+                    previousGhostElapsed,
+                    0
+                )
+
+            if userSplit > 0,
+               ghostSplit > 0 {
+                result.append(
+                    PostWorkoutGhostSplit(
+                        kilometer:
+                            kilometer,
+                        userSplitSeconds:
+                            userSplit,
+                        ghostSplitSeconds:
+                            ghostSplit
+                    )
+                )
+            }
+
+            previousUserElapsed =
+                userElapsed
+            previousGhostElapsed =
+                ghostElapsed
+        }
+
+        return result
+    }
+
+    private func routeCumulativeDistances(
+        _ locations: [CLLocation]
+    ) -> [Double] {
+        guard !locations.isEmpty
+        else {
+            return []
+        }
+
+        var values =
+            Array(
+                repeating: 0.0,
+                count:
+                    locations.count
+            )
+
+        guard locations.count > 1
+        else {
+            return values
+        }
+
+        for index in
+            1..<locations.count {
+            values[index] =
+                values[index - 1] +
+                max(
+                    locations[index]
+                        .distance(
+                            from:
+                                locations[
+                                    index - 1
+                                ]
+                        ),
+                    0
+                )
+        }
+
+        return values
+    }
+
+    private func userElapsedAtDistance(
+        _ targetMeters: Double,
+        locations: [CLLocation],
+        rawCumulative: [Double],
+        rawTotal: Double,
+        officialDistance: Double,
+        firstTimestamp: Date,
+        timestampSpan: TimeInterval
+    ) -> TimeInterval? {
+        guard locations.count ==
+                rawCumulative.count,
+              locations.count >= 2,
+              rawTotal > 0,
+              officialDistance > 0
+        else {
+            return nil
+        }
+
+        let targetRawDistance =
+            min(
+                max(
+                    targetMeters /
+                    officialDistance,
+                    0
+                ),
+                1
+            ) *
+            rawTotal
+
+        guard let upperIndex =
+                rawCumulative
+                    .firstIndex(
+                        where: {
+                            $0 >=
+                                targetRawDistance
+                        }
+                    )
+        else {
+            return workout.duration
+        }
+
+        if upperIndex == 0 {
+            return 0
+        }
+
+        let lowerIndex =
+            upperIndex - 1
+        let lowerDistance =
+            rawCumulative[
+                lowerIndex
+            ]
+        let upperDistance =
+            rawCumulative[
+                upperIndex
+            ]
+        let span =
+            max(
+                upperDistance -
+                lowerDistance,
+                0.001
+            )
+        let fraction =
+            min(
+                max(
+                    (
+                        targetRawDistance -
+                        lowerDistance
+                    ) / span,
+                    0
+                ),
+                1
+            )
+
+        let lowerProgress:
+            Double
+        let upperProgress:
+            Double
+
+        if timestampSpan > 10,
+           workout.duration > 0 {
+            lowerProgress =
+                min(
+                    max(
+                        locations[
+                            lowerIndex
+                        ]
+                        .timestamp
+                        .timeIntervalSince(
+                            firstTimestamp
+                        ) /
+                        timestampSpan,
+                        0
+                    ),
+                    1
+                )
+            upperProgress =
+                min(
+                    max(
+                        locations[
+                            upperIndex
+                        ]
+                        .timestamp
+                        .timeIntervalSince(
+                            firstTimestamp
+                        ) /
+                        timestampSpan,
+                        0
+                    ),
+                    1
+                )
+        } else {
+            lowerProgress =
+                lowerDistance /
+                rawTotal
+            upperProgress =
+                upperDistance /
+                rawTotal
+        }
+
+        let progress =
+            lowerProgress +
+            (
+                upperProgress -
+                lowerProgress
+            ) *
+            fraction
+
+        return workout.duration *
+            progress
+    }
+
+    private func ghostElapsedAtDistance(
+        _ targetMeters: Double,
+        reference: GhostRaceReference
+    ) -> TimeInterval? {
+        let points =
+            reference.points
+
+        guard points.count >= 2,
+              let upperIndex =
+                points.firstIndex(
+                    where: {
+                        $0.cumulativeMeters >=
+                            targetMeters
+                    }
+                )
+        else {
+            return nil
+        }
+
+        if upperIndex == 0 {
+            return points[0]
+                .elapsedTime
+        }
+
+        let lower =
+            points[
+                upperIndex - 1
+            ]
+        let upper =
+            points[
+                upperIndex
+            ]
+        let distanceSpan =
+            max(
+                upper.cumulativeMeters -
+                lower.cumulativeMeters,
+                0.001
+            )
+        let fraction =
+            min(
+                max(
+                    (
+                        targetMeters -
+                        lower.cumulativeMeters
+                    ) /
+                    distanceSpan,
+                    0
+                ),
+                1
+            )
+
+        return lower.elapsedTime +
+            (
+                upper.elapsedTime -
+                lower.elapsedTime
+            ) *
+            fraction
+    }
+
+    private func ghostResultHeadline(
+        _ result: GhostRaceResult
+    ) -> String {
+        guard result.completedRoute,
+              let signed =
+                result.signedTimeSeconds
+        else {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Ghost comparison saved",
+                    norwegian:
+                        "Ghost-sammenligning lagret"
+                )
+        }
+
+        if abs(signed) < 1 {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Dead even with your Ghost",
+                    norwegian:
+                        "Helt likt med Ghost"
+                )
+        }
+
+        return signed > 0
+            ? ATHLTHLocalization
+                .choose(
+                    english:
+                        "You beat your Ghost",
+                    norwegian:
+                        "Du slo Ghost"
+                )
+            : ATHLTHLocalization
+                .choose(
+                    english:
+                        "Ghost finished ahead",
+                    norwegian:
+                        "Ghost kom foran"
+                )
+    }
+
+    private func ghostResultSubtitle(
+        _ result: GhostRaceResult,
+        reference: GhostRaceReference
+    ) -> String {
+        if !result.completedRoute {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "ATHLTH could not confirm the full reference route, but the race data below is still useful.",
+                    norwegian:
+                        "ATHLTH kunne ikke bekrefte hele referanseruten, men løpsdataene under er fortsatt nyttige."
+                )
+        }
+
+        return ATHLTHLocalization
+            .format(
+                english:
+                    "Against %@ · %@",
+                norwegian:
+                    "Mot %@ · %@",
+                reference.title,
+                ghostOverallDeltaDetail(
+                    result
+                )
+            )
+    }
+
+    private func ghostOverallDeltaText(
+        _ result: GhostRaceResult
+    ) -> String {
+        guard let signed =
+                result.signedTimeSeconds,
+              result.completedRoute
+        else {
+            return "—"
+        }
+
+        let prefix =
+            signed > 0
+                ? "−"
+                : signed < 0
+                    ? "+"
+                    : "±"
+
+        return prefix +
+            compactGhostDuration(
+                abs(signed)
+            )
+    }
+
+    private func ghostOverallDeltaDetail(
+        _ result: GhostRaceResult
+    ) -> String {
+        guard let signed =
+                result.signedTimeSeconds,
+              result.completedRoute
+        else {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "route comparison incomplete",
+                    norwegian:
+                        "rutesammenligning ufullstendig"
+                )
+        }
+
+        if abs(signed) < 1 {
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "same finish time",
+                    norwegian:
+                        "samme sluttid"
+                )
+        }
+
+        return ATHLTHLocalization
+            .format(
+                english:
+                    signed > 0
+                        ? "%@ ahead"
+                        : "%@ behind",
+                norwegian:
+                    signed > 0
+                        ? "%@ foran"
+                        : "%@ bak",
+                compactGhostDuration(
+                    abs(signed)
+                )
+            )
+    }
+
+    private func ghostResultTint(
+        _ result: GhostRaceResult
+    ) -> Color {
+        guard let signed =
+                result.signedTimeSeconds,
+              result.completedRoute
+        else {
+            return .secondary
+        }
+
+        return signed >= 0
+            ? .green
+            : .orange
+    }
+
+    private func ghostSplitDeltaText(
+        _ signedSeconds:
+            TimeInterval
+    ) -> String {
+        if abs(signedSeconds) < 0.5 {
+            return "±0s"
+        }
+
+        let prefix =
+            signedSeconds >= 0
+                ? "−"
+                : "+"
+
+        return prefix +
+            compactGhostDuration(
+                abs(signedSeconds)
+            )
+    }
+
+    private func compactGhostDuration(
+        _ seconds: TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(
+                    seconds
+                        .rounded()
+                ),
+                0
+            )
+
+        if total < 60 {
+            return "\(total)s"
+        }
+
+        return String(
+            format:
+                "%d:%02d",
+            total / 60,
+            total % 60
+        )
+    }
+
+    private func compactGhostDistance(
+        _ meters: Double
+    ) -> String {
+        if meters >= 1_000 {
+            return String(
+                format:
+                    "%.2f km",
+                meters / 1_000
+            )
+        }
+
+        return "\(Int(meters.rounded())) m"
+    }
+
+    private func splitPaceText(
+        _ seconds:
+            TimeInterval
+    ) -> String {
+        let total =
+            max(
+                Int(
+                    seconds
+                        .rounded()
+                ),
+                0
+            )
+
+        return String(
+            format:
+                "%d:%02d",
+            total / 60,
+            total % 60
+        )
     }
 
     private var reflectionCard: some View {
