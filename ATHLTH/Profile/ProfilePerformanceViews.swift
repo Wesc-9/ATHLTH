@@ -61,6 +61,9 @@ enum ProfileFeaturedRecordKind:
     case fastestHalfMarathon
     case fastestMarathon
     case longestRun
+    case bestWeeklyRunningDistance
+    case mostRunsInWeek
+    case bestRunningMonth
 
     // Exercise-specific strength records shown in the profile picker.
     case strengthBenchPress
@@ -77,6 +80,13 @@ enum ProfileFeaturedRecordKind:
     case strengthWorkoutVolume
     case strengthBestRepPR
     case longestStrengthWorkout
+    case strengthWorkoutCount
+    case strengthLifetimeVolume
+    case strengthMostSets
+    case strengthMostReps
+    case strengthMostExercises
+    case strengthBestWeeklyVolume
+    case strengthMostCalories
 
     case longestRide
     case longestWalkOrHike
@@ -118,10 +128,16 @@ enum ProfileFeaturedRecordKind:
              .fastest10Mile,
              .fastestHalfMarathon,
              .fastestMarathon,
-             .longestRun:
+             .longestRun,
+             .bestWeeklyRunningDistance,
+             .mostRunsInWeek,
+             .bestRunningMonth:
             return .running
 
-        case .strengthBenchPress,
+        case .bestWeeklyRunningDistance,
+             .mostRunsInWeek,
+             .bestRunningMonth,
+             .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
              .strengthShoulderPress,
@@ -133,7 +149,14 @@ enum ProfileFeaturedRecordKind:
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
              .strengthBestRepPR,
-             .longestStrengthWorkout:
+             .longestStrengthWorkout,
+             .strengthWorkoutCount,
+             .strengthLifetimeVolume,
+             .strengthMostSets,
+             .strengthMostReps,
+             .strengthMostExercises,
+             .strengthBestWeeklyVolume,
+             .strengthMostCalories:
             return .strength
 
         case .longestRide,
@@ -204,6 +227,21 @@ enum ProfileFeaturedRecordKind:
             return .mostActiveCalories
         case .mostStepsInWorkout:
             return .mostStepsInWorkout
+        case .bestWeeklyRunningDistance:
+            return bestWeeklyRunningDistanceValue(
+                performanceWorkouts
+            )
+
+        case .mostRunsInWeek:
+            return mostRunsInWeekValue(
+                performanceWorkouts
+            )
+
+        case .bestRunningMonth:
+            return bestRunningMonthValue(
+                performanceWorkouts
+            )
+
         case .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
@@ -215,7 +253,14 @@ enum ProfileFeaturedRecordKind:
              .strengthHeaviestSet,
              .strengthEstimatedOneRM,
              .strengthWorkoutVolume,
-             .strengthBestRepPR:
+             .strengthBestRepPR,
+             .strengthWorkoutCount,
+             .strengthLifetimeVolume,
+             .strengthMostSets,
+             .strengthMostReps,
+             .strengthMostExercises,
+             .strengthBestWeeklyVolume,
+             .strengthMostCalories:
             return nil
         }
     }
@@ -282,6 +327,21 @@ enum ProfileFeaturedRecordKind:
                 english: "Longest run",
                 norwegian: "Lengste løpetur"
             )
+        case .bestWeeklyRunningDistance:
+            return ATHLTHLocalization.choose(
+                english: "Best weekly distance",
+                norwegian: "Beste ukesdistanse"
+            )
+        case .mostRunsInWeek:
+            return ATHLTHLocalization.choose(
+                english: "Most runs in a week",
+                norwegian: "Flest løpeøkter på én uke"
+            )
+        case .bestRunningMonth:
+            return ATHLTHLocalization.choose(
+                english: "Best running month",
+                norwegian: "Beste løpemåned"
+            )
         case .strengthBenchPress:
             return ATHLTHLocalization.choose(
                 english: "Bench press",
@@ -337,6 +397,41 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Longest strength workout",
                 norwegian: "Lengste styrkeøkt"
+            )
+        case .strengthWorkoutCount:
+            return ATHLTHLocalization.choose(
+                english: "Strength workouts",
+                norwegian: "Styrkeøkter"
+            )
+        case .strengthLifetimeVolume:
+            return ATHLTHLocalization.choose(
+                english: "Lifetime volume",
+                norwegian: "Totalt styrkevolum"
+            )
+        case .strengthMostSets:
+            return ATHLTHLocalization.choose(
+                english: "Most sets in a workout",
+                norwegian: "Flest sett i én økt"
+            )
+        case .strengthMostReps:
+            return ATHLTHLocalization.choose(
+                english: "Most reps in a workout",
+                norwegian: "Flest reps i én økt"
+            )
+        case .strengthMostExercises:
+            return ATHLTHLocalization.choose(
+                english: "Most exercises in a workout",
+                norwegian: "Flest øvelser i én økt"
+            )
+        case .strengthBestWeeklyVolume:
+            return ATHLTHLocalization.choose(
+                english: "Best weekly volume",
+                norwegian: "Høyeste ukesvolum"
+            )
+        case .strengthMostCalories:
+            return ATHLTHLocalization.choose(
+                english: "Most active calories",
+                norwegian: "Flest aktive kalorier"
             )
         case .longestRide:
             return ATHLTHLocalization.choose(
@@ -436,6 +531,21 @@ enum ProfileFeaturedRecordKind:
                 english: "Run",
                 norwegian: "Løp"
             )
+        case .bestWeeklyRunningDistance:
+            return ATHLTHLocalization.choose(
+                english: "Best week",
+                norwegian: "Beste uke"
+            )
+        case .mostRunsInWeek:
+            return ATHLTHLocalization.choose(
+                english: "Runs/week",
+                norwegian: "Økter/uke"
+            )
+        case .bestRunningMonth:
+            return ATHLTHLocalization.choose(
+                english: "Best month",
+                norwegian: "Beste måned"
+            )
         case .strengthBenchPress:
             return ATHLTHLocalization.choose(
                 english: "Bench",
@@ -485,6 +595,38 @@ enum ProfileFeaturedRecordKind:
             return ATHLTHLocalization.choose(
                 english: "Strength",
                 norwegian: "Styrke"
+            )
+        case .strengthWorkoutCount:
+            return ATHLTHLocalization.choose(
+                english: "Workouts",
+                norwegian: "Økter"
+            )
+        case .strengthLifetimeVolume:
+            return ATHLTHLocalization.choose(
+                english: "Lifetime",
+                norwegian: "Totalvolum"
+            )
+        case .strengthMostSets:
+            return ATHLTHLocalization.choose(
+                english: "Sets",
+                norwegian: "Sett"
+            )
+        case .strengthMostReps:
+            return "Reps"
+        case .strengthMostExercises:
+            return ATHLTHLocalization.choose(
+                english: "Exercises",
+                norwegian: "Øvelser"
+            )
+        case .strengthBestWeeklyVolume:
+            return ATHLTHLocalization.choose(
+                english: "Weekly volume",
+                norwegian: "Ukesvolum"
+            )
+        case .strengthMostCalories:
+            return ATHLTHLocalization.choose(
+                english: "Calories",
+                norwegian: "Kalorier"
             )
         case .longestRide:
             return ATHLTHLocalization.choose(
@@ -569,6 +711,12 @@ enum ProfileFeaturedRecordKind:
             return "flag.checkered"
         case .longestRun:
             return "point.topleft.down.to.point.bottomright.curvepath"
+        case .bestWeeklyRunningDistance:
+            return "calendar.badge.checkmark"
+        case .mostRunsInWeek:
+            return "calendar.badge.plus"
+        case .bestRunningMonth:
+            return "calendar"
         case .strengthBenchPress,
              .strengthBackSquat,
              .strengthDeadlift,
@@ -589,6 +737,20 @@ enum ProfileFeaturedRecordKind:
             return "chart.bar.fill"
         case .strengthBestRepPR:
             return "repeat"
+        case .strengthWorkoutCount:
+            return "list.number"
+        case .strengthLifetimeVolume:
+            return "scalemass.fill"
+        case .strengthMostSets:
+            return "list.number"
+        case .strengthMostReps:
+            return "repeat.circle.fill"
+        case .strengthMostExercises:
+            return "square.grid.2x2.fill"
+        case .strengthBestWeeklyVolume:
+            return "chart.bar.fill"
+        case .strengthMostCalories:
+            return "flame.fill"
         case .longestRide:
             return "figure.outdoor.cycle"
         case .longestWalkOrHike:
@@ -642,6 +804,12 @@ enum ProfileFeaturedRecordKind:
             return .indigo
         case .longestRun:
             return .purple
+        case .bestWeeklyRunningDistance:
+            return .green
+        case .mostRunsInWeek:
+            return .cyan
+        case .bestRunningMonth:
+            return .orange
         case .strengthBenchPress:
             return .blue
         case .strengthBackSquat:
@@ -668,6 +836,20 @@ enum ProfileFeaturedRecordKind:
             return .orange
         case .longestStrengthWorkout:
             return .mint
+        case .strengthWorkoutCount:
+            return .green
+        case .strengthLifetimeVolume:
+            return ATHLTHTheme.accentDeep
+        case .strengthMostSets:
+            return .blue
+        case .strengthMostReps:
+            return .purple
+        case .strengthMostExercises:
+            return .teal
+        case .strengthBestWeeklyVolume:
+            return ATHLTHTheme.accentDeep
+        case .strengthMostCalories:
+            return .orange
         case .longestRide:
             return .green
         case .longestWalkOrHike:
@@ -699,7 +881,9 @@ enum ProfileFeaturedRecordKind:
         healthRecords: [HealthPersonalRecord],
         stats: ProfilePerformanceStats?,
         strengthRecords: [StrengthPersonalRecord] = [],
-        strengthRepRecords: [StrengthRepPersonalRecord] = []
+        strengthRepRecords: [StrengthRepPersonalRecord] = [],
+        performanceWorkouts: [WorkoutSummary] = [],
+        strengthWorkouts: [StrengthWorkoutLog] = []
     ) -> String {
         if let healthKind,
            let record = healthRecords.first(
@@ -802,6 +986,123 @@ enum ProfileFeaturedRecordKind:
                 }?
                 .value ?? "—"
 
+        case .strengthWorkoutCount:
+            let completed =
+                strengthWorkouts.filter(\.isFinished)
+            return completed.isEmpty
+                ? "—"
+                : completed.count.formatted()
+
+        case .strengthLifetimeVolume:
+            let volume =
+                strengthWorkouts
+                    .filter(\.isFinished)
+                    .reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.totalVolumeKilograms,
+                            0
+                        )
+                    }
+            return volume > 0
+                ? formatKilograms(volume)
+                : "—"
+
+        case .strengthMostSets:
+            let best =
+                strengthWorkouts
+                    .filter(\.isFinished)
+                    .map(\.totalCompletedSets)
+                    .max() ?? 0
+            return best > 0
+                ? best.formatted()
+                : "—"
+
+        case .strengthMostReps:
+            let best =
+                strengthWorkouts
+                    .filter(\.isFinished)
+                    .map { workout in
+                        workout.exercises
+                            .flatMap(\.sets)
+                            .filter(\.isCompleted)
+                            .reduce(0) {
+                                $0 +
+                                max(
+                                    $1.completedReps ?? 0,
+                                    0
+                                )
+                            }
+                    }
+                    .max() ?? 0
+            return best > 0
+                ? best.formatted()
+                : "—"
+
+        case .strengthMostExercises:
+            let best =
+                strengthWorkouts
+                    .filter(\.isFinished)
+                    .map { workout in
+                        workout.exercises
+                            .filter(\.isCompleted)
+                            .count
+                    }
+                    .max() ?? 0
+            return best > 0
+                ? best.formatted()
+                : "—"
+
+        case .strengthBestWeeklyVolume:
+            let completed =
+                strengthWorkouts.filter(\.isFinished)
+            let grouped =
+                Dictionary(
+                    grouping: completed
+                ) {
+                    Calendar.current
+                        .dateInterval(
+                            of: .weekOfYear,
+                            for: $0.startedAt
+                        )?
+                        .start ??
+                    Calendar.current
+                        .startOfDay(
+                            for: $0.startedAt
+                        )
+                }
+            let best =
+                grouped
+                    .values
+                    .map { workouts in
+                        workouts.reduce(0.0) {
+                            $0 +
+                            max(
+                                $1.totalVolumeKilograms,
+                                0
+                            )
+                        }
+                    }
+                    .max() ?? 0
+            return best > 0
+                ? formatKilograms(best)
+                : "—"
+
+        case .strengthMostCalories:
+            let best =
+                strengthWorkouts
+                    .filter(\.isFinished)
+                    .compactMap {
+                        $0.healthMetrics?
+                            .activeCalories
+                    }
+                    .filter { $0 > 0 }
+                    .max()
+            guard let best else {
+                return "—"
+            }
+            return "\(Int(best.rounded())) kcal"
+
         case .fastest400M,
              .fastest800M,
              .fastestMile,
@@ -825,6 +1126,117 @@ enum ProfileFeaturedRecordKind:
              .mostStepsInWorkout:
             return "—"
         }
+    }
+
+    private func bestWeeklyRunningDistanceValue(
+        _ workouts: [WorkoutSummary]
+    ) -> String {
+        let running =
+            workouts.filter {
+                $0.activity == .running
+            }
+        let grouped =
+            Dictionary(
+                grouping: running
+            ) {
+                Calendar.current
+                    .dateInterval(
+                        of: .weekOfYear,
+                        for: $0.startDate
+                    )?
+                    .start ??
+                Calendar.current
+                    .startOfDay(
+                        for: $0.startDate
+                    )
+            }
+        let best =
+            grouped
+                .values
+                .map { week in
+                    week.reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ?? 0,
+                            0
+                        )
+                    }
+                }
+                .max() ?? 0
+        return best > 0
+            ? formatDistance(best)
+            : "—"
+    }
+
+    private func mostRunsInWeekValue(
+        _ workouts: [WorkoutSummary]
+    ) -> String {
+        let running =
+            workouts.filter {
+                $0.activity == .running
+            }
+        let grouped =
+            Dictionary(
+                grouping: running
+            ) {
+                Calendar.current
+                    .dateInterval(
+                        of: .weekOfYear,
+                        for: $0.startDate
+                    )?
+                    .start ??
+                Calendar.current
+                    .startOfDay(
+                        for: $0.startDate
+                    )
+            }
+        let best =
+            grouped.values
+                .map(\.count)
+                .max() ?? 0
+        return best > 0
+            ? best.formatted()
+            : "—"
+    }
+
+    private func bestRunningMonthValue(
+        _ workouts: [WorkoutSummary]
+    ) -> String {
+        let running =
+            workouts.filter {
+                $0.activity == .running
+            }
+        let grouped =
+            Dictionary(
+                grouping: running
+            ) {
+                Calendar.current
+                    .dateInterval(
+                        of: .month,
+                        for: $0.startDate
+                    )?
+                    .start ??
+                Calendar.current
+                    .startOfDay(
+                        for: $0.startDate
+                    )
+            }
+        let best =
+            grouped
+                .values
+                .map { month in
+                    month.reduce(0.0) {
+                        $0 +
+                        max(
+                            $1.distanceMeters ?? 0,
+                            0
+                        )
+                    }
+                }
+                .max() ?? 0
+        return best > 0
+            ? formatDistance(best)
+            : "—"
     }
 
     private func strengthExerciseDisplayValue(
