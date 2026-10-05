@@ -369,6 +369,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostRaceTitle = ghost?.title
             self.ghostDistanceDeltaMeters = nil
             self.ghostTimeDeltaSeconds = nil
+            self.ghostMapUserLatitude = nil
+            self.ghostMapUserLongitude = nil
+            self.ghostMapLatitude = nil
+            self.ghostMapLongitude = nil
+            self.ghostMapRevision = 0
         }
 
         persistWorkoutRecoveryState()
