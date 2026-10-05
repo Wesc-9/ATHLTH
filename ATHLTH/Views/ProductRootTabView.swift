@@ -7052,16 +7052,8 @@ struct ATHLTHRecoveryView: View {
                                     recoveryAIInsight ??
                                     fallbackRecoveryAIInsight,
                                 context: recoveryAIContext,
-                                isLoading: isLoadingRecoveryAI,
-                                onScoreDetails: {
-                                    showingRecoveryInfo = true
-                                },
-                                onAdjustTraining: {
-                                    onSelectTab(2)
-                                },
-                                onAskATHLTH: {
-                                    showingRecoveryCoach = true
-                                }
+                                isLoading:
+                                    isLoadingRecoveryAI
                             )
 
                             // Coach is now a dedicated next step instead of
