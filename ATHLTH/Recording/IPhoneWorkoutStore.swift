@@ -1651,6 +1651,83 @@ final class IPhoneWorkoutStore:
         syncLiveActivity()
     }
 
+    func applyLiveGhostConnectionState(
+        opponentName: String,
+        state: String,
+        configuration:
+            WatchGhostRaceAudioConfiguration
+    ) {
+        let normalized =
+            state.uppercased()
+
+        guard configuration.enabled,
+              configuration
+                .shouldAnnounceLiveConnectionChanges,
+              active != nil
+        else {
+            lastLiveGhostConnectionText =
+                normalized
+            return
+        }
+
+        let previous =
+            lastLiveGhostConnectionText
+        lastLiveGhostConnectionText =
+            normalized
+
+        guard let previous,
+              previous != normalized
+        else {
+            return
+        }
+
+        let name =
+            opponentName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        let resolvedName =
+            name.isEmpty
+                ? ATHLTHLocalization.choose(
+                    english: "your opponent",
+                    norwegian: "motstanderen"
+                )
+                : name
+
+        if normalized == "LIVE",
+           previous != "LIVE" {
+            deliverPhoneGuidanceAlert(
+                english:
+                    "\(resolvedName) is live again.",
+                norwegian:
+                    "\(resolvedName) er live igjen.",
+                delivery:
+                    configuration
+                        .resolvedImportantLeadChangeDelivery,
+                haptic: .success,
+                priority: .ghostImportant,
+                coachConfiguration:
+                    active?
+                        .audioCoachConfiguration
+            )
+        } else if previous == "LIVE",
+                  normalized != "LIVE" {
+            deliverPhoneGuidanceAlert(
+                english:
+                    "Live connection to \(resolvedName) is interrupted.",
+                norwegian:
+                    "Live-tilkoblingen til \(resolvedName) er avbrutt.",
+                delivery:
+                    configuration
+                        .resolvedImportantLeadChangeDelivery,
+                haptic: .warning,
+                priority: .ghostImportant,
+                coachConfiguration:
+                    active?
+                        .audioCoachConfiguration
+            )
+        }
+    }
+
     private func cachePlannedRouteGeometry(
         _ route: TrainingRoute?
     ) {
@@ -2154,96 +2231,291 @@ final class IPhoneWorkoutStore:
         timeDelta: TimeInterval?,
         delivery: WatchAlertDelivery,
         priority: ATHLTHGuidancePriority,
-        workout: PhoneWorkout
+        workout: PhoneWorkout,
+        finalPhaseRemainingMeters:
+            Double?
     ) {
-        let meters = abs(distanceDelta)
-        let english: String
-        let norwegian: String
+        let meters =
+            abs(distanceDelta)
+        let configuration =
+            workout
+                .ghostAudioConfiguration ??
+            .standard
+        let mode =
+            configuration
+                .resolvedStatusDetailMode
+        let includeDistance =
+            mode != .time ||
+            timeDelta == nil
+        let includeTime =
+            mode != .distance &&
+            timeDelta != nil
+        let opponent =
+            liveGhostOpponentName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        let hasPerson =
+            opponent?.isEmpty == false
+
+        var englishParts: [String] = []
+        var norwegianParts: [String] = []
+
+        if let finalPhaseRemainingMeters {
+            englishParts.append(
+                "Final " +
+                ghostGapDistancePhrase(
+                    finalPhaseRemainingMeters,
+                    norwegian: false
+                ) +
+                "."
+            )
+            norwegianParts.append(
+                "Siste " +
+                ghostGapDistancePhrase(
+                    finalPhaseRemainingMeters,
+                    norwegian: true
+                ) +
+                "."
+            )
+        }
 
         if meters < 8 {
-            english =
-                "Ghost Race. Neck and neck."
-            norwegian =
-                "Spøkelsesløp. Helt jevnt."
+            if let opponent,
+               hasPerson {
+                englishParts.append(
+                    "You and \(opponent) are neck and neck."
+                )
+                norwegianParts.append(
+                    "Du og \(opponent) ligger helt jevnt."
+                )
+            } else {
+                englishParts.append(
+                    "Ghost Race. Neck and neck."
+                )
+                norwegianParts.append(
+                    "Ghost Race. Helt jevnt."
+                )
+            }
         } else if distanceDelta > 0 {
-            var englishParts = [
-                "Ghost Race. You are " +
-                    routeDistancePhrase(meters) +
-                    " ahead."
-            ]
-            var norwegianParts = [
-                "Spøkelsesløp. Du er " +
-                    routeDistancePhrase(meters) +
-                    " foran."
-            ]
+            if let opponent,
+               hasPerson {
+                if includeDistance {
+                    englishParts.append(
+                        "You are " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead of \(opponent)."
+                    )
+                    norwegianParts.append(
+                        "Du er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran \(opponent)."
+                    )
+                }
 
-            if let timeDelta {
-                englishParts.append(
-                    "About " +
-                    durationPhrase(
-                        abs(timeDelta)
-                    ) +
-                    " ahead."
-                )
-                norwegianParts.append(
-                    "Omtrent " +
-                    durationPhrase(
-                        abs(timeDelta)
-                    ) +
-                    " foran."
-                )
+                if includeTime,
+                   let timeDelta {
+                    if includeDistance {
+                        englishParts.append(
+                            "About " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead."
+                        )
+                        norwegianParts.append(
+                            "Omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran."
+                        )
+                    } else {
+                        englishParts.append(
+                            "You are about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead of \(opponent)."
+                        )
+                        norwegianParts.append(
+                            "Du er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran \(opponent)."
+                        )
+                    }
+                }
+            } else {
+                if includeDistance {
+                    englishParts.append(
+                        "Ghost Race. You are " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "Ghost Race. Du er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
+
+                if includeTime,
+                   let timeDelta {
+                    englishParts.append(
+                        (includeDistance
+                            ? "About "
+                            : "Ghost Race. You are about ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        (includeDistance
+                            ? "Omtrent "
+                            : "Ghost Race. Du er omtrent ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
             }
-
-            english =
-                englishParts.joined(
-                    separator: " "
-                )
-            norwegian =
-                norwegianParts.joined(
-                    separator: " "
-                )
         } else {
-            var englishParts = [
-                "Ghost Race. Your ghost is " +
-                    routeDistancePhrase(meters) +
-                    " ahead."
-            ]
-            var norwegianParts = [
-                "Spøkelsesløp. Spøkelset er " +
-                    routeDistancePhrase(meters) +
-                    " foran."
-            ]
+            if let opponent,
+               hasPerson {
+                if includeDistance {
+                    englishParts.append(
+                        "\(opponent) is " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "\(opponent) er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
 
-            if let timeDelta {
-                englishParts.append(
-                    "About " +
-                    durationPhrase(
-                        abs(timeDelta)
-                    ) +
-                    " behind."
-                )
-                norwegianParts.append(
-                    "Omtrent " +
-                    durationPhrase(
-                        abs(timeDelta)
-                    ) +
-                    " bak."
-                )
+                if includeTime,
+                   let timeDelta {
+                    if includeDistance {
+                        englishParts.append(
+                            "You are about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " behind."
+                        )
+                        norwegianParts.append(
+                            "Du er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " bak."
+                        )
+                    } else {
+                        englishParts.append(
+                            "\(opponent) is about " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: false
+                            ) +
+                            " ahead."
+                        )
+                        norwegianParts.append(
+                            "\(opponent) er omtrent " +
+                            ghostGapTimePhrase(
+                                abs(timeDelta),
+                                norwegian: true
+                            ) +
+                            " foran."
+                        )
+                    }
+                }
+            } else {
+                if includeDistance {
+                    englishParts.append(
+                        "Ghost Race. Your ghost is " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: false
+                        ) +
+                        " ahead."
+                    )
+                    norwegianParts.append(
+                        "Ghost Race. Ghosten er " +
+                        ghostGapDistancePhrase(
+                            meters,
+                            norwegian: true
+                        ) +
+                        " foran."
+                    )
+                }
+
+                if includeTime,
+                   let timeDelta {
+                    englishParts.append(
+                        (includeDistance
+                            ? "You are about "
+                            : "Ghost Race. You are about ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: false
+                        ) +
+                        " behind."
+                    )
+                    norwegianParts.append(
+                        (includeDistance
+                            ? "Du er omtrent "
+                            : "Ghost Race. Du er omtrent ") +
+                        ghostGapTimePhrase(
+                            abs(timeDelta),
+                            norwegian: true
+                        ) +
+                        " bak."
+                    )
+                }
             }
-
-            english =
-                englishParts.joined(
-                    separator: " "
-                )
-            norwegian =
-                norwegianParts.joined(
-                    separator: " "
-                )
         }
 
         deliverPhoneGuidanceAlert(
-            english: english,
-            norwegian: norwegian,
+            english:
+                englishParts.joined(
+                    separator: " "
+                ),
+            norwegian:
+                norwegianParts.joined(
+                    separator: " "
+                ),
             delivery: delivery,
             haptic:
                 distanceDelta >= 0
@@ -2253,6 +2525,59 @@ final class IPhoneWorkoutStore:
             coachConfiguration:
                 workout.audioCoachConfiguration
         )
+    }
+
+    private func ghostGapDistancePhrase(
+        _ meters: Double,
+        norwegian: Bool
+    ) -> String {
+        let value =
+            max(meters, 0)
+
+        if value >= 1_000 {
+            return String(
+                format: "%.1f km",
+                value / 1_000
+            )
+        }
+
+        let rounded =
+            Int(value.rounded())
+        return norwegian
+            ? "\(rounded) meter"
+            : "\(rounded) meters"
+    }
+
+    private func ghostGapTimePhrase(
+        _ seconds: TimeInterval,
+        norwegian: Bool
+    ) -> String {
+        let total =
+            max(
+                Int(seconds.rounded()),
+                0
+            )
+
+        if total < 90 {
+            return norwegian
+                ? "\(total) sekunder"
+                : "\(total) seconds"
+        }
+
+        let minutes =
+            total / 60
+        let remainder =
+            total % 60
+
+        if remainder == 0 {
+            return norwegian
+                ? "\(minutes) minutter"
+                : "\(minutes) minutes"
+        }
+
+        return norwegian
+            ? "\(minutes) minutter \(remainder) sekunder"
+            : "\(minutes) minutes \(remainder) seconds"
     }
 
     private func ghostLeadSign(
