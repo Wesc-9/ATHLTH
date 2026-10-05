@@ -6,6 +6,7 @@ struct HomeAssistantSettingsView: View {
 
     @State private var manualAddress = ""
     @State private var pairingCode = ""
+    @State private var alternateAddress = ""
     @State private var showingDisconnectConfirmation = false
 
     var body: some View {
@@ -15,6 +16,7 @@ struct HomeAssistantSettingsView: View {
 
                 if homeAssistant.isConnected {
                     connectedCard
+                    connectionRoutesCard
                     syncTimingCard
                     sharingCard
                 } else {
@@ -37,9 +39,24 @@ struct HomeAssistantSettingsView: View {
         .navigationTitle("Home Assistant")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            if !homeAssistant.isConnected {
+            if homeAssistant.isConnected {
+                alternateAddress =
+                    homeAssistant
+                        .connectedAlternateURL?
+                        .absoluteString
+                    ?? ""
+            } else {
                 homeAssistant.startDiscovery()
             }
+        }
+        .onChange(
+            of:
+                homeAssistant
+                    .connectedAlternateURL
+        ) { _, value in
+            alternateAddress =
+                value?.absoluteString
+                ?? ""
         }
         .onDisappear {
             homeAssistant.stopDiscovery()
@@ -282,21 +299,277 @@ struct HomeAssistantSettingsView: View {
             if homeAssistant.lastConnectionTestSucceeded {
                 Label(
                     ATHLTHLocalization.choose(
-                        english: "Connection OK · Home Assistant responds",
-                        norwegian: "Tilkobling OK · Home Assistant svarer"
+                        english:
+                            "Connection OK · Home Assistant responds",
+                        norwegian:
+                            "Tilkobling OK · Home Assistant svarer"
                     ),
-                    systemImage: "checkmark.circle.fill"
+                    systemImage:
+                        "checkmark.circle.fill"
                 )
-                .font(.caption.weight(.semibold))
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
                 .foregroundStyle(.green)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
                 .transition(.opacity)
+            }
+
+            if homeAssistant
+                .lastLocalConnectionTestSucceeded != nil ||
+                homeAssistant
+                    .lastAlternateConnectionTestSucceeded != nil {
+                HStack(spacing: 8) {
+                    if let succeeded =
+                        homeAssistant
+                            .lastLocalConnectionTestSucceeded {
+                        routeTestBadge(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Local",
+                                    norwegian:
+                                        "Lokal"
+                                ),
+                            succeeded:
+                                succeeded
+                        )
+                    }
+
+                    if let succeeded =
+                        homeAssistant
+                            .lastAlternateConnectionTestSucceeded {
+                        routeTestBadge(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "VPN / external",
+                                    norwegian:
+                                        "VPN / ekstern"
+                                ),
+                            succeeded:
+                                succeeded
+                        )
+                    }
+                }
             }
         }
         .padding(18)
         .background(
             ATHLTHTheme.card,
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+    }
+
+    private var connectionRoutesCard: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Local + VPN connection",
+                    norwegian:
+                        "Lokal + VPN-tilkobling"
+                ),
+                systemImage:
+                    "arrow.triangle.branch"
+            )
+            .font(.headline)
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Keep the local Home Assistant address and add the address you use through VPN or externally. ATHLTH can then switch automatically when the preferred route is unavailable.",
+                    norwegian:
+                        "Behold den lokale Home Assistant-adressen og legg til adressen du bruker via VPN eller eksternt. ATHLTH kan da bytte automatisk når den foretrukne ruten ikke er tilgjengelig."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+
+            if let localURL =
+                homeAssistant
+                    .connectedInstanceURL {
+                connectionRouteRow(
+                    icon: "house.fill",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Local",
+                            norwegian:
+                                "Lokal"
+                        ),
+                    url: localURL
+                )
+            }
+
+            Divider()
+
+            VStack(
+                alignment: .leading,
+                spacing: 8
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "VPN / external address",
+                        norwegian:
+                            "VPN / ekstern adresse"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                TextField(
+                    "http://100.x.x.x:8123",
+                    text:
+                        $alternateAddress
+                )
+                .textInputAutocapitalization(
+                    .never
+                )
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .frame(height: 48)
+                .background(
+                    ATHLTHTheme.canvasTop,
+                    in: RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+                )
+
+                HStack(spacing: 10) {
+                    Button {
+                        homeAssistant
+                            .configureAlternateAddress(
+                                alternateAddress
+                            )
+
+                        Task {
+                            await homeAssistant
+                                .sendConnectionTest()
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Save route",
+                                norwegian:
+                                    "Lagre rute"
+                            ),
+                            systemImage:
+                                "checkmark"
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .disabled(
+                        alternateAddress
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                    )
+
+                    if homeAssistant
+                        .connectedAlternateURL != nil {
+                        Button(
+                            role:
+                                .destructive
+                        ) {
+                            homeAssistant
+                                .clearAlternateAddress()
+                        } label: {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Remove",
+                                    norwegian:
+                                        "Fjern"
+                                )
+                            )
+                        }
+                        .buttonStyle(
+                            .bordered
+                        )
+                    }
+                }
+            }
+
+            if let alternateURL =
+                homeAssistant
+                    .connectedAlternateURL {
+                connectionRouteRow(
+                    icon:
+                        "network.badge.shield.half.filled",
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "VPN / external",
+                            norwegian:
+                                "VPN / ekstern"
+                        ),
+                    url:
+                        alternateURL
+                )
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "On Wi-Fi, ATHLTH prefers the local route. On other networks it prefers VPN/external. If that route fails, the other configured route is tried automatically. Use HTTP only over a trusted VPN.",
+                    norwegian:
+                        "På Wi‑Fi prioriterer ATHLTH lokalruten. På andre nett prioriteres VPN/ekstern. Hvis den ruten feiler, prøves den andre konfigurerte ruten automatisk. Bruk HTTP kun over en VPN du stoler på."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
+        .padding(18)
+        .background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
         )
     }
 
@@ -1141,5 +1414,95 @@ struct HomeAssistantSettingsView: View {
             Image(systemName: icon)
                 .foregroundStyle(ATHLTHTheme.mutedText)
         }
+    }
+
+    private func connectionRouteRow(
+        icon: String,
+        title: String,
+        url: URL
+    ) -> some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName: icon
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .accentDeep
+            )
+            .frame(
+                width: 22
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(title)
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Text(
+                    url.absoluteString
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+                .truncationMode(
+                    .middle
+                )
+            }
+
+            Spacer(
+                minLength: 0
+            )
+        }
+    }
+
+    private func routeTestBadge(
+        title: String,
+        succeeded: Bool
+    ) -> some View {
+        Label(
+            title,
+            systemImage:
+                succeeded
+                ? "checkmark.circle.fill"
+                : "xmark.circle.fill"
+        )
+        .font(
+            .caption2
+                .weight(.semibold)
+        )
+        .foregroundStyle(
+            succeeded
+            ? Color.green
+            : Color.orange
+        )
+        .padding(
+            .horizontal,
+            9
+        )
+        .padding(
+            .vertical,
+            6
+        )
+        .background(
+            ATHLTHTheme.canvasTop,
+            in: Capsule()
+        )
     }
 }
