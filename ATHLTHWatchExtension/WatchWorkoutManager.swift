@@ -1923,7 +1923,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func startPreparedWorkout(
         kind: WatchWorkoutKind,
-        route: WatchRouteTransfer? = nil
+        route: WatchRouteTransfer? = nil,
+        indoor: Bool? = nil
     ) async {
         workoutInitiatedLocallyOnWatch = true
 
@@ -1937,9 +1938,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         configuration.activityType =
             activityType(for: kind)
         configuration.locationType =
-            kind.usesOutdoorLocation
-                ? .outdoor
-                : .indoor
+            indoor.map {
+                $0 ? .indoor : .outdoor
+            } ??
+            (
+                kind.usesOutdoorLocation
+                    ? .outdoor
+                    : .indoor
+            )
 
         await start(
             configuration: configuration,
