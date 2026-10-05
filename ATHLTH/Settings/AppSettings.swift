@@ -594,6 +594,11 @@ final class AppSettingsStore: ObservableObject {
     @Published var ghostRaceAudioLeadChangeDelivery: WatchAlertDelivery { didSet { persist() } }
     @Published var ghostRaceAudioImportantLeadChangeDelivery: WatchAlertDelivery { didSet { persist() } }
     @Published var ghostRaceAudioImportantLeadChangeMeters: Double { didSet { persist() } }
+    @Published var ghostRaceStatusDetailMode: GhostRaceStatusDetailMode { didSet { persist() } }
+    @Published var ghostRaceAnnounceOvertakes: Bool { didSet { persist() } }
+    @Published var ghostRaceFinalPhaseEnabled: Bool { didSet { persist() } }
+    @Published var ghostRaceFinalPhaseStartMeters: Double { didSet { persist() } }
+    @Published var ghostRaceLiveConnectionAlerts: Bool { didSet { persist() } }
 
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
@@ -1010,6 +1015,34 @@ final class AppSettingsStore: ObservableObject {
                 forKey:
                     "settings.ghostRace.audio.importantLeadChangeMeters"
             ) as? Double ?? 50
+        ghostRaceStatusDetailMode =
+            GhostRaceStatusDetailMode(
+                rawValue:
+                    defaults.string(
+                        forKey:
+                            "settings.ghostRace.audio.statusDetailMode"
+                    ) ?? ""
+            ) ?? .both
+        ghostRaceAnnounceOvertakes =
+            defaults.object(
+                forKey:
+                    "settings.ghostRace.audio.announceOvertakes"
+            ) as? Bool ?? true
+        ghostRaceFinalPhaseEnabled =
+            defaults.object(
+                forKey:
+                    "settings.ghostRace.audio.finalPhaseEnabled"
+            ) as? Bool ?? true
+        ghostRaceFinalPhaseStartMeters =
+            defaults.object(
+                forKey:
+                    "settings.ghostRace.audio.finalPhaseStartMeters"
+            ) as? Double ?? 500
+        ghostRaceLiveConnectionAlerts =
+            defaults.object(
+                forKey:
+                    "settings.ghostRace.audio.liveConnectionAlerts"
+            ) as? Bool ?? true
 
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
@@ -1288,6 +1321,31 @@ final class AppSettingsStore: ObservableObject {
             forKey:
                 "settings.ghostRace.audio.importantLeadChangeMeters"
         )
+        defaults.set(
+            ghostRaceStatusDetailMode.rawValue,
+            forKey:
+                "settings.ghostRace.audio.statusDetailMode"
+        )
+        defaults.set(
+            ghostRaceAnnounceOvertakes,
+            forKey:
+                "settings.ghostRace.audio.announceOvertakes"
+        )
+        defaults.set(
+            ghostRaceFinalPhaseEnabled,
+            forKey:
+                "settings.ghostRace.audio.finalPhaseEnabled"
+        )
+        defaults.set(
+            ghostRaceFinalPhaseStartMeters,
+            forKey:
+                "settings.ghostRace.audio.finalPhaseStartMeters"
+        )
+        defaults.set(
+            ghostRaceLiveConnectionAlerts,
+            forKey:
+                "settings.ghostRace.audio.liveConnectionAlerts"
+        )
 
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
@@ -1503,7 +1561,23 @@ final class AppSettingsStore: ObservableObject {
                         ghostRaceAudioLeadChangeMeters
                     ),
                     500
-                )
+                ),
+            statusDetailMode:
+                ghostRaceStatusDetailMode,
+            announceOvertakes:
+                ghostRaceAnnounceOvertakes,
+            finalPhaseEnabled:
+                ghostRaceFinalPhaseEnabled,
+            finalPhaseStartMeters:
+                min(
+                    max(
+                        ghostRaceFinalPhaseStartMeters,
+                        200
+                    ),
+                    1_000
+                ),
+            liveConnectionAlerts:
+                ghostRaceLiveConnectionAlerts
         )
     }
 
