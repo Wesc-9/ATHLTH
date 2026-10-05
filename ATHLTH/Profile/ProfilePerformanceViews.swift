@@ -2206,7 +2206,12 @@ struct PerformanceStatsView: View {
                                     .personalRecords,
                             strengthRepRecords:
                                 strengthWorkout
-                                    .repPersonalRecords
+                                    .repPersonalRecords,
+                            performanceWorkouts:
+                                resolvedPerformanceWorkouts,
+                            strengthWorkouts:
+                                strengthWorkout
+                                    .workoutHistory
                         )
                     )
                     .font(
@@ -5299,7 +5304,18 @@ struct PerformanceStatsView: View {
                 kind.displayValue(
                     healthRecords:
                         resolvedHealthRecords,
-                    stats: stats
+                    stats: stats,
+                    strengthRecords:
+                        strengthWorkout
+                            .personalRecords,
+                    strengthRepRecords:
+                        strengthWorkout
+                            .repPersonalRecords,
+                    performanceWorkouts:
+                        resolvedPerformanceWorkouts,
+                    strengthWorkouts:
+                        strengthWorkout
+                            .workoutHistory
                 )
             )
             .font(
@@ -8120,6 +8136,8 @@ private struct PerformanceMilestonesDetailView:
     let healthRecords:
         [HealthPersonalRecord]
 
+    @EnvironmentObject private var health:
+        HealthKitManager
     @EnvironmentObject private var strengthWorkout:
         StrengthWorkoutStore
 
@@ -8362,7 +8380,12 @@ private struct PerformanceMilestonesDetailView:
                                 .personalRecords,
                         strengthRepRecords:
                             strengthWorkout
-                                .repPersonalRecords
+                                .repPersonalRecords,
+                        performanceWorkouts:
+                            health.workouts,
+                        strengthWorkouts:
+                            strengthWorkout
+                                .workoutHistory
                     )
                 )
                 .font(
@@ -8588,7 +8611,12 @@ struct ProfileRecordShowcasePickerView:
                     .personalRecords,
             strengthRepRecords:
                 strengthWorkout
-                    .repPersonalRecords
+                    .repPersonalRecords,
+            performanceWorkouts:
+                health.workouts,
+            strengthWorkouts:
+                strengthWorkout
+                    .workoutHistory
         )
     }
 
