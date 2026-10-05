@@ -4352,6 +4352,35 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    func releaseTransientCachesForMemoryPressure() {
+        allWorkoutsCache = nil
+
+        workoutObjects
+            .removeAll(
+                keepingCapacity: false
+            )
+        workoutObjectCacheOrder
+            .removeAll(
+                keepingCapacity: false
+            )
+
+        workoutRouteCache
+            .removeAll(
+                keepingCapacity: false
+            )
+        workoutRouteCacheOrder
+            .removeAll(
+                keepingCapacity: false
+            )
+
+        profilePerformanceCache = nil
+        personalRecordsCache = nil
+        recoveryTrendCache
+            .removeAll(
+                keepingCapacity: false
+            )
+    }
+
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
         workoutRouteCache.removeAll(
