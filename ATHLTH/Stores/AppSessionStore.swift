@@ -205,6 +205,8 @@ final class AppSessionStore: ObservableObject {
             displayName: "",
             bio: "",
             avatarURL: nil,
+            headerArtworkName: nil,
+            headerImageURL: nil,
             presence: TrainingPresence(
                 state: .available,
                 workoutTitle: nil,
@@ -248,6 +250,10 @@ final class AppSessionStore: ObservableObject {
         profile.displayName = bootstrap.profile.displayName ?? profile.displayName
         profile.bio = bootstrap.profile.bio ?? ""
         profile.avatarURL = bootstrap.profile.avatarURL.flatMap(URL.init(string:))
+        profile.headerArtworkName =
+            bootstrap.profile.headerArtworkName
+        profile.headerImageURL =
+            bootstrap.profile.headerImageURL.flatMap(URL.init(string:))
 
         accountCreatedAt = bootstrap.profile.createdAt
         defaults.set(accountCreatedAt, forKey: "session.accountCreatedAt")
