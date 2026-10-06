@@ -4725,6 +4725,12 @@ struct SessionEditorView: View {
                     }
                     .textCase(nil)
                 }
+                .listRowBackground(
+                    ATHLTHTheme.card
+                )
+                .listRowSeparatorTint(
+                    ATHLTHTheme.border
+                )
 
 
                 if existingWorkout == nil ||
@@ -4787,6 +4793,12 @@ struct SessionEditorView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .listRowBackground(
+                        ATHLTHTheme.card
+                    )
+                    .listRowSeparatorTint(
+                        ATHLTHTheme.border
+                    )
                 }
 
                 if editorMode == .advanced {
@@ -5078,6 +5090,12 @@ struct SessionEditorView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+        .listRowBackground(
+            ATHLTHTheme.card
+        )
+        .listRowSeparatorTint(
+            ATHLTHTheme.border
+        )
 
     }
 
@@ -5761,6 +5779,12 @@ struct SessionEditorView: View {
             }
 
         }
+        .listRowBackground(
+            ATHLTHTheme.card
+        )
+        .listRowSeparatorTint(
+            ATHLTHTheme.border
+        )
         .environment(\.editMode, .constant(.active))
     }
 
