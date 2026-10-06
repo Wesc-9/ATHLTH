@@ -1194,70 +1194,6 @@ enum StrengthMuscleResolver {
     }
 }
 
-enum StrengthBodyPresentation:
-    String,
-    CaseIterable,
-    Identifiable
-{
-    case neutral
-    case female
-    case male
-
-    var id: String { rawValue }
-
-    fileprivate var horizontalScale:
-        CGFloat
-    {
-        switch self {
-        case .neutral:
-            return 1.0
-        case .female:
-            return 0.992
-        case .male:
-            return 1.008
-        }
-    }
-
-    fileprivate var shoulderHalfWidth:
-        CGFloat
-    {
-        switch self {
-        case .neutral:
-            return 0.205
-        case .female:
-            return 0.192
-        case .male:
-            return 0.218
-        }
-    }
-
-    fileprivate var waistHalfWidth:
-        CGFloat
-    {
-        switch self {
-        case .neutral:
-            return 0.116
-        case .female:
-            return 0.106
-        case .male:
-            return 0.122
-        }
-    }
-
-    fileprivate var hipHalfWidth:
-        CGFloat
-    {
-        switch self {
-        case .neutral:
-            return 0.154
-        case .female:
-            return 0.168
-        case .male:
-            return 0.150
-        }
-    }
-}
-
 enum StrengthMuscleMapStyle {
     case activation
     case recoveryLoad
@@ -1267,8 +1203,6 @@ struct StrengthMuscleMapView: View {
     let profile: StrengthMuscleProfile
     var compact = false
     var style: StrengthMuscleMapStyle = .activation
-    var figureStyle:
-        StrengthBodyPresentation = .neutral
     var activationTint:
         Color = Color(
             red: 0.14,
@@ -1305,8 +1239,6 @@ struct StrengthMuscleMapView: View {
                 profile: profile,
                 side: side,
                 style: style,
-                figureStyle:
-                    figureStyle,
                 activationTint:
                     activationTint
             )
@@ -1352,8 +1284,6 @@ private struct StrengthBodyFigureCanvas:
     let profile: StrengthMuscleProfile
     let side: StrengthBodySide
     let style: StrengthMuscleMapStyle
-    let figureStyle:
-        StrengthBodyPresentation
     let activationTint:
         Color
 
@@ -1411,13 +1341,6 @@ private struct StrengthBodyFigureCanvas:
             0.48,
             contentMode: .fit
         )
-        .scaleEffect(
-            x:
-                figureStyle
-                    .horizontalScale,
-            y: 1,
-            anchor: .center
-        )
     }
 
     private func drawBase(
@@ -1469,15 +1392,10 @@ private struct StrengthBodyFigureCanvas:
                 Color.white.opacity(0.30)
         }
 
-        let shoulder =
-            figureStyle
-                .shoulderHalfWidth
-        let waist =
-            figureStyle
-                .waistHalfWidth
-        let hip =
-            figureStyle
-                .hipHalfWidth
+        // One neutral anatomical silhouette is used throughout ATHLTH.
+        let shoulder: CGFloat = 0.205
+        let waist: CGFloat = 0.116
+        let hip: CGFloat = 0.154
 
         // Limbs are drawn first so the torso naturally covers the shoulder
         // and hip joints. Tapered organic segments avoid the old toy-like
