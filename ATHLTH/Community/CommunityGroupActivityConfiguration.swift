@@ -160,7 +160,7 @@ struct CommunityGroupActivityConfiguration:
 struct CommunityGroupActivityDraft {
     var activityType = "running"
     var mode: CommunityGroupActivityMode = .free
-    var distanceText = "5"
+    var distanceText = "0"
     var selectedRoute: TrainingRoute?
     var selectedRouteSnapshot:
         CommunityGroupRouteSnapshot?
@@ -199,10 +199,24 @@ struct CommunityGroupActivityDraft {
         case "running", "walking", "cycling":
             switch mode {
             case .free:
-                guard let distanceKilometers,
-                      distanceKilometers > 0
-                else {
-                    return "Choose a distance greater than 0 km."
+                let cleanDistance =
+                    distanceText
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                if !cleanDistance.isEmpty {
+                    guard let distanceKilometers,
+                          distanceKilometers >= 0
+                    else {
+                        return ATHLTHLocalization.choose(
+                            english:
+                                "Distance must be 0 km or greater.",
+                            norwegian:
+                                "Distanse må være 0 km eller mer."
+                        )
+                    }
                 }
 
             case .route:
@@ -245,6 +259,11 @@ struct CommunityGroupActivityDraft {
                 distanceKilometers:
                     mode == .free
                         ? distanceKilometers
+                            .flatMap {
+                                $0 > 0
+                                    ? $0
+                                    : nil
+                            }
                         : (
                             mode == .route
                                 ? (
@@ -348,7 +367,7 @@ struct CommunityGroupActivityDraft {
                     format: "%.2f",
                     $0
                 )
-            } ?? "5"
+            } ?? "0"
         draft.selectedRouteSnapshot =
             configuration.route
         draft.selectedRunningWorkout =
@@ -500,7 +519,12 @@ struct CommunityGroupActivityEditor: View {
             }
 
             Text(
-                "A distance is required for a free \(activityNoun)."
+                ATHLTHLocalization.choose(
+                    english:
+                        "0 km means no fixed distance for this \(activityNoun).",
+                    norwegian:
+                        "0 km betyr at \(activityNoun == "run" ? "løpeturen" : activityNoun == "walk" ? "gåturen" : "sykkelturen") ikke har en fast distanse."
+                )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
