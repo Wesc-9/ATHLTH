@@ -1039,8 +1039,10 @@ private struct HomePersonalHorizontalWorkoutCard:
                         )
 
                     Text(
-                        workout.startDate,
-                        style: .relative
+                        workout.endDate.formatted(
+                            date: .omitted,
+                            time: .shortened
+                        )
                     )
                     .font(.system(size: 9.5))
                     .foregroundStyle(
@@ -1951,8 +1953,10 @@ private struct HomePersonalCompactWorkoutCard:
                         )
 
                     Text(
-                        workout.startDate,
-                        style: .relative
+                        workout.endDate.formatted(
+                            date: .omitted,
+                            time: .shortened
+                        )
                     )
                     .font(.caption2)
                     .foregroundStyle(
