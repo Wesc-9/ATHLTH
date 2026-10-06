@@ -13258,6 +13258,7 @@ private struct ATHLTHProfileMediaUploadPreview:
                                             .continuous
                                     )
                                 )
+                            }
                         }
                         .shadow(
                             color:
