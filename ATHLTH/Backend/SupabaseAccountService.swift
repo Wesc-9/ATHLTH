@@ -438,46 +438,84 @@ final class SupabaseAccountService: ObservableObject {
     func uploadProfileAvatar(
         jpegData: Data
     ) async throws -> URL {
+        guard currentUserID != nil else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        return try await ATHLTHPublicImagePublisher
+            .publish(
+                jpegData: jpegData,
+                purpose: .profileAvatar,
+                client: client
+            )
+            .url
+    }
+
+    func uploadProfileHeader(
+        jpegData: Data
+    ) async throws -> URL {
+        guard currentUserID != nil else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        return try await ATHLTHPublicImagePublisher
+            .publish(
+                jpegData: jpegData,
+                purpose: .profileHeader,
+                client: client
+            )
+            .url
+    }
+
+    func updateProfileHeader(
+        artworkName: String?,
+        imageURL: URL?
+    ) async throws -> BackendUserBootstrap {
         guard let userID = currentUserID else {
             throw SupabaseAccountError.notAuthenticated
         }
 
-        guard jpegData.count <= 10_485_760 else {
-            throw SupabaseAccountError.invalidProfile(
-                "Profile photo must be smaller than 10 MB."
-            )
-        }
+        let cleanArtwork =
+            artworkName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
 
-        let path = "\(userID.uuidString.lowercased())/avatar.jpg"
-
-        try await client.storage
-            .from("profile-avatars")
-            .upload(
-                path,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "3600",
-                    contentType: "image/jpeg",
-                    upsert: true
+        try await client
+            .from("profiles")
+            .update(
+                ProfileHeaderUpdate(
+                    headerArtworkName:
+                        cleanArtwork?.isEmpty == false
+                            ? cleanArtwork
+                            : nil,
+                    headerImageURL:
+                        imageURL?.absoluteString
                 )
             )
+            .eq("id", value: userID)
+            .execute()
 
-        let publicURL = try client.storage
+        return try await loadCurrentUser()
+    }
+
+    func removeProfileHeaderImage() async throws -> BackendUserBootstrap {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        try? await client.storage
             .from("profile-avatars")
-            .getPublicURL(path: path)
-
-        var components = URLComponents(
-            url: publicURL,
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = [
-            URLQueryItem(
-                name: "v",
-                value: String(Int(Date().timeIntervalSince1970))
+            .remove(
+                paths: [
+                    "\(userID.uuidString.lowercased())/header.jpg"
+                ]
             )
-        ]
 
-        return components?.url ?? publicURL
+        return try await updateProfileHeader(
+            artworkName: "ProfileHero",
+            imageURL: nil
+        )
     }
 
     func removeProfileAvatar() async throws -> BackendUserBootstrap {
@@ -566,6 +604,16 @@ private struct DeleteAccountResponse: Decodable {
 
 private struct UsernameAvailabilityParams: Encodable {
     let candidate: String
+}
+
+private struct ProfileHeaderUpdate: Encodable {
+    let headerArtworkName: String?
+    let headerImageURL: String?
+
+    enum CodingKeys: String, CodingKey {
+        case headerArtworkName = "header_artwork_name"
+        case headerImageURL = "header_image_url"
+    }
 }
 
 private struct ProfileUpdate: Encodable {
