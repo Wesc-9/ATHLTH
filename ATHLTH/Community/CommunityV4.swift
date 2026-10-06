@@ -4683,12 +4683,12 @@ private struct CommunityReferenceUpcomingEventCard: View {
 
             eventCover
                 .frame(
-                    width: 52,
-                    height: 52
+                    width: 40,
+                    height: 40
                 )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 10,
+                        cornerRadius: 9,
                         style: .continuous
                     )
                 )
