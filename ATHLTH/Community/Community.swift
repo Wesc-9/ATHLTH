@@ -72,6 +72,7 @@ enum CommunityEventActivity: String, CaseIterable, Codable, Hashable, Identifiab
 enum CommunityEventCoverPolicy {
     static let standardArtworkOptions: [String] = [
         "GoalRunning",
+        "GoalSprint",
         "GoalWalking",
         "GoalStrength",
         "GoalEndurance",
@@ -84,25 +85,13 @@ enum CommunityEventCoverPolicy {
         "GoalRelax"
     ]
 
-    /// Some semantic goal artwork names intentionally share an existing
-    /// full-resolution runtime image. Keep the semantic name in persisted
-    /// event data, but always resolve it to an image set that actually has
-    /// pixels before rendering. This prevents white/empty cover cells.
+    /// Standard event artwork now has a concrete runtime image in every
+    /// semantic image set. Keep this indirection so older persisted events
+    /// and future aliases still have one rendering path.
     static func displayArtworkName(
         _ artwork: String
     ) -> String {
-        switch artwork {
-        case "GoalStrength":
-            return "TrainHero"
-        case "GoalEndurance":
-            return "StrengthPostWorkoutHero"
-        case "GoalConsistency":
-            return "ProgressHero"
-        case "GoalEvent":
-            return "CommunityHero"
-        default:
-            return artwork
-        }
+        artwork
     }
 
     /// Every standard goal has a dedicated cropped picker thumbnail,
