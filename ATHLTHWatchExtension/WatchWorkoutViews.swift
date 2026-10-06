@@ -1404,17 +1404,31 @@ struct WatchActiveWorkoutView: View {
 
     private var completedContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 42))
-                .foregroundStyle(WatchTheme.green)
+            VStack(spacing: 5) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 42))
+                    .foregroundStyle(WatchTheme.green)
 
-            Text("Workout Saved")
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Workout Saved",
+                        norwegian: "Økt lagret"
+                    )
+                )
                 .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(
+                    WatchTheme.textPrimary
+                )
+            }
+            .padding(.top, 4)
 
             if let result = workoutManager.completedResult {
                 Text(durationText(result.duration))
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .foregroundStyle(
+                        WatchTheme.textPrimary
+                    )
 
                 HStack(spacing: 0) {
                     metric(
@@ -1426,6 +1440,9 @@ struct WatchActiveWorkoutView: View {
                     )
 
                     Divider()
+                        .overlay(
+                            WatchTheme.border
+                        )
 
                     metric(
                         icon: "flame.fill",
@@ -1435,6 +1452,9 @@ struct WatchActiveWorkoutView: View {
 
                     if result.kind != .strength {
                         Divider()
+                            .overlay(
+                                WatchTheme.border
+                            )
 
                         metric(
                             icon: "location.fill",
@@ -1663,12 +1683,34 @@ struct WatchActiveWorkoutView: View {
                 }
             }
 
-            Button("Done") {
+            Button {
                 workoutManager.reset()
+            } label: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Done",
+                        norwegian: "Ferdig"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 14,
+                        weight: .bold
+                    )
+                )
+                .foregroundStyle(
+                    Color.white
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
             }
             .buttonStyle(.borderedProminent)
             .tint(WatchTheme.green)
         }
+        .foregroundStyle(
+            WatchTheme.textPrimary
+        )
         .frame(maxWidth: .infinity)
     }
 
