@@ -74,15 +74,13 @@ struct ExerciseLibraryView: View {
     }
 
     private static let exerciseAlphabet:
-        [String] = (
-            (65...90).compactMap {
-                UnicodeScalar($0)
-                    .map {
-                        String(Character($0))
-                    }
-            } +
-            ["Æ", "Ø", "Å"]
-        )
+        [String] = [
+            "A", "B", "C", "D", "E", "F",
+            "G", "H", "I", "J", "K", "L",
+            "M", "N", "O", "P", "Q", "R",
+            "S", "T", "U", "V", "W", "X",
+            "Y", "Z", "Æ", "Ø", "Å"
+        ]
 
     private var displayedResults:
         [ExerciseLibraryEntry] {
