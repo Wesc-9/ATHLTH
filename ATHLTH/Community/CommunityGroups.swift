@@ -92,7 +92,7 @@ private enum CommunityImageProcessor {
 }
 
 
-private enum CommunityImageCropTarget:
+enum CommunityImageCropTarget:
     String,
     Identifiable {
     case clubImage
@@ -149,7 +149,7 @@ private enum CommunityImageCropTarget:
     }
 }
 
-private struct CommunityImageCropRequest:
+struct CommunityImageCropRequest:
     Identifiable {
     let id = UUID()
     let image: UIImage
@@ -368,7 +368,7 @@ private extension CommunityImageProcessor {
     }
 }
 
-private struct CommunityImageCropEditor:
+struct CommunityImageCropEditor:
     View {
     @Environment(\.dismiss)
     private var dismiss
