@@ -67,6 +67,9 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
             clearDisabledValues()
         }
+        .onChange(of: homeAssistant.shareWorkoutRouteMap) { _, _ in
+            clearDisabledValues()
+        }
         .onChange(of: homeAssistant.shareRecovery) { _, _ in
             clearDisabledValues()
         }
@@ -750,6 +753,23 @@ struct HomeAssistantSettingsView: View {
                 ),
                 icon: "checkmark.circle",
                 isOn: $homeAssistant.shareCompletedWorkouts
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Workout route map",
+                    norwegian: "Rutekart for fullførte økter"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Shares the completed GPS route, an Apple Maps snapshot and route details with your Home Assistant. Location data is sent only after the workout ends. Off by default.",
+                    norwegian:
+                        "Deler den fullførte GPS-ruten, et Apple Maps-kart og rutedetaljer med Home Assistant. Posisjonsdata sendes først etter at økten er avsluttet. Av som standard."
+                ),
+                icon: "map.fill",
+                isOn:
+                    $homeAssistant
+                        .shareWorkoutRouteMap
             )
 
             sharingToggle(
