@@ -4683,12 +4683,12 @@ private struct CommunityReferenceUpcomingEventCard: View {
 
             eventCover
                 .frame(
-                    width: 82,
-                    height: 70
+                    width: 52,
+                    height: 52
                 )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 12,
+                        cornerRadius: 10,
                         style: .continuous
                     )
                 )
@@ -4829,7 +4829,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 URL(string: rawURL) {
             ATHLTHStorageImage(
                 url: url,
-                maxPixelSize: 360
+                maxPixelSize: 220
             ) { phase in
                 switch phase {
                 case .success(let image):
