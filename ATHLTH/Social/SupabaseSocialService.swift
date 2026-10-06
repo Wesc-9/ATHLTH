@@ -1418,41 +1418,18 @@ final class SupabaseSocialService: Sendable {
             )
         }
 
-        let storagePath =
-            "\(userID.uuidString.lowercased())/" +
-            "challenge-covers/" +
-            "\(challengeID.uuidString.lowercased()).jpg"
-
-        try await client.storage
-            .from("workout-media")
-            .upload(
-                storagePath,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "60",
-                    contentType: "image/jpeg",
-                    upsert: true
+        let published =
+            try await ATHLTHPublicImagePublisher
+                .publish(
+                    jpegData: jpegData,
+                    purpose:
+                        .challengeCover,
+                    entityID:
+                        challengeID,
+                    client: client
                 )
-            )
 
-        let publicURL = try client.storage
-            .from("workout-media")
-            .getPublicURL(path: storagePath)
-
-        var components = URLComponents(
-            url: publicURL,
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = [
-            URLQueryItem(
-                name: "v",
-                value: String(
-                    Int(Date().timeIntervalSince1970)
-                )
-            )
-        ]
-
-        return (components?.url ?? publicURL).absoluteString
+        return published.url.absoluteString
     }
 
     func removeChallengeCover(
@@ -1505,26 +1482,20 @@ final class SupabaseSocialService: Sendable {
 
         let mediaID = UUID()
         let createdAt = Date()
-        let storagePath =
-            "\(userID.uuidString.lowercased())/" +
-            "\(workoutID.uuidString.lowercased())/" +
-            "\(mediaID.uuidString.lowercased()).jpg"
-
-        try await client.storage
-            .from("workout-media")
-            .upload(
-                storagePath,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "60",
-                    contentType: "image/jpeg",
-                    upsert: false
+        let published =
+            try await ATHLTHPublicImagePublisher
+                .publish(
+                    jpegData: jpegData,
+                    purpose:
+                        .workoutMedia,
+                    entityID:
+                        mediaID,
+                    parentID:
+                        workoutID,
+                    client: client
                 )
-            )
-
-        let publicURL = try client.storage
-            .from("workout-media")
-            .getPublicURL(path: storagePath)
+        let storagePath =
+            published.storagePath
 
         let cleanCaption =
             caption?
@@ -1536,7 +1507,7 @@ final class SupabaseSocialService: Sendable {
             id: mediaID,
             userID: userID,
             workoutID: workoutID,
-            imageURL: publicURL.absoluteString,
+            imageURL: published.url.absoluteString,
             storagePath: storagePath,
             caption:
                 cleanCaption?.isEmpty == false
