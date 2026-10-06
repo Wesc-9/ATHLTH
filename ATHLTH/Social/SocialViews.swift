@@ -3684,7 +3684,7 @@ struct SocialPrivacySettingsView: View {
                         Text("Nobody").tag("nobody")
                     }
 
-                    Text("Message requests let people you do not mutually follow send one text message. They cannot send another message or share workouts, plans, routes or challenges until you accept. Blocking always stops messaging.")
+                    Text("Message requests let people you do not mutually follow send one first request. That request can contain text or one shared workout, plan, route or challenge. They cannot send anything else until you accept. Blocking always stops messaging.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
