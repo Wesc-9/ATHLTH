@@ -1092,35 +1092,18 @@ final class ProfileGearStore: ObservableObject {
             throw ProfileGearError.imageTooLarge
         }
 
-        let path = imagePath(userID: userID, itemID: itemID)
-
-        try await client.storage
-            .from("profile-gear")
-            .upload(
-                path,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "3600",
-                    contentType: "image/jpeg",
-                    upsert: true
+        let published =
+            try await ATHLTHPublicImagePublisher
+                .publish(
+                    jpegData: jpegData,
+                    purpose:
+                        .profileGear,
+                    entityID:
+                        itemID,
+                    client: client
                 )
-            )
 
-        let publicURL = try client.storage
-            .from("profile-gear")
-            .getPublicURL(path: path)
-
-        var components = URLComponents(
-            url: publicURL,
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = [
-            URLQueryItem(
-                name: "v",
-                value: String(Int(Date().timeIntervalSince1970))
-            )
-        ]
-        return components?.url ?? publicURL
+        return published.url
     }
 
     private func imagePath(
