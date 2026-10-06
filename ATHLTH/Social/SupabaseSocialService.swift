@@ -719,6 +719,18 @@ final class SupabaseSocialService: Sendable {
             .execute()
     }
 
+    func deleteActivity(_ activityID: UUID) async throws {
+        guard currentUserID != nil else {
+            throw SocialServiceError.notAuthenticated
+        }
+
+        try await client
+            .from("social_activities")
+            .delete()
+            .eq("id", value: activityID)
+            .execute()
+    }
+
     func loadMutedUserIDs() async throws -> Set<UUID> {
         guard currentUserID != nil else {
             throw SocialServiceError.notAuthenticated
