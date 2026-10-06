@@ -3905,6 +3905,17 @@ struct ReportUserView: View {
                         Text("Spam").tag("spam")
                         Text("Harassment").tag("harassment")
                         Text("Impersonation").tag("impersonation")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Inappropriate profile image/header",
+                                norwegian:
+                                    "Upassende profilbilde/header"
+                            )
+                        )
+                        .tag(
+                            "profile_image"
+                        )
                         Text("Unsafe content").tag("unsafe_content")
                         Text("Other").tag("other")
                     }
