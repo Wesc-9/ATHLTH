@@ -553,8 +553,11 @@ struct ChallengeCoverArtworkView: View {
                         }
                     }
                 } else if let artworkName,
-                          UIImage(named: artworkName) != nil {
-                    coverImage(Image(artworkName), size: proxy.size)
+                          !artworkName.isEmpty {
+                    coverImage(
+                        Image(artworkName),
+                        size: proxy.size
+                    )
                 } else {
                     fallback
                 }
@@ -1403,167 +1406,453 @@ struct ChallengeCreationView: View {
                     )
                 }
 
-                ZStack(
-                    alignment:
-                        .bottomLeading
-                ) {
-                    Group {
-                        if let data =
-                                selectedCoverImageData,
-                           let image =
-                                UIImage(
-                                    data: data
-                                ) {
-                            Image(
-                                uiImage: image
-                            )
-                            .resizable()
-                            .scaledToFill()
-                        } else {
-                            ChallengeCoverArtworkView(
-                                sport: sport,
-                                artworkName:
-                                    selectedCoverArtworkName,
-                                remoteURL: nil
-                            )
-                        }
-                    }
-                    .frame(
-                        maxWidth: .infinity
-                    )
-                    .frame(height: 112)
-                    .clipped()
+                creationLivePreview
 
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            .black
-                                .opacity(0.44)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                creationArtworkPicker
+            }
+        }
+    }
+
+    private var creationLivePreview: some View {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            Group {
+                if let data =
+                        selectedCoverImageData,
+                   let image =
+                        UIImage(
+                            data: data
+                        ) {
+                    Image(
+                        uiImage: image
+                    )
+                    .resizable()
+                    .scaledToFill()
+                } else {
+                    ChallengeCoverArtworkView(
+                        sport: sport,
+                        artworkName:
+                            selectedCoverArtworkName,
+                        remoteURL: nil
+                    )
+                }
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black
+                        .opacity(0.02),
+                    Color.black
+                        .opacity(0.18),
+                    Color.black
+                        .opacity(0.78)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.black
+                        .opacity(0.42),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 6
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "PREVIEW",
+                        norwegian:
+                            "FORHÅNDSVISNING"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .bold
+                    )
+                )
+                .tracking(1.2)
+                .foregroundStyle(
+                    .white.opacity(0.78)
+                )
+
+                Text(resolvedTitle)
+                    .font(
+                        .title3.weight(.bold)
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+
+                if let resolvedSummary {
+                    Text(resolvedSummary)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .white.opacity(0.88)
+                        )
+                        .lineLimit(2)
+                }
+
+                HStack(spacing: 8) {
+                    Label(
+                        sport.title,
+                        systemImage:
+                            sport.systemImage
                     )
 
                     Label(
-                        creationHeroLabel,
+                        effectiveScoring.title,
                         systemImage:
-                            "photo.fill"
+                            scoringIcon(
+                                effectiveScoring
+                            )
                     )
-                    .font(
-                        .caption
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(.white)
-                    .padding(
-                        .horizontal,
-                        10
-                    )
-                    .padding(
-                        .vertical,
-                        7
-                    )
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .padding(10)
+
+                    if !invitees.isEmpty {
+                        Label(
+                            "\(invitees.count)",
+                            systemImage:
+                                "person.2.fill"
+                        )
+                    }
                 }
-                .frame(height: 112)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
+                .font(
+                    .caption2.weight(
+                        .semibold
                     )
                 )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style: .continuous
+                .foregroundStyle(
+                    .white.opacity(0.94)
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+            }
+            .padding(14)
+            .padding(.trailing, 48)
+
+            PhotosPicker(
+                selection:
+                    $selectedCoverPhoto,
+                matching: .images
+            ) {
+                Image(
+                    systemName:
+                        "photo.badge.plus"
+                )
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .semibold
                     )
-                    .stroke(
-                        Color.white
-                            .opacity(0.52),
-                        lineWidth: 0.8
+                )
+                .foregroundStyle(.white)
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    Color.black
+                        .opacity(0.34),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color.white
+                                .opacity(0.34),
+                            lineWidth: 0.8
+                        )
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topTrailing
+            )
+            .padding(11)
+        }
+        .frame(height: 176)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.52),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var creationArtworkPicker: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Challenge image",
+                        norwegian:
+                            "Challenge-bilde"
+                    )
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+                Spacer()
+
+                if selectedCoverImageData != nil {
+                    Button {
+                        selectedCoverImageData =
+                            nil
+                        selectedCoverPhoto =
+                            nil
+                        selectedCoverArtworkName =
+                            defaultCoverArtwork(
+                                for: sport
+                            )
+                        coverWasManuallySelected =
+                            false
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Reset",
+                                norwegian:
+                                    "Tilbakestill"
+                            )
+                        )
+                        .font(
+                            .caption2.weight(
+                                .semibold
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(
+                        clubEmerald
                     )
                 }
-                .overlay(
-                    alignment:
-                        .topTrailing
-                ) {
-                    HStack(spacing: 7) {
-                        Menu {
-                            ForEach(
-                                challengeCoverArtworkOptions,
-                                id: \.self
-                            ) { artwork in
-                                Button {
-                                    selectedCoverArtworkName =
-                                        artwork
-                                    selectedCoverImageData =
-                                        nil
-                                    selectedCoverPhoto =
-                                        nil
-                                    coverWasManuallySelected =
-                                        true
-                                } label: {
-                                    Label(
-                                        artwork
-                                            .replacingOccurrences(
-                                                of:
-                                                    "Goal",
-                                                with:
-                                                    ""
-                                            ),
-                                        systemImage:
-                                            selectedCoverArtworkName ==
-                                                artwork &&
-                                            selectedCoverImageData ==
-                                                nil
-                                                ? "checkmark.circle.fill"
-                                                : "photo"
+            }
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                HStack(spacing: 9) {
+                    ForEach(
+                        challengeCoverArtworkOptions,
+                        id: \.self
+                    ) { artwork in
+                        Button {
+                            selectedCoverArtworkName =
+                                artwork
+                            selectedCoverImageData =
+                                nil
+                            selectedCoverPhoto =
+                                nil
+                            coverWasManuallySelected =
+                                true
+                        } label: {
+                            ZStack(
+                                alignment:
+                                    .topTrailing
+                            ) {
+                                Image(
+                                    "\(artwork)Thumbnail"
+                                )
+                                .resizable()
+                                .scaledToFill()
+                                .frame(
+                                    width: 88,
+                                    height: 56
+                                )
+                                .clipped()
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: 13,
+                                        style:
+                                            .continuous
                                     )
+                                )
+
+                                if selectedCoverImageData ==
+                                    nil &&
+                                    selectedCoverArtworkName ==
+                                    artwork {
+                                    Image(
+                                        systemName:
+                                            "checkmark.circle.fill"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .white
+                                    )
+                                    .shadow(
+                                        color:
+                                            .black.opacity(
+                                                0.26
+                                            ),
+                                        radius: 3,
+                                        y: 1
+                                    )
+                                    .padding(5)
                                 }
                             }
-                        } label: {
-                            Image(
-                                systemName:
-                                    "photo.stack.fill"
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(.white)
-                            .frame(
-                                width: 34,
-                                height: 34
-                            )
-                            .background(
-                                .ultraThinMaterial,
-                                in: Circle()
-                            )
+                            .overlay {
+                                RoundedRectangle(
+                                    cornerRadius: 13,
+                                    style:
+                                        .continuous
+                                )
+                                .stroke(
+                                    selectedCoverImageData ==
+                                        nil &&
+                                    selectedCoverArtworkName ==
+                                        artwork
+                                        ? clubEmerald
+                                        : Color.black
+                                            .opacity(
+                                                0.06
+                                            ),
+                                    lineWidth:
+                                        selectedCoverImageData ==
+                                            nil &&
+                                        selectedCoverArtworkName ==
+                                            artwork
+                                            ? 2
+                                            : 0.8
+                                )
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            artwork
+                                .replacingOccurrences(
+                                    of: "Goal",
+                                    with: ""
+                                )
+                        )
+                    }
 
-                        PhotosPicker(
-                            selection:
-                                $selectedCoverPhoto,
-                            matching: .images
-                        ) {
-                            Image(
-                                systemName:
-                                    "photo.badge.plus"
+                    PhotosPicker(
+                        selection:
+                            $selectedCoverPhoto,
+                        matching: .images
+                    ) {
+                        ZStack {
+                            if let data =
+                                    selectedCoverImageData,
+                               let image =
+                                    UIImage(
+                                        data: data
+                                    ) {
+                                Image(
+                                    uiImage: image
+                                )
+                                .resizable()
+                                .scaledToFill()
+                            } else {
+                                VStack(spacing: 3) {
+                                    Image(
+                                        systemName:
+                                            "photo.badge.plus"
+                                    )
+                                    .font(
+                                        .headline
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Own",
+                                            norwegian:
+                                                "Eget"
+                                        )
+                                    )
+                                    .font(
+                                        .caption2
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                }
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                            }
+                        }
+                        .frame(
+                            width: 88,
+                            height: 56
+                        )
+                        .background(
+                            clubMint.opacity(
+                                0.72
                             )
-                            .font(.subheadline)
-                            .foregroundStyle(.white)
-                            .frame(
-                                width: 34,
-                                height: 34
+                        )
+                        .clipped()
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 13,
+                                style:
+                                    .continuous
                             )
-                            .background(
-                                .ultraThinMaterial,
-                                in: Circle()
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 13,
+                                style:
+                                    .continuous
+                            )
+                            .stroke(
+                                selectedCoverImageData !=
+                                    nil
+                                    ? clubEmerald
+                                    : Color.black
+                                        .opacity(0.06),
+                                lineWidth:
+                                    selectedCoverImageData !=
+                                        nil
+                                        ? 2
+                                        : 0.8
                             )
                         }
                     }
-                    .padding(9)
+                    .buttonStyle(.plain)
                 }
+                .padding(.vertical, 2)
             }
         }
     }
