@@ -914,7 +914,7 @@ struct ATHLTHEditProfileView: View {
     }
 }
 
-private struct ATHLTHAvatarCropView: View {
+struct ATHLTHAvatarCropView: View {
     let image: UIImage
     let onCancel: () -> Void
     let onUse: (Data) -> Void
@@ -1269,7 +1269,7 @@ private struct ATHLTHAvatarCropView: View {
     }
 }
 
-private enum ATHLTHAvatarCropper {
+enum ATHLTHAvatarCropper {
     static let maximumZoom: CGFloat = 5
     static let maximumSourceDimension:
         CGFloat = 4_096
