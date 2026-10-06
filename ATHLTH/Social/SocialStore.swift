@@ -1789,6 +1789,75 @@ final class SocialStore: ObservableObject {
         )) ?? false
     }
 
+    func deleteWorkoutActivities(
+        matching workoutIDs: Set<UUID>
+    ) async {
+        guard !workoutIDs.isEmpty,
+              let currentUserID
+        else {
+            return
+        }
+
+        let normalizedIDs =
+            Set(
+                workoutIDs.map {
+                    $0.uuidString.lowercased()
+                }
+            )
+
+        let ownedMatches =
+            feed.filter { item in
+                guard item.activity.actorID == currentUserID,
+                      item.activity.kind == "workout"
+                else {
+                    return false
+                }
+
+                if let metadataID =
+                        item.activity
+                            .metadata?["workout_id"]?
+                            .lowercased(),
+                   normalizedIDs.contains(metadataID) {
+                    return true
+                }
+
+                guard let eventKey =
+                        item.activity
+                            .eventKey?
+                            .lowercased()
+                else {
+                    return false
+                }
+
+                return normalizedIDs.contains {
+                    eventKey == "workout-\($0)" ||
+                    eventKey == "strength-workout-\($0)"
+                }
+            }
+
+        guard !ownedMatches.isEmpty else {
+            return
+        }
+
+        errorMessage = nil
+
+        do {
+            for item in ownedMatches {
+                try await service.deleteActivity(
+                    item.activity.id
+                )
+            }
+
+            feed.removeAll { item in
+                ownedMatches.contains {
+                    $0.id == item.id
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func syncChallenges(_ challengeStore: ChallengeStore) async {
         guard let currentUserID =
                 service.currentUserID
