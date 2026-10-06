@@ -3918,31 +3918,59 @@ struct DirectMessageThreadView: View {
     }
 
     private var currentConversation: DirectConversationRecord? {
-        guard let conversationID else { return nil }
-        return messaging.conversations.first { $0.id == conversationID }
+        if let conversationID,
+           let exact =
+                messaging.conversations.first(
+                    where: {
+                        $0.id ==
+                            conversationID
+                    }
+                ) {
+            return exact
+        }
+
+        return messaging.conversation(
+            with: friend.userID
+        )
     }
 
     private var isIncomingRequest: Bool {
         guard let currentConversation,
-              let currentUserID = messaging.currentUserID
+              let currentUserID =
+                messaging.currentUserID,
+              hasSentRequestMessage
         else {
             return false
         }
 
-        return currentConversation.requestStatus == .pending &&
-            currentConversation.requestedBy != nil &&
-            currentConversation.requestedBy != currentUserID
+        return currentConversation.requestStatus ==
+                .pending &&
+            currentConversation.requestedBy !=
+                nil &&
+            currentConversation.requestedBy !=
+                currentUserID
     }
 
     private var isOutgoingRequest: Bool {
         guard let currentConversation,
-              let currentUserID = messaging.currentUserID
+              let currentUserID =
+                messaging.currentUserID
         else {
             return false
         }
 
-        return currentConversation.requestStatus == .pending &&
-            currentConversation.requestedBy == currentUserID
+        guard currentConversation.requestStatus ==
+                .pending
+        else {
+            return false
+        }
+
+        // Opening a non-mutual thread reserves a pending conversation
+        // before anyone sends. Until the first real request exists, either
+        // participant may become the requester by sending first.
+        return !hasSentRequestMessage ||
+            currentConversation.requestedBy ==
+                currentUserID
     }
 
     private var hasSentRequestMessage: Bool {
@@ -4295,7 +4323,11 @@ struct DirectMessageThreadView: View {
             }
 
             HStack(alignment: .bottom, spacing: 10) {
-                if currentConversation?.requestStatus == .accepted {
+                if currentConversation?.requestStatus == .accepted ||
+                    (
+                        isOutgoingRequest &&
+                        !hasSentRequestMessage
+                    ) {
                     Button {
                         showingSharePicker = true
                     } label: {
@@ -4328,9 +4360,9 @@ struct DirectMessageThreadView: View {
                     isOutgoingRequest
                         ? ATHLTHLocalization.choose(
                             english:
-                                "Write one message request",
+                                "Send one request…",
                             norwegian:
-                                "Skriv én meldingsforespørsel"
+                                "Send én forespørsel …"
                         )
                         : ATHLTHLocalization.choose(
                             english:
@@ -4470,7 +4502,12 @@ struct DirectMessageThreadView: View {
         case .accepted:
             return hasText || selectedShare != nil
         case .pending:
-            return isOutgoingRequest && !hasSentRequestMessage && hasText
+            return isOutgoingRequest &&
+                !hasSentRequestMessage &&
+                (
+                    hasText ||
+                    selectedShare != nil
+                )
         case .declined:
             return false
         }
@@ -4654,9 +4691,18 @@ struct DirectMessageThreadView: View {
 
         isSending = true
         let body = text
-        let attachment = currentConversation?.requestStatus == .accepted
-            ? selectedShare
-            : nil
+        let attachment =
+            (
+                currentConversation?
+                    .requestStatus ==
+                    .accepted ||
+                (
+                    isOutgoingRequest &&
+                    !hasSentRequestMessage
+                )
+            )
+                ? selectedShare
+                : nil
 
         if await messaging.send(
             to: friend.userID,
