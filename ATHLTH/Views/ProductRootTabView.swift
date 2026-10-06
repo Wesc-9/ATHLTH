@@ -10661,6 +10661,10 @@ struct ATHLTHProfileView: View {
         false
     @State private var updatingProfilePhoto =
         false
+    @State private var pendingProfilePhotoUploadData:
+        Data?
+    @State private var showingProfilePhotoUploadPreview =
+        false
     @State private var profilePhotoError:
         String?
     @State private var showingHeaderPicker =
@@ -10669,6 +10673,10 @@ struct ATHLTHProfileView: View {
         PhotosPickerItem?
     @State private var pendingHeaderCropRequest:
         CommunityImageCropRequest?
+    @State private var pendingProfileHeaderUploadData:
+        Data?
+    @State private var showingProfileHeaderUploadPreview =
+        false
     @State private var updatingProfileHeader =
         false
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
@@ -10773,11 +10781,52 @@ struct ATHLTHProfileView: View {
                             nil
                         showingProfileCrop =
                             false
+                        pendingProfilePhotoUploadData =
+                            jpegData
+                        showingProfilePhotoUploadPreview =
+                            true
+                    }
+                )
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingProfilePhotoUploadPreview
+        ) {
+            if let pendingProfilePhotoUploadData {
+                ATHLTHProfileMediaUploadPreview(
+                    jpegData:
+                        pendingProfilePhotoUploadData,
+                    shape: .avatar,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Profile photo",
+                            norwegian:
+                                "Profilbilde"
+                        ),
+                    isUploading:
+                        updatingProfilePhoto,
+                    onCancel: {
+                        showingProfilePhotoUploadPreview =
+                            false
+                        self.pendingProfilePhotoUploadData =
+                            nil
+                    },
+                    onUpload: {
+                        let data =
+                            pendingProfilePhotoUploadData
+                        showingProfilePhotoUploadPreview =
+                            false
+                        self.pendingProfilePhotoUploadData =
+                            nil
 
-                        Task {
-                            await saveProfilePhoto(
-                                jpegData
-                            )
+                        if let data {
+                            Task {
+                                await saveProfilePhoto(
+                                    data
+                                )
+                            }
                         }
                     }
                 )
@@ -10829,12 +10878,53 @@ struct ATHLTHProfileView: View {
             ) { jpegData in
                 pendingHeaderCropRequest =
                     nil
+                pendingProfileHeaderUploadData =
+                    jpegData
+                showingProfileHeaderUploadPreview =
+                    true
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingProfileHeaderUploadPreview
+        ) {
+            if let pendingProfileHeaderUploadData {
+                ATHLTHProfileMediaUploadPreview(
+                    jpegData:
+                        pendingProfileHeaderUploadData,
+                    shape: .header,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Profile header",
+                            norwegian:
+                                "Profilheader"
+                        ),
+                    isUploading:
+                        updatingProfileHeader,
+                    onCancel: {
+                        showingProfileHeaderUploadPreview =
+                            false
+                        self.pendingProfileHeaderUploadData =
+                            nil
+                    },
+                    onUpload: {
+                        let data =
+                            pendingProfileHeaderUploadData
+                        showingProfileHeaderUploadPreview =
+                            false
+                        self.pendingProfileHeaderUploadData =
+                            nil
 
-                Task {
-                    await saveProfileHeader(
-                        jpegData
-                    )
-                }
+                        if let data {
+                            Task {
+                                await saveProfileHeader(
+                                    data
+                                )
+                            }
+                        }
+                    }
+                )
             }
         }
         .alert(
@@ -13068,6 +13158,252 @@ struct ATHLTHProfileView: View {
                 enabled:
                     privacy.shareGoals
             )
+        }
+    }
+}
+
+private enum ATHLTHProfileMediaPreviewShape {
+    case avatar
+    case header
+}
+
+private struct ATHLTHProfileMediaUploadPreview:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let jpegData: Data
+    let shape:
+        ATHLTHProfileMediaPreviewShape
+    let title: String
+    let isUploading: Bool
+    let onCancel: () -> Void
+    let onUpload: () -> Void
+
+    private var image: UIImage? {
+        UIImage(data: jpegData)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.18)
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 22) {
+                    Spacer(
+                        minLength: 20
+                    )
+
+                    if let image {
+                        Group {
+                            switch shape {
+                            case .avatar:
+                                Image(
+                                    uiImage: image
+                                )
+                                .resizable()
+                                .interpolation(
+                                    .high
+                                )
+                                .scaledToFill()
+                                .frame(
+                                    width: 230,
+                                    height: 230
+                                )
+                                .clipShape(
+                                    Circle()
+                                )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            Color.white
+                                                .opacity(
+                                                    0.96
+                                                ),
+                                            lineWidth:
+                                                4
+                                        )
+                                }
+
+                            case .header:
+                                Image(
+                                    uiImage: image
+                                )
+                                .resizable()
+                                .interpolation(
+                                    .high
+                                )
+                                .scaledToFill()
+                                .frame(
+                                    maxWidth:
+                                        .infinity
+                                )
+                                .aspectRatio(
+                                    16.0 / 7.0,
+                                    contentMode:
+                                        .fit
+                                )
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            24,
+                                        style:
+                                            .continuous
+                                    )
+                                )
+                        }
+                        .shadow(
+                            color:
+                                Color.black
+                                    .opacity(
+                                        0.12
+                                    ),
+                            radius: 16,
+                            y: 7
+                        )
+                    }
+
+                    VStack(spacing: 7) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Ready to upload?",
+                                norwegian:
+                                    "Klar til opplasting?"
+                            )
+                        )
+                        .font(
+                            .title3
+                                .weight(.bold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "This is the crop other people will see. The image is safety checked before it can become public.",
+                                norwegian:
+                                    "Dette er utsnittet andre vil se. Bildet sikkerhetskontrolleres før det kan bli offentlig."
+                            )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .multilineTextAlignment(
+                            .center
+                        )
+                        .padding(
+                            .horizontal,
+                            18
+                        )
+                    }
+
+                    Button {
+                        onUpload()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if isUploading {
+                                ProgressView()
+                                    .controlSize(
+                                        .small
+                                    )
+                                    .tint(
+                                        .white
+                                    )
+                            } else {
+                                Image(
+                                    systemName:
+                                        "arrow.up.circle.fill"
+                                )
+                            }
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Upload photo",
+                                    norwegian:
+                                        "Last opp bilde"
+                                )
+                            )
+                        }
+                        .font(
+                            .headline
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 52)
+                        .background(
+                            ATHLTHTheme
+                                .accentDeep,
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        isUploading
+                    )
+
+                    Button {
+                        onCancel()
+                        dismiss()
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose another photo",
+                                norwegian:
+                                    "Velg et annet bilde"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Cancel",
+                            norwegian:
+                                "Avbryt"
+                        )
+                    ) {
+                        onCancel()
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
