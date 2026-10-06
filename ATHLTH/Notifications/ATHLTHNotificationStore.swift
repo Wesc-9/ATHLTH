@@ -449,9 +449,24 @@ final class ATHLTHNotificationStore: ObservableObject {
             await refreshAuthorizationStatus()
         }
 
-        return authorizationStatus == .authorized ||
+        let allowed =
+            authorizationStatus == .authorized ||
             authorizationStatus == .provisional ||
             authorizationStatus == .ephemeral
+
+        if allowed {
+            // Alert permission and APNs registration are separate. Keep them
+            // coupled from the user's point of view so enabling device alerts
+            // always repairs/registers the backend push destination as well.
+            APNsPushManager.shared
+                .ensureSystemRegistration(
+                    force: true
+                )
+            await APNsPushManager.shared
+                .syncCurrentToken()
+        }
+
+        return allowed
     }
 
     func refreshAuthorizationStatus() async {
