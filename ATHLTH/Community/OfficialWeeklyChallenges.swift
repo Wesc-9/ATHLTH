@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import SwiftUI
+import UIKit
 
 enum OfficialRunningChallengeKind: String, Codable, CaseIterable, Identifiable {
     case distance
@@ -53,6 +54,117 @@ enum OfficialRunningChallengeKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+
+struct OfficialWeeklyChallengeAppearance: Codable, Hashable {
+    var textColorHex: String = "#FFFFFF"
+    var secondaryTextColorHex: String = "#FFFFFF"
+    var showTextShadow: Bool = true
+    var shadowOpacity: Double = 0.72
+    var showTextBackdrop: Bool = true
+    var backdropOpacity: Double = 0.30
+    var showImageOverlay: Bool = false
+    var imageOverlayOpacity: Double = 0.22
+    var showBadge: Bool = true
+    var showMetadata: Bool = true
+    var showSubtitle: Bool = true
+    var preserveOriginalImageColors: Bool = true
+
+    enum CodingKeys: String, CodingKey {
+        case textColorHex = "text_color_hex"
+        case secondaryTextColorHex = "secondary_text_color_hex"
+        case showTextShadow = "show_text_shadow"
+        case shadowOpacity = "shadow_opacity"
+        case showTextBackdrop = "show_text_backdrop"
+        case backdropOpacity = "backdrop_opacity"
+        case showImageOverlay = "show_image_overlay"
+        case imageOverlayOpacity = "image_overlay_opacity"
+        case showBadge = "show_badge"
+        case showMetadata = "show_metadata"
+        case showSubtitle = "show_subtitle"
+        case preserveOriginalImageColors = "preserve_original_image_colors"
+    }
+
+    static let defaultStyle = Self()
+
+    var resolvedShadowOpacity: Double {
+        min(max(shadowOpacity, 0), 1)
+    }
+
+    var resolvedBackdropOpacity: Double {
+        min(max(backdropOpacity, 0), 0.75)
+    }
+
+    var resolvedImageOverlayOpacity: Double {
+        min(max(imageOverlayOpacity, 0), 0.75)
+    }
+}
+
+extension Color {
+    init(athlthHex value: String) {
+        let cleaned = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+
+        var raw: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&raw)
+
+        let red: Double
+        let green: Double
+        let blue: Double
+        let alpha: Double
+
+        switch cleaned.count {
+        case 8:
+            red = Double((raw >> 24) & 0xFF) / 255
+            green = Double((raw >> 16) & 0xFF) / 255
+            blue = Double((raw >> 8) & 0xFF) / 255
+            alpha = Double(raw & 0xFF) / 255
+        case 6:
+            red = Double((raw >> 16) & 0xFF) / 255
+            green = Double((raw >> 8) & 0xFF) / 255
+            blue = Double(raw & 0xFF) / 255
+            alpha = 1
+        default:
+            red = 1
+            green = 1
+            blue = 1
+            alpha = 1
+        }
+
+        self.init(
+            .sRGB,
+            red: red,
+            green: green,
+            blue: blue,
+            opacity: alpha
+        )
+    }
+
+    var athlthHexString: String {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 1
+        var green: CGFloat = 1
+        var blue: CGFloat = 1
+        var alpha: CGFloat = 1
+
+        guard uiColor.getRed(
+            &red,
+            green: &green,
+            blue: &blue,
+            alpha: &alpha
+        ) else {
+            return "#FFFFFF"
+        }
+
+        return String(
+            format: "#%02X%02X%02X",
+            Int(round(red * 255)),
+            Int(round(green * 255)),
+            Int(round(blue * 255))
+        )
+    }
+}
+
 struct OfficialWeeklyChallenge: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -66,6 +178,11 @@ struct OfficialWeeklyChallenge: Identifiable, Codable, Hashable {
     var createdBy: UUID?
     var createdAt: Date
     var updatedAt: Date
+    var appearance: OfficialWeeklyChallengeAppearance?
+
+    var resolvedAppearance: OfficialWeeklyChallengeAppearance {
+        appearance ?? .defaultStyle
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -80,6 +197,7 @@ struct OfficialWeeklyChallenge: Identifiable, Codable, Hashable {
         case createdBy = "created_by"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case appearance
     }
 
     var isActive: Bool {
@@ -144,6 +262,7 @@ private struct OfficialWeeklyChallengeWrite: Encodable {
     let createdBy: UUID
     let createdAt: Date
     let updatedAt: Date
+    let appearance: OfficialWeeklyChallengeAppearance
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -158,6 +277,7 @@ private struct OfficialWeeklyChallengeWrite: Encodable {
         case createdBy = "created_by"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case appearance
     }
 }
 
@@ -503,7 +623,8 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
         targetValue: Double,
         startsAt: Date,
         endsAt: Date,
-        source: String
+        source: String,
+        appearance: OfficialWeeklyChallengeAppearance = .defaultStyle
     ) async -> Bool {
         guard let currentUserID = client.auth.currentUser?.id else {
             errorMessage = "Sign in again to manage challenges."
@@ -556,7 +677,8 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             source: source,
             createdBy: existing?.createdBy ?? currentUserID,
             createdAt: existing?.createdAt ?? now,
-            updatedAt: now
+            updatedAt: now,
+            appearance: appearance
         )
 
         do {
@@ -3895,6 +4017,7 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
     let startsAt: Date
     let endsAt: Date
     let source: String
+    let appearance: OfficialWeeklyChallengeAppearance
 
     static func existing(
         _ challenge: OfficialWeeklyChallenge
@@ -3907,7 +4030,8 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
             targetValue: challenge.targetValue,
             startsAt: challenge.startsAt,
             endsAt: challenge.endsAt,
-            source: challenge.source
+            source: challenge.source,
+            appearance: challenge.resolvedAppearance
         )
     }
 
@@ -3922,7 +4046,8 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
             targetValue: 25,
             startsAt: window.0,
             endsAt: window.1,
-            source: "manual"
+            source: "manual",
+            appearance: .defaultStyle
         )
     }
 
@@ -3938,7 +4063,8 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
             targetValue: template.targetValue,
             startsAt: window.0,
             endsAt: window.1,
-            source: "template"
+            source: "template",
+            appearance: .defaultStyle
         )
     }
 
@@ -3955,7 +4081,8 @@ struct OfficialWeeklyChallengeEditorSeed: Identifiable {
             targetValue: draft.targetValue,
             startsAt: startsAt,
             endsAt: endsAt,
-            source: "ai"
+            source: "ai",
+            appearance: .defaultStyle
         )
     }
 }
@@ -4068,6 +4195,7 @@ struct OfficialWeeklyChallengeEditorView: View {
     @State private var startsAt: Date
     @State private var endsAt: Date
     @State private var source: String
+    @State private var appearance: OfficialWeeklyChallengeAppearance
     @State private var saving = false
 
     init(seed: OfficialWeeklyChallengeEditorSeed) {
@@ -4079,131 +4207,407 @@ struct OfficialWeeklyChallengeEditorView: View {
         _startsAt = State(initialValue: seed.startsAt)
         _endsAt = State(initialValue: seed.endsAt)
         _source = State(initialValue: seed.source)
+        _appearance = State(initialValue: seed.appearance)
     }
 
     var body: some View {
-        Form {
-            Section("Challenge") {
-                TextField("Title", text: $title)
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .accent
+                        .opacity(0.20)
+            )
+            .ignoresSafeArea()
 
-                TextField(
-                    "Short description",
-                    text: $subtitle,
-                    axis: .vertical
-                )
-                .lineLimit(2...4)
+            ScrollView {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    previewSection
+                    challengeSection
+                    scheduleSection
+                    appearanceSection
+                    aiSection
 
-                Picker("Challenge type", selection: $kind) {
-                    ForEach(OfficialRunningChallengeKind.allCases) { item in
-                        Label(item.title, systemImage: item.icon)
-                            .tag(item)
-                    }
-                }
-
-                LabeledContent(kind.targetLabel) {
-                    TextField(
-                        "Target",
-                        value: $targetValue,
-                        format: .number.precision(.fractionLength(0...1))
-                    )
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                }
-            }
-
-            Section("Schedule") {
-                DatePicker(
-                    "Starts",
-                    selection: $startsAt
-                )
-
-                DatePicker(
-                    "Ends",
-                    selection: $endsAt
-                )
-            }
-
-            Section {
-                Button {
-                    regenerateWithAI()
-                } label: {
-                    Label(
-                        "Generate a new AI suggestion",
-                        systemImage: "sparkles"
-                    )
-                }
-                .disabled(store.isGeneratingAI)
-
-                if let existing = seed.existing {
-                    Button {
-                        Task {
-                            _ = await store.generateCover(
-                                for: existing.id
+                    if let error = store.errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding(14)
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
                             )
-                        }
-                    } label: {
-                        Label(
-                            "Generate AI cover",
-                            systemImage: "photo.badge.plus"
-                        )
+                            .background(
+                                Color.red.opacity(0.08),
+                                in: RoundedRectangle(
+                                    cornerRadius: 16,
+                                    style: .continuous
+                                )
+                            )
                     }
-                    .disabled(store.isGeneratingCover)
                 }
-            } footer: {
-                Text(
-                    "AI can draft the challenge and create its cover image. The challenge text is not published until you review and save it."
-                )
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 36)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
             }
-
-            if let error = store.errorMessage {
-                Section {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
         }
         .navigationTitle(
             seed.existing == nil
-                ? "New Weekly Challenge"
-                : "Edit Challenge"
+                ? ATHLTHLocalization.choose(
+                    english: "New Weekly Challenge",
+                    norwegian: "Ny ukentlig utfordring"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Edit Challenge",
+                    norwegian: "Rediger utfordring"
+                )
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
+            ToolbarItem(
+                placement: .cancellationAction
+            ) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel",
+                        norwegian: "Avbryt"
+                    )
+                ) {
                     dismiss()
                 }
             }
 
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
+            ToolbarItem(
+                placement: .confirmationAction
+            ) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Save",
+                        norwegian: "Lagre"
+                    )
+                ) {
                     save()
                 }
-                .disabled(
-                    saving ||
-                    title.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty ||
-                    targetValue <= 0 ||
-                    endsAt <= startsAt
-                )
+                .font(.headline)
+                .disabled(!canSave)
             }
         }
         .overlay {
-            if saving || store.isGeneratingAI || store.isGeneratingCover {
+            if saving ||
+                store.isGeneratingAI ||
+                store.isGeneratingCover {
                 ProgressView(
                     store.isGeneratingCover
-                        ? "Generating cover…"
+                        ? ATHLTHLocalization.choose(
+                            english: "Generating cover…",
+                            norwegian: "Genererer bilde…"
+                        )
                         : (
                             store.isGeneratingAI
-                                ? "Generating…"
-                                : "Saving…"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Generating…",
+                                    norwegian: "Genererer…"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Saving…",
+                                    norwegian: "Lagrer…"
+                                )
                         )
                 )
                 .padding(18)
                 .background(
                     .regularMaterial,
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                )
+                .shadow(
+                    color: Color.black.opacity(0.10),
+                    radius: 18,
+                    y: 8
+                )
+            }
+        }
+    }
+
+    private var canSave: Bool {
+        !saving &&
+        !title.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty &&
+        targetValue > 0 &&
+        endsAt > startsAt
+    }
+
+    private var liveChallenge: OfficialWeeklyChallenge {
+        let liveHeroAsset: String = {
+            guard let existingID = seed.existing?.id else {
+                return ""
+            }
+
+            return store.challenges.first {
+                $0.id == existingID
+            }?.heroAsset ??
+                seed.existing?.heroAsset ??
+                ""
+        }()
+
+        let cleanTitle =
+            title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        let cleanSubtitle =
+            subtitle.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        return OfficialWeeklyChallenge(
+            id: seed.existing?.id ?? seed.id,
+            title:
+                cleanTitle.isEmpty
+                    ? ATHLTHLocalization.choose(
+                        english: "Weekly Challenge",
+                        norwegian: "Ukens utfordring"
+                    )
+                    : cleanTitle,
+            subtitle:
+                cleanSubtitle.isEmpty
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Your challenge description appears here.",
+                        norwegian:
+                            "Beskrivelsen av utfordringen vises her."
+                    )
+                    : cleanSubtitle,
+            kind: kind,
+            targetValue: max(targetValue, 1),
+            startsAt: startsAt,
+            endsAt: endsAt,
+            heroAsset: liveHeroAsset,
+            source: source,
+            createdBy: seed.existing?.createdBy,
+            createdAt:
+                seed.existing?.createdAt ??
+                Date(),
+            updatedAt: Date(),
+            appearance: appearance
+        )
+    }
+
+    private var previewSection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack(spacing: 8) {
+                Image(systemName: "eye.fill")
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "LIVE PREVIEW",
+                        norwegian: "FORHÅNDSVISNING"
+                    )
+                )
+                .font(.caption.weight(.bold))
+                .tracking(1.5)
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+
+                Spacer()
+
+                Text("Community")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(
+                        Color.white.opacity(0.72),
+                        in: Capsule()
+                    )
+            }
+
+            OfficialWeeklyChallengeEditorPreviewCard(
+                challenge: liveChallenge,
+                appearance: appearance
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "This preview updates as you edit text, image treatment and readability settings.",
+                    norwegian:
+                        "Forhåndsvisningen oppdateres mens du endrer tekst, bildebehandling og lesbarhet."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+        }
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var challengeSection: some View {
+        ATHLTHPremiumFormSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Challenge",
+                    norwegian: "Utfordring"
+                ),
+            icon: "trophy.fill",
+            tint: ATHLTHTheme.vitality
+        ) {
+            VStack(spacing: 12) {
+                editorField(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Title",
+                            norwegian: "Tittel"
+                        ),
+                    icon: "textformat"
+                ) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Challenge title",
+                            norwegian: "Navn på utfordringen"
+                        ),
+                        text: $title
+                    )
+                    .textInputAutocapitalization(
+                        .sentences
+                    )
+                }
+
+                editorField(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Short description",
+                            norwegian: "Kort beskrivelse"
+                        ),
+                    icon: "text.alignleft"
+                ) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "What is the challenge?",
+                            norwegian: "Hva går utfordringen ut på?"
+                        ),
+                        text: $subtitle,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                }
+
+                HStack(spacing: 10) {
+                    Image(systemName: kind.icon)
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+                        .frame(width: 34)
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Challenge type",
+                            norwegian: "Utfordringstype"
+                        ),
+                        selection: $kind
+                    ) {
+                        ForEach(
+                            OfficialRunningChallengeKind
+                                .allCases
+                        ) { item in
+                            Label(
+                                item.title,
+                                systemImage: item.icon
+                            )
+                            .tag(item)
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(12)
+                .background(
+                    Color.white.opacity(0.70),
+                    in: RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
+                    )
+                )
+
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "scope"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(width: 34)
+
+                    Text(kind.targetLabel)
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                    Spacer()
+
+                    TextField(
+                        "0",
+                        value: $targetValue,
+                        format:
+                            .number
+                            .precision(
+                                .fractionLength(
+                                    0...1
+                                )
+                            )
+                    )
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(
+                        .trailing
+                    )
+                    .frame(width: 84)
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                }
+                .padding(12)
+                .background(
+                    Color.white.opacity(0.70),
                     in: RoundedRectangle(
                         cornerRadius: 16,
                         style: .continuous
@@ -4211,6 +4615,456 @@ struct OfficialWeeklyChallengeEditorView: View {
                 )
             }
         }
+    }
+
+    private var scheduleSection: some View {
+        ATHLTHPremiumFormSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Schedule",
+                    norwegian: "Tidsplan"
+                ),
+            icon: "calendar",
+            tint: ATHLTHTheme.recoveryBlue
+        ) {
+            VStack(spacing: 0) {
+                DatePicker(
+                    ATHLTHLocalization.choose(
+                        english: "Starts",
+                        norwegian: "Starter"
+                    ),
+                    selection: $startsAt
+                )
+                .padding(.vertical, 5)
+
+                Divider()
+                    .opacity(0.55)
+
+                DatePicker(
+                    ATHLTHLocalization.choose(
+                        english: "Ends",
+                        norwegian: "Slutter"
+                    ),
+                    selection: $endsAt
+                )
+                .padding(.vertical, 5)
+            }
+        }
+    }
+
+    private var appearanceSection: some View {
+        ATHLTHPremiumFormSection(
+            title:
+                ATHLTHLocalization.choose(
+                    english: "Appearance",
+                    norwegian: "Utseende"
+                ),
+            icon: "paintpalette.fill",
+            tint: ATHLTHTheme.premiumGold
+        ) {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                ColorPicker(
+                    ATHLTHLocalization.choose(
+                        english: "Main text color",
+                        norwegian: "Farge på hovedtekst"
+                    ),
+                    selection:
+                        Binding(
+                            get: {
+                                Color(
+                                    athlthHex:
+                                        appearance
+                                        .textColorHex
+                                )
+                            },
+                            set: {
+                                appearance
+                                    .textColorHex =
+                                    $0.athlthHexString
+                            }
+                        ),
+                    supportsOpacity: false
+                )
+
+                ColorPicker(
+                    ATHLTHLocalization.choose(
+                        english: "Secondary text color",
+                        norwegian: "Farge på undertekst"
+                    ),
+                    selection:
+                        Binding(
+                            get: {
+                                Color(
+                                    athlthHex:
+                                        appearance
+                                        .secondaryTextColorHex
+                                )
+                            },
+                            set: {
+                                appearance
+                                    .secondaryTextColorHex =
+                                    $0.athlthHexString
+                            }
+                        ),
+                    supportsOpacity: false
+                )
+
+                Divider()
+                    .opacity(0.55)
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Text shadow",
+                        norwegian: "Skygge på tekst"
+                    ),
+                    isOn:
+                        $appearance
+                        .showTextShadow
+                )
+
+                if appearance.showTextShadow {
+                    editorSlider(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Shadow strength",
+                                norwegian: "Skyggestyrke"
+                            ),
+                        value:
+                            $appearance
+                            .shadowOpacity,
+                        range: 0...1
+                    )
+                }
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Background behind text",
+                        norwegian: "Bakgrunn bak tekst"
+                    ),
+                    isOn:
+                        $appearance
+                        .showTextBackdrop
+                )
+
+                if appearance.showTextBackdrop {
+                    editorSlider(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Background strength",
+                                norwegian: "Bakgrunnsstyrke"
+                            ),
+                        value:
+                            $appearance
+                            .backdropOpacity,
+                        range: 0...0.65
+                    )
+                }
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Darken image",
+                        norwegian: "Mørklegg bilde"
+                    ),
+                    isOn:
+                        $appearance
+                        .showImageOverlay
+                )
+
+                if appearance.showImageOverlay {
+                    editorSlider(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Image overlay",
+                                norwegian: "Mørklegging"
+                            ),
+                        value:
+                            $appearance
+                            .imageOverlayOpacity,
+                        range: 0...0.65
+                    )
+                }
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Keep original image colors",
+                        norwegian: "Behold originalfarger i bildet"
+                    ),
+                    isOn:
+                        $appearance
+                        .preserveOriginalImageColors
+                )
+
+                Divider()
+                    .opacity(0.55)
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Show subtitle",
+                        norwegian: "Vis undertekst"
+                    ),
+                    isOn:
+                        $appearance
+                        .showSubtitle
+                )
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Show Weekly Challenge badge",
+                        norwegian: "Vis Ukens challenge-merke"
+                    ),
+                    isOn:
+                        $appearance
+                        .showBadge
+                )
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Show participants and time",
+                        norwegian: "Vis deltakere og tid"
+                    ),
+                    isOn:
+                        $appearance
+                        .showMetadata
+                )
+
+                Button {
+                    appearance = .defaultStyle
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Reset appearance",
+                            norwegian: "Tilbakestill utseende"
+                        ),
+                        systemImage:
+                            "arrow.counterclockwise"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                }
+                .buttonStyle(.bordered)
+                .tint(
+                    ATHLTHTheme.accentDeep
+                )
+            }
+        }
+    }
+
+    private var aiSection: some View {
+        ATHLTHPremiumFormSection(
+            title: "AI",
+            icon: "sparkles",
+            tint: ATHLTHTheme.accent
+        ) {
+            VStack(spacing: 10) {
+                Button {
+                    regenerateWithAI()
+                } label: {
+                    editorActionLabel(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Generate a new AI suggestion",
+                                norwegian:
+                                    "Generer et nytt AI-forslag"
+                            ),
+                        icon: "sparkles"
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(store.isGeneratingAI)
+
+                if let existing = seed.existing {
+                    Button {
+                        Task {
+                            _ =
+                                await store
+                                .generateCover(
+                                    for:
+                                        existing.id
+                                )
+                        }
+                    } label: {
+                        editorActionLabel(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Generate AI cover",
+                                    norwegian:
+                                        "Generer AI-bilde"
+                                ),
+                            icon:
+                                "photo.badge.plus"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        store.isGeneratingCover
+                    )
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The preview above shows the current cover or an estimated local cover before publishing.",
+                        norwegian:
+                            "Forhåndsvisningen over viser gjeldende bilde eller et lokalt estimat før publisering."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
+        }
+    }
+
+    private func editorField<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Label(title, systemImage: icon)
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            content()
+                .font(.body)
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .padding(12)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .background(
+                    Color.white.opacity(0.72),
+                    in: RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                )
+        }
+    }
+
+    private func editorSlider(
+        title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            HStack {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                Spacer()
+
+                Text(
+                    "\(Int((value.wrappedValue * 100).rounded()))%"
+                )
+                .font(
+                    .caption
+                        .monospacedDigit()
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+            }
+
+            Slider(
+                value: value,
+                in: range
+            )
+            .tint(
+                ATHLTHTheme.accentDeep
+            )
+        }
+    }
+
+    private func editorActionLabel(
+        title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(
+                    width: 38,
+                    height: 38
+                )
+                .background(
+                    ATHLTHTheme
+                        .accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            Text(title)
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+        }
+        .padding(10)
+        .background(
+            Color.white.opacity(0.68),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
     }
 
     private func save() {
@@ -4225,7 +5079,8 @@ struct OfficialWeeklyChallengeEditorView: View {
                 targetValue: targetValue,
                 startsAt: startsAt,
                 endsAt: endsAt,
-                source: source
+                source: source,
+                appearance: appearance
             )
 
             saving = false
@@ -4249,6 +5104,325 @@ struct OfficialWeeklyChallengeEditorView: View {
                 source = "ai"
             }
         }
+    }
+}
+
+private struct OfficialWeeklyChallengeEditorPreviewCard:
+    View {
+    let challenge: OfficialWeeklyChallenge
+    let appearance: OfficialWeeklyChallengeAppearance
+
+    private var titleColor: Color {
+        Color(
+            athlthHex:
+                appearance.textColorHex
+        )
+    }
+
+    private var secondaryColor: Color {
+        Color(
+            athlthHex:
+                appearance
+                    .secondaryTextColorHex
+        )
+    }
+
+    private var daysRemaining: Int {
+        max(
+            Calendar.current
+                .dateComponents(
+                    [.day],
+                    from: Date(),
+                    to: challenge.endsAt
+                )
+                .day ?? 0,
+            0
+        )
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            OfficialWeeklyChallengeArtwork(
+                challenge: challenge,
+                preserveOriginalColors:
+                    appearance
+                    .preserveOriginalImageColors
+            )
+
+            if appearance.showImageOverlay {
+                Color.black.opacity(
+                    appearance
+                        .resolvedImageOverlayOpacity
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                if appearance.showBadge {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "WEEKLY CHALLENGE",
+                            norwegian:
+                                "UKENS CHALLENGE"
+                        ),
+                        systemImage:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .tracking(0.8)
+                    .foregroundStyle(
+                        Color(
+                            red: 0.43,
+                            green: 0.31,
+                            blue: 0.08
+                        )
+                    )
+                    .padding(
+                        .horizontal,
+                        11
+                    )
+                    .frame(height: 25)
+                    .background(
+                        ATHLTHTheme
+                            .champagneSoft
+                            .opacity(0.96),
+                        in: Capsule()
+                    )
+                }
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(challenge.title)
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            titleColor
+                        )
+                        .lineLimit(2)
+                        .minimumScaleFactor(
+                            0.82
+                        )
+                        .shadow(
+                            color:
+                                Color.black
+                                .opacity(
+                                    appearance
+                                        .showTextShadow
+                                        ? appearance
+                                            .resolvedShadowOpacity
+                                        : 0
+                                ),
+                            radius:
+                                appearance
+                                    .showTextShadow
+                                    ? 3
+                                    : 0,
+                            y: 1
+                        )
+
+                    if appearance.showSubtitle {
+                        Text(
+                            challenge.subtitle
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            secondaryColor
+                        )
+                        .lineLimit(2)
+                        .shadow(
+                            color:
+                                Color.black
+                                .opacity(
+                                    appearance
+                                        .showTextShadow
+                                        ? appearance
+                                            .resolvedShadowOpacity
+                                        : 0
+                                ),
+                            radius:
+                                appearance
+                                    .showTextShadow
+                                    ? 3
+                                    : 0,
+                            y: 1
+                        )
+                    }
+                }
+                .padding(
+                    appearance
+                        .showTextBackdrop
+                        ? 7
+                        : 0
+                )
+                .background(
+                    Color.black.opacity(
+                        appearance
+                            .showTextBackdrop
+                            ? appearance
+                                .resolvedBackdropOpacity
+                            : 0
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 10,
+                            style:
+                                .continuous
+                        )
+                )
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    if appearance.showMetadata {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "0 participating",
+                                    norwegian:
+                                        "0 deltar"
+                                ),
+                                systemImage:
+                                    "person.2.fill"
+                            )
+
+                            Label(
+                                ATHLTHLocalization.format(
+                                    english:
+                                        "%d days left",
+                                    norwegian:
+                                        "%d dager igjen",
+                                    daysRemaining
+                                ),
+                                systemImage:
+                                    "clock"
+                            )
+                        }
+                        .font(
+                            .caption2
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            secondaryColor
+                        )
+                        .padding(
+                            .horizontal,
+                            7
+                        )
+                        .padding(
+                            .vertical,
+                            4
+                        )
+                        .background(
+                            Color.black.opacity(
+                                appearance
+                                    .showTextBackdrop
+                                    ? max(
+                                        appearance
+                                            .resolvedBackdropOpacity -
+                                            0.02,
+                                        0
+                                    )
+                                    : 0
+                            ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        8,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                        .shadow(
+                            color:
+                                Color.black
+                                .opacity(
+                                    appearance
+                                        .showTextShadow
+                                        ? appearance
+                                            .resolvedShadowOpacity *
+                                            0.50
+                                        : 0
+                                ),
+                            radius: 2,
+                            y: 1
+                        )
+                    }
+
+                    Spacer(minLength: 6)
+
+                    Image(
+                        systemName:
+                            "chevron.right"
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        .white,
+                        in: Circle()
+                    )
+                }
+            }
+            .padding(11)
+        }
+        .frame(height: 162)
+        .frame(maxWidth: .infinity)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.50),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.10),
+            radius: 14,
+            y: 6
+        )
     }
 }
 
