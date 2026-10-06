@@ -62,11 +62,22 @@ final class ProfileRecordRegressionTests:
     }
 
     func testAllHealthBackedProfileRecordsMapToHealthKind() {
+        let derivedRunningRecords:
+            Set<ProfileFeaturedRecordKind> = [
+                .bestWeeklyRunningDistance,
+                .mostRunsInWeek,
+                .bestRunningMonth
+            ]
+
         let healthBacked =
             ProfileFeaturedRecordKind
                 .allCases
                 .filter {
-                    $0.group == .running ||
+                    (
+                        $0.group == .running &&
+                        !derivedRunningRecords
+                            .contains($0)
+                    ) ||
                     $0.group == .appleHealth ||
                     $0 ==
                         .longestStrengthWorkout
@@ -76,6 +87,13 @@ final class ProfileRecordRegressionTests:
             healthBacked.allSatisfy {
                 $0.healthKind != nil
             }
+        )
+
+        XCTAssertTrue(
+            derivedRunningRecords
+                .allSatisfy {
+                    $0.healthKind == nil
+                }
         )
     }
 }
