@@ -206,7 +206,10 @@ struct CommunityEventItem: Identifiable, Hashable {
     }
 }
 
-struct CommunityEventDraft {
+struct CommunityEventDraft:
+    Codable,
+    Hashable
+{
     var title = ""
     var summary = ""
     var activityType: CommunityEventActivity = .running
@@ -232,6 +235,77 @@ struct CommunityEventDraft {
             )
             .isEmpty &&
         startsAt > now
+    }
+}
+
+private struct CommunityEventCreationDraftSnapshot:
+    Codable
+{
+    var draft: CommunityEventDraft
+    var limitParticipants: Bool
+    var maxParticipants: Int
+    var selectedRouteID: UUID?
+    var shareToCommunity: Bool
+    var selectedCoverArtworkName: String
+    var coverWasManuallySelected: Bool
+}
+
+private enum CommunityEventCreationDraftStore {
+    private static let prefix =
+        "community.event.create.draft.v1."
+
+    static func load(
+        userID: UUID
+    ) -> CommunityEventCreationDraftSnapshot? {
+        guard let data =
+                UserDefaults.standard.data(
+                    forKey:
+                        key(userID)
+                )
+        else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(
+            CommunityEventCreationDraftSnapshot.self,
+            from: data
+        )
+    }
+
+    static func save(
+        _ snapshot:
+            CommunityEventCreationDraftSnapshot,
+        userID: UUID
+    ) {
+        guard let data =
+                try? JSONEncoder().encode(
+                    snapshot
+                )
+        else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey:
+                key(userID)
+        )
+    }
+
+    static func clear(
+        userID: UUID
+    ) {
+        UserDefaults.standard.removeObject(
+            forKey:
+                key(userID)
+        )
+    }
+
+    private static func key(
+        _ userID: UUID
+    ) -> String {
+        prefix +
+        userID.uuidString.lowercased()
     }
 }
 
@@ -1608,6 +1682,8 @@ struct CommunityEventCreateView: View {
     @State private var coverWasManuallySelected =
         false
     @State private var createError: String?
+    @State private var restoredSavedDraft =
+        false
 
     private var canCreate: Bool {
         draft.isValidForCreation() &&
@@ -2350,6 +2426,7 @@ struct CommunityEventCreateView: View {
                             norwegian: "Avbryt"
                         )
                     ) {
+                        clearSavedDraft()
                         dismiss()
                     }
                     .foregroundStyle(
@@ -2444,6 +2521,44 @@ struct CommunityEventCreateView: View {
                 .background(
                     .ultraThinMaterial
                 )
+            }
+            .task {
+                restoreSavedDraftIfNeeded()
+            }
+            .onChange(
+                of: draft
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: limitParticipants
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: maxParticipants
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: selectedRouteID
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: shareToCommunity
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: selectedCoverArtworkName
+            ) { _, _ in
+                saveDraftIfRestored()
+            }
+            .onChange(
+                of: coverWasManuallySelected
+            ) { _, _ in
+                saveDraftIfRestored()
             }
             .onChange(
                 of: draft.activityType
@@ -3306,8 +3421,97 @@ struct CommunityEventCreateView: View {
             }
 
             isCreating = false
+            clearSavedDraft()
             dismiss()
         }
+    }
+
+    private func restoreSavedDraftIfNeeded() {
+        guard !restoredSavedDraft
+        else {
+            return
+        }
+
+        defer {
+            restoredSavedDraft = true
+        }
+
+        guard let saved =
+                CommunityEventCreationDraftStore
+                    .load(
+                        userID:
+                            session
+                                .profile
+                                .userID
+                    )
+        else {
+            return
+        }
+
+        draft = saved.draft
+        limitParticipants =
+            saved.limitParticipants
+        maxParticipants =
+            saved.maxParticipants
+        selectedRouteID =
+            saved.selectedRouteID
+        shareToCommunity =
+            saved.shareToCommunity
+        selectedCoverArtworkName =
+            saved.selectedCoverArtworkName
+        coverWasManuallySelected =
+            saved.coverWasManuallySelected
+
+        // A PhotosPicker selection cannot be reconstructed after the
+        // process has released it. Keep the rest of the draft intact and
+        // fall back to the saved standard cover until the user reselects a
+        // custom photo.
+        selectedCoverPhoto = nil
+        selectedCoverImageData = nil
+        createError = nil
+    }
+
+    private func saveDraftIfRestored() {
+        guard restoredSavedDraft
+        else {
+            return
+        }
+
+        let snapshot =
+            CommunityEventCreationDraftSnapshot(
+                draft: draft,
+                limitParticipants:
+                    limitParticipants,
+                maxParticipants:
+                    maxParticipants,
+                selectedRouteID:
+                    selectedRouteID,
+                shareToCommunity:
+                    shareToCommunity,
+                selectedCoverArtworkName:
+                    selectedCoverArtworkName,
+                coverWasManuallySelected:
+                    coverWasManuallySelected
+            )
+
+        CommunityEventCreationDraftStore
+            .save(
+                snapshot,
+                userID:
+                    session
+                        .profile
+                        .userID
+            )
+    }
+
+    private func clearSavedDraft() {
+        CommunityEventCreationDraftStore
+            .clear(
+                userID:
+                    session
+                        .profile
+                        .userID
+            )
     }
 }
 
