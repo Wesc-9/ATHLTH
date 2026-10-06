@@ -1812,9 +1812,19 @@ final class HealthKitManager: ObservableObject {
                     ? distance /
                         workout.duration
                     : .infinity
+            let prestigeElapsedSeconds =
+                workout.endDate
+                    .timeIntervalSince(
+                        workout.startDate
+                    )
             let prestigeEligible =
                 !wasUserEntered &&
                 workout.duration >= 20 * 60 &&
+                prestigeElapsedSeconds > 0 &&
+                abs(
+                    prestigeElapsedSeconds -
+                    workout.duration
+                ) <= 10 * 60 &&
                 prestigeAverageSpeed >= 0.4 &&
                 prestigeAverageSpeed <= 8.0 &&
                 !sourceBundleIdentifier
