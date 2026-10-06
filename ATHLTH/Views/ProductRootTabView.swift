@@ -1578,6 +1578,8 @@ struct ATHLTHHomeView: View {
         homeWorkoutsThisWeek.count
     }
 
+    private let homeGoalCalendarContentMinHeight: CGFloat = 90
+
     @ViewBuilder
     private var homeGoalAndCalendarRow:
         some View {
@@ -1767,7 +1769,8 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .frame(
-                    minHeight: 90
+                    minHeight:
+                        homeGoalCalendarContentMinHeight
                 )
             }
             .padding(11)
@@ -1892,7 +1895,8 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .frame(
-                    minHeight: 74
+                    minHeight:
+                        homeGoalCalendarContentMinHeight
                 )
             }
             .padding(11)
@@ -2137,7 +2141,8 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .frame(
-                    minHeight: 74,
+                    minHeight:
+                        homeGoalCalendarContentMinHeight,
                     alignment: .top
                 )
             } else {
@@ -2161,7 +2166,8 @@ struct ATHLTHHomeView: View {
                     }
                 }
                 .frame(
-                    minHeight: 74,
+                    minHeight:
+                        homeGoalCalendarContentMinHeight,
                     alignment: .center
                 )
             }
