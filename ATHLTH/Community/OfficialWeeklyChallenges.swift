@@ -5279,13 +5279,14 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
 
                 VStack(
                     alignment: .leading,
-                    spacing: 3
+                    spacing: 5
                 ) {
                     Text(challenge.title)
                         .font(
                             .system(
-                                size: 18,
-                                weight: .bold
+                                size: 20,
+                                weight: .bold,
+                                design: .rounded
                             )
                         )
                         .foregroundStyle(
@@ -5293,8 +5294,9 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                         )
                         .lineLimit(2)
                         .minimumScaleFactor(
-                            0.82
+                            0.86
                         )
+                        .lineSpacing(1)
                         .shadow(
                             color:
                                 Color.black
@@ -5319,7 +5321,7 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                         )
                         .font(
                             .system(
-                                size: 11,
+                                size: 12,
                                 weight: .semibold
                             )
                         )
@@ -5327,6 +5329,7 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                             secondaryColor
                         )
                         .lineLimit(2)
+                        .lineSpacing(1.5)
                         .shadow(
                             color:
                                 Color.black
@@ -5347,22 +5350,29 @@ private struct OfficialWeeklyChallengeEditorPreviewCard:
                     }
                 }
                 .padding(
+                    .horizontal,
                     appearance
                         .showTextBackdrop
-                        ? 7
+                        ? 10
                         : 0
                 )
+                .padding(
+                    .vertical,
+                    appearance
+                        .showTextBackdrop
+                        ? 8
+                        : 0
+                )
+                .frame(
+                    maxWidth: 300,
+                    alignment: .leading
+                )
                 .background(
-                    Color.black.opacity(
-                        appearance
-                            .showTextBackdrop
-                            ? appearance
-                                .resolvedBackdropOpacity
-                            : 0
-                    ),
+                    appearance
+                        .readableTextBackdropColor,
                     in:
                         RoundedRectangle(
-                            cornerRadius: 10,
+                            cornerRadius: 12,
                             style:
                                 .continuous
                         )
