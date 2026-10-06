@@ -585,7 +585,7 @@ struct ATHLTHCommunityV4View: View {
                 .horizontal,
                 showsIndicators: false
             ) {
-                LazyHStack(spacing: 9) {
+                LazyHStack(spacing: 14) {
                     ForEach(discoveryGroups) { group in
                         NavigationLink {
                             CommunityGroupDetailView(
