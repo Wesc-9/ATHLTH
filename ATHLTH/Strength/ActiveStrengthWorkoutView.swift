@@ -34,6 +34,8 @@ struct ActiveStrengthWorkoutView: View {
     @State private var statusCoachTask:
         Task<Void, Never>?
     @State private var didDisableIdleTimer = false
+    @State private var focusedExerciseMediaIndex = 0
+    @State private var showingExerciseInstructions = false
 
     var body: some View {
         NavigationStack {
@@ -432,6 +434,9 @@ struct ActiveStrengthWorkoutView: View {
                 guard oldValue != newValue else {
                     return
                 }
+
+                focusedExerciseMediaIndex = 0
+                showingExerciseInstructions = false
                 announceNextExerciseIfNeeded()
             }
             .onChange(
@@ -1238,13 +1243,19 @@ struct ActiveStrengthWorkoutView: View {
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
     ) -> some View {
-        VStack(spacing: 0) {
+        let mediaURLs =
+            focusedExerciseMediaURLs(
+                exercise
+            )
+
+        return VStack(spacing: 0) {
             ZStack(
                 alignment:
                     .bottomLeading
             ) {
-                focusedExerciseArtwork(
-                    exercise
+                focusedExerciseMediaCarousel(
+                    exercise,
+                    urls: mediaURLs
                 )
                 .frame(height: 205)
                 .frame(
@@ -1261,6 +1272,7 @@ struct ActiveStrengthWorkoutView: View {
                     startPoint: .center,
                     endPoint: .bottom
                 )
+                .allowsHitTesting(false)
 
                 VStack(
                     alignment: .leading,
@@ -1317,7 +1329,84 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
                 .padding(16)
+                .allowsHitTesting(false)
+
+                if mediaURLs.count > 1 {
+                    VStack {
+                        HStack {
+                            Spacer()
+
+                            Text(
+                                "\(min(focusedExerciseMediaIndex + 1, mediaURLs.count)) / \(mediaURLs.count)"
+                            )
+                            .font(
+                                .caption2
+                                    .monospacedDigit()
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(.white)
+                            .padding(
+                                .horizontal,
+                                9
+                            )
+                            .padding(
+                                .vertical,
+                                5
+                            )
+                            .background(
+                                Color.black
+                                    .opacity(0.30),
+                                in: Capsule()
+                            )
+                            .background(
+                                .ultraThinMaterial,
+                                in: Capsule()
+                            )
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 5) {
+                            Spacer()
+
+                            ForEach(
+                                mediaURLs.indices,
+                                id: \.self
+                            ) { index in
+                                Capsule()
+                                    .fill(
+                                        index ==
+                                            focusedExerciseMediaIndex
+                                            ? Color.white
+                                            : Color.white
+                                                .opacity(0.42)
+                                    )
+                                    .frame(
+                                        width:
+                                            index ==
+                                                focusedExerciseMediaIndex
+                                                ? 15
+                                                : 5,
+                                        height: 5
+                                    )
+                                    .animation(
+                                        .easeOut(
+                                            duration: 0.18
+                                        ),
+                                        value:
+                                            focusedExerciseMediaIndex
+                                    )
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .allowsHitTesting(false)
+                }
             }
+
+            focusedExerciseInstructionDisclosure(
+                exercise
+            )
 
             HStack(spacing: 0) {
                 focusedHeroMetric(
@@ -1432,14 +1521,63 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @ViewBuilder
-    private func focusedExerciseArtwork(
-        _ exercise: StrengthExerciseLog
+    private func focusedExerciseMediaCarousel(
+        _ exercise: StrengthExerciseLog,
+        urls: [URL]
     ) -> some View {
-        if let imageURL =
-                exercise.exercise
-                    .imageURL {
+        if urls.count > 1 {
+            TabView(
+                selection:
+                    $focusedExerciseMediaIndex
+            ) {
+                ForEach(
+                    Array(
+                        urls.enumerated()
+                    ),
+                    id: \.offset
+                ) { index, url in
+                    focusedExerciseArtwork(
+                        url: url,
+                        exercise: exercise
+                    )
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(
+                .page(
+                    indexDisplayMode: .never
+                )
+            )
+        } else if let url =
+                    urls.first {
+            focusedExerciseArtwork(
+                url: url,
+                exercise: exercise
+            )
+        } else {
+            focusedExerciseArtworkFallback(
+                exercise
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func focusedExerciseArtwork(
+        url: URL,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        if url.isFileURL,
+           let image =
+                UIImage(
+                    contentsOfFile:
+                        url.path
+                ) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+        } else {
             ATHLTHStorageImage(
-                url: imageURL
+                url: url
             ) { phase in
                 switch phase {
                 case .success(let image):
@@ -1471,11 +1609,526 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
-        } else {
-            focusedExerciseArtworkFallback(
-                exercise
+        }
+    }
+
+    private func focusedExerciseMediaURLs(
+        _ exercise: StrengthExerciseLog
+    ) -> [URL] {
+        var values: [URL] = []
+
+        func appendUnique(
+            _ url: URL?
+        ) {
+            guard let url,
+                  !values.contains(
+                    where: {
+                        $0.absoluteString ==
+                            url.absoluteString
+                    }
+                  )
+            else {
+                return
+            }
+
+            values.append(url)
+        }
+
+        if let entry =
+                focusedExerciseLibraryEntry(
+                    exercise
+                ) {
+            // RepDB commonly exposes start + peak frames. Keep that
+            // movement order instead of showing arbitrary alternate art.
+            appendUnique(
+                entry.imageStartURL
+            )
+            appendUnique(
+                entry.imagePeakURL
+            )
+            appendUnique(
+                entry.exercise.imageURL
             )
         }
+
+        appendUnique(
+            exercise.exercise.imageURL
+        )
+
+        return values
+    }
+
+    private func focusedExerciseLibraryEntry(
+        _ exercise: StrengthExerciseLog
+    ) -> ExerciseLibraryEntry? {
+        let snapshotName =
+            exercise.exercise.name
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .folding(
+                    options: [
+                        .diacriticInsensitive,
+                        .caseInsensitive
+                    ],
+                    locale: .current
+                )
+                .lowercased()
+
+        if let snapshotURL =
+                exercise.exercise.imageURL,
+           let exactMediaMatch =
+                exerciseLibrary
+                    .allExercises
+                    .first(
+                        where: {
+                            $0.exercise.imageURL ==
+                                snapshotURL ||
+                            $0.imageStartURL ==
+                                snapshotURL ||
+                            $0.imagePeakURL ==
+                                snapshotURL
+                        }
+                    ) {
+            return exactMediaMatch
+        }
+
+        let nameMatches =
+            exerciseLibrary
+                .allExercises
+                .filter {
+                    $0.exercise.name
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .folding(
+                            options: [
+                                .diacriticInsensitive,
+                                .caseInsensitive
+                            ],
+                            locale: .current
+                        )
+                        .lowercased() ==
+                    snapshotName
+                }
+
+        // Prefer the richer source when duplicate catalog entries exist.
+        return
+            nameMatches.first(
+                where: {
+                    $0.imagePeakURL != nil
+                }
+            ) ??
+            nameMatches.first(
+                where: {
+                    !$0.exercise
+                        .instructions
+                        .isEmpty
+                }
+            ) ??
+            nameMatches.first
+    }
+
+    private func focusedExerciseInstructionSteps(
+        _ exercise: StrengthExerciseLog
+    ) -> [String] {
+        let snapshotSteps =
+            exercise.exercise
+                .instructions
+                .map {
+                    $0.trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    )
+                }
+                .filter {
+                    !$0.isEmpty
+                }
+
+        if !snapshotSteps.isEmpty {
+            return snapshotSteps
+        }
+
+        return
+            focusedExerciseLibraryEntry(
+                exercise
+            )?
+            .exercise
+            .instructions
+            .map {
+                $0.trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+            }
+            .filter {
+                !$0.isEmpty
+            } ?? []
+    }
+
+    private func focusedExerciseSummary(
+        _ exercise: StrengthExerciseLog
+    ) -> String? {
+        let value =
+            focusedExerciseLibraryEntry(
+                exercise
+            )?
+            .summary?
+            .trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+
+        guard let value,
+              !value.isEmpty
+        else {
+            return nil
+        }
+
+        return value
+    }
+
+    private func focusedExerciseTips(
+        _ exercise: StrengthExerciseLog
+    ) -> [String] {
+        focusedExerciseLibraryEntry(
+            exercise
+        )?
+        .tips
+        .map {
+            $0.trimmingCharacters(
+                in:
+                    .whitespacesAndNewlines
+            )
+        }
+        .filter {
+            !$0.isEmpty
+        } ?? []
+    }
+
+    private func focusedExerciseInstructionDisclosure(
+        _ exercise: StrengthExerciseLog
+    ) -> some View {
+        let steps =
+            focusedExerciseInstructionSteps(
+                exercise
+            )
+        let tips =
+            focusedExerciseTips(
+                exercise
+            )
+        let summary =
+            focusedExerciseSummary(
+                exercise
+            )
+
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(
+                    .easeInOut(
+                        duration: 0.22
+                    )
+                ) {
+                    showingExerciseInstructions
+                        .toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "book.pages.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in: RoundedRectangle(
+                            cornerRadius: 10,
+                            style:
+                                .continuous
+                        )
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "How to do this exercise",
+                                norwegian:
+                                    "Slik gjør du øvelsen"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+
+                        Text(
+                            steps.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Description",
+                                    norwegian:
+                                        "Beskrivelse"
+                                )
+                                : ATHLTHLocalization.format(
+                                    english:
+                                        "%d steps",
+                                    norwegian:
+                                        "%d steg",
+                                    steps.count
+                                )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                showingExerciseInstructions
+                                    ? "Less"
+                                    : "Show",
+                            norwegian:
+                                showingExerciseInstructions
+                                    ? "Skjul"
+                                    : "Vis"
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+
+                    Image(
+                        systemName:
+                            showingExerciseInstructions
+                                ? "chevron.up"
+                                : "chevron.down"
+                    )
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .padding(
+                    .vertical,
+                    11
+                )
+            }
+            .buttonStyle(.plain)
+
+            if showingExerciseInstructions {
+                Divider()
+                    .overlay(
+                        ATHLTHTheme.divider
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    if let summary {
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .fixedSize(
+                                horizontal:
+                                    false,
+                                vertical: true
+                            )
+                    }
+
+                    if !steps.isEmpty {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 10
+                        ) {
+                            ForEach(
+                                Array(
+                                    steps.enumerated()
+                                ),
+                                id: \.offset
+                            ) { index, step in
+                                HStack(
+                                    alignment: .top,
+                                    spacing: 10
+                                ) {
+                                    Text(
+                                        "\(index + 1)"
+                                    )
+                                    .font(
+                                        .caption2
+                                            .monospacedDigit()
+                                            .weight(
+                                                .bold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+                                    .frame(
+                                        width: 24,
+                                        height: 24
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .vitalitySoft,
+                                        in: Circle()
+                                    )
+
+                                    Text(step)
+                                        .font(
+                                            .subheadline
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                        .fixedSize(
+                                            horizontal:
+                                                false,
+                                            vertical:
+                                                true
+                                        )
+                                }
+                            }
+                        }
+                    }
+
+                    if !tips.isEmpty {
+                        Divider()
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 7
+                        ) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Tips",
+                                    norwegian: "Tips"
+                                ),
+                                systemImage:
+                                    "sparkles"
+                            )
+                            .font(
+                                .caption
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme.vitality
+                            )
+
+                            ForEach(
+                                Array(
+                                    tips.enumerated()
+                                ),
+                                id: \.offset
+                            ) { _, tip in
+                                HStack(
+                                    alignment: .top,
+                                    spacing: 7
+                                ) {
+                                    Circle()
+                                        .fill(
+                                            ATHLTHTheme
+                                                .premiumGold
+                                        )
+                                        .frame(
+                                            width: 5,
+                                            height: 5
+                                        )
+                                        .padding(
+                                            .top,
+                                            6
+                                        )
+
+                                    Text(tip)
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                }
+                            }
+                        }
+                    }
+
+                    if summary == nil &&
+                        steps.isEmpty &&
+                        tips.isEmpty {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No exercise description is available yet.",
+                                norwegian:
+                                    "Det finnes ingen øvelsesbeskrivelse ennå."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .padding(
+                    .top,
+                    12
+                )
+                .padding(
+                    .bottom,
+                    14
+                )
+                .transition(
+                    .opacity.combined(
+                        with:
+                            .move(
+                                edge: .top
+                            )
+                    )
+                )
+            }
+        }
+        .background(
+            Color.white
+                .opacity(0.94)
+        )
     }
 
     private func focusedExerciseArtworkFallback(
@@ -1611,9 +2264,9 @@ struct ActiveStrengthWorkoutView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Last time · (formatWeight(suggestion.previousWeightKilograms)) kg × (suggestion.previousReps)",
+                            "Last time · \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)",
                         norwegian:
-                            "Sist · (formatWeight(suggestion.previousWeightKilograms)) kg × (suggestion.previousReps)"
+                            "Sist · \(formatWeight(suggestion.previousWeightKilograms)) kg × \(suggestion.previousReps)"
                     )
                 )
                 .font(
