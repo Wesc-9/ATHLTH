@@ -4741,7 +4741,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                     )
 
                     Label(
-                        "(item.participantCount)",
+                        "\(item.participantCount)",
                         systemImage:
                             "person.2.fill"
                     )
