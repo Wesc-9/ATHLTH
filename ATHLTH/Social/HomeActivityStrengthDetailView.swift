@@ -735,6 +735,8 @@ struct HomeActivityStrengthDetailView: View {
                         profile:
                             muscleSummary
                                 .profile,
+                        presentation:
+                            .home,
                         activationTint:
                             activationTint
                     )
