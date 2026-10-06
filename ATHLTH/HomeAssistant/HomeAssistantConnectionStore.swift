@@ -2525,6 +2525,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         endedAt: Date,
         duration: TimeInterval,
         distanceMeters: Double?,
+        activeEnergyKilocalories: Double? = nil,
+        averageHeartRateBPM: Double? = nil,
+        maxHeartRateBPM: Double? = nil,
+        routeMatchPercent: Double? = nil,
+        routeLocations: [CLLocation] = [],
         device: String = "iPhone"
     ) async {
         guard isConnected else {
@@ -2558,12 +2563,106 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 payload["distance_meters"] = .double(
                     distanceMeters
                 )
+
+                if distanceMeters >= 100,
+                   duration.isFinite,
+                   duration > 0 {
+                    payload["average_pace_seconds_per_km"] =
+                        .double(
+                            duration /
+                            (
+                                distanceMeters /
+                                1_000
+                            )
+                        )
+                }
+            }
+
+            if let activeEnergyKilocalories,
+               activeEnergyKilocalories.isFinite,
+               activeEnergyKilocalories >= 0 {
+                payload["active_energy_kcal"] =
+                    .double(
+                        activeEnergyKilocalories
+                    )
+            }
+
+            if let averageHeartRateBPM,
+               averageHeartRateBPM.isFinite {
+                payload["average_heart_rate_bpm"] =
+                    .double(
+                        min(
+                            max(
+                                averageHeartRateBPM,
+                                20
+                            ),
+                            260
+                        )
+                    )
+            }
+
+            if let maxHeartRateBPM,
+               maxHeartRateBPM.isFinite {
+                payload["max_heart_rate_bpm"] =
+                    .double(
+                        min(
+                            max(
+                                maxHeartRateBPM,
+                                20
+                            ),
+                            260
+                        )
+                    )
+            }
+
+            if let routeMatchPercent,
+               routeMatchPercent.isFinite {
+                payload["route_match_percent"] =
+                    .double(
+                        min(
+                            max(
+                                routeMatchPercent,
+                                0
+                            ),
+                            100
+                        )
+                    )
             }
 
             await sendReliably(
                 event: "workout_finished",
                 payload: payload
             )
+
+            if shareWorkoutRouteMap,
+               routeLocations.count >= 2,
+               storedPairing?
+                    .capabilities
+                    .contains(
+                        "workout_route_map"
+                    ) == true {
+                await sendCompletedWorkoutRouteMap(
+                    name: name,
+                    type: type,
+                    startedAt: startedAt,
+                    endedAt: endedAt,
+                    duration: duration,
+                    distanceMeters:
+                        distanceMeters,
+                    activeEnergyKilocalories:
+                        activeEnergyKilocalories,
+                    averageHeartRateBPM:
+                        averageHeartRateBPM,
+                    maxHeartRateBPM:
+                        maxHeartRateBPM,
+                    routeMatchPercent:
+                        routeMatchPercent,
+                    routeLocations:
+                        routeLocations,
+                    device: device
+                )
+            }
+
             return
         }
 
@@ -2578,6 +2677,479 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 ]
             )
         }
+    }
+
+    private func sendCompletedWorkoutRouteMap(
+        name: String,
+        type: String,
+        startedAt: Date,
+        endedAt: Date,
+        duration: TimeInterval,
+        distanceMeters: Double?,
+        activeEnergyKilocalories: Double?,
+        averageHeartRateBPM: Double?,
+        maxHeartRateBPM: Double?,
+        routeMatchPercent: Double?,
+        routeLocations: [CLLocation],
+        device: String
+    ) async {
+        let cleaned =
+            routeLocations
+                .filter {
+                    CLLocationCoordinate2DIsValid(
+                        $0.coordinate
+                    ) &&
+                    $0.horizontalAccuracy >= 0 &&
+                    $0.horizontalAccuracy <= 150
+                }
+                .sorted {
+                    $0.timestamp <
+                    $1.timestamp
+                }
+
+        guard cleaned.count >= 2
+        else {
+            return
+        }
+
+        let sampled =
+            Self.downsampleRoute(
+                cleaned,
+                maximumCount: 64
+            )
+        let routePoints =
+            sampled.map {
+                HomeAssistantJSONValue.array([
+                    .double(
+                        $0.coordinate.latitude
+                    ),
+                    .double(
+                        $0.coordinate.longitude
+                    )
+                ])
+            }
+
+        var payload:
+            [String: HomeAssistantJSONValue] = [
+                "name":
+                    .string(
+                        Self.sanitizedText(name) ??
+                        "Workout"
+                    ),
+                "type":
+                    .string(
+                        Self.sanitizedText(type) ??
+                        "workout"
+                    ),
+                "started_at":
+                    .string(
+                        Self.iso8601(startedAt)
+                    ),
+                "ended_at":
+                    .string(
+                        Self.iso8601(endedAt)
+                    ),
+                "duration_seconds":
+                    .double(
+                        max(duration, 0)
+                    ),
+                "device":
+                    .string(device),
+                "route_points":
+                    .array(routePoints),
+                "route_point_count":
+                    .int(cleaned.count),
+                "elevation_gain_meters":
+                    .double(
+                        Self.elevationGain(
+                            cleaned
+                        )
+                    )
+            ]
+
+        if let distanceMeters,
+           distanceMeters.isFinite,
+           distanceMeters >= 0 {
+            payload["distance_meters"] =
+                .double(
+                    distanceMeters
+                )
+
+            if distanceMeters >= 100,
+               duration.isFinite,
+               duration > 0 {
+                payload["average_pace_seconds_per_km"] =
+                    .double(
+                        duration /
+                        (
+                            distanceMeters /
+                            1_000
+                        )
+                    )
+            }
+        }
+
+        if let activeEnergyKilocalories,
+           activeEnergyKilocalories.isFinite,
+           activeEnergyKilocalories >= 0 {
+            payload["active_energy_kcal"] =
+                .double(
+                    activeEnergyKilocalories
+                )
+        }
+
+        if let averageHeartRateBPM,
+           averageHeartRateBPM.isFinite {
+            payload["average_heart_rate_bpm"] =
+                .double(
+                    averageHeartRateBPM
+                )
+        }
+
+        if let maxHeartRateBPM,
+           maxHeartRateBPM.isFinite {
+            payload["max_heart_rate_bpm"] =
+                .double(
+                    maxHeartRateBPM
+                )
+        }
+
+        if let routeMatchPercent,
+           routeMatchPercent.isFinite {
+            payload["route_match_percent"] =
+                .double(
+                    min(
+                        max(
+                            routeMatchPercent,
+                            0
+                        ),
+                        100
+                    )
+                )
+        }
+
+        if let mapData =
+                await Self.routeMapJPEG(
+                    locations: sampled
+                ) {
+            payload["map_mime_type"] =
+                .string("image/jpeg")
+            payload["map_image_base64"] =
+                .string(
+                    mapData
+                        .base64EncodedString()
+                )
+        }
+
+        try? await send(
+            event: "workout_route_map",
+            payload: payload
+        )
+    }
+
+    private static func downsampleRoute(
+        _ locations: [CLLocation],
+        maximumCount: Int
+    ) -> [CLLocation] {
+        guard locations.count >
+                maximumCount,
+              maximumCount >= 2
+        else {
+            return locations
+        }
+
+        let lastIndex =
+            locations.count - 1
+
+        return (0..<maximumCount)
+            .map { index in
+                let progress =
+                    Double(index) /
+                    Double(
+                        maximumCount - 1
+                    )
+                let sourceIndex =
+                    min(
+                        Int(
+                            (
+                                progress *
+                                Double(lastIndex)
+                            )
+                            .rounded()
+                        ),
+                        lastIndex
+                    )
+                return locations[
+                    sourceIndex
+                ]
+            }
+    }
+
+    private static func elevationGain(
+        _ locations: [CLLocation]
+    ) -> Double {
+        guard locations.count >= 2
+        else {
+            return 0
+        }
+
+        var gain = 0.0
+
+        for index in
+            1..<locations.count {
+            let previous =
+                locations[index - 1]
+            let current =
+                locations[index]
+
+            guard previous.verticalAccuracy >= 0,
+                  current.verticalAccuracy >= 0
+            else {
+                continue
+            }
+
+            let delta =
+                current.altitude -
+                previous.altitude
+
+            if delta > 0,
+               delta < 80 {
+                gain += delta
+            }
+        }
+
+        return gain
+    }
+
+    private static func routeMapJPEG(
+        locations: [CLLocation]
+    ) async -> Data? {
+        guard locations.count >= 2
+        else {
+            return nil
+        }
+
+        let coordinates =
+            locations.map(
+                \.coordinate
+            )
+        let latitudes =
+            coordinates.map(
+                \.latitude
+            )
+        let longitudes =
+            coordinates.map(
+                \.longitude
+            )
+
+        guard let minLatitude =
+                latitudes.min(),
+              let maxLatitude =
+                latitudes.max(),
+              let minLongitude =
+                longitudes.min(),
+              let maxLongitude =
+                longitudes.max()
+        else {
+            return nil
+        }
+
+        let center =
+            CLLocationCoordinate2D(
+                latitude:
+                    (
+                        minLatitude +
+                        maxLatitude
+                    ) / 2,
+                longitude:
+                    (
+                        minLongitude +
+                        maxLongitude
+                    ) / 2
+            )
+        let options =
+            MKMapSnapshotter.Options()
+        options.size =
+            CGSize(
+                width: 520,
+                height: 320
+            )
+        options.scale = 1
+        options.mapType = .standard
+        options.showsBuildings = false
+        options.pointOfInterestFilter =
+            .excludingAll
+        options.region =
+            MKCoordinateRegion(
+                center: center,
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta:
+                            max(
+                                (
+                                    maxLatitude -
+                                    minLatitude
+                                ) * 1.32,
+                                0.002
+                            ),
+                        longitudeDelta:
+                            max(
+                                (
+                                    maxLongitude -
+                                    minLongitude
+                                ) * 1.32,
+                                0.002
+                            )
+                    )
+            )
+
+        let snapshot:
+            MKMapSnapshotter.Snapshot
+
+        do {
+            snapshot =
+                try await withCheckedThrowingContinuation {
+                    continuation in
+                    MKMapSnapshotter(
+                        options: options
+                    )
+                    .start {
+                        snapshot,
+                        error in
+
+                        if let snapshot {
+                            continuation
+                                .resume(
+                                    returning:
+                                        snapshot
+                                )
+                        } else {
+                            continuation
+                                .resume(
+                                    throwing:
+                                        error ??
+                                        HomeAssistantConnectionError
+                                            .routeMapFailed
+                                )
+                        }
+                    }
+                }
+        } catch {
+            return nil
+        }
+
+        let renderer =
+            UIGraphicsImageRenderer(
+                size: options.size
+            )
+        let image =
+            renderer.image {
+                context in
+                snapshot.image.draw(
+                    at: .zero
+                )
+
+                let path =
+                    UIBezierPath()
+                for (
+                    index,
+                    coordinate
+                ) in coordinates.enumerated() {
+                    let point =
+                        snapshot.point(
+                            for: coordinate
+                        )
+
+                    if index == 0 {
+                        path.move(
+                            to: point
+                        )
+                    } else {
+                        path.addLine(
+                            to: point
+                        )
+                    }
+                }
+
+                context.cgContext
+                    .setLineCap(.round)
+                context.cgContext
+                    .setLineJoin(.round)
+
+                UIColor.white
+                    .withAlphaComponent(
+                        0.92
+                    )
+                    .setStroke()
+                path.lineWidth = 8
+                path.stroke()
+
+                UIColor(
+                    red: 0.10,
+                    green: 0.48,
+                    blue: 0.33,
+                    alpha: 1
+                )
+                .setStroke()
+                path.lineWidth = 5
+                path.stroke()
+
+                if let start =
+                        coordinates.first {
+                    let point =
+                        snapshot.point(
+                            for: start
+                        )
+                    UIColor(
+                        red: 0.10,
+                        green: 0.48,
+                        blue: 0.33,
+                        alpha: 1
+                    )
+                    .setFill()
+                    UIBezierPath(
+                        ovalIn:
+                            CGRect(
+                                x:
+                                    point.x - 7,
+                                y:
+                                    point.y - 7,
+                                width: 14,
+                                height: 14
+                            )
+                    )
+                    .fill()
+                }
+
+                if let finish =
+                        coordinates.last {
+                    let point =
+                        snapshot.point(
+                            for: finish
+                        )
+                    UIColor.black
+                        .withAlphaComponent(
+                            0.82
+                        )
+                        .setFill()
+                    UIBezierPath(
+                        ovalIn:
+                            CGRect(
+                                x:
+                                    point.x - 7,
+                                y:
+                                    point.y - 7,
+                                width: 14,
+                                height: 14
+                            )
+                    )
+                    .fill()
+                }
+            }
+
+        return image.jpegData(
+            compressionQuality: 0.58
+        )
     }
 
     func sendRecovery(score: Int?) async {
@@ -4379,6 +4951,7 @@ private enum HomeAssistantConnectionError: LocalizedError {
     case secureStorageFailed
     case webhookUnavailable
     case webhookRejected
+    case routeMapFailed
 
     var errorDescription: String? {
         switch self {
@@ -4467,6 +5040,11 @@ private enum HomeAssistantConnectionError: LocalizedError {
                     "Home Assistant is temporarily unavailable. ATHLTH will retry important updates.",
                 norwegian:
                     "Home Assistant er midlertidig utilgjengelig. ATHLTH prøver viktige oppdateringer på nytt."
+            )
+        case .routeMapFailed:
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH could not create the workout route map.",
+                norwegian: "ATHLTH kunne ikke lage kartet for treningsruten."
             )
         case .webhookRejected:
             return ATHLTHLocalization.choose(
