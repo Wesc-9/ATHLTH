@@ -192,6 +192,55 @@ enum CommunityEventAttendance: String, Codable, Hashable {
     case maybe
 }
 
+enum CommunityEventLifecycleStatus:
+    String,
+    Codable,
+    Hashable
+{
+    case upcoming
+    case live
+    case completed
+    case cancelled
+
+    var title: String {
+        switch self {
+        case .upcoming:
+            return ATHLTHLocalization.choose(
+                english: "Planned",
+                norwegian: "Planlagt"
+            )
+        case .live:
+            return ATHLTHLocalization.choose(
+                english: "Started",
+                norwegian: "Startet"
+            )
+        case .completed:
+            return ATHLTHLocalization.choose(
+                english: "Completed",
+                norwegian: "Fullført"
+            )
+        case .cancelled:
+            return ATHLTHLocalization.choose(
+                english: "Cancelled",
+                norwegian: "Avlyst"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .upcoming:
+            return "calendar"
+        case .live:
+            return "play.circle.fill"
+        case .completed:
+            return "checkmark.seal.fill"
+        case .cancelled:
+            return "xmark.circle.fill"
+        }
+    }
+}
+
 enum CommunityEventCheckInMethod:
     String,
     Codable,
@@ -530,6 +579,18 @@ private struct CommunityParticipantWrite: Encodable {
         case eventID = "event_id"
         case userID = "user_id"
         case attendanceStatus = "attendance_status"
+    }
+}
+
+private struct CommunityEventLifecycleParams:
+    Encodable
+{
+    let eventID: UUID
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "p_event_id"
+        case status = "p_status"
     }
 }
 
@@ -1109,15 +1170,27 @@ final class SupabaseCommunityService {
             .execute()
     }
 
-    func cancel(eventID: UUID) async throws {
+    func setLifecycle(
+        eventID: UUID,
+        status: CommunityEventLifecycleStatus
+    ) async throws {
         try await client
-            .from("community_events")
-            .update([
-                "status": "cancelled",
-                "updated_at": ISO8601DateFormatter().string(from: Date())
-            ])
-            .eq("id", value: eventID)
+            .rpc(
+                "community_event_set_lifecycle",
+                params:
+                    CommunityEventLifecycleParams(
+                        eventID: eventID,
+                        status: status.rawValue
+                    )
+            )
             .execute()
+    }
+
+    func cancel(eventID: UUID) async throws {
+        try await setLifecycle(
+            eventID: eventID,
+            status: .cancelled
+        )
     }
 }
 
@@ -1159,10 +1232,19 @@ final class CommunityEventStore: ObservableObject {
     var upcomingEvents: [CommunityEventItem] {
         events
             .filter {
-                $0.event.status == "upcoming" &&
-                $0.event.startsAt >= Date()
+                $0.event.status == "upcoming" ||
+                $0.event.status == "live"
             }
-            .sorted { $0.event.startsAt < $1.event.startsAt }
+            .sorted { lhs, rhs in
+                if lhs.event.status !=
+                    rhs.event.status {
+                    return lhs.event.status ==
+                        "live"
+                }
+
+                return lhs.event.startsAt <
+                    rhs.event.startsAt
+            }
     }
 
     func refresh(force: Bool = false) async {
@@ -1373,13 +1455,29 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
-    func cancel(_ item: CommunityEventItem) async {
+    func setLifecycle(
+        _ item: CommunityEventItem,
+        status: CommunityEventLifecycleStatus
+    ) async -> Bool {
         do {
-            try await service.cancel(eventID: item.id)
+            try await service.setLifecycle(
+                eventID: item.id,
+                status: status
+            )
             await refresh(force: true)
+            return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
+            return false
         }
+    }
+
+    func cancel(_ item: CommunityEventItem) async {
+        _ = await setLifecycle(
+            item,
+            status: .cancelled
+        )
     }
 
     func item(id: UUID) -> CommunityEventItem? {
@@ -1477,11 +1575,14 @@ struct CommunityEventsView: View {
     private var history: [CommunityEventItem] {
         community.events
             .filter {
-                $0.event.status != "upcoming" ||
-                $0.event.startsAt < Date()
+                $0.event.status ==
+                    "completed" ||
+                $0.event.status ==
+                    "cancelled"
             }
             .sorted {
-                $0.event.startsAt > $1.event.startsAt
+                $0.event.startsAt >
+                    $1.event.startsAt
             }
     }
 
@@ -1677,14 +1778,24 @@ struct CommunityEventDetailView: View {
             if let item = community.item(id: eventID) {
                 VStack(alignment: .leading, spacing: 16) {
                     eventHero(item)
+                    CommunityEventSocialSection(
+                        item: item
+                    )
                     eventDetails(item)
                     checkInCard(item)
                     participants(item)
 
                     if item.event.creatorID ==
+                        session.profile.userID {
+                        adminLifecycleCard(item)
+                    }
+
+                    if item.event.creatorID ==
                         session.profile.userID &&
                         item.event.status !=
-                        "cancelled" {
+                        "cancelled" &&
+                        item.event.status !=
+                        "completed" {
                         cancelEventButton(item)
                     }
                 }
@@ -1788,13 +1899,28 @@ struct CommunityEventDetailView: View {
                     )
                 )
 
-            Label(
-                item.event.activityType.title.uppercased(),
-                systemImage: item.event.activityType.systemImage
-            )
-            .font(.caption2.weight(.bold))
-            .tracking(1.1)
-            .foregroundStyle(ATHLTHTheme.vitality)
+            HStack(spacing: 10) {
+                Label(
+                    item.event.activityType
+                        .title.uppercased(),
+                    systemImage:
+                        item.event.activityType
+                            .systemImage
+                )
+                .font(
+                    .caption2.weight(.bold)
+                )
+                .tracking(1.1)
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+
+                Spacer()
+
+                eventLifecycleBadge(
+                    item.event.status
+                )
+            }
 
             Text(item.event.title)
                 .font(.largeTitle.weight(.bold))
@@ -3000,6 +3126,227 @@ struct CommunityEventDetailView: View {
                     item.participantCount
                 )
             )
+        }
+    }
+
+
+    @ViewBuilder
+    private func adminLifecycleCard(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let lifecycle =
+            CommunityEventLifecycleStatus(
+                rawValue: item.event.status
+            ) ?? .upcoming
+
+        ATHLTHCard {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Event control",
+                                norwegian:
+                                    "Styring av arrangement"
+                            )
+                    )
+                    .font(.headline)
+
+                    Text(
+                        lifecycle.title
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        lifecycle.systemImage
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    lifecycleTint(
+                        lifecycle
+                    )
+                )
+            }
+
+            switch lifecycle {
+            case .upcoming:
+                Button {
+                    Task {
+                        _ = await community
+                            .setLifecycle(
+                                item,
+                                status: .live
+                            )
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Start event now",
+                                norwegian:
+                                    "Start arrangement nå"
+                            ),
+                        systemImage:
+                            "play.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .padding(.top, 8)
+
+            case .live:
+                Button {
+                    Task {
+                        _ = await community
+                            .setLifecycle(
+                                item,
+                                status:
+                                    .completed
+                            )
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Mark as completed",
+                                norwegian:
+                                    "Marker som fullført"
+                            ),
+                        systemImage:
+                            "checkmark.seal.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .padding(.top, 8)
+
+            case .completed:
+                Label(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "This event is completed.",
+                            norwegian:
+                                "Arrangementet er fullført."
+                        ),
+                    systemImage:
+                        "checkmark.seal.fill"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+                .padding(.top, 8)
+
+            case .cancelled:
+                Label(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "This event is cancelled.",
+                            norwegian:
+                                "Arrangementet er avlyst."
+                        ),
+                    systemImage:
+                        "xmark.circle.fill"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+                .foregroundStyle(.red)
+                .padding(.top, 8)
+            }
+        }
+    }
+
+    private func eventLifecycleBadge(
+        _ rawStatus: String
+    ) -> some View {
+        let lifecycle =
+            CommunityEventLifecycleStatus(
+                rawValue: rawStatus
+            ) ?? .upcoming
+
+        return Label(
+            lifecycle.title,
+            systemImage:
+                lifecycle.systemImage
+        )
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(
+            lifecycleTint(lifecycle)
+        )
+        .padding(
+            .horizontal,
+            9
+        )
+        .padding(
+            .vertical,
+            5
+        )
+        .background(
+            lifecycleTint(
+                lifecycle
+            )
+            .opacity(0.11),
+            in: Capsule()
+        )
+    }
+
+    private func lifecycleTint(
+        _ lifecycle:
+            CommunityEventLifecycleStatus
+    ) -> Color {
+        switch lifecycle {
+        case .upcoming:
+            return ATHLTHTheme.vitality
+        case .live:
+            return .green
+        case .completed:
+            return .indigo
+        case .cancelled:
+            return .red
         }
     }
 
