@@ -10954,7 +10954,7 @@ struct ATHLTHProfileView: View {
                                 )
                                 .font(
                                     .system(
-                                        size: 27,
+                                        size: 24,
                                         weight: .bold,
                                         design: .rounded
                                     )
