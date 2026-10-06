@@ -34,6 +34,11 @@ struct EmailAuthView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(OnboardingBackground().ignoresSafeArea())
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !confirmationSent {
+                    persistentSubmitBar
+                }
+            }
             .foregroundStyle(OnboardingTheme.primaryText)
             .preferredColorScheme(.light)
             .navigationTitle("Email")
@@ -186,23 +191,6 @@ struct EmailAuthView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Button {
-                submit()
-            } label: {
-                HStack {
-                    if isSubmitting {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text(mode == .signIn ? "Sign In" : "Create Account")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(OnboardingPrimaryButtonStyle())
-            .disabled(isSubmitting)
-            .opacity(isSubmitting ? 0.65 : 1)
-
             if mode == .signIn {
                 Button("Forgot password?") {
                     showingReset = true
@@ -211,6 +199,100 @@ struct EmailAuthView: View {
                 .disabled(isSubmitting)
             }
         }
+    }
+
+    private var persistentSubmitBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .opacity(0.28)
+
+            Button {
+                submit()
+            } label: {
+                HStack(spacing: 9) {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(
+                            systemName:
+                                mode == .signIn
+                                    ? "arrow.right.circle.fill"
+                                    : "person.crop.circle.badge.plus"
+                        )
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: .semibold
+                            )
+                        )
+                    }
+
+                    Text(
+                        isSubmitting
+                            ? (mode == .signIn
+                                ? "Signing In…"
+                                : "Creating Account…")
+                            : (mode == .signIn
+                                ? "Sign In"
+                                : "Create Account")
+                    )
+                    .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(
+                OnboardingPrimaryButtonStyle()
+            )
+            .disabled(
+                isSubmitting ||
+                !submitRequirementsMet
+            )
+            .opacity(
+                isSubmitting ||
+                !submitRequirementsMet
+                    ? 0.48
+                    : 1
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+        }
+        .background(.ultraThinMaterial)
+    }
+
+    private var submitRequirementsMet: Bool {
+        let cleanEmail =
+            email
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        guard
+            cleanEmail.contains("@"),
+            cleanEmail.contains("."),
+            !password.isEmpty
+        else {
+            return false
+        }
+
+        guard mode == .createAccount else {
+            return true
+        }
+
+        return !firstName
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+            !lastName
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .isEmpty &&
+            password.count >= 12 &&
+            password == confirmPassword &&
+            acceptedLegal
     }
 
     private var firstNameField: some View {
