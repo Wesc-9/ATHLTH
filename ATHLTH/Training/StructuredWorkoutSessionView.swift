@@ -58,6 +58,7 @@ enum StructuredWorkoutCompletionStore {
 
 struct StructuredWorkoutSessionView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
 
     let workout: PlannedSession
@@ -138,6 +139,24 @@ struct StructuredWorkoutSessionView: View {
             }
             .onAppear {
                 startedAt = Date()
+                updateScreenAwakeState()
+            }
+            .onDisappear {
+                ATHLTHWorkoutScreenAwake.set(
+                    false,
+                    reason:
+                        "iphone-structured-workout"
+                )
+            }
+            .onChange(
+                of: scenePhase
+            ) { _, _ in
+                updateScreenAwakeState()
+            }
+            .onChange(
+                of: savedCompletion
+            ) { _, _ in
+                updateScreenAwakeState()
             }
         }
     }
@@ -507,6 +526,16 @@ struct StructuredWorkoutSessionView: View {
         } else {
             showingFinishConfirmation = true
         }
+    }
+
+    @MainActor
+    private func updateScreenAwakeState() {
+        ATHLTHWorkoutScreenAwake.set(
+            !savedCompletion &&
+                scenePhase == .active,
+            reason:
+                "iphone-structured-workout"
+        )
     }
 
     private func finishWorkout() {
