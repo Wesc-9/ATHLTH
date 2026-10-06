@@ -3240,6 +3240,31 @@ final class StrengthWorkoutStore: ObservableObject {
         }
     }
 
+    func removeWorkoutFromHistory(
+        matching workoutIDs: Set<UUID>
+    ) {
+        guard !workoutIDs.isEmpty else {
+            return
+        }
+
+        workoutHistory.removeAll { workout in
+            workoutIDs.contains(workout.id) ||
+            workout.healthMetrics
+                .healthKitWorkoutUUID
+                .map(workoutIDs.contains) == true
+        }
+
+        if let completedWorkout,
+           workoutIDs.contains(completedWorkout.id) ||
+            completedWorkout.healthMetrics
+                .healthKitWorkoutUUID
+                .map(workoutIDs.contains) == true {
+            self.completedWorkout = nil
+        }
+
+        persistWorkoutHistory()
+    }
+
     private func upsertWorkoutHistory(_ workout: StrengthWorkoutLog) {
         if let index = workoutHistory.firstIndex(where: { $0.id == workout.id }) {
             workoutHistory[index] = workout
