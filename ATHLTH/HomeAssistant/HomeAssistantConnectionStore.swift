@@ -1355,8 +1355,21 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 try? JSONDecoder().decode(
                     HomeAssistantWebhookResponse.self,
                     from: data
-                ),
-              let commands = response.commands,
+                )
+        else {
+            return
+        }
+
+        if let capabilities =
+                response.capabilities,
+           !capabilities.isEmpty {
+            refreshStoredCapabilities(
+                capabilities
+            )
+        }
+
+        guard let commands =
+                response.commands,
               !commands.isEmpty
         else {
             return
@@ -1426,6 +1439,62 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 "ids": .array(ids)
             ]
         )
+    }
+
+    private func refreshStoredCapabilities(
+        _ capabilities: [String]
+    ) {
+        guard let pairing = storedPairing
+        else {
+            return
+        }
+
+        let normalized =
+            Array(
+                Set(capabilities)
+            )
+            .sorted()
+
+        guard normalized !=
+                pairing.capabilities
+        else {
+            return
+        }
+
+        let updated =
+            HomeAssistantStoredPairing(
+                instanceName:
+                    pairing.instanceName,
+                instanceURL:
+                    pairing.instanceURL,
+                alternateURL:
+                    pairing.alternateURL,
+                protocolVersion:
+                    pairing.protocolVersion,
+                clientID:
+                    pairing.clientID,
+                webhookID:
+                    pairing.webhookID,
+                webhookURL:
+                    pairing.webhookURL,
+                webhookPath:
+                    pairing.webhookPath,
+                sharedSecret:
+                    pairing.sharedSecret,
+                signatureAlgorithm:
+                    pairing.signatureAlgorithm,
+                capabilities:
+                    normalized,
+                pairedAt:
+                    pairing.pairedAt
+            )
+
+        guard (try? storePairing(updated)) != nil
+        else {
+            return
+        }
+
+        storedPairing = updated
     }
 
     private func scheduleLocalNotification(
