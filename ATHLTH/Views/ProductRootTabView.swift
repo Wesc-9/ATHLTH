@@ -675,7 +675,9 @@ struct ATHLTHHomeView: View {
 
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,
-                        workouts: health.workouts
+                        workouts: health.workouts,
+                        events:
+                            homeWeeklyCommunityEvents
                     )
 
                     homeGoalAndCalendarRow
@@ -1954,6 +1956,13 @@ struct ATHLTHHomeView: View {
                     in: $0
                 )
             } ?? []
+        let events =
+            homeTodayCommunityEvents
+        let remainingEventSlots =
+            max(
+                2 - workouts.count,
+                0
+            )
 
         return VStack(
             alignment: .leading,
@@ -2008,26 +2017,27 @@ struct ATHLTHHomeView: View {
             }
             .buttonStyle(.plain)
 
-            if let plan,
-               !workouts.isEmpty {
+            if !workouts.isEmpty ||
+                !events.isEmpty {
                 VStack(spacing: 7) {
-                    ForEach(
-                        Array(
-                            workouts
-                                .prefix(2)
-                        )
-                    ) { workout in
-                        Button {
-                            onOpenTrain(
-                                .workout(
-                                    planID:
-                                        plan.id,
-                                    workoutID:
-                                        workout
-                                            .id
-                                )
+                    if let plan {
+                        ForEach(
+                            Array(
+                                workouts
+                                    .prefix(2)
                             )
-                        } label: {
+                        ) { workout in
+                            Button {
+                                onOpenTrain(
+                                    .workout(
+                                        planID:
+                                            plan.id,
+                                        workoutID:
+                                            workout
+                                                .id
+                                    )
+                                )
+                            } label: {
                             HStack(
                                 spacing: 7
                             ) {
@@ -2129,6 +2139,153 @@ struct ATHLTHHomeView: View {
                                         homeSessionSummary(
                                             workout
                                         )
+                                    )
+                                    .font(
+                                        .system(
+                                            size:
+                                                8.5
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                    .lineLimit(
+                                        1
+                                    )
+                                }
+
+                                Spacer(
+                                    minLength:
+                                        0
+                                )
+                            }
+                            }
+                            .buttonStyle(
+                                .plain
+                            )
+                        }
+                    }
+
+                    ForEach(
+                        Array(
+                            events
+                                .prefix(
+                                    remainingEventSlots
+                                )
+                        )
+                    ) { event in
+                        NavigationLink {
+                            CommunityEventDetailView(
+                                eventID:
+                                    event.id
+                            )
+                        } label: {
+                            HStack(
+                                spacing: 7
+                            ) {
+                                Text(
+                                    event.event
+                                        .startsAt
+                                        .formatted(
+                                            date:
+                                                .omitted,
+                                            time:
+                                                .shortened
+                                        )
+                                )
+                                .font(
+                                    .system(
+                                        size:
+                                            9.5,
+                                        weight:
+                                            .medium
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                                .frame(
+                                    width: 34,
+                                    alignment:
+                                        .leading
+                                )
+
+                                Image(
+                                    systemName:
+                                        event.event
+                                            .activityType
+                                            .systemImage
+                                )
+                                .font(
+                                    .system(
+                                        size: 11,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .recoveryBlue
+                                )
+                                .frame(
+                                    width: 27,
+                                    height: 27
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .recoveryBlue
+                                        .opacity(
+                                            0.10
+                                        ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                9,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 1
+                                ) {
+                                    Text(
+                                        event.event
+                                            .title
+                                    )
+                                    .font(
+                                        .system(
+                                            size:
+                                                10.5,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(
+                                        1
+                                    )
+
+                                    Text(
+                                        event.event
+                                            .meetingName
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
+                                            )
+                                            .isEmpty
+                                            ? event.event
+                                                .activityType
+                                                .title
+                                            : event.event
+                                                .meetingName
                                     )
                                     .font(
                                         .system(
@@ -2269,6 +2426,64 @@ struct ATHLTHHomeView: View {
         .accessibilityLabel(
             "Start quick \(title)"
         )
+    }
+
+    private var homeUserCommunityEvents:
+        [CommunityEventItem] {
+        community.events.filter {
+            item in
+
+            guard item.event.status ==
+                    "upcoming"
+            else {
+                return false
+            }
+
+            return item.event.creatorID ==
+                    session.profile.userID ||
+                item.participantRows.contains {
+                    $0.userID ==
+                        session.profile.userID &&
+                    (
+                        $0.attendanceStatus ==
+                            .going ||
+                        $0.attendanceStatus ==
+                            .maybe
+                    )
+                }
+        }
+    }
+
+    private var homeTodayCommunityEvents:
+        [CommunityEventItem] {
+        let calendar =
+            Calendar.current
+
+        return homeUserCommunityEvents
+            .filter {
+                calendar.isDateInToday(
+                    $0.event.startsAt
+                )
+            }
+            .sorted {
+                $0.event.startsAt <
+                    $1.event.startsAt
+            }
+    }
+
+    private var homeWeeklyCommunityEvents:
+        [CommunityEventItem] {
+        homeUserCommunityEvents
+            .filter {
+                homeWeekInterval
+                    .contains(
+                        $0.event.startsAt
+                    )
+            }
+            .sorted {
+                $0.event.startsAt <
+                    $1.event.startsAt
+            }
     }
 
     private var homeActiveGoal: ATHLTHGoal? {
