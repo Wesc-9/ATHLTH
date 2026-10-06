@@ -1451,13 +1451,14 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
 
                 VStack(
                     alignment: .leading,
-                    spacing: 3
+                    spacing: 5
                 ) {
                     Text(challenge.title)
                         .font(
                             .system(
-                                size: 18,
-                                weight: .bold
+                                size: 20,
+                                weight: .bold,
+                                design: .rounded
                             )
                         )
                         .foregroundStyle(
@@ -1465,8 +1466,9 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                         .lineLimit(2)
                         .minimumScaleFactor(
-                            0.82
+                            0.86
                         )
+                        .lineSpacing(1)
                         .shadow(
                             color:
                                 Color.black
@@ -1491,7 +1493,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                         .font(
                             .system(
-                                size: 11,
+                                size: 12,
                                 weight: .semibold
                             )
                         )
@@ -1499,6 +1501,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                             secondaryColor
                         )
                         .lineLimit(2)
+                        .lineSpacing(1.5)
                         .truncationMode(
                             .tail
                         )
@@ -1525,30 +1528,25 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .horizontal,
                     appearance
                         .showTextBackdrop
-                        ? 8
+                        ? 10
                         : 0
                 )
                 .padding(
                     .vertical,
                     appearance
                         .showTextBackdrop
-                        ? 6
+                        ? 8
                         : 0
                 )
                 .frame(
-                    maxWidth: 276,
+                    maxWidth: 300,
                     alignment: .leading
                 )
                 .background(
-                    Color.black.opacity(
-                        appearance
-                            .showTextBackdrop
-                            ? appearance
-                                .resolvedBackdropOpacity
-                            : 0
-                    ),
+                    appearance
+                        .readableTextBackdropColor,
                     in: RoundedRectangle(
-                        cornerRadius: 10,
+                        cornerRadius: 12,
                         style: .continuous
                     )
                 )
@@ -1598,7 +1596,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                                         )
                                 )
                                 .foregroundStyle(
-                                    secondaryColor
+                                    .white
                                 )
                                 .frame(
                                     width: 30,
@@ -1665,11 +1663,11 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                                 .weight(.bold)
                         )
                         .foregroundStyle(
-                            secondaryColor
+                            .white
                         )
                         .padding(
                             .horizontal,
-                            7
+                            8
                         )
                         .padding(
                             .vertical,
@@ -1677,20 +1675,12 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                         .background(
                             Color.black.opacity(
-                                appearance
-                                    .showTextBackdrop
-                                    ? max(
-                                        appearance
-                                            .resolvedBackdropOpacity -
-                                            0.02,
-                                        0
-                                    )
-                                    : 0
+                                0.34
                             ),
                             in:
                                 RoundedRectangle(
                                     cornerRadius:
-                                        8,
+                                        9,
                                     style:
                                         .continuous
                                 )
