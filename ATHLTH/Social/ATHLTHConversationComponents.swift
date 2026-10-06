@@ -35,21 +35,21 @@ struct ATHLTHConversationHero<
                 .scaledToFill()
                 // GoalMountain has a small baked presentation margin.
                 // Crop into it so the chat hero is always full-bleed.
-                .scaleEffect(1.16)
+                .scaleEffect(1.14)
                 .frame(
                     maxWidth: .infinity
                 )
-                .frame(height: 222)
+                .frame(height: 214)
                 .clipped()
 
             LinearGradient(
                 colors: [
                     Color.black
-                        .opacity(0.18),
+                        .opacity(0.34),
                     Color.black
-                        .opacity(0.02),
+                        .opacity(0.06),
                     Color.black
-                        .opacity(0.30)
+                        .opacity(0.18)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -77,6 +77,10 @@ struct ATHLTHConversationHero<
                         height: 42
                     )
                     .background(
+                        Color.black
+                            .opacity(0.16)
+                    )
+                    .background(
                         .ultraThinMaterial,
                         in: Circle()
                     )
@@ -84,7 +88,7 @@ struct ATHLTHConversationHero<
                         Circle()
                             .stroke(
                                 Color.white
-                                    .opacity(0.30),
+                                    .opacity(0.34),
                                 lineWidth: 0.8
                             )
                     }
@@ -96,6 +100,13 @@ struct ATHLTHConversationHero<
                         width: 44,
                         height: 44
                     )
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(0.12),
+                        radius: 7,
+                        y: 3
+                    )
 
                 VStack(
                     alignment: .leading,
@@ -103,7 +114,7 @@ struct ATHLTHConversationHero<
                 ) {
                     Text(title)
                         .font(
-                            .headline
+                            .title3
                                 .weight(.bold)
                         )
                         .foregroundStyle(
@@ -115,13 +126,25 @@ struct ATHLTHConversationHero<
                         )
 
                     Text(subtitle)
-                        .font(.caption)
+                        .font(
+                            .subheadline
+                        )
                         .foregroundStyle(
                             Color.white
-                                .opacity(0.84)
+                                .opacity(0.88)
                         )
                         .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.80
+                        )
                 }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(0.28),
+                    radius: 5,
+                    y: 2
+                )
 
                 Spacer(
                     minLength: 8
@@ -135,50 +158,14 @@ struct ATHLTHConversationHero<
             }
             .padding(
                 .horizontal,
-                13
-            )
-            .padding(
-                .vertical,
-                10
-            )
-            .background(
-                .ultraThinMaterial,
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-            )
-            .background(
-                Color.black
-                    .opacity(0.10),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 24,
-                        style: .continuous
-                    )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white
-                        .opacity(0.18),
-                    lineWidth: 0.8
-                )
-            }
-            .padding(
-                .horizontal,
-                12
+                14
             )
             .padding(
                 .top,
-                12
+                14
             )
         }
-        .frame(height: 222)
+        .frame(height: 214)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 30,
@@ -192,7 +179,7 @@ struct ATHLTHConversationHero<
             )
             .stroke(
                 Color.white
-                    .opacity(0.42),
+                    .opacity(0.34),
                 lineWidth: 0.8
             )
         }
@@ -200,7 +187,7 @@ struct ATHLTHConversationHero<
             color:
                 ATHLTHTheme
                     .accentDeep
-                    .opacity(0.08),
+                    .opacity(0.09),
             radius: 15,
             y: 7
         )
@@ -215,10 +202,10 @@ extension View {
                 LinearGradient(
                     colors: [
                         Color.white
-                            .opacity(0.96),
+                            .opacity(0.97),
                         ATHLTHTheme
                             .cardWarm
-                            .opacity(0.72)
+                            .opacity(0.76)
                     ],
                     startPoint:
                         .topLeading,
