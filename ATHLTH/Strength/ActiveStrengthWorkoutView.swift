@@ -3,6 +3,7 @@ import UIKit
 
 struct ActiveStrengthWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -33,7 +34,6 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var statusCoachTask:
         Task<Void, Never>?
-    @State private var didDisableIdleTimer = false
     @State private var focusedExerciseMediaIndex = 0
     @State private var showingExerciseInstructions = false
     @State private var showingWorkoutReview = false
@@ -374,6 +374,7 @@ struct ActiveStrengthWorkoutView: View {
                     for: strength.restEndsAt
                 )
                 scheduleStatusCoach()
+                updateScreenAwakeState()
             }
             .onDisappear {
                 restCueTask?.cancel()
@@ -382,11 +383,11 @@ struct ActiveStrengthWorkoutView: View {
                 watchFinishTimeoutTask = nil
                 strengthCoach.stop()
 
-                if didDisableIdleTimer {
-                    UIApplication.shared
-                        .isIdleTimerDisabled = false
-                    didDisableIdleTimer = false
-                }
+                ATHLTHWorkoutScreenAwake.set(
+                    false,
+                    reason:
+                        "iphone-strength-workout"
+                )
             }
             .onChange(
                 of:
@@ -394,6 +395,8 @@ struct ActiveStrengthWorkoutView: View {
                         .activeWorkout?
                         .id
             ) { oldValue, newValue in
+                updateScreenAwakeState()
+
                 guard oldValue != nil,
                       newValue == nil
                 else {
@@ -406,6 +409,11 @@ struct ActiveStrengthWorkoutView: View {
                 spotify.endLinkedWorkoutPlaybackSession()
                 appSession.endTrainingStatus()
                 dismiss()
+            }
+            .onChange(
+                of: scenePhase
+            ) { _, _ in
+                updateScreenAwakeState()
             }
             .onChange(
                 of:
@@ -554,6 +562,16 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @MainActor
+    private func updateScreenAwakeState() {
+        ATHLTHWorkoutScreenAwake.set(
+            strength.activeWorkout != nil &&
+                scenePhase == .active,
+            reason:
+                "iphone-strength-workout"
+        )
+    }
+
+    @MainActor
     private func configureAdvancedRuntime() {
         guard let workout =
                 strength.activeWorkout,
@@ -564,12 +582,6 @@ struct ActiveStrengthWorkoutView: View {
                     .advancedConfiguration
         else {
             return
-        }
-
-        if configuration.keepScreenAwake {
-            UIApplication.shared
-                .isIdleTimerDisabled = true
-            didDisableIdleTimer = true
         }
 
         if workout.captureDevice == .iPhone,
