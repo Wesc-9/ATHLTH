@@ -11110,11 +11110,11 @@ struct ATHLTHProfileView: View {
             accent:
                 ATHLTHTheme.premiumGold.opacity(0.34),
             immersiveTransition: true,
-            // Keep the rounded content sheet below the stat row. The short
-            // fade is limited to the hero's bottom breathing space so the
-            // white transition no longer washes over the four stat cards.
-            sheetOverlapOverride: 0,
-            transitionFadeHeightOverride: 22
+            // Let the profile sheet blend into the hero instead of starting
+            // as a separate white panel below the stat row. This mirrors the
+            // softer reference transition while keeping the stats readable.
+            sheetOverlapOverride: 34,
+            transitionFadeHeightOverride: 56
         ) {
             profileHero
         } content: {
@@ -11125,10 +11125,9 @@ struct ATHLTHProfileView: View {
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            // Keep the white/gray content sheet exactly where it is relative
-            // to the four hero stat cells. Only reduce the internal breathing
-            // room above the first (Trophy cabinet) card.
-            .padding(.top, 24)
+            // Keep the first profile section visually attached to the hero
+            // transition instead of leaving a large empty rounded area.
+            .padding(.top, 8)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
