@@ -1635,59 +1635,68 @@ struct ATHLTHHomeView: View {
     private func homeCompactGoalCard(
         _ goal: ATHLTHGoal
     ) -> some View {
-        NavigationLink {
-            GoalDetailView(
-                goalID: goal.id
-            )
-        } label: {
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-                HStack {
-                    Text("Aktuelt mål")
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .bold
+        VStack(
+            alignment: .leading,
+            spacing: 8
+        ) {
+            HStack {
+                Text("Aktuelt mål")
+                    .font(
+                        .subheadline
+                            .weight(
+                                .bold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                Spacer()
+
+                NavigationLink {
+                    GoalsHubView()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Se alle")
+                            .font(
+                                .system(
+                                    size: 9.5,
+                                    weight:
+                                        .semibold
                                 )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
+                            )
 
-                    Spacer()
-
-                    Text("Se alle")
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
                         .font(
                             .system(
-                                size: 9.5,
-                                weight:
-                                    .semibold
+                                size: 8,
+                                weight: .bold
                             )
                         )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
+                    }
                     .foregroundStyle(
                         ATHLTHTheme
                             .accentDeep
                     )
+                    .contentShape(
+                        Rectangle()
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    "Se alle mål"
+                )
+            }
 
+            NavigationLink {
+                GoalDetailView(
+                    goalID: goal.id
+                )
+            } label: {
                 HStack(spacing: 8) {
                     ZStack(
                         alignment:
@@ -1811,34 +1820,40 @@ struct ATHLTHHomeView: View {
                     minHeight:
                         homeGoalCalendarContentMinHeight
                 )
+                .contentShape(
+                    Rectangle()
+                )
             }
-            .padding(11)
-            .background(
-                Color.white.opacity(
-                    0.90
-                ),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 19,
-                        style:
-                            .continuous
-                    )
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                "Åpne mål: \(goal.title)"
             )
-            .overlay {
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(
+                0.90
+            ),
+            in:
                 RoundedRectangle(
                     cornerRadius: 19,
                     style:
                         .continuous
                 )
-                .stroke(
-                    Color.black.opacity(
-                        0.04
-                    ),
-                    lineWidth: 0.7
-                )
-            }
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style:
+                    .continuous
+            )
+            .stroke(
+                Color.black.opacity(
+                    0.04
+                ),
+                lineWidth: 0.7
+            )
         }
-        .buttonStyle(.plain)
     }
 
     private var homeCompactCreateGoalCard:
