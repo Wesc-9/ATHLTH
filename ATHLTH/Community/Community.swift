@@ -2627,6 +2627,7 @@ private struct CommunityEventMapPlacePickerView:
                 placemark
                     .administrativeArea
             ]
+            .compactMap { $0 }
             .filter {
                 !$0.isEmpty
             }
