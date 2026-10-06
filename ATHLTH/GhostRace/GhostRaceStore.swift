@@ -465,11 +465,24 @@ final class GhostRaceStore: ObservableObject {
             longitude: longitude
         )
 
+        // Watch snapshots normally include live distance. Phone Ghost updates
+        // only carry GPS + elapsed time, so a literal 0 m distance would pin
+        // route matching to the start of the course and reject valid points
+        // later in the race. Fall back to the reference distance expected at
+        // the current elapsed time while keeping the normal route-drift window.
+        let expectedDistanceForMatching =
+            snapshot.distanceMeters > 0
+                ? snapshot.distanceMeters
+                : ghostPoint(
+                    at: snapshot.elapsedTime,
+                    in: reference
+                ).cumulativeMeters
+
         guard let matchedIndex =
                 nearestReferenceIndex(
                     to: currentLocation,
                     expectedDistanceMeters:
-                        snapshot.distanceMeters,
+                        expectedDistanceForMatching,
                     in: reference
                 )
         else {
