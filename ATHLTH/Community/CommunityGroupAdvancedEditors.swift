@@ -14,8 +14,6 @@ struct CommunityGroupEventAdvancedEditor: View {
     @Binding var cohostIDs: Set<UUID>
     let routeStart: RouteCoordinate?
 
-    @State private var showingMeetingMap = false
-
     var body: some View {
         Section("Organizer") {
             Picker(
@@ -131,8 +129,14 @@ struct CommunityGroupEventAdvancedEditor: View {
                 )
             }
 
-            Button {
-                showingMeetingMap = true
+            NavigationLink {
+                CommunityGroupMeetingPointPicker(
+                    latitude:
+                        $options.meetingLatitude,
+                    longitude:
+                        $options.meetingLongitude,
+                    routeStart: routeStart
+                )
             } label: {
                 HStack {
                     Label(
@@ -220,17 +224,6 @@ struct CommunityGroupEventAdvancedEditor: View {
                         CommunityGroupContentStatus
                             .draft
                     )
-            }
-        }
-        .sheet(isPresented: $showingMeetingMap) {
-            NavigationStack {
-                CommunityGroupMeetingPointPicker(
-                    latitude:
-                        $options.meetingLatitude,
-                    longitude:
-                        $options.meetingLongitude,
-                    routeStart: routeStart
-                )
             }
         }
     }
