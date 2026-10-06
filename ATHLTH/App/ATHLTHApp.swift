@@ -1012,6 +1012,11 @@ struct AppRootView: View {
 
             guard phase == .active else { return }
 
+            // iOS protected-data/Keychain reads may be unavailable while an
+            // update relaunches ATHLTH in the background. Retry on foreground
+            // instead of requiring the user to pair Home Assistant again.
+            homeAssistant.setActiveAccount(signedInUserID)
+
             // Apple Watch belongs to the paired iPhone. iPad does not query,
             // activate or present WatchConnectivity state.
             if ATHLTHDeviceRole.supportsDirectAppleWatch {
@@ -1407,6 +1412,11 @@ struct AppRootView: View {
             lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
+            // Suspend HA transfers on logout/account transitions without
+            // deleting the device's Keychain pairing. A restored session for
+            // the same account can resume without requesting a new code.
+            homeAssistant.setActiveAccount(userID)
+            syncHomeAssistantWatchConfiguration()
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
             ATHLTHArtworkImage.clearRemoteCache()
             phoneWorkout.switchAccount(userID)
@@ -1429,12 +1439,12 @@ struct AppRootView: View {
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
             guard signedIn else {
-                Task {
-                    if homeAssistant.isConnected {
-                        await homeAssistant.disconnect()
-                    }
-                    syncHomeAssistantWatchConfiguration()
-                }
+                // Authentication can transiently become signed out after an
+                // upgrade or refresh. Do not revoke Home Assistant's server
+                // pairing or delete the Keychain secret here.
+                homeAssistant.setActiveAccount(nil)
+                syncHomeAssistantWatchConfiguration()
+                ATHLTHHomeAssistantBackgroundRefresh.cancel()
                 return
             }
 
