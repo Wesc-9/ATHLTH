@@ -2094,6 +2094,21 @@ struct AppRootView: View {
             .recordWatchWorkout(result)
 
         Task { @MainActor in
+            let routeLocations:
+                [CLLocation]
+            if let workoutID =
+                    result
+                        .healthKitWorkoutUUID {
+                routeLocations =
+                    await health
+                        .workoutRoute(
+                            for:
+                                workoutID
+                        )
+            } else {
+                routeLocations = []
+            }
+
             await homeAssistant.sendCompletedWorkout(
                 name: publishable.title,
                 type: publishable.activity.rawValue,
@@ -2101,6 +2116,17 @@ struct AppRootView: View {
                 endedAt: publishable.endDate,
                 duration: publishable.duration,
                 distanceMeters: publishable.distanceMeters,
+                activeEnergyKilocalories:
+                    publishable
+                        .activeEnergyKilocalories,
+                averageHeartRateBPM:
+                    result.averageHeartRate,
+                maxHeartRateBPM:
+                    result.maxHeartRate,
+                routeMatchPercent:
+                    result.routeMatchPercent,
+                routeLocations:
+                    routeLocations,
                 device: "Apple Watch"
             )
 
@@ -2260,7 +2286,17 @@ struct AppRootView: View {
                 startedAt: publishable.startDate,
                 endedAt: publishable.endDate,
                 duration: publishable.duration,
-                distanceMeters: publishable.distanceMeters
+                distanceMeters: publishable.distanceMeters,
+                activeEnergyKilocalories:
+                    publishable
+                        .activeEnergyKilocalories,
+                routeMatchPercent:
+                    workout
+                        .finalRouteMatchPercent,
+                routeLocations:
+                    workout.points.map(
+                        \.location
+                    )
             )
 
             await officialWeeklyChallenges
@@ -2413,6 +2449,17 @@ struct AppRootView: View {
                 endedAt: publishable.endDate,
                 duration: publishable.duration,
                 distanceMeters: publishable.distanceMeters,
+                activeEnergyKilocalories:
+                    publishable
+                        .activeEnergyKilocalories,
+                averageHeartRateBPM:
+                    workout
+                        .healthMetrics
+                        .averageHeartRate,
+                maxHeartRateBPM:
+                    workout
+                        .healthMetrics
+                        .maxHeartRate,
                 device:
                     workout.captureDevice == .appleWatch
                         ? "Apple Watch"
