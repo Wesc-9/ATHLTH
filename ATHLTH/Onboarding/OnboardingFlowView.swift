@@ -129,6 +129,10 @@ struct OnboardingFlowView: View {
                     usernameSeedFallback: usernameSeedFallback
                 )
             }
+            // Prevent an accidental tap outside the iPad sheet or a swipe
+            // gesture from discarding partially entered account information.
+            // The explicit Close button remains available.
+            .interactiveDismissDisabled(true)
         }
         .task(id: step) {
             switch step {
