@@ -2275,7 +2275,9 @@ struct MuscleRecoveryCard: View {
                     muscleMapProfile,
                 compact: true,
                 style:
-                    .recoveryLoad
+                    .recoveryLoad,
+                presentation:
+                    .insight
             )
             .frame(height: 205)
             .frame(
