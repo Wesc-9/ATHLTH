@@ -20,6 +20,7 @@ final class APNsPushManager: ObservableObject {
     private let client: SupabaseClient
     private var deviceTokenHex: String?
     private var lastSystemRegistrationRequestAt: Date?
+    private var registrationRetryTask: Task<Void, Never>?
 
     private static let storedTokenKey =
         "athlth.apns.deviceToken.v1"
@@ -43,6 +44,10 @@ final class APNsPushManager: ObservableObject {
                 }
                 .joined()
 
+        registrationRetryTask?
+            .cancel()
+        registrationRetryTask = nil
+
         deviceTokenHex = token
         UserDefaults.standard.set(
             token,
@@ -55,8 +60,10 @@ final class APNsPushManager: ObservableObject {
     }
 
     func didFailToRegister(_ error: Error) {
-        lastRegistrationError = error.localizedDescription
+        lastRegistrationError =
+            error.localizedDescription
         isRegisteredWithBackend = false
+        scheduleRegistrationRecovery()
     }
 
     func syncCurrentToken() async {
@@ -71,11 +78,14 @@ final class APNsPushManager: ObservableObject {
                 deviceTokenHex,
               !token.isEmpty
         else {
-            // registerForRemoteNotifications() is safe to call repeatedly.
-            // This recovers installations where the first APNs callback
-            // happened before auth/startup was ready or was missed after an
-            // app update. The delegate callback calls syncCurrentToken again.
-            ensureSystemRegistration()
+            // A remote notification cannot be delivered until APNs has given
+            // this installation a device token. Force a fresh registration
+            // attempt and keep a short bounded recovery loop for installations
+            // where the callback was missed around sign-in/app updates.
+            ensureSystemRegistration(
+                force: true
+            )
+            scheduleRegistrationRecovery()
             return
         }
 
@@ -98,6 +108,9 @@ final class APNsPushManager: ObservableObject {
 
             isRegisteredWithBackend = true
             lastRegistrationError = nil
+            registrationRetryTask?
+                .cancel()
+            registrationRetryTask = nil
 
             // Keep the compiler aware that the current authenticated identity
             // is intentionally authoritative for this registration.
@@ -126,6 +139,54 @@ final class APNsPushManager: ObservableObject {
 
         UIApplication.shared
             .registerForRemoteNotifications()
+    }
+
+    private func scheduleRegistrationRecovery() {
+        guard registrationRetryTask == nil
+        else {
+            return
+        }
+
+        registrationRetryTask =
+            Task { @MainActor [weak self] in
+                let delays:
+                    [Duration] = [
+                        .seconds(2),
+                        .seconds(8)
+                    ]
+
+                for delay in delays {
+                    try? await Task.sleep(
+                        for: delay
+                    )
+
+                    guard
+                        let self,
+                        !Task.isCancelled
+                    else {
+                        return
+                    }
+
+                    if let token =
+                            self.deviceTokenHex,
+                       !token.isEmpty {
+                        self.registrationRetryTask =
+                            nil
+                        await self
+                            .syncCurrentToken()
+                        return
+                    }
+
+                    self
+                        .ensureSystemRegistration(
+                            force: true
+                        )
+                }
+
+                self?
+                    .registrationRetryTask =
+                    nil
+            }
     }
 
     func syncNotificationPreferences(
