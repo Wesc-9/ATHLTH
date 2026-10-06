@@ -512,7 +512,7 @@ final class ATHLTHAppDelegate: NSObject,
         APNsPushManager.shared.didFailToRegister(error)
     }
 
-    nonisolated func userNotificationCenter(
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
@@ -527,7 +527,7 @@ final class ATHLTHAppDelegate: NSObject,
         return [.banner, .sound, .badge, .list]
     }
 
-    nonisolated func userNotificationCenter(
+    func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
