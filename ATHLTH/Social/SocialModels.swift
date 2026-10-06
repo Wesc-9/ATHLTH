@@ -15,8 +15,8 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
     let displayName: String?
     let bio: String?
     let avatarURL: String?
-    let headerArtworkName: String?
-    let headerImageURL: String?
+    var headerArtworkName: String? = nil
+    var headerImageURL: String? = nil
     let profileVisibility: String?
     let createdAt: Date?
     let updatedAt: Date?
