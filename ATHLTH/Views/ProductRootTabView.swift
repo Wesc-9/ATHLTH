@@ -984,6 +984,8 @@ struct ATHLTHHomeView: View {
             }
             .refreshable {
                 async let communityRefresh: Void = community.refresh()
+                async let groupRefresh: Void =
+                    refreshHomeGroupCalendar()
                 async let activityRefresh: Void =
                     social.refreshHomeFeed(force: true)
 
@@ -1074,10 +1076,10 @@ struct ATHLTHHomeView: View {
                 guard !health.shouldDeferAutomaticHealthWork else {
                     await loadHomeStreak()
                     _ = await (
-                    communityRefresh,
-                    groupRefresh,
-                    activityRefresh
-                )
+                        communityRefresh,
+                        groupRefresh,
+                        activityRefresh
+                    )
                     return
                 }
 
@@ -1969,30 +1971,31 @@ struct ATHLTHHomeView: View {
         some View {
         let plan =
             session.activePlan
-        let workouts =
+        let planWorkouts =
             plan.map {
                 homeTodaySessions(
                     in: $0
                 )
             } ?? []
-        let events =
+        let personalEvents =
             homeTodayCommunityEvents
-        let groupEvents =
+        let clubEvents =
             homeTodayGroupEvents
-        let remainingEventSlots =
+
+        let availableAfterPlan =
             max(
-                2 - workouts.count,
+                2 - planWorkouts.count,
                 0
             )
-        let visiblePersonalEventCount =
+        let visiblePersonalCount =
             min(
-                events.count,
-                remainingEventSlots
+                personalEvents.count,
+                availableAfterPlan
             )
-        let remainingGroupEventSlots =
+        let availableForClub =
             max(
-                remainingEventSlots -
-                visiblePersonalEventCount,
+                availableAfterPlan -
+                    visiblePersonalCount,
                 0
             )
 
@@ -2049,14 +2052,14 @@ struct ATHLTHHomeView: View {
             }
             .buttonStyle(.plain)
 
-            if !workouts.isEmpty ||
-                !events.isEmpty ||
-                !groupEvents.isEmpty {
+            if !planWorkouts.isEmpty ||
+                !personalEvents.isEmpty ||
+                !clubEvents.isEmpty {
                 VStack(spacing: 7) {
                     if let plan {
                         ForEach(
                             Array(
-                                workouts
+                                planWorkouts
                                     .prefix(2)
                             )
                         ) { workout in
@@ -2066,145 +2069,23 @@ struct ATHLTHHomeView: View {
                                         planID:
                                             plan.id,
                                         workoutID:
-                                            workout
-                                                .id
+                                            workout.id
                                     )
                                 )
                             } label: {
-                            HStack(
-                                spacing: 7
-                            ) {
-                                Text(
+                                homeCalendarPlanRow(
                                     workout
-                                        .scheduledStart?
-                                        .formatted(
-                                            date:
-                                                .omitted,
-                                            time:
-                                                .shortened
-                                        ) ??
-                                    "—"
-                                )
-                                .font(
-                                    .system(
-                                        size:
-                                            9.5,
-                                        weight:
-                                            .medium
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                                .frame(
-                                    width: 34,
-                                    alignment:
-                                        .leading
-                                )
-
-                                Image(
-                                    systemName:
-                                        workout
-                                            .kind
-                                            .systemImage
-                                )
-                                .font(
-                                    .system(
-                                        size: 11,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    homeWorkoutTint(
-                                        workout
-                                            .kind
-                                    )
-                                )
-                                .frame(
-                                    width: 27,
-                                    height: 27
-                                )
-                                .background(
-                                    homeWorkoutTint(
-                                        workout
-                                            .kind
-                                    )
-                                    .opacity(
-                                        0.10
-                                    ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                9,
-                                            style:
-                                                .continuous
-                                        )
-                                )
-
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 1
-                                ) {
-                                    Text(
-                                        workout
-                                            .title
-                                    )
-                                    .font(
-                                        .system(
-                                            size:
-                                                10.5,
-                                            weight:
-                                                .semibold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
-                                    .lineLimit(
-                                        1
-                                    )
-
-                                    Text(
-                                        homeSessionSummary(
-                                            workout
-                                        )
-                                    )
-                                    .font(
-                                        .system(
-                                            size:
-                                                8.5
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .mutedText
-                                    )
-                                    .lineLimit(
-                                        1
-                                    )
-                                }
-
-                                Spacer(
-                                    minLength:
-                                        0
                                 )
                             }
-                            }
-                            .buttonStyle(
-                                .plain
-                            )
+                            .buttonStyle(.plain)
                         }
                     }
 
                     ForEach(
                         Array(
-                            events
+                            personalEvents
                                 .prefix(
-                                    remainingEventSlots
+                                    availableAfterPlan
                                 )
                         )
                     ) { event in
@@ -2214,143 +2095,40 @@ struct ATHLTHHomeView: View {
                                     event.id
                             )
                         } label: {
-                            HStack(
-                                spacing: 7
-                            ) {
-                                Text(
+                            homeCalendarEventRow(
+                                time:
                                     event.event
-                                        .startsAt
-                                        .formatted(
-                                            date:
-                                                .omitted,
-                                            time:
-                                                .shortened
+                                        .startsAt,
+                                title:
+                                    event.event
+                                        .title,
+                                systemImage:
+                                    event.event
+                                        .activityType
+                                        .systemImage,
+                                detail:
+                                    event.event
+                                        .meetingName
+                                        .trimmingCharacters(
+                                            in:
+                                                .whitespacesAndNewlines
                                         )
-                                )
-                                .font(
-                                    .system(
-                                        size:
-                                            9.5,
-                                        weight:
-                                            .medium
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                                .frame(
-                                    width: 34,
-                                    alignment:
-                                        .leading
-                                )
-
-                                Image(
-                                    systemName:
-                                        event.event
+                                        .isEmpty
+                                        ? event.event
                                             .activityType
-                                            .systemImage
-                                )
-                                .font(
-                                    .system(
-                                        size: 11,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .recoveryBlue
-                                )
-                                .frame(
-                                    width: 27,
-                                    height: 27
-                                )
-                                .background(
-                                    ATHLTHTheme
-                                        .recoveryBlue
-                                        .opacity(
-                                            0.10
-                                        ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                9,
-                                            style:
-                                                .continuous
-                                        )
-                                )
-
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 1
-                                ) {
-                                    Text(
-                                        event.event
                                             .title
-                                    )
-                                    .font(
-                                        .system(
-                                            size:
-                                                10.5,
-                                            weight:
-                                                .semibold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
-                                    .lineLimit(
-                                        1
-                                    )
-
-                                    Text(
-                                        event.event
+                                        : event.event
                                             .meetingName
-                                            .trimmingCharacters(
-                                                in:
-                                                    .whitespacesAndNewlines
-                                            )
-                                            .isEmpty
-                                            ? event.event
-                                                .activityType
-                                                .title
-                                            : event.event
-                                                .meetingName
-                                    )
-                                    .font(
-                                        .system(
-                                            size:
-                                                8.5
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .mutedText
-                                    )
-                                    .lineLimit(
-                                        1
-                                    )
-                                }
-
-                                Spacer(
-                                    minLength:
-                                        0
-                                )
-                            }
+                            )
                         }
-                        .buttonStyle(
-                            .plain
-                        )
+                        .buttonStyle(.plain)
                     }
-                }
+
                     ForEach(
                         Array(
-                            groupEvents
+                            clubEvents
                                 .prefix(
-                                    remainingGroupEventSlots
+                                    availableForClub
                                 )
                         )
                     ) { event in
@@ -2365,128 +2143,32 @@ struct ATHLTHHomeView: View {
                                     event: event
                                 )
                             } label: {
-                                HStack(
-                                    spacing: 7
-                                ) {
-                                    Text(
-                                        event.startsAt
-                                            .formatted(
-                                                date:
-                                                    .omitted,
-                                                time:
-                                                    .shortened
+                                homeCalendarEventRow(
+                                    time:
+                                        event.startsAt,
+                                    title:
+                                        event.title,
+                                    systemImage:
+                                        homeGroupEventSystemImage(
+                                            event.activityType
+                                        ),
+                                    detail:
+                                        event.meetingName
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
                                             )
-                                    )
-                                    .font(
-                                        .system(
-                                            size:
-                                                9.5,
-                                            weight:
-                                                .medium
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .mutedText
-                                    )
-                                    .frame(
-                                        width: 34,
-                                        alignment:
-                                            .leading
-                                    )
-
-                                    Image(
-                                        systemName:
-                                            homeGroupEventSystemImage(
+                                            .isEmpty
+                                            ? homeGroupEventActivityTitle(
                                                 event.activityType
                                             )
-                                    )
-                                    .font(
-                                        .system(
-                                            size: 11,
-                                            weight:
-                                                .semibold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .recoveryBlue
-                                    )
-                                    .frame(
-                                        width: 27,
-                                        height: 27
-                                    )
-                                    .background(
-                                        ATHLTHTheme
-                                            .recoveryBlue
-                                            .opacity(
-                                                0.10
-                                            ),
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius:
-                                                    9,
-                                                style:
-                                                    .continuous
-                                            )
-                                    )
-
-                                    VStack(
-                                        alignment:
-                                            .leading,
-                                        spacing: 1
-                                    ) {
-                                        Text(
-                                            event.title
-                                        )
-                                        .font(
-                                            .system(
-                                                size:
-                                                    10.5,
-                                                weight:
-                                                    .semibold
-                                            )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .primaryText
-                                        )
-                                        .lineLimit(1)
-
-                                        Text(
-                                            event.meetingName
-                                                .trimmingCharacters(
-                                                    in:
-                                                        .whitespacesAndNewlines
-                                                )
-                                                .isEmpty
-                                                ? homeGroupEventActivityTitle(
-                                                    event.activityType
-                                                )
-                                                : event.meetingName
-                                        )
-                                        .font(
-                                            .system(
-                                                size:
-                                                    8.5
-                                            )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-                                        .lineLimit(1)
-                                    }
-
-                                    Spacer(
-                                        minLength: 0
-                                    )
-                                }
+                                            : event.meetingName
+                                )
                             }
                             .buttonStyle(.plain)
                         }
                     }
-
+                }
                 .frame(
                     minHeight:
                         homeGoalCalendarContentMinHeight,
@@ -2497,7 +2179,9 @@ struct ATHLTHHomeView: View {
                     homeCalendarQuickStartButton(
                         title: "Run",
                         icon: "figure.run",
-                        tint: ATHLTHTheme.vitality
+                        tint:
+                            ATHLTHTheme
+                                .vitality
                     ) {
                         pendingHomeQuickStartKind =
                             .running
@@ -2505,8 +2189,11 @@ struct ATHLTHHomeView: View {
 
                     homeCalendarQuickStartButton(
                         title: "Strength",
-                        icon: "dumbbell.fill",
-                        tint: ATHLTHTheme.accentDeep
+                        icon:
+                            "dumbbell.fill",
+                        tint:
+                            ATHLTHTheme
+                                .accentDeep
                     ) {
                         pendingHomeQuickStartKind =
                             .strength
@@ -2540,6 +2227,123 @@ struct ATHLTHHomeView: View {
                     0.04
                 ),
                 lineWidth: 0.7
+            )
+        }
+    }
+
+    private func homeCalendarPlanRow(
+        _ workout: PlannedSession
+    ) -> some View {
+        homeCalendarEventRow(
+            time:
+                workout.scheduledStart,
+            title:
+                workout.title,
+            systemImage:
+                workout.kind
+                    .systemImage,
+            detail:
+                homeSessionSummary(
+                    workout
+                ),
+            tint:
+                homeWorkoutTint(
+                    workout.kind
+                )
+        )
+    }
+
+    private func homeCalendarEventRow(
+        time: Date?,
+        title: String,
+        systemImage: String,
+        detail: String,
+        tint: Color =
+            ATHLTHTheme.recoveryBlue
+    ) -> some View {
+        HStack(spacing: 7) {
+            Text(
+                time?
+                    .formatted(
+                        date: .omitted,
+                        time: .shortened
+                    ) ??
+                "—"
+            )
+            .font(
+                .system(
+                    size: 9.5,
+                    weight: .medium
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+            )
+            .frame(
+                width: 34,
+                alignment: .leading
+            )
+
+            Image(
+                systemName:
+                    systemImage
+            )
+            .font(
+                .system(
+                    size: 11,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(tint)
+            .frame(
+                width: 27,
+                height: 27
+            )
+            .background(
+                tint.opacity(0.10),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 9,
+                        style:
+                            .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 1
+            ) {
+                Text(title)
+                    .font(
+                        .system(
+                            size: 10.5,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(detail)
+                    .font(
+                        .system(
+                            size: 8.5
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer(
+                minLength: 0
             )
         }
     }
