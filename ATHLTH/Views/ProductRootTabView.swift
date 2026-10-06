@@ -10673,10 +10673,10 @@ struct ATHLTHProfileView: View {
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            // Keep the first section comfortably below the profile stats.
-            // The profile uses a smaller sheet overlap so all four stat cells
-            // remain fully visible above the rounded white content sheet.
-            .padding(.top, 50)
+            // Keep the white/gray content sheet exactly where it is relative
+            // to the four hero stat cells. Only reduce the internal breathing
+            // room above the first (Trophy cabinet) card.
+            .padding(.top, 24)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
