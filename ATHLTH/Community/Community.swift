@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import CoreLocation
 @preconcurrency import MapKit
 import Supabase
 import SwiftUI
@@ -191,17 +192,31 @@ enum CommunityEventAttendance: String, Codable, Hashable {
     case maybe
 }
 
+enum CommunityEventCheckInMethod:
+    String,
+    Codable,
+    Hashable
+{
+    case proximity
+    case manual
+}
+
 struct CommunityEventParticipantRecord: Codable, Hashable {
     let eventID: UUID
     let userID: UUID
     let joinedAt: Date
     let attendanceStatus: CommunityEventAttendance
+    let checkedInAt: Date?
+    let checkInMethod:
+        CommunityEventCheckInMethod?
 
     enum CodingKeys: String, CodingKey {
         case eventID = "event_id"
         case userID = "user_id"
         case joinedAt = "joined_at"
         case attendanceStatus = "attendance_status"
+        case checkedInAt = "checked_in_at"
+        case checkInMethod = "check_in_method"
     }
 }
 
@@ -216,6 +231,12 @@ struct CommunityEventItem: Identifiable, Hashable {
     var participantCount: Int {
         1 + participantRows.filter {
             $0.attendanceStatus == .going
+        }.count
+    }
+
+    var checkedInCount: Int {
+        participantRows.filter {
+            $0.checkedInAt != nil
         }.count
     }
 }
@@ -509,6 +530,20 @@ private struct CommunityParticipantWrite: Encodable {
         case eventID = "event_id"
         case userID = "user_id"
         case attendanceStatus = "attendance_status"
+    }
+}
+
+private struct CommunityEventCheckInUpdate:
+    Encodable
+{
+    let attendanceStatus: String
+    let checkInMethod: String
+
+    enum CodingKeys: String, CodingKey {
+        case attendanceStatus =
+            "attendance_status"
+        case checkInMethod =
+            "check_in_method"
     }
 }
 
@@ -1028,6 +1063,39 @@ final class SupabaseCommunityService {
         )
     }
 
+    func checkIn(
+        eventID: UUID,
+        method: CommunityEventCheckInMethod
+    ) async throws {
+        guard let currentUserID else {
+            throw CommunityEventError
+                .notAuthenticated
+        }
+
+        try await client
+            .from(
+                "community_event_participants"
+            )
+            .update(
+                CommunityEventCheckInUpdate(
+                    attendanceStatus:
+                        CommunityEventAttendance
+                            .going.rawValue,
+                    checkInMethod:
+                        method.rawValue
+                )
+            )
+            .eq(
+                "event_id",
+                value: eventID
+            )
+            .eq(
+                "user_id",
+                value: currentUserID
+            )
+            .execute()
+    }
+
     func leave(eventID: UUID) async throws {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
@@ -1278,6 +1346,24 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
+    func checkIn(
+        _ item: CommunityEventItem,
+        method: CommunityEventCheckInMethod
+    ) async -> Bool {
+        do {
+            try await service.checkIn(
+                eventID: item.id,
+                method: method
+            )
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func leave(_ item: CommunityEventItem) async {
         do {
             try await service.leave(eventID: item.id)
@@ -1317,6 +1403,25 @@ final class CommunityEventStore: ObservableObject {
 
     func isMaybe(_ item: CommunityEventItem) -> Bool {
         attendance(for: item) == .maybe
+    }
+
+    func checkInRecord(
+        for item: CommunityEventItem
+    ) -> CommunityEventParticipantRecord? {
+        guard let currentUserID else {
+            return nil
+        }
+
+        return item.participantRows.first {
+            $0.userID == currentUserID &&
+            $0.checkedInAt != nil
+        }
+    }
+
+    func isCheckedIn(
+        _ item: CommunityEventItem
+    ) -> Bool {
+        checkInRecord(for: item) != nil
     }
 }
 
@@ -1534,7 +1639,14 @@ private struct CommunityEventListRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-                heroAttendanceSummary(item)
+                Label(
+                    ATHLTHLocalization.format(
+                        english: "%d joined",
+                        norwegian: "%d deltar",
+                        item.participantCount
+                    ),
+                    systemImage: "person.2.fill"
+                )
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
@@ -1552,6 +1664,13 @@ struct CommunityEventDetailView: View {
     @State private var showingEditEvent = false
     @State private var showingCancelConfirmation =
         false
+    @StateObject private var checkInLocation =
+        ChallengeLocationStore()
+    @State private var checkInMessage: String?
+    @State private var manualCheckInFallback =
+        false
+    @State private var attemptedAutomaticCheckIn =
+        false
 
     var body: some View {
         ScrollView {
@@ -1559,6 +1678,7 @@ struct CommunityEventDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     eventHero(item)
                     eventDetails(item)
+                    checkInCard(item)
                     participants(item)
 
                     if item.event.creatorID ==
@@ -1651,6 +1771,9 @@ struct CommunityEventDetailView: View {
                 )
             )
         }
+        .task(id: eventID) {
+            await attemptAutomaticCheckIn()
+        }
     }
 
     private func eventHero(_ item: CommunityEventItem) -> some View {
@@ -1690,14 +1813,7 @@ struct CommunityEventDetailView: View {
 
                 Spacer()
 
-                Label(
-                    ATHLTHLocalization.format(
-                            english: "%d joined",
-                            norwegian: "%d deltar",
-                            item.participantCount
-                        ),
-                    systemImage: "person.2.fill"
-                )
+                heroAttendanceSummary(item)
             }
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
@@ -2065,6 +2181,8 @@ struct CommunityEventDetailView: View {
                 item,
                 status: .maybe
             )
+        let checkedIn =
+            checkedInRows(item)
 
         return ATHLTHCard {
             Text(
@@ -2119,6 +2237,48 @@ struct CommunityEventDetailView: View {
                 )
             }
 
+            if !checkedIn.isEmpty {
+                Divider()
+                    .padding(.vertical, 8)
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Checked in · %d",
+                        norwegian:
+                            "Sjekket inn · %d",
+                        checkedIn.count
+                    )
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+
+                ForEach(
+                    checkedIn,
+                    id: \.userID
+                ) { row in
+                    if let profile =
+                        profile(
+                            for: row.userID,
+                            in: item
+                        ) {
+                        attendeeRow(
+                            profile: profile,
+                            subtitle:
+                                checkInSubtitle(
+                                    row
+                                )
+                        )
+                    }
+                }
+            }
+
             if !maybe.isEmpty {
                 Divider()
                     .padding(.vertical, 8)
@@ -2147,6 +2307,589 @@ struct CommunityEventDetailView: View {
                 }
             }
         }
+    }
+
+
+    @ViewBuilder
+    private func checkInCard(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let isHost =
+            item.event.creatorID ==
+            session.profile.userID
+        let hasResponse =
+            community.attendance(
+                for: item
+            ) != nil
+
+        if isHost ||
+            hasResponse ||
+            item.checkedInCount > 0 {
+            ATHLTHCard {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Check-in",
+                                    norwegian:
+                                        "Innsjekk"
+                                )
+                        )
+                        .font(.headline)
+
+                        Text(
+                            ATHLTHLocalization
+                                .format(
+                                    english:
+                                        "%d checked in",
+                                    norwegian:
+                                        "%d sjekket inn",
+                                    item.checkedInCount
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            item.checkedInCount > 0
+                            ? "checkmark.seal.fill"
+                            : "mappin.and.ellipse"
+                    )
+                    .foregroundStyle(
+                        item.checkedInCount > 0
+                            ? ATHLTHTheme
+                                .vitality
+                            : .secondary
+                    )
+                }
+
+                if isHost {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Participant check-ins appear below as people arrive.",
+                                norwegian:
+                                    "Innsjekkede deltakere vises under etter hvert som de kommer."
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .padding(.top, 6)
+                } else if let record =
+                            community
+                                .checkInRecord(
+                                    for: item
+                                ) {
+                    HStack(spacing: 10) {
+                        Image(
+                            systemName:
+                                "checkmark.circle.fill"
+                        )
+                        .font(.title3)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+
+                        VStack(
+                            alignment:
+                                .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "You're checked in",
+                                        norwegian:
+                                            "Du er sjekket inn"
+                                    )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            Text(
+                                checkInSubtitle(
+                                    record
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                } else if community
+                            .isJoined(item) &&
+                            item.event.status !=
+                                "cancelled" &&
+                            item.event.status !=
+                                "completed" {
+                    if hasMeetingCoordinate(
+                        item
+                    ) {
+                        Button {
+                            Task {
+                                await verifyAndCheckIn(
+                                    item,
+                                    automatic: false
+                                )
+                            }
+                        } label: {
+                            HStack {
+                                if checkInLocation
+                                    .isLocating {
+                                    ProgressView()
+                                } else {
+                                    Image(
+                                        systemName:
+                                            "location.fill"
+                                    )
+                                }
+
+                                Text(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Check in near meetup",
+                                            norwegian:
+                                                "Sjekk inn ved møtested"
+                                        )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                            }
+                            .frame(
+                                maxWidth:
+                                    .infinity,
+                                minHeight: 42
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .tint(
+                            ATHLTHTheme.vitality
+                        )
+                        .disabled(
+                            checkInLocation
+                                .isLocating
+                        )
+                        .padding(.top, 8)
+
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "ATHLTH verifies that you are within about 100 m of the meetup point. Your location is not stored.",
+                                    norwegian:
+                                        "ATHLTH bekrefter at du er innen omtrent 100 m fra møtestedet. Posisjonen din lagres ikke."
+                                )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .padding(.top, 4)
+
+                        if manualCheckInFallback {
+                            Button {
+                                Task {
+                                    await manualCheckIn(
+                                        item
+                                    )
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Check in manually",
+                                            norwegian:
+                                                "Sjekk inn manuelt"
+                                        ),
+                                    systemImage:
+                                        "hand.tap"
+                                )
+                                .font(
+                                    .caption
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                            }
+                            .buttonStyle(
+                                .bordered
+                            )
+                            .padding(.top, 6)
+                        }
+                    } else {
+                        Button {
+                            Task {
+                                await manualCheckIn(
+                                    item
+                                )
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Check in manually",
+                                        norwegian:
+                                            "Sjekk inn manuelt"
+                                    ),
+                                systemImage:
+                                    "hand.tap"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .frame(
+                                maxWidth:
+                                    .infinity,
+                                minHeight: 42
+                            )
+                        }
+                        .buttonStyle(
+                            .borderedProminent
+                        )
+                        .tint(
+                            ATHLTHTheme.vitality
+                        )
+                        .padding(.top, 8)
+
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "No meetup location was set, so check-in is manual.",
+                                    norwegian:
+                                        "Det er ikke angitt et møtested, derfor gjøres innsjekk manuelt."
+                                )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .padding(.top, 4)
+                    }
+                } else if community
+                            .isMaybe(item) {
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Choose Going before you check in.",
+                                norwegian:
+                                    "Velg Deltar før du kan sjekke inn."
+                            )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .padding(.top, 6)
+                }
+
+                if let checkInMessage {
+                    Text(checkInMessage)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                        .padding(.top, 6)
+                }
+            }
+        }
+    }
+
+    private func hasMeetingCoordinate(
+        _ item: CommunityEventItem
+    ) -> Bool {
+        item.event.latitude != nil &&
+        item.event.longitude != nil
+    }
+
+    private func meetingLocation(
+        _ item: CommunityEventItem
+    ) -> CLLocation? {
+        guard let latitude =
+                item.event.latitude,
+              let longitude =
+                item.event.longitude
+        else {
+            return nil
+        }
+
+        return CLLocation(
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
+
+    private func verifyAndCheckIn(
+        _ item: CommunityEventItem,
+        automatic: Bool
+    ) async {
+        guard let meeting =
+                meetingLocation(item)
+        else {
+            if !automatic {
+                await manualCheckIn(item)
+            }
+            return
+        }
+
+        let current =
+            await checkInLocation
+                .requestCurrentLocation()
+
+        guard let current else {
+            if !automatic {
+                manualCheckInFallback = true
+                checkInMessage =
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "ATHLTH couldn't verify your location. You can use manual check-in instead.",
+                            norwegian:
+                                "ATHLTH klarte ikke å bekrefte posisjonen din. Du kan bruke manuell innsjekk i stedet."
+                        )
+            }
+            return
+        }
+
+        let distance =
+            current.distance(from: meeting)
+        let accuracyAllowance =
+            min(
+                max(
+                    current.horizontalAccuracy,
+                    0
+                ),
+                35
+            )
+        let allowedDistance =
+            100 + accuracyAllowance
+
+        guard distance <=
+                allowedDistance
+        else {
+            if !automatic {
+                manualCheckInFallback =
+                    false
+                checkInMessage =
+                    ATHLTHLocalization
+                        .format(
+                            english:
+                                "You're about %d m from the meetup point. Move within 100 m to check in.",
+                            norwegian:
+                                "Du er omtrent %d m fra møtestedet. Gå innenfor 100 m for å sjekke inn.",
+                            Int(
+                                distance
+                                    .rounded()
+                            )
+                        )
+            }
+            return
+        }
+
+        let saved =
+            await community.checkIn(
+                item,
+                method: .proximity
+            )
+
+        if saved {
+            manualCheckInFallback =
+                false
+            checkInMessage =
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Checked in at the meetup point.",
+                        norwegian:
+                            "Du er sjekket inn ved møtestedet."
+                    )
+        }
+    }
+
+    private func manualCheckIn(
+        _ item: CommunityEventItem
+    ) async {
+        let saved =
+            await community.checkIn(
+                item,
+                method: .manual
+            )
+
+        if saved {
+            manualCheckInFallback =
+                false
+            checkInMessage =
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Manual check-in completed.",
+                        norwegian:
+                            "Manuell innsjekk er registrert."
+                    )
+        }
+    }
+
+    private func attemptAutomaticCheckIn()
+        async {
+        guard !attemptedAutomaticCheckIn
+        else {
+            return
+        }
+
+        attemptedAutomaticCheckIn =
+            true
+
+        guard let item =
+                community.item(
+                    id: eventID
+                ),
+              item.event.creatorID !=
+                session.profile.userID,
+              community.isJoined(item),
+              !community.isCheckedIn(item),
+              hasMeetingCoordinate(item),
+              item.event.status !=
+                "cancelled",
+              item.event.status !=
+                "completed"
+        else {
+            return
+        }
+
+        switch checkInLocation
+            .authorizationStatus {
+        case .authorizedAlways,
+             .authorizedWhenInUse:
+            await verifyAndCheckIn(
+                item,
+                automatic: true
+            )
+
+        case .notDetermined,
+             .denied,
+             .restricted:
+            // Never prompt for location merely by opening an event.
+            // Tapping Check in can request permission and offers a
+            // manual fallback if verification is unavailable.
+            break
+
+        @unknown default:
+            break
+        }
+    }
+
+    private func checkedInRows(
+        _ item: CommunityEventItem
+    ) -> [CommunityEventParticipantRecord] {
+        item.participantRows
+            .filter {
+                $0.checkedInAt != nil
+            }
+            .sorted {
+                ($0.checkedInAt ??
+                    .distantFuture) <
+                ($1.checkedInAt ??
+                    .distantFuture)
+            }
+    }
+
+    private func profile(
+        for userID: UUID,
+        in item: CommunityEventItem
+    ) -> SocialProfileCard? {
+        if userID ==
+            item.event.creatorID {
+            return item.creator
+        }
+
+        return item.participantProfiles
+            .first {
+                $0.userID == userID
+            }
+    }
+
+    private func checkInSubtitle(
+        _ row:
+            CommunityEventParticipantRecord
+    ) -> String {
+        let method:
+            String
+
+        switch row.checkInMethod {
+        case .proximity:
+            method =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Verified at meetup",
+                    norwegian:
+                        "Bekreftet ved møtested"
+                )
+        case .manual:
+            method =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Manual check-in",
+                    norwegian:
+                        "Manuell innsjekk"
+                )
+        case nil:
+            method =
+                ATHLTHLocalization.choose(
+                    english: "Checked in",
+                    norwegian:
+                        "Sjekket inn"
+                )
+        }
+
+        guard let checkedInAt =
+                row.checkedInAt
+        else {
+            return method
+        }
+
+        return method +
+            " · " +
+            checkedInAt.formatted(
+                date: .omitted,
+                time: .shortened
+            )
     }
 
     private func participantProfiles(
