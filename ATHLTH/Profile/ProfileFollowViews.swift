@@ -66,32 +66,17 @@ struct ProfileFollowListView: View {
             .padding(.bottom, 120)
         }
         .background {
-            LinearGradient(
-                colors: [
-                    Color(
-                        red: 0.965,
-                        green: 0.965,
-                        blue: 0.982
-                    ),
-                    Color(
-                        red: 0.985,
-                        green: 0.980,
-                        blue: 0.970
-                    )
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ATHLTHPremiumCanvas(
+                accent:
+                    listAccent
+                        .opacity(0.18)
             )
             .ignoresSafeArea()
         }
         .navigationTitle(mode.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(
-            .ultraThinMaterial,
-            for: .navigationBar
-        )
-        .toolbarBackground(
-            .visible,
+            .hidden,
             for: .navigationBar
         )
         .task {
@@ -104,97 +89,162 @@ struct ProfileFollowListView: View {
 
     private var premiumSummary: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(
-                        ATHLTHTheme
-                            .premiumGold
-                            .opacity(0.12)
+            Image(
+                systemName:
+                    mode == .followers
+                        ? "person.2.fill"
+                        : "person.crop.circle.badge.checkmark"
+            )
+            .font(
+                .system(
+                    size: 20,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                listAccent
+            )
+            .frame(
+                width: 50,
+                height: 50
+            )
+            .background(
+                listAccent.opacity(
+                    0.11
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 16,
+                        style: .continuous
                     )
-
-                Image(
-                    systemName:
-                        mode == .followers
-                            ? "person.2.fill"
-                            : "person.crop.circle.badge.checkmark"
-                )
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.premiumGold
-                )
-            }
-            .frame(width: 48, height: 48)
+            )
 
             VStack(
                 alignment: .leading,
                 spacing: 3
             ) {
+                Text(
+                    mode == .followers
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "YOUR NETWORK",
+                            norwegian:
+                                "NETTVERKET DITT"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "YOUR CIRCLE",
+                            norwegian:
+                                "DIN SIRKEL"
+                        )
+                )
+                .font(
+                    .caption2.weight(
+                        .bold
+                    )
+                )
+                .tracking(1.5)
+                .foregroundStyle(
+                    listAccent
+                )
+
                 Text(mode.title)
                     .font(
-                        .title3
+                        .title2
                             .weight(.bold)
                     )
 
                 Text(summaryDetail)
                     .font(.caption)
                     .foregroundStyle(
-                        ATHLTHTheme.mutedText
+                        ATHLTHTheme
+                            .mutedText
                     )
+                    .lineLimit(2)
             }
 
             Spacer()
 
-            Text(expectedCount.formatted())
+            VStack(
+                alignment: .trailing,
+                spacing: 1
+            ) {
+                Text(
+                    expectedCount
+                        .formatted()
+                )
                 .font(
                     .system(
-                        size: 24,
+                        size: 30,
                         weight: .bold,
                         design: .rounded
                     )
                 )
                 .monospacedDigit()
                 .foregroundStyle(
-                    ATHLTHTheme.primaryText
+                    ATHLTHTheme
+                        .primaryText
                 )
+
+                Text(
+                    mode == .followers
+                        ? ATHLTHLocalization.choose(
+                            english: "people",
+                            norwegian: "personer"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "profiles",
+                            norwegian: "profiler"
+                        )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+            }
         }
         .padding(16)
         .background(
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.96),
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.055)
+                    Color.white.opacity(
+                        0.94
+                    ),
+                    listAccent.opacity(
+                        0.055
+                    )
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
             ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
+            in:
+                RoundedRectangle(
+                    cornerRadius: 26,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 24,
+                cornerRadius: 26,
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .premiumGold
-                    .opacity(0.13),
+                listAccent.opacity(
+                    0.13
+                ),
                 lineWidth: 0.8
             )
         }
         .shadow(
-            color: Color.black.opacity(0.045),
-            radius: 18,
-            y: 8
+            color:
+                Color.black.opacity(
+                    0.04
+                ),
+            radius: 14,
+            y: 6
         )
     }
 
@@ -203,8 +253,7 @@ struct ProfileFollowListView: View {
             ZStack {
                 Circle()
                     .fill(
-                        ATHLTHTheme
-                            .premiumGold
+                        listAccent
                             .opacity(0.09)
                     )
                     .frame(
@@ -225,8 +274,7 @@ struct ProfileFollowListView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
+                    listAccent
                 )
             }
 
@@ -279,45 +327,80 @@ struct ProfileFollowListView: View {
                 )
             } label: {
                 HStack(spacing: 12) {
-                    SocialAvatar(
-                        profile: profile,
-                        size: 50
-                    )
+                    ZStack {
+                        Circle()
+                            .fill(
+                                listAccent
+                                    .opacity(
+                                        0.08
+                                    )
+                            )
+                            .frame(
+                                width: 54,
+                                height: 54
+                            )
+
+                        SocialAvatar(
+                            profile: profile,
+                            size: 48
+                        )
+                    }
 
                     VStack(
                         alignment: .leading,
-                        spacing: 3
+                        spacing: 4
                     ) {
-                        Text(profile.resolvedName)
-                            .font(
-                                .subheadline
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .lineLimit(1)
+                        Text(
+                            profile
+                                .resolvedName
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .lineLimit(1)
 
-                        Text(profile.usernameLabel)
-                            .font(.caption)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
+                        Text(
+                            profile
+                                .usernameLabel
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+
+                        Text(
+                            mode == .followers
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Follows you",
+                                    norwegian:
+                                        "Følger deg"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "In your circle",
+                                    norwegian:
+                                        "I din sirkel"
+                                )
+                        )
+                        .font(
+                            .caption2.weight(
+                                .semibold
                             )
+                        )
+                        .foregroundStyle(
+                            listAccent
+                        )
                     }
 
-                    Spacer(minLength: 6)
-
-                    Image(
-                        systemName: "chevron.right"
-                    )
-                    .font(
-                        .caption
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                            .opacity(0.55)
+                    Spacer(
+                        minLength: 6
                     )
                 }
             }
@@ -326,52 +409,94 @@ struct ProfileFollowListView: View {
             if mode == .following {
                 Button {
                     Task {
-                        await social.unfollow(
-                            profile.userID
-                        )
+                        await social
+                            .unfollow(
+                                profile
+                                    .userID
+                            )
                     }
                 } label: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Following",
-                            norwegian: "Følger"
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "checkmark"
                         )
-                    )
+                        .font(.caption2.bold())
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Following",
+                                norwegian:
+                                    "Følger"
+                            )
+                        )
+                    }
                     .font(
                         .caption
-                            .weight(.semibold)
+                            .weight(
+                                .semibold
+                            )
                     )
-                    .padding(.horizontal, 13)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .padding(
+                        .horizontal,
+                        12
+                    )
                     .frame(height: 34)
+                    .background(
+                        listAccent
+                            .opacity(
+                                0.09
+                            ),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                listAccent
+                                    .opacity(
+                                        0.16
+                                    ),
+                                lineWidth:
+                                    0.8
+                            )
+                    }
                 }
                 .buttonStyle(.plain)
+            } else {
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(
+                    .caption
+                        .weight(.bold)
+                )
                 .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .background(
                     ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.10),
-                    in: Capsule()
+                        .mutedText
+                        .opacity(0.5)
                 )
-                .overlay {
-                    Capsule()
-                        .stroke(
-                            ATHLTHTheme
-                                .premiumGold
-                                .opacity(0.18),
-                            lineWidth: 0.8
-                        )
-                }
             }
         }
-        .padding(14)
+        .padding(
+            .horizontal,
+            14
+        )
+        .frame(minHeight: 82)
         .background(
-            Color.white.opacity(0.92),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
+            Color.white.opacity(
+                0.90
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
         )
         .overlay {
             RoundedRectangle(
@@ -379,14 +504,19 @@ struct ProfileFollowListView: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.75),
+                listAccent.opacity(
+                    0.08
+                ),
                 lineWidth: 0.8
             )
         }
         .shadow(
-            color: Color.black.opacity(0.035),
-            radius: 12,
-            y: 5
+            color:
+                Color.black.opacity(
+                    0.028
+                ),
+            radius: 10,
+            y: 4
         )
     }
 
@@ -400,6 +530,14 @@ struct ProfileFollowListView: View {
             ATHLTHTheme.mutedText
         )
         .padding(.horizontal, 4)
+    }
+
+    private var listAccent: Color {
+        mode == .followers
+            ? ATHLTHTheme
+                .recoveryBlue
+            : ATHLTHTheme
+                .vitality
     }
 
     private var summaryDetail: String {
