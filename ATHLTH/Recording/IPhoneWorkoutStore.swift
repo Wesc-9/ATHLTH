@@ -3829,6 +3829,22 @@ final class IPhoneWorkoutStore:
         lastActiveCheckpointWriteAt = now
     }
 
+    func removeWorkoutFromHistory(
+        matching workoutIDs: Set<UUID>
+    ) {
+        guard !workoutIDs.isEmpty else {
+            return
+        }
+
+        history.removeAll { workout in
+            workoutIDs.contains(workout.id) ||
+            workout.healthID
+                .map(workoutIDs.contains) == true
+        }
+
+        persistHistory()
+    }
+
     private func persistHistory() {
         guard let accountID,
               !UserDefaults.standard.bool(
