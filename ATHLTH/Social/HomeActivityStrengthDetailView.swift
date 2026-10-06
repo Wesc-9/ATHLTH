@@ -3,8 +3,6 @@ import SwiftUI
 struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var health: HealthKitManager
-    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let workout: SocialPublishableWorkout
@@ -57,38 +55,6 @@ struct HomeActivityStrengthDetailView: View {
                     exerciseLibrary
                         .allExercises
             )
-    }
-
-    private var figureStyle:
-        StrengthBodyPresentation {
-        switch settings
-            .strengthFigurePreference {
-        case .female:
-            return .female
-        case .male:
-            return .male
-        case .neutral:
-            return .neutral
-        case .automatic:
-            let healthSex =
-                session
-                    .onboardingProfile?
-                    .healthSex ??
-                health
-                    .personalDetails
-                    .healthSex
-
-            switch healthSex {
-            case .female:
-                return .female
-            case .male:
-                return .male
-            case .other,
-                 .preferNotToSay,
-                 .none:
-                return .neutral
-            }
-        }
     }
 
     private var activationTint:
@@ -769,8 +735,6 @@ struct HomeActivityStrengthDetailView: View {
                         profile:
                             muscleSummary
                                 .profile,
-                        figureStyle:
-                            figureStyle,
                         activationTint:
                             activationTint
                     )
