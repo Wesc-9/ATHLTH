@@ -207,17 +207,86 @@ private struct HomeActivityStreamItem:
     }
 }
 
+private enum HomeActivityVisibilityStore {
+    static let changed =
+        Notification.Name(
+            "athlth.homeActivityVisibility.changed"
+        )
+
+    private static let storageName =
+        "homeHiddenWorkoutIDs"
+
+    static func hiddenWorkoutIDs(
+        userID: UUID?
+    ) -> Set<UUID> {
+        guard let userID else {
+            return []
+        }
+
+        let key =
+            AccountLocalStorage.key(
+                storageName,
+                userID: userID
+            )
+
+        return Set(
+            UserDefaults.standard
+                .stringArray(
+                    forKey: key
+                )?
+                .compactMap(UUID.init(uuidString:)) ??
+            []
+        )
+    }
+
+    static func hide(
+        _ workoutIDs: Set<UUID>,
+        userID: UUID?
+    ) {
+        guard let userID,
+              !workoutIDs.isEmpty
+        else {
+            return
+        }
+
+        var hidden =
+            hiddenWorkoutIDs(
+                userID: userID
+            )
+        hidden.formUnion(workoutIDs)
+
+        let key =
+            AccountLocalStorage.key(
+                storageName,
+                userID: userID
+            )
+        UserDefaults.standard.set(
+            hidden
+                .map(\.uuidString)
+                .sorted(),
+            forKey: key
+        )
+
+        NotificationCenter.default.post(
+            name: changed,
+            object: nil
+        )
+    }
+}
+
 @MainActor
 private enum HomePersonalWorkoutCatalog {
     static func merge(
         healthSummaries: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog],
-        phoneHistory: [PhoneWorkout]
+        phoneHistory: [PhoneWorkout],
+        excludedIDs: Set<UUID> = []
     ) -> [SocialPublishableWorkout] {
         var byID: [UUID: SocialPublishableWorkout] =
             [:]
 
-        for summary in healthSummaries {
+        for summary in healthSummaries
+        where !excludedIDs.contains(summary.id) {
             let workout =
                 SocialPublishableWorkout(
                     summary: summary
@@ -226,7 +295,9 @@ private enum HomePersonalWorkoutCatalog {
         }
 
         for phoneWorkout in phoneHistory
-        where phoneWorkout.end != nil {
+        where phoneWorkout.end != nil &&
+              !excludedIDs.contains(phoneWorkout.id) &&
+              phoneWorkout.healthID.map(excludedIDs.contains) != true {
             let workout =
                 SocialPublishableWorkout(
                     phoneWorkout:
@@ -241,7 +312,11 @@ private enum HomePersonalWorkoutCatalog {
         // near-identical Health summary by time before inserting the richer log.
         for strengthWorkout in
             strengthHistory
-            .filter(\.isFinished) {
+            .filter(\.isFinished)
+        where !excludedIDs.contains(strengthWorkout.id) &&
+              strengthWorkout.healthMetrics
+                .healthKitWorkoutUUID
+                .map(excludedIDs.contains) != true {
             let workout =
                 SocialPublishableWorkout(
                     strengthWorkout:
@@ -304,6 +379,7 @@ private enum HomePersonalWorkoutCatalog {
         healthSummaries: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog],
         phoneHistory: [PhoneWorkout],
+        excludedIDs: Set<UUID> = [],
         limitPerSource: Int = 24
     ) -> [SocialPublishableWorkout] {
         let limit = max(limitPerSource, 6)
@@ -329,7 +405,9 @@ private enum HomePersonalWorkoutCatalog {
                             $0.end != nil
                         }
                         .prefix(limit)
-                )
+                ),
+            excludedIDs:
+                excludedIDs
         )
     }
 
@@ -588,6 +666,15 @@ struct HomePersonalRecentActivitySection:
         .task(id: recentRevision) {
             rebuildRecentWorkouts()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for:
+                    HomeActivityVisibilityStore
+                        .changed
+            )
+        ) { _ in
+            rebuildRecentWorkouts()
+        }
     }
 
     private func rebuildRecentWorkouts() {
@@ -601,7 +688,13 @@ struct HomePersonalRecentActivitySection:
                             .workoutHistory,
                     phoneHistory:
                         phoneWorkout
-                            .history
+                            .history,
+                    excludedIDs:
+                        HomeActivityVisibilityStore
+                            .hiddenWorkoutIDs(
+                                userID:
+                                    social.currentUserID
+                            )
                 )
 
         if refreshed != myWorkouts {
@@ -707,6 +800,10 @@ struct HomePersonalRecentActivitySection:
                         strengthWorkout:
                             strengthWorkout(
                                 for: workout
+                            ),
+                        phoneWorkout:
+                            localPhoneWorkout(
+                                for: workout
                             )
                     )
                 } label: {
@@ -732,6 +829,7 @@ struct HomePersonalRecentActivitySection:
                 )
                 .padding(.horizontal, 10)
                 .padding(.bottom, 7)
+                .zIndex(4)
             }
 
         case .following(let socialItem):
@@ -752,6 +850,7 @@ struct HomePersonalRecentActivitySection:
                 )
                 .padding(.horizontal, 10)
                 .padding(.bottom, 7)
+                .zIndex(4)
             }
         }
     }
@@ -1578,6 +1677,12 @@ private struct HomeCompactActivityEngagementRow:
                             .mutedText
                 )
             }
+            .buttonStyle(.plain)
+            .frame(
+                minWidth: 44,
+                minHeight: 38
+            )
+            .contentShape(Rectangle())
             .disabled(currentItem == nil)
 
             Button {
@@ -1600,6 +1705,12 @@ private struct HomeCompactActivityEngagementRow:
                     ATHLTHTheme.mutedText
                 )
             }
+            .buttonStyle(.plain)
+            .frame(
+                minWidth: 44,
+                minHeight: 38
+            )
+            .contentShape(Rectangle())
             .disabled(currentItem == nil)
 
             Spacer(minLength: 0)
@@ -2834,6 +2945,17 @@ struct HomePersonalActivityHistoryView:
                     .refreshActivityHistoryFeed()
             }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for:
+                    HomeActivityVisibilityStore
+                        .changed
+            )
+        ) { _ in
+            Task {
+                await load()
+            }
+        }
     }
 
     @ViewBuilder
@@ -3255,7 +3377,13 @@ struct HomePersonalActivityHistoryView:
                             .workoutHistory,
                     phoneHistory:
                         phoneWorkout
-                            .history
+                            .history,
+                    excludedIDs:
+                        HomeActivityVisibilityStore
+                            .hiddenWorkoutIDs(
+                                userID:
+                                    social.currentUserID
+                            )
                 )
     }
 
@@ -4341,75 +4469,51 @@ private struct HomeStrengthMuscleArtwork:
                 LinearGradient(
                     colors: [
                         Color(
-                            red: 0.996,
-                            green: 0.991,
-                            blue: 0.982
+                            red: 0.992,
+                            green: 0.988,
+                            blue: 0.978
                         ),
                         Color(
-                            red: 0.966,
-                            green: 0.960,
-                            blue: 0.947
+                            red: 0.948,
+                            green: 0.955,
+                            blue: 0.958
                         )
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
 
-                RadialGradient(
-                    colors: [
-                        activationTint
-                            .opacity(0.13),
-                        activationTint
-                            .opacity(0.04),
-                        Color.clear
-                    ],
-                    center:
-                        UnitPoint(
-                            x: 0.56,
-                            y: 0.46
-                        ),
-                    startRadius: 4,
-                    endRadius:
-                        max(
-                            proxy.size.width *
-                                0.54,
-                            110
-                        )
-                )
-
-                RoundedRectangle(
-                    cornerRadius: 34,
-                    style: .continuous
-                )
-                .fill(
-                    Color.white.opacity(
-                        0.46
-                    )
-                )
+                HStack(spacing: 0) {
+                    figureGlow
+                    figureGlow
+                }
                 .frame(
                     width:
                         min(
-                            proxy.size.width -
-                                16,
-                            224
+                            proxy.size.width,
+                            260
                         ),
                     height:
                         max(
-                            height - 10,
-                            108
+                            height,
+                            118
                         )
                 )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 34,
-                        style: .continuous
+
+                Rectangle()
+                    .fill(
+                        Color.black.opacity(
+                            0.045
+                        )
                     )
-                    .stroke(
-                        Color.white
-                            .opacity(0.74),
-                        lineWidth: 0.7
+                    .frame(
+                        width: 0.7,
+                        height:
+                            max(
+                                height - 32,
+                                80
+                            )
                     )
-                }
 
                 StrengthMuscleMapView(
                     profile: profile,
@@ -4423,27 +4527,64 @@ private struct HomeStrengthMuscleArtwork:
                     width:
                         min(
                             max(
-                                height * 1.58,
-                                158
+                                height * 1.86,
+                                184
                             ),
                             proxy.size.width -
-                                18
+                                10
                         ),
                     height:
                         max(
-                            height + 14,
-                            126
+                            height + 28,
+                            142
                         )
                 )
-                .padding(.top, 6)
+                .scaleEffect(
+                    1.08,
+                    anchor: .center
+                )
+                .padding(.top, 7)
+
+                VStack {
+                    Spacer()
+
+                    HStack {
+                        atlasLabel(
+                            ATHLTHLocalization.choose(
+                                english: "FRONT",
+                                norwegian: "FORSIDE"
+                            )
+                        )
+
+                        Spacer()
+
+                        atlasLabel(
+                            ATHLTHLocalization.choose(
+                                english: "BACK",
+                                norwegian: "BAKSIDE"
+                            )
+                        )
+                    }
+                    .frame(
+                        width:
+                            min(
+                                proxy.size.width -
+                                    64,
+                                154
+                            )
+                    )
+                    .padding(.bottom, 7)
+                }
 
                 LinearGradient(
                     colors: [
-                        Color.white
-                            .opacity(0.20),
+                        Color.white.opacity(
+                            0.24
+                        ),
                         Color.clear,
-                        Color.black
-                            .opacity(0.025)
+                        Color.black.opacity(
+                            0.028
+                        )
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -4459,6 +4600,53 @@ private struct HomeStrengthMuscleArtwork:
         .frame(height: height)
         .clipped()
         .accessibilityHidden(true)
+    }
+
+    private var figureGlow:
+        some View {
+        RadialGradient(
+            colors: [
+                activationTint.opacity(
+                    0.14
+                ),
+                activationTint.opacity(
+                    0.045
+                ),
+                Color.clear
+            ],
+            center: .center,
+            startRadius: 3,
+            endRadius: 76
+        )
+    }
+
+    private func atlasLabel(
+        _ text: String
+    ) -> some View {
+        Text(text)
+            .font(
+                .system(
+                    size: 7.5,
+                    weight: .bold
+                )
+            )
+            .tracking(0.7)
+            .foregroundStyle(
+                ATHLTHTheme
+                    .mutedText
+                    .opacity(0.78)
+            )
+            .padding(
+                .horizontal,
+                7
+            )
+            .frame(height: 17)
+            .background(
+                Color.white.opacity(
+                    0.74
+                ),
+                in: Capsule()
+            )
     }
 }
 
@@ -4805,8 +4993,20 @@ private struct HomePersonalWorkoutVisual:
 
 private struct HomePersonalActivityDestination:
     View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var strength:
+        StrengthWorkoutStore
+    @EnvironmentObject private var phoneWorkoutStore:
+        IPhoneWorkoutStore
+    @EnvironmentObject private var social:
+        SocialStore
+
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
+    var phoneWorkout: PhoneWorkout? = nil
+
+    @State private var showingDeleteConfirmation =
+        false
 
     var body: some View {
         Group {
@@ -4834,6 +5034,143 @@ private struct HomePersonalActivityDestination:
                 )
             }
         }
+        .toolbar {
+            ToolbarItem(
+                placement:
+                    .topBarTrailing
+            ) {
+                Menu {
+                    Button(
+                        role: .destructive
+                    ) {
+                        showingDeleteConfirmation =
+                            true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Remove from ATHLTH",
+                                norwegian:
+                                    "Fjern fra ATHLTH"
+                            ),
+                            systemImage:
+                                "trash"
+                        )
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis.circle"
+                    )
+                }
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Workout options",
+                        norwegian:
+                            "Valg for økten"
+                    )
+                )
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english:
+                    "Remove this workout from ATHLTH?",
+                norwegian:
+                    "Fjerne denne økten fra ATHLTH?"
+            ),
+            isPresented:
+                $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Remove from ATHLTH",
+                    norwegian:
+                        "Fjern fra ATHLTH"
+                ),
+                role: .destructive
+            ) {
+                removeFromATHLTH()
+            }
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel",
+                    norwegian: "Avbryt"
+                ),
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "The workout disappears from ATHLTH. Apple Health data is not deleted.",
+                    norwegian:
+                        "Økten forsvinner fra ATHLTH. Data i Apple Health blir ikke slettet."
+                )
+            )
+        }
+    }
+
+    private var relatedWorkoutIDs:
+        Set<UUID> {
+        var ids: Set<UUID> = [
+            workout.id
+        ]
+
+        if let strengthWorkout {
+            ids.insert(
+                strengthWorkout.id
+            )
+            if let healthID =
+                    strengthWorkout
+                        .healthMetrics
+                        .healthKitWorkoutUUID {
+                ids.insert(healthID)
+            }
+        }
+
+        if let phoneWorkout {
+            ids.insert(
+                phoneWorkout.id
+            )
+            if let healthID =
+                    phoneWorkout.healthID {
+                ids.insert(healthID)
+            }
+        }
+
+        return ids
+    }
+
+    private func removeFromATHLTH() {
+        let ids = relatedWorkoutIDs
+
+        HomeActivityVisibilityStore.hide(
+            ids,
+            userID:
+                social.currentUserID
+        )
+
+        strength.removeWorkoutFromHistory(
+            matching: ids
+        )
+        phoneWorkoutStore
+            .removeWorkoutFromHistory(
+                matching: ids
+            )
+
+        Task {
+            await social
+                .deleteWorkoutActivities(
+                    matching: ids
+                )
+        }
+
+        dismiss()
     }
 }
 
