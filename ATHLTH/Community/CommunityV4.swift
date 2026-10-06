@@ -760,7 +760,7 @@ struct ATHLTHCommunityV4View: View {
                                 CommunityReferenceUpcomingEventCard(
                                     item: event
                                 )
-                                .frame(width: 300)
+                                .frame(width: 336)
                             }
                             .buttonStyle(.plain)
                         }
@@ -4616,7 +4616,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
     let item: CommunityEventItem
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
             VStack(spacing: 0) {
                 Text(
                     item.event.startsAt
@@ -4630,7 +4630,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
                 .font(
                     .system(
-                        size: 8,
+                        size: 9,
                         weight: .bold
                     )
                 )
@@ -4643,9 +4643,8 @@ private struct CommunityReferenceUpcomingEventCard: View {
                         )
                 )
                 .font(
-                    .system(
-                        size: 18,
-                        weight: .bold
+                    .title3.weight(
+                        .bold
                     )
                 )
 
@@ -4661,7 +4660,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
                 .font(
                     .system(
-                        size: 7.5,
+                        size: 8,
                         weight: .semibold
                     )
                 )
@@ -4670,38 +4669,38 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
             }
             .frame(
-                width: 42,
-                height: 60
+                width: 46,
+                height: 70
             )
             .background(
                 Color.white,
                 in:
                     RoundedRectangle(
-                        cornerRadius: 11,
+                        cornerRadius: 12,
                         style: .continuous
                     )
             )
 
-            upcomingArtwork
+            eventCover
                 .frame(
-                    width: 62,
-                    height: 60
+                    width: 82,
+                    height: 70
                 )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 11,
+                        cornerRadius: 12,
                         style: .continuous
                     )
                 )
 
             VStack(
                 alignment: .leading,
-                spacing: 3
+                spacing: 4
             ) {
                 Text(item.event.title)
                     .font(
                         .system(
-                            size: 12.5,
+                            size: 14,
                             weight: .bold
                         )
                     )
@@ -4709,32 +4708,20 @@ private struct CommunityReferenceUpcomingEventCard: View {
                         ATHLTHTheme.primaryText
                     )
                     .lineLimit(2)
-                    .minimumScaleFactor(0.86)
+                    .minimumScaleFactor(0.88)
                     .fixedSize(
                         horizontal: false,
                         vertical: true
                     )
 
                 Label(
-                    item.event.meetingName
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        .isEmpty
-                        ? item.event.activityType.title
-                        : item.event.meetingName,
+                    eventLocationText,
                     systemImage:
-                        item.event.meetingName
-                            .trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            )
-                            .isEmpty
-                            ? item.event.activityType.systemImage
-                            : "location.fill"
+                        "location.fill"
                 )
                 .font(
                     .system(
-                        size: 9.5,
+                        size: 10,
                         weight: .medium
                     )
                 )
@@ -4754,14 +4741,14 @@ private struct CommunityReferenceUpcomingEventCard: View {
                     )
 
                     Label(
-                        "\(item.participantCount)",
+                        "(item.participantCount)",
                         systemImage:
                             "person.2.fill"
                     )
                 }
                 .font(
                     .system(
-                        size: 9,
+                        size: 9.5,
                         weight: .medium
                     )
                 )
@@ -4774,6 +4761,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 maxWidth: .infinity,
                 alignment: .leading
             )
+            .layoutPriority(1)
 
             Image(
                 systemName:
@@ -4788,11 +4776,14 @@ private struct CommunityReferenceUpcomingEventCard: View {
             .foregroundStyle(
                 ATHLTHTheme.accentDeep
             )
-            .frame(width: 14)
+            .frame(
+                width: 20,
+                height: 34
+            )
         }
-        .padding(8)
+        .padding(9)
         .background(
-            Color.white.opacity(0.86),
+            Color.white.opacity(0.90),
             in:
                 RoundedRectangle(
                     cornerRadius: 18,
@@ -4811,57 +4802,68 @@ private struct CommunityReferenceUpcomingEventCard: View {
         }
     }
 
+    private var eventLocationText:
+        String {
+        let clean =
+            item.event
+                .meetingName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        return clean.isEmpty
+            ? item.event
+                .activityType
+                .title
+            : clean
+    }
+
     @ViewBuilder
-    private var upcomingArtwork:
+    private var eventCover:
         some View {
         if let rawURL =
-                item.event.coverImageURL,
+                item.event
+                    .coverImageURL,
            let url =
                 URL(string: rawURL) {
             ATHLTHStorageImage(
                 url: url,
-                maxPixelSize: 220
+                maxPixelSize: 360
             ) { phase in
                 switch phase {
                 case .success(let image):
                     image
                         .resizable()
                         .scaledToFill()
+
                 default:
-                    Image(
-                        CommunityEventCoverPolicy
-                            .displayArtworkName(
-                                item.event
-                                    .coverArtworkName ??
-                                CommunityEventCoverPolicy
-                                    .defaultArtwork(
-                                        for:
-                                            item.event
-                                                .activityType
-                                    )
-                            )
-                    )
-                    .resizable()
-                    .scaledToFill()
+                    standardCover
                 }
             }
         } else {
-            Image(
-                CommunityEventCoverPolicy
-                    .displayArtworkName(
-                        item.event
-                            .coverArtworkName ??
-                        CommunityEventCoverPolicy
-                            .defaultArtwork(
-                                for:
-                                    item.event
-                                        .activityType
-                            )
-                    )
-            )
-            .resizable()
-            .scaledToFill()
+            standardCover
         }
+    }
+
+    private var standardCover:
+        some View {
+        Image(
+            CommunityEventCoverPolicy
+                .displayArtworkName(
+                    item.event
+                        .coverArtworkName ??
+                    CommunityEventCoverPolicy
+                        .defaultArtwork(
+                            for:
+                                item.event
+                                    .activityType
+                        )
+                )
+        )
+        .resizable()
+        .scaledToFill()
+        .clipped()
     }
 }
 
