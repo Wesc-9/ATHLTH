@@ -18,6 +18,7 @@ final class GhostRaceCadenceTests:
         return defaults
     }
 
+    @MainActor
     func testDefaultGhostCadenceIsOneKilometreWithoutExtraLeadAlerts() {
         let settings =
             AppSettingsStore(
@@ -64,6 +65,7 @@ final class GhostRaceCadenceTests:
         )
     }
 
+    @MainActor
     func testGhostDistanceAndTimeUnitsAreConvertedExactly() {
         let settings =
             AppSettingsStore(
@@ -99,6 +101,7 @@ final class GhostRaceCadenceTests:
         )
     }
 
+    @MainActor
     func testGhostStatusModePersistsAndTransfers() {
         let defaults =
             makeDefaults()
