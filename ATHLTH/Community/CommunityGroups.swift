@@ -12023,313 +12023,297 @@ struct CommunityGroupCreateView: View {
 
     @ViewBuilder
     private var createClubPreview: some View {
-        ZStack(
-            alignment: .bottomLeading
-        ) {
-            createHeaderPreviewBackground
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(
-                        0.05
-                    ),
-                    Color.black.opacity(
-                        0.18
-                    ),
-                    Color.black.opacity(
-                        0.74
-                    )
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(
-                        0.38
-                    ),
-                    Color.clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(
-                spacing: 0
+        GeometryReader { proxy in
+            ZStack(
+                alignment: .bottomLeading
             ) {
-                HStack(
-                    spacing: 8
-                ) {
+                createHeaderPreviewBackground
+                    .frame(
+                        width: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    .clipped()
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(
+                            0.05
+                        ),
+                        Color.black.opacity(
+                            0.18
+                        ),
+                        Color.black.opacity(
+                            0.74
+                        )
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(
+                            0.38
+                        ),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                VStack(spacing: 0) {
+                    HStack(spacing: 8) {
+                        PhotosPicker(
+                            selection:
+                                $selectedHeaderPhoto,
+                            matching:
+                                .images
+                        ) {
+                            createPreviewMediaButton(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Change header",
+                                    norwegian:
+                                        "Endre header"
+                                ),
+                                icon: "photo"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+
+                        PhotosPicker(
+                            selection:
+                                $selectedPhoto,
+                            matching:
+                                .images
+                        ) {
+                            createPreviewMediaButton(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Club photo",
+                                    norwegian:
+                                        "Profilbilde"
+                                ),
+                                icon:
+                                    "person.crop.square"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                    }
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                    .padding(
+                        .horizontal,
+                        12
+                    )
+                    .padding(
+                        .top,
+                        12
+                    )
+
                     Spacer()
-
-                    PhotosPicker(
-                        selection:
-                            $selectedHeaderPhoto,
-                        matching:
-                            .images
-                    ) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Change header",
-                                norwegian:
-                                    "Endre header"
-                            ),
-                            systemImage:
-                                "photo"
-                        )
-                        .font(
-                            .caption.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .padding(
-                            .horizontal,
-                            11
-                        )
-                        .frame(height: 34)
-                        .background(
-                            Color.black
-                                .opacity(
-                                    0.34
-                                ),
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    Color.white
-                                        .opacity(
-                                            0.28
-                                        ),
-                                    lineWidth:
-                                        0.8
-                                )
-                        }
-                    }
-                    .buttonStyle(
-                        .plain
-                    )
-
-                    PhotosPicker(
-                        selection:
-                            $selectedPhoto,
-                        matching:
-                            .images
-                    ) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Club photo",
-                                norwegian:
-                                    "Profilbilde"
-                            ),
-                            systemImage:
-                                "person.crop.square"
-                        )
-                        .font(
-                            .caption.weight(
-                                .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            .white
-                        )
-                        .padding(
-                            .horizontal,
-                            11
-                        )
-                        .frame(height: 34)
-                        .background(
-                            Color.black
-                                .opacity(
-                                    0.34
-                                ),
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    Color.white
-                                        .opacity(
-                                            0.28
-                                        ),
-                                    lineWidth:
-                                        0.8
-                                )
-                        }
-                    }
-                    .buttonStyle(
-                        .plain
-                    )
                 }
-                .padding(
-                    .horizontal,
-                    12
-                )
-                .padding(
-                    .top,
-                    12
+                .frame(
+                    width:
+                        proxy.size.width,
+                    height:
+                        proxy.size.height
                 )
 
-                Spacer()
-            }
-
-            HStack(
-                alignment: .bottom,
-                spacing: 12
-            ) {
-                ZStack(
-                    alignment:
-                        .bottomTrailing
+                HStack(
+                    alignment: .bottom,
+                    spacing: 10
                 ) {
-                    createProfileImagePreview
-
-                    PhotosPicker(
-                        selection:
-                            $selectedPhoto,
-                        matching:
-                            .images
+                    ZStack(
+                        alignment:
+                            .bottomTrailing
                     ) {
-                        Image(
-                            systemName:
-                                "pencil"
+                        createProfileImagePreview
+                            .frame(
+                                width: 62,
+                                height: 62
+                            )
+
+                        PhotosPicker(
+                            selection:
+                                $selectedPhoto,
+                            matching:
+                                .images
+                        ) {
+                            Image(
+                                systemName:
+                                    "pencil"
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight:
+                                        .bold
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                            )
+                            .frame(
+                                width: 24,
+                                height: 24
+                            )
+                            .background(
+                                Color(
+                                    red: 0.025,
+                                    green: 0.30,
+                                    blue: 0.21
+                                ),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white,
+                                        lineWidth:
+                                            2
+                                    )
+                            }
+                        }
+                        .buttonStyle(
+                            .plain
+                        )
+                        .offset(
+                            x: 3,
+                            y: 3
+                        )
+                    }
+                    .frame(
+                        width: 62,
+                        height: 62
+                    )
+                    .layoutPriority(1)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            name
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                                .isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Your Club",
+                                    norwegian:
+                                        "Din klubb"
+                                )
+                                : name
                         )
                         .font(
                             .system(
-                                size: 11,
-                                weight:
-                                    .bold
+                                size: 22,
+                                weight: .bold,
+                                design:
+                                    .rounded
                             )
                         )
                         .foregroundStyle(
                             .white
-                        )
-                        .frame(
-                            width: 26,
-                            height: 26
-                        )
-                        .background(
-                            Color(
-                                red: 0.025,
-                                green: 0.30,
-                                blue: 0.21
-                            ),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white,
-                                    lineWidth:
-                                        2
-                                )
-                        }
-                    }
-                    .buttonStyle(
-                        .plain
-                    )
-                    .offset(
-                        x: 4,
-                        y: 4
-                    )
-                }
-                .layoutPriority(1)
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text(
-                        name
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Your Club",
-                                norwegian:
-                                    "Din klubb"
-                            )
-                            : name
-                    )
-                    .font(
-                        .system(
-                            size: 24,
-                            weight: .bold,
-                            design:
-                                .rounded
-                        )
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.68
-                    )
-
-                    let cleanSummary =
-                        summary
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-
-                    if !cleanSummary.isEmpty {
-                        Text(
-                            cleanSummary
-                        )
-                        .font(
-                            .caption
-                        )
-                        .foregroundStyle(
-                            .white
-                                .opacity(
-                                    0.90
-                                )
                         )
                         .lineLimit(1)
-                    }
-
-                    HStack(
-                        spacing: 6
-                    ) {
-                        createPreviewChip(
-                            visibility ==
-                                "private"
-                                ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Private",
-                                    norwegian:
-                                        "Privat"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english:
-                                        "Public",
-                                    norwegian:
-                                        "Offentlig"
-                                ),
-                            icon:
-                                visibility ==
-                                    "private"
-                                    ? "lock.fill"
-                                    : "globe"
+                        .minimumScaleFactor(
+                            0.72
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity,
+                            alignment:
+                                .leading
                         )
 
-                        createPreviewChip(
-                            createMembershipPreviewTitle,
-                            icon:
-                                joinMode ==
-                                    "open"
-                                    ? "person.badge.plus"
-                                    : "person.badge.clock"
+                        let cleanSummary =
+                            summary
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+
+                        if !cleanSummary.isEmpty {
+                            Text(
+                                cleanSummary
+                            )
+                            .font(
+                                .system(
+                                    size: 10
+                                )
+                            )
+                            .foregroundStyle(
+                                .white
+                                    .opacity(
+                                        0.90
+                                    )
+                            )
+                            .lineLimit(1)
+                            .frame(
+                                maxWidth:
+                                    .infinity,
+                                alignment:
+                                    .leading
+                            )
+                        }
+
+                        HStack(
+                            spacing: 5
+                        ) {
+                            createPreviewChip(
+                                visibility ==
+                                    "private"
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Private",
+                                        norwegian:
+                                            "Privat"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Public",
+                                        norwegian:
+                                            "Offentlig"
+                                    ),
+                                icon:
+                                    visibility ==
+                                        "private"
+                                        ? "lock.fill"
+                                        : "globe"
+                            )
+
+                            createPreviewChip(
+                                createMembershipPreviewTitle,
+                                icon:
+                                    joinMode ==
+                                        "open"
+                                        ? "person.badge.plus"
+                                        : "person.badge.clock"
+                            )
+
+                            Spacer(
+                                minLength: 0
+                            )
+                        }
+                        .frame(
+                            maxWidth:
+                                .infinity,
+                            alignment:
+                                .leading
                         )
 
                         let cleanLocation =
@@ -12339,38 +12323,61 @@ struct CommunityGroupCreateView: View {
                                         .whitespacesAndNewlines
                                 )
 
-                        if !cleanLocation
-                            .isEmpty {
-                            createPreviewChip(
+                        if !cleanLocation.isEmpty {
+                            Label(
                                 cleanLocation,
-                                icon:
+                                systemImage:
                                     "location.fill"
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight:
+                                        .medium
+                                )
+                            )
+                            .foregroundStyle(
+                                .white.opacity(
+                                    0.86
+                                )
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(
+                                0.78
                             )
                         }
                     }
+                    .frame(
+                        maxWidth:
+                            .infinity,
+                        alignment:
+                            .leading
+                    )
                 }
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .padding(
+                    .bottom,
+                    14
+                )
                 .frame(
-                    maxWidth:
-                        .infinity,
+                    width:
+                        proxy.size.width,
                     alignment:
                         .leading
                 )
             }
-            .padding(
-                .horizontal,
-                14
+            .frame(
+                width:
+                    proxy.size.width,
+                height:
+                    proxy.size.height
             )
-            .padding(
-                .bottom,
-                14
-            )
+            .clipped()
         }
         .frame(height: 242)
-        .frame(
-            maxWidth:
-                .infinity
-        )
-        .clipped()
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 24,
@@ -12399,6 +12406,69 @@ struct CommunityGroupCreateView: View {
             radius: 16,
             y: 7
         )
+    }
+
+    private func createPreviewMediaButton(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        HStack(
+            spacing: 6
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 12,
+                    weight:
+                        .semibold
+                )
+            )
+
+            Text(title)
+                .font(
+                    .system(
+                        size: 11,
+                        weight:
+                            .semibold
+                    )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.78
+                )
+        }
+        .foregroundStyle(
+            .white
+        )
+        .frame(
+            maxWidth:
+                .infinity
+        )
+        .frame(height: 34)
+        .padding(
+            .horizontal,
+            8
+        )
+        .background(
+            Color.black
+                .opacity(
+                    0.36
+                ),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.white
+                        .opacity(
+                            0.30
+                        ),
+                    lineWidth:
+                        0.8
+                )
+        }
     }
 
     @ViewBuilder
@@ -12494,8 +12564,8 @@ struct CommunityGroupCreateView: View {
             }
         }
         .frame(
-            width: 70,
-            height: 70
+            maxWidth: .infinity,
+            maxHeight: .infinity
         )
         .clipShape(
             RoundedRectangle(
