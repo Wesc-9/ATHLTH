@@ -1585,23 +1585,6 @@ struct AllTrainingPlansView: View {
             }
     }
 
-    private var editorModeIndex:
-        Binding<Int> {
-        Binding(
-            get: {
-                editorMode == .advanced
-                    ? 1
-                    : 0
-            },
-            set: { index in
-                editorMode =
-                    index == 1
-                        ? .advanced
-                        : .basic
-            }
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -4523,6 +4506,23 @@ struct SessionEditorView: View {
                 initialValue: total % 60
             )
         }
+    }
+
+    private var editorModeIndex:
+        Binding<Int> {
+        Binding(
+            get: {
+                editorMode == .advanced
+                    ? 1
+                    : 0
+            },
+            set: { index in
+                editorMode =
+                    index == 1
+                        ? .advanced
+                        : .basic
+            }
+        )
     }
 
     var body: some View {
