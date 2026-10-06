@@ -2752,8 +2752,24 @@ private struct HomeWeeklyProgressDaySelection:
 
     let date: Date
     let planned: [PlannedSession]
+    let communityEvents:
+        [HomeScheduledCommunityEvent]
     let actual: [WorkoutSummary]
     let completedPlannedIDs: Set<UUID>
+    let completedCommunityEventIDs:
+        Set<String>
+}
+
+struct HomeScheduledCommunityEvent:
+    Identifiable,
+    Hashable
+{
+    let id: String
+    let title: String
+    let startsAt: Date
+    let activityType: String
+    let systemImage: String
+    let detail: String
 }
 
 struct HomeWeeklyProgressStrip:
@@ -2763,6 +2779,8 @@ struct HomeWeeklyProgressStrip:
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
+    let communityEvents:
+        [HomeScheduledCommunityEvent]
 
     @State private var weekOffset = 0
     @State private var selectedDay:
@@ -2907,10 +2925,20 @@ struct HomeWeeklyProgressStrip:
             workoutsForDay(
                 date
             )
+        let scheduledCommunityEvents =
+            communityEventsForDay(
+                date
+            )
         let completedIDs =
             completedPlanSessionIDs(
                 date: date,
                 planned: planned
+            )
+        let completedCommunityIDs =
+            completedCommunityEventIDs(
+                date: date,
+                events:
+                    scheduledCommunityEvents
             )
 
         Button {
@@ -2918,17 +2946,25 @@ struct HomeWeeklyProgressStrip:
                 HomeWeeklyProgressDaySelection(
                     date: date,
                     planned: planned,
+                    communityEvents:
+                        scheduledCommunityEvents,
                     actual: actual,
                     completedPlannedIDs:
-                        completedIDs
+                        completedIDs,
+                    completedCommunityEventIDs:
+                        completedCommunityIDs
                 )
         } label: {
             day(
                 date,
                 planned: planned,
+                communityEvents:
+                    scheduledCommunityEvents,
                 actual: actual,
                 completedIDs:
-                    completedIDs
+                    completedIDs,
+                completedCommunityIDs:
+                    completedCommunityIDs
             )
         }
         .buttonStyle(.plain)
@@ -2945,8 +2981,12 @@ struct HomeWeeklyProgressStrip:
     private func day(
         _ date: Date,
         planned: [PlannedSession],
+        communityEvents:
+            [HomeScheduledCommunityEvent],
         actual: [WorkoutSummary],
-        completedIDs: Set<UUID>
+        completedIDs: Set<UUID>,
+        completedCommunityIDs:
+            Set<String>
     ) -> some View {
         let plannedSession =
             planned.first {
@@ -2954,15 +2994,27 @@ struct HomeWeeklyProgressStrip:
                     .contains($0.id)
             } ??
             planned.first
-        let allPlannedCompleted =
-            !planned.isEmpty &&
-            completedIDs.count ==
-                planned.count
+        let plannedCommunityEvent =
+            communityEvents.first {
+                !completedCommunityIDs
+                    .contains($0.id)
+            } ??
+            communityEvents.first
+        let scheduledCount =
+            planned.count +
+            communityEvents.count
+        let completedScheduledCount =
+            completedIDs.count +
+            completedCommunityIDs.count
+        let allScheduledCompleted =
+            scheduledCount > 0 &&
+            completedScheduledCount >=
+                scheduledCount
         let hasUnplannedActual =
-            planned.isEmpty &&
+            scheduledCount == 0 &&
             !actual.isEmpty
         let isCompleted =
-            allPlannedCompleted ||
+            allScheduledCompleted ||
             hasUnplannedActual
         let isToday =
             calendar.isDateInToday(
@@ -2983,6 +3035,8 @@ struct HomeWeeklyProgressStrip:
                     Circle()
                         .stroke(
                             plannedSession ==
+                                nil &&
+                            plannedCommunityEvent ==
                                 nil
                                 ? Color
                                     .secondary
@@ -2998,11 +3052,15 @@ struct HomeWeeklyProgressStrip:
                                 StrokeStyle(
                                     lineWidth:
                                         plannedSession ==
+                                        nil &&
+                                    plannedCommunityEvent ==
                                         nil
                                             ? 1
                                             : 1.5,
                                     dash:
                                         plannedSession ==
+                                        nil &&
+                                    plannedCommunityEvent ==
                                         nil
                                             ? [
                                                 3,
@@ -3032,6 +3090,23 @@ struct HomeWeeklyProgressStrip:
                         systemName:
                             plannedSession
                                 .kind
+                                .systemImage
+                    )
+                    .font(
+                        .system(
+                            size: 10,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+                } else if let plannedCommunityEvent {
+                    Image(
+                        systemName:
+                            plannedCommunityEvent
                                 .systemImage
                     )
                     .font(
@@ -3252,11 +3327,28 @@ struct HomeWeeklyProgressStrip:
                     date: date,
                     planned: planned
                 )
+            let scheduledCommunityEvents =
+                communityEventsForDay(
+                    date
+                )
+            let completedCommunity =
+                completedCommunityEventIDs(
+                    date: date,
+                    events:
+                        scheduledCommunityEvents
+                )
 
             return total +
                 max(
                     planned.count -
                         completed.count,
+                    0
+                ) +
+                max(
+                    scheduledCommunityEvents
+                        .count -
+                    completedCommunity
+                        .count,
                     0
                 )
         }
@@ -3289,6 +3381,36 @@ struct HomeWeeklyProgressStrip:
 
     private var canAdvance:
         Bool {
+        let nextWeekStart =
+            calendar.date(
+                byAdding: .day,
+                value: 7,
+                to:
+                    visibleWeekInterval
+                        .start
+            )
+        let nextWeekEnd =
+            nextWeekStart.flatMap {
+                calendar.date(
+                    byAdding: .day,
+                    value: 7,
+                    to: $0
+                )
+            }
+
+        if let nextWeekStart,
+           let nextWeekEnd,
+           communityEvents.contains(
+                where: {
+                    $0.startsAt >=
+                        nextWeekStart &&
+                    $0.startsAt <
+                        nextWeekEnd
+                }
+           ) {
+            return true
+        }
+
         guard let plan,
               !plan.weeks.isEmpty
         else {
@@ -3353,6 +3475,106 @@ struct HomeWeeklyProgressStrip:
                 $0.startDate <
                     $1.startDate
             }
+    }
+
+    private func communityEventsForDay(
+        _ date: Date
+    ) -> [HomeScheduledCommunityEvent] {
+        communityEvents
+            .filter {
+                calendar.isDate(
+                    $0.startsAt,
+                    inSameDayAs:
+                        date
+                )
+            }
+            .sorted {
+                $0.startsAt <
+                    $1.startsAt
+            }
+    }
+
+    private func completedCommunityEventIDs(
+        date: Date,
+        events:
+            [HomeScheduledCommunityEvent]
+    ) -> Set<String> {
+        guard !events.isEmpty
+        else {
+            return []
+        }
+
+        var completed =
+            Set<String>()
+        var unused =
+            workoutsForDay(date)
+
+        for event in events {
+            guard let index =
+                    unused.firstIndex(
+                        where: {
+                            healthWorkout(
+                                $0,
+                                matchesCommunityActivity:
+                                    event.activityType
+                            )
+                        }
+                    )
+            else {
+                continue
+            }
+
+            completed.insert(
+                event.id
+            )
+            unused.remove(
+                at: index
+            )
+        }
+
+        return completed
+    }
+
+    private func healthWorkout(
+        _ workout: WorkoutSummary,
+        matchesCommunityActivity
+            activityType: String
+    ) -> Bool {
+        switch activityType {
+        case "running":
+            return workout.activity ==
+                .running
+        case "walking":
+            return workout.activity ==
+                .walking ||
+                workout.activity ==
+                    .hiking
+        case "hike":
+            return workout.activity ==
+                .hiking ||
+                workout.activity ==
+                    .walking
+        case "strength":
+            return workout.activity ==
+                .strength
+        case "cycling":
+            return workout.activity ==
+                .cycling
+        case "group_workout":
+            return workout.activity ==
+                .hiit ||
+                workout.activity ==
+                    .other
+        default:
+            return workout.activity ==
+                .other ||
+                workout.activity ==
+                    .hiit ||
+                workout.activity ==
+                    .rowing ||
+                workout.activity ==
+                    .stairClimbing
+        }
     }
 
     private func completedPlanSessionIDs(
@@ -3581,6 +3803,7 @@ private struct HomeWeeklyProgressDaySheet:
                     spacing: 10
                 ) {
                     if selection.planned.isEmpty &&
+                        selection.communityEvents.isEmpty &&
                         selection.actual.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
@@ -3612,6 +3835,28 @@ private struct HomeWeeklyProgressDaySheet:
                         ) { workout in
                             plannedRow(
                                 workout
+                            )
+                        }
+                    }
+
+                    if !selection
+                        .communityEvents
+                        .isEmpty {
+                        sectionTitle(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Events",
+                                norwegian:
+                                    "Arrangementer"
+                            )
+                        )
+
+                        ForEach(
+                            selection
+                                .communityEvents
+                        ) { event in
+                            communityEventRow(
+                                event
                             )
                         }
                     }
@@ -3761,6 +4006,115 @@ private struct HomeWeeklyProgressDaySheet:
                             "Planned",
                         norwegian:
                             "Planlagt"
+                    )
+            )
+            .font(
+                .caption2.weight(
+                    .semibold
+                )
+            )
+            .foregroundStyle(
+                completed
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .mutedText
+            )
+        }
+        .padding(11)
+        .background(
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+
+    private func communityEventRow(
+        _ event:
+            HomeScheduledCommunityEvent
+    ) -> some View {
+        let completed =
+            selection
+                .completedCommunityEventIDs
+                .contains(
+                    event.id
+                )
+
+        return HStack(spacing: 11) {
+            Image(
+                systemName:
+                    completed
+                        ? "checkmark"
+                        : event.systemImage
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                completed
+                    ? .white
+                    : ATHLTHTheme
+                        .accentDeep
+            )
+            .frame(
+                width: 36,
+                height: 36
+            )
+            .background(
+                completed
+                    ? ATHLTHTheme
+                        .vitality
+                    : ATHLTHTheme
+                        .accentSoft,
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(event.title)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(2)
+
+                Text(event.detail)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(
+                completed
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Completed",
+                        norwegian:
+                            "Fullført"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Event",
+                        norwegian:
+                            "Event"
                     )
             )
             .font(
