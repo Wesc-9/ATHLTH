@@ -1602,8 +1602,8 @@ struct CommunityEventCreateView: View {
             ZStack {
                 ATHLTHPremiumCanvas(
                     accent:
-                        ATHLTHTheme.accent
-                            .opacity(0.12)
+                        ATHLTHTheme.vitality
+                            .opacity(0.20)
                 )
                 .ignoresSafeArea()
 
@@ -1861,54 +1861,172 @@ struct CommunityEventCreateView: View {
 
                                 eventDivider
 
-                                Menu {
-                                    Button {
-                                        selectedRouteID =
-                                            nil
-                                    } label: {
-                                        Label(
-                                            ATHLTHLocalization.choose(
-                                                english: "No route",
-                                                norwegian: "Ingen rute"
-                                            ),
-                                            systemImage:
-                                                "xmark.circle"
-                                        )
-                                    }
-
-                                    ForEach(
-                                        session.savedRoutes
-                                    ) { route in
-                                        Button {
-                                            selectedRouteID =
-                                                route.id
-                                        } label: {
-                                            Label(
-                                                route.title,
-                                                systemImage:
-                                                    "map"
-                                            )
-                                        }
-                                    }
-                                } label: {
-                                    eventSelectionRow(
-                                        title:
-                                            ATHLTHLocalization.choose(
-                                                english: "Route",
-                                                norwegian: "Rute"
-                                            ),
-                                        value:
-                                            selectedRoute?
-                                                .title ??
-                                            ATHLTHLocalization.choose(
-                                                english: "No route",
-                                                norwegian: "Ingen rute"
-                                            ),
-                                        icon:
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
                                             "point.topleft.down.to.point.bottomright.curvepath"
                                     )
+                                    .font(
+                                        .system(
+                                            size: 17,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .vitality
+                                    )
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .vitalitySoft,
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius: 12,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Route",
+                                            norwegian: "Rute"
+                                        )
+                                    )
+                                    .font(.subheadline)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Spacer(
+                                        minLength: 8
+                                    )
+
+                                    Menu {
+                                        Button {
+                                            selectedRouteID =
+                                                nil
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "No route",
+                                                    norwegian: "Ingen rute"
+                                                ),
+                                                systemImage:
+                                                    "xmark.circle"
+                                            )
+                                        }
+
+                                        ForEach(
+                                            session.savedRoutes
+                                        ) { route in
+                                            Button {
+                                                selectedRouteID =
+                                                    route.id
+                                            } label: {
+                                                Label(
+                                                    route.title,
+                                                    systemImage:
+                                                        "map"
+                                                )
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(
+                                            spacing: 7
+                                        ) {
+                                            Text(
+                                                selectedRoute?
+                                                    .title ??
+                                                ATHLTHLocalization.choose(
+                                                    english:
+                                                        "No route",
+                                                    norwegian:
+                                                        "Ingen rute"
+                                                )
+                                            )
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(
+                                                0.78
+                                            )
+
+                                            Image(
+                                                systemName:
+                                                    "chevron.up.chevron.down"
+                                            )
+                                            .font(
+                                                .caption2
+                                                    .bold()
+                                            )
+                                        }
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .accentDeep
+                                        )
+                                        .padding(
+                                            .horizontal,
+                                            12
+                                        )
+                                        .frame(
+                                            height: 40
+                                        )
+                                        .background(
+                                            ATHLTHTheme
+                                                .surfaceSage,
+                                            in: Capsule()
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    NavigationLink {
+                                        RunRouteBuilderView()
+                                    } label: {
+                                        Image(
+                                            systemName:
+                                                "plus"
+                                        )
+                                        .font(
+                                            .system(
+                                                size: 16,
+                                                weight:
+                                                    .bold
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            .white
+                                        )
+                                        .frame(
+                                            width: 40,
+                                            height: 40
+                                        )
+                                        .background(
+                                            ATHLTHTheme
+                                                .vitality,
+                                            in: Circle()
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Create new route",
+                                            norwegian:
+                                                "Lag ny rute"
+                                        )
+                                    )
                                 }
-                                .buttonStyle(.plain)
 
                                 if let selectedRoute {
                                     eventRoutePreview(
@@ -2190,6 +2308,10 @@ struct CommunityEventCreateView: View {
             .navigationBarTitleDisplayMode(
                 .inline
             )
+            .toolbarBackground(
+                .hidden,
+                for: .navigationBar
+            )
             .toolbar {
                 ToolbarItem(
                     placement:
@@ -2274,22 +2396,8 @@ struct CommunityEventCreateView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
                         .background(
-                            LinearGradient(
-                                colors: [
-                                    Color(
-                                        red: 0.20,
-                                        green: 0.26,
-                                        blue: 0.36
-                                    ),
-                                    Color(
-                                        red: 0.34,
-                                        green: 0.43,
-                                        blue: 0.57
-                                    )
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
+                            ATHLTHTheme
+                                .vitality,
                             in: Capsule(
                                 style:
                                     .continuous
@@ -2561,12 +2669,22 @@ struct CommunityEventCreateView: View {
         }
         .padding(14)
         .background(
-            Color.white.opacity(0.92),
+            ATHLTHTheme.surfaceSage,
             in: RoundedRectangle(
                 cornerRadius: 20,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private var eventArtworkName: String {
@@ -2623,42 +2741,56 @@ struct CommunityEventCreateView: View {
         @ViewBuilder content:
             () -> Content
     ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 12
-        ) {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName: icon
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 11,
+                                style:
+                                    .continuous
+                            )
+                    )
 
-            content()
+                    Text(title)
+                        .font(
+                            .headline
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer()
+                }
+
+                content()
+            }
         }
-        .padding(16)
-        .background(
-            Color.white.opacity(0.93),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.025),
-            radius: 9,
-            y: 3
-        )
     }
 
     private func eventTextField(
@@ -2683,11 +2815,11 @@ struct CommunityEventCreateView: View {
                     )
                 )
                 .foregroundStyle(
-                    ATHLTHTheme.accent
+                    ATHLTHTheme.vitality
                 )
                 .frame(width: 38, height: 38)
                 .background(
-                    ATHLTHTheme.accentSoft,
+                    ATHLTHTheme.vitalitySoft,
                     in: RoundedRectangle(
                         cornerRadius: 12,
                         style: .continuous
