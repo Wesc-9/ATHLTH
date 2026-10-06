@@ -2779,7 +2779,7 @@ struct HomeWeeklyProgressStrip:
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
-    let communityEvents:
+    let events:
         [HomeScheduledCommunityEvent]
 
     @State private var weekOffset = 0
@@ -3400,7 +3400,7 @@ struct HomeWeeklyProgressStrip:
 
         if let nextWeekStart,
            let nextWeekEnd,
-           communityEvents.contains(
+           events.contains(
                 where: {
                     $0.startsAt >=
                         nextWeekStart &&
@@ -3480,7 +3480,7 @@ struct HomeWeeklyProgressStrip:
     private func communityEventsForDay(
         _ date: Date
     ) -> [HomeScheduledCommunityEvent] {
-        communityEvents
+        events
             .filter {
                 calendar.isDate(
                     $0.startsAt,
