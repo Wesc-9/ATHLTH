@@ -142,6 +142,11 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
     let paceLabel: String?
     let routeID: UUID?
     let routeTitle: String?
+    let routeCoordinates: [RouteCoordinate]?
+    let routeDistanceKilometers: Double?
+    let routeElevationGainMeters: Double?
+    let routeStartName: String?
+    let routeEndName: String?
     let coverArtworkName: String?
     let coverImageURL: String?
     let createdAt: Date
@@ -165,6 +170,15 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
         case paceLabel = "pace_label"
         case routeID = "route_id"
         case routeTitle = "route_title"
+        case routeCoordinates = "route_coordinates"
+        case routeDistanceKilometers =
+            "route_distance_kilometers"
+        case routeElevationGainMeters =
+            "route_elevation_gain_meters"
+        case routeStartName =
+            "route_start_name"
+        case routeEndName =
+            "route_end_name"
         case coverArtworkName = "cover_artwork_name"
         case coverImageURL = "cover_image_url"
         case createdAt = "created_at"
@@ -223,6 +237,11 @@ struct CommunityEventDraft:
     var paceLabel = ""
     var routeID: UUID? = nil
     var routeTitle: String? = nil
+    var routeCoordinates: [RouteCoordinate]? = nil
+    var routeDistanceKilometers: Double? = nil
+    var routeElevationGainMeters: Double? = nil
+    var routeStartName: String? = nil
+    var routeEndName: String? = nil
     var coverArtworkName: String? = nil
     var coverImageURL: String? = nil
 
@@ -326,6 +345,11 @@ private struct CommunityEventWrite: Encodable {
     let paceLabel: String?
     let routeID: UUID?
     let routeTitle: String?
+    let routeCoordinates: [RouteCoordinate]?
+    let routeDistanceKilometers: Double?
+    let routeElevationGainMeters: Double?
+    let routeStartName: String?
+    let routeEndName: String?
     let coverArtworkName: String?
     let coverImageURL: String?
     let updatedAt: Date
@@ -347,6 +371,15 @@ private struct CommunityEventWrite: Encodable {
         case paceLabel = "pace_label"
         case routeID = "route_id"
         case routeTitle = "route_title"
+        case routeCoordinates = "route_coordinates"
+        case routeDistanceKilometers =
+            "route_distance_kilometers"
+        case routeElevationGainMeters =
+            "route_elevation_gain_meters"
+        case routeStartName =
+            "route_start_name"
+        case routeEndName =
+            "route_end_name"
         case coverArtworkName = "cover_artwork_name"
         case coverImageURL = "cover_image_url"
         case updatedAt = "updated_at"
@@ -615,6 +648,16 @@ final class SupabaseCommunityService {
                     paceLabel: draft.paceLabel.nilIfBlank,
                     routeID: draft.routeID,
                     routeTitle: draft.routeTitle,
+                    routeCoordinates:
+                        draft.routeCoordinates,
+                    routeDistanceKilometers:
+                        draft.routeDistanceKilometers,
+                    routeElevationGainMeters:
+                        draft.routeElevationGainMeters,
+                    routeStartName:
+                        draft.routeStartName,
+                    routeEndName:
+                        draft.routeEndName,
                     coverArtworkName:
                         draft.coverArtworkName,
                     coverImageURL:
@@ -1331,9 +1374,26 @@ struct CommunityEventDetailView: View {
                 .padding(.top, 70)
             }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Event")
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.20)
+            )
+            .ignoresSafeArea()
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Event",
+                norwegian: "Arrangement"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
+        )
     }
 
     private func eventHero(_ item: CommunityEventItem) -> some View {
@@ -1354,7 +1414,7 @@ struct CommunityEventDetailView: View {
             )
             .font(.caption2.weight(.bold))
             .tracking(1.1)
-            .foregroundStyle(ATHLTHTheme.accent)
+            .foregroundStyle(ATHLTHTheme.vitality)
 
             Text(item.event.title)
                 .font(.largeTitle.weight(.bold))
@@ -1389,8 +1449,28 @@ struct CommunityEventDetailView: View {
         }
         .padding(18)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            ATHLTHTheme.surfaceSage,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.045),
+            radius: 12,
+            y: 5
         )
     }
 
@@ -1475,7 +1555,7 @@ struct CommunityEventDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHTheme.vitality)
                 } else {
                     Button {
                         Task {
@@ -1490,7 +1570,7 @@ struct CommunityEventDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHTheme.vitality)
                     .disabled(
                         item.event.maxParticipants.map {
                             item.participantCount >= $0
@@ -1573,11 +1653,24 @@ struct CommunityEventDetailView: View {
                 )
             }
 
-            if let route = item.event.routeTitle, !route.isEmpty {
+            if let route =
+                    eventRoute(item) {
+                eventRouteOverview(
+                    route
+                )
+                .padding(.top, 10)
+            } else if let routeTitle =
+                        item.event
+                            .routeTitle?
+                            .nilIfBlank {
                 eventDetailRow(
-                    "Route",
-                    value: route,
-                    icon: "point.topleft.down.to.point.bottomright.curvepath"
+                    ATHLTHLocalization.choose(
+                        english: "Route",
+                        norwegian: "Rute"
+                    ),
+                    value: routeTitle,
+                    icon:
+                        "point.topleft.down.to.point.bottomright.curvepath"
                 )
             }
 
@@ -1635,117 +1728,541 @@ struct CommunityEventDetailView: View {
         }
     }
 
+    private func eventRoute(
+        _ item:
+            CommunityEventItem
+    ) -> TrainingRoute? {
+        if let coordinates =
+                item.event
+                    .routeCoordinates,
+           coordinates.count >= 2 {
+            return TrainingRoute(
+                id:
+                    item.event.routeID ??
+                    UUID(),
+                ownerID:
+                    item.event.creatorID,
+                title:
+                    item.event.routeTitle ??
+                    ATHLTHLocalization.choose(
+                        english: "Event route",
+                        norwegian:
+                            "Arrangementsrute"
+                    ),
+                visibility:
+                    ProfileVisibility(
+                        rawValue:
+                            item.event
+                                .visibility
+                    ) ??
+                    .publicProfile,
+                coordinates:
+                    coordinates,
+                distanceKilometers:
+                    item.event
+                        .routeDistanceKilometers ??
+                    0,
+                elevationGainMeters:
+                    item.event
+                        .routeElevationGainMeters,
+                importedFilename: nil,
+                createdAt:
+                    item.event.createdAt,
+                startName:
+                    item.event.routeStartName,
+                endName:
+                    item.event.routeEndName
+            )
+        }
+
+        guard let routeID =
+                item.event.routeID
+        else {
+            return nil
+        }
+
+        return session.savedRoutes
+            .first {
+                $0.id == routeID
+            }
+    }
+
+    private func eventRouteOverview(
+        _ route:
+            TrainingRoute
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Route",
+                        norwegian: "Rute"
+                    ),
+                    systemImage:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(
+                    .subheadline
+                        .weight(.semibold)
+                )
+
+                Spacer()
+
+                if route
+                    .distanceKilometers >
+                    0 {
+                    Text(
+                        String(
+                            format:
+                                "%.1f km",
+                            route
+                                .distanceKilometers
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                }
+            }
+
+            NavigationLink {
+                RouteDetailView(
+                    route: route
+                )
+            } label: {
+                VStack(
+                    alignment: .leading,
+                    spacing: 9
+                ) {
+                    Map(
+                        initialPosition:
+                            .region(
+                                routeRegion(
+                                    route
+                                )
+                            )
+                    ) {
+                        MapPolyline(
+                            coordinates:
+                                route
+                                    .coordinates
+                                    .map(
+                                        \.coordinate
+                                    )
+                        )
+                        .stroke(
+                            ATHLTHTheme
+                                .vitality,
+                            lineWidth: 5
+                        )
+
+                        if let first =
+                                route
+                                    .coordinates
+                                    .first {
+                            Marker(
+                                route.startName ??
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Start",
+                                    norwegian:
+                                        "Start"
+                                ),
+                                coordinate:
+                                    first
+                                        .coordinate
+                            )
+                            .tint(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                        }
+
+                        if let last =
+                                route
+                                    .coordinates
+                                    .last {
+                            Marker(
+                                route.endName ??
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Finish",
+                                    norwegian:
+                                        "Mål"
+                                ),
+                                coordinate:
+                                    last
+                                        .coordinate
+                            )
+                            .tint(.red)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .frame(height: 176)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style:
+                                .continuous
+                        )
+                    )
+
+                    HStack(spacing: 8) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(route.title)
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Tap to view the full route",
+                                    norwegian:
+                                        "Trykk for å se hele ruten"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(
+            ATHLTHTheme
+                .surfaceSage,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+    private func routeRegion(
+        _ route:
+            TrainingRoute
+    ) -> MKCoordinateRegion {
+        let coordinates =
+            route.coordinates.map(
+                \.coordinate
+            )
+
+        guard let first =
+                coordinates.first
+        else {
+            return MKCoordinateRegion(
+                center:
+                    CLLocationCoordinate2D(
+                        latitude: 63.43,
+                        longitude: 10.39
+                    ),
+                span:
+                    MKCoordinateSpan(
+                        latitudeDelta:
+                            0.04,
+                        longitudeDelta:
+                            0.04
+                    )
+            )
+        }
+
+        var minLat =
+            first.latitude
+        var maxLat =
+            first.latitude
+        var minLon =
+            first.longitude
+        var maxLon =
+            first.longitude
+
+        for coordinate in
+            coordinates {
+            minLat = min(
+                minLat,
+                coordinate.latitude
+            )
+            maxLat = max(
+                maxLat,
+                coordinate.latitude
+            )
+            minLon = min(
+                minLon,
+                coordinate.longitude
+            )
+            maxLon = max(
+                maxLon,
+                coordinate.longitude
+            )
+        }
+
+        return MKCoordinateRegion(
+            center:
+                CLLocationCoordinate2D(
+                    latitude:
+                        (
+                            minLat +
+                            maxLat
+                        ) / 2,
+                    longitude:
+                        (
+                            minLon +
+                            maxLon
+                        ) / 2
+                ),
+            span:
+                MKCoordinateSpan(
+                    latitudeDelta:
+                        max(
+                            (
+                                maxLat -
+                                minLat
+                            ) *
+                            1.30,
+                            0.008
+                        ),
+                    longitudeDelta:
+                        max(
+                            (
+                                maxLon -
+                                minLon
+                            ) *
+                            1.30,
+                            0.008
+                        )
+                )
+        )
+    }
+
     private func eventMeetingPointRow(
         _ meeting: String,
         latitude: Double?,
         longitude: Double?
     ) -> some View {
-        HStack(
-            alignment: .center,
-            spacing: 12
-        ) {
-            HStack(
-                alignment: .top,
-                spacing: 10
-            ) {
-                Image(
-                    systemName:
-                        "mappin.and.ellipse"
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
-                .frame(width: 24)
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Meeting point",
-                            norwegian:
-                                "Møtested"
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-
-                    Text(meeting)
-                        .font(
-                            .subheadline
-                                .weight(.medium)
-                        )
-                        .lineLimit(3)
-                }
-            }
-
-            Spacer(
-                minLength: 8
-            )
-
+        Button {
             if let latitude,
                let longitude {
-                let coordinate =
-                    CLLocationCoordinate2D(
-                        latitude: latitude,
-                        longitude: longitude
-                    )
-
-                Map(
-                    initialPosition:
-                        .region(
-                            meetingRegion(
-                                coordinate
-                            )
-                        )
+                openMeetingPoint(
+                    meeting,
+                    latitude: latitude,
+                    longitude: longitude
+                )
+            }
+        } label: {
+            HStack(
+                alignment: .center,
+                spacing: 12
+            ) {
+                HStack(
+                    alignment: .top,
+                    spacing: 10
                 ) {
-                    Marker(
-                        meeting,
-                        coordinate:
-                            coordinate
+                    Image(
+                        systemName:
+                            "mappin.and.ellipse"
                     )
-                    .tint(
-                        ATHLTHTheme
-                            .vitality
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
                     )
+                    .frame(width: 24)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        HStack(spacing: 5) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Meeting point",
+                                    norwegian:
+                                        "Møtested"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+
+                            if latitude != nil,
+                               longitude != nil {
+                                Image(
+                                    systemName:
+                                        "arrow.up.right"
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+                            }
+                        }
+
+                        Text(meeting)
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .lineLimit(3)
+
+                        if latitude != nil,
+                           longitude != nil {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Open in Apple Maps",
+                                    norwegian:
+                                        "Åpne i Apple Maps"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                        }
+                    }
                 }
-                .mapStyle(
-                    .standard(
-                        pointsOfInterest:
-                            .excludingAll
-                    )
+
+                Spacer(
+                    minLength: 8
                 )
-                .allowsHitTesting(false)
-                .frame(
-                    width: 118,
-                    height: 82
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style:
-                            .continuous
+
+                if let latitude,
+                   let longitude {
+                    let coordinate =
+                        CLLocationCoordinate2D(
+                            latitude: latitude,
+                            longitude: longitude
+                        )
+
+                    Map(
+                        initialPosition:
+                            .region(
+                                meetingRegion(
+                                    coordinate
+                                )
+                            )
+                    ) {
+                        Marker(
+                            meeting,
+                            coordinate:
+                                coordinate
+                        )
+                        .tint(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                    }
+                    .mapStyle(
+                        .standard(
+                            pointsOfInterest:
+                                .excludingAll
+                        )
                     )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style:
-                            .continuous
+                    .allowsHitTesting(false)
+                    .frame(
+                        width: 118,
+                        height: 82
                     )
-                    .stroke(
-                        Color.black
-                            .opacity(0.05),
-                        lineWidth: 0.8
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style:
+                                .continuous
+                        )
                     )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            ATHLTHTheme
+                                .vitality
+                                .opacity(0.18),
+                            lineWidth: 1
+                        )
+                    }
                 }
             }
+            .contentShape(
+                Rectangle()
+            )
         }
+        .buttonStyle(.plain)
+        .disabled(
+            latitude == nil ||
+            longitude == nil
+        )
         .padding(.top, 10)
+    }
+
+    private func openMeetingPoint(
+        _ meeting: String,
+        latitude: Double,
+        longitude: Double
+    ) {
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+        let placemark =
+            MKPlacemark(
+                coordinate:
+                    coordinate
+            )
+        let mapItem =
+            MKMapItem(
+                placemark:
+                    placemark
+            )
+        mapItem.name = meeting
+        mapItem.openInMaps()
     }
 
     private func meetingRegion(
@@ -1771,7 +2288,7 @@ struct CommunityEventDetailView: View {
     ) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .foregroundStyle(ATHLTHTheme.accent)
+                .foregroundStyle(ATHLTHTheme.vitality)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -4005,9 +4522,28 @@ struct CommunityEventCreateView: View {
                     selectedRoute.id
                 draft.routeTitle =
                     selectedRoute.title
+                draft.routeCoordinates =
+                    selectedRoute.coordinates
+                draft.routeDistanceKilometers =
+                    selectedRoute
+                        .distanceKilometers
+                draft.routeElevationGainMeters =
+                    selectedRoute
+                        .elevationGainMeters
+                draft.routeStartName =
+                    selectedRoute.startName
+                draft.routeEndName =
+                    selectedRoute.endName
             } else {
                 draft.routeID = nil
                 draft.routeTitle = nil
+                draft.routeCoordinates = nil
+                draft.routeDistanceKilometers =
+                    nil
+                draft.routeElevationGainMeters =
+                    nil
+                draft.routeStartName = nil
+                draft.routeEndName = nil
             }
 
             let requestedEventID = UUID()
