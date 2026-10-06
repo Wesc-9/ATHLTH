@@ -1,6 +1,7 @@
 import Charts
 import Combine
 import MapKit
+import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -10631,6 +10632,8 @@ private struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
 struct ATHLTHProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var accountService:
+        SupabaseAccountService
     @EnvironmentObject private var trophyStore: TrophyStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var social: SocialStore
@@ -10648,6 +10651,18 @@ struct ATHLTHProfileView: View {
     @State private var profilePerformanceWorkoutHistory:
         [WorkoutSummary] = []
     @State private var loadingProfileData = false
+    @State private var showingProfilePhotoPicker =
+        false
+    @State private var selectedProfilePhoto:
+        PhotosPickerItem?
+    @State private var pendingProfileCropImage:
+        UIImage?
+    @State private var showingProfileCrop =
+        false
+    @State private var updatingProfilePhoto =
+        false
+    @State private var profilePhotoError:
+        String?
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
     @AppStorage(ProfileMomentFavorites.storageKey)
@@ -10707,6 +10722,85 @@ struct ATHLTHProfileView: View {
         .task {
             await refreshProfile()
         }
+        .photosPicker(
+            isPresented:
+                $showingProfilePhotoPicker,
+            selection:
+                $selectedProfilePhoto,
+            matching: .images
+        )
+        .onChange(
+            of: selectedProfilePhoto
+        ) { _, newItem in
+            guard let newItem else {
+                return
+            }
+
+            Task {
+                await prepareProfilePhoto(
+                    newItem
+                )
+            }
+        }
+        .fullScreenCover(
+            isPresented:
+                $showingProfileCrop
+        ) {
+            if let pendingProfileCropImage {
+                ATHLTHAvatarCropView(
+                    image:
+                        pendingProfileCropImage,
+                    onCancel: {
+                        selectedProfilePhoto =
+                            nil
+                        self.pendingProfileCropImage =
+                            nil
+                        showingProfileCrop =
+                            false
+                    },
+                    onUse: { jpegData in
+                        selectedProfilePhoto =
+                            nil
+                        self.pendingProfileCropImage =
+                            nil
+                        showingProfileCrop =
+                            false
+
+                        Task {
+                            await saveProfilePhoto(
+                                jpegData
+                            )
+                        }
+                    }
+                )
+            }
+        }
+        .alert(
+            "ATHLTH",
+            isPresented:
+                Binding(
+                    get: {
+                        profilePhotoError !=
+                            nil
+                    },
+                    set: {
+                        if !$0 {
+                            profilePhotoError =
+                                nil
+                        }
+                    }
+                )
+        ) {
+            Button(
+                "OK",
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                profilePhotoError ??
+                ""
+            )
+        }
     }
 
     private var profileHero: some View {
@@ -10757,48 +10851,96 @@ struct ATHLTHProfileView: View {
                         spacing: 14
                     ) {
                         ZStack(alignment: .bottomTrailing) {
-                            profileAvatar
-
-                            NavigationLink {
-                                ATHLTHEditProfileView()
+                            Button {
+                                showingProfilePhotoPicker =
+                                    true
                             } label: {
-                                Image(systemName: "pencil")
-                                    .font(
-                                        .system(
-                                            size: 12,
-                                            weight: .semibold
-                                        )
-                                    )
-                                    .foregroundStyle(.white)
-                                    .frame(
-                                        width: 30,
-                                        height: 30
-                                    )
-                                    .background(
-                                        Color.black.opacity(0.34),
-                                        in: Circle()
-                                    )
-                                    .overlay {
-                                        Circle()
-                                            .stroke(
-                                                Color.white.opacity(0.42),
-                                                lineWidth: 0.8
-                                            )
-                                    }
-                                    .shadow(
-                                        color: Color.black.opacity(0.16),
-                                        radius: 4,
-                                        y: 2
-                                    )
+                                profileAvatar
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(
                                 ATHLTHLocalization.choose(
-                                    english: "Edit Profile",
-                                    norwegian: "Rediger profil"
+                                    english:
+                                        "Change profile photo",
+                                    norwegian:
+                                        "Bytt profilbilde"
                                 )
                             )
-                            .offset(x: 2, y: 2)
+
+                            Button {
+                                showingProfilePhotoPicker =
+                                    true
+                            } label: {
+                                Group {
+                                    if updatingProfilePhoto {
+                                        ProgressView()
+                                            .controlSize(
+                                                .mini
+                                            )
+                                            .tint(.white)
+                                    } else {
+                                        Image(
+                                            systemName:
+                                                "pencil"
+                                        )
+                                        .font(
+                                            .system(
+                                                size: 9.5,
+                                                weight:
+                                                    .semibold
+                                            )
+                                        )
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .frame(
+                                    width: 24,
+                                    height: 24
+                                )
+                                .background(
+                                    Color.black
+                                        .opacity(
+                                            0.38
+                                        ),
+                                    in: Circle()
+                                )
+                                .overlay {
+                                    Circle()
+                                        .stroke(
+                                            Color.white
+                                                .opacity(
+                                                    0.48
+                                                ),
+                                            lineWidth:
+                                                0.8
+                                        )
+                                }
+                                .shadow(
+                                    color:
+                                        Color.black
+                                            .opacity(
+                                                0.16
+                                            ),
+                                    radius: 3,
+                                    y: 1
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(
+                                updatingProfilePhoto
+                            )
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Change profile photo",
+                                    norwegian:
+                                        "Bytt profilbilde"
+                                )
+                            )
+                            .offset(
+                                x: 7,
+                                y: 7
+                            )
                         }
 
                         VStack(
@@ -12464,6 +12606,99 @@ struct ATHLTHProfileView: View {
                     ATHLTHTheme.accentDeep
                 )
             }
+    }
+
+    @MainActor
+    private func prepareProfilePhoto(
+        _ item: PhotosPickerItem
+    ) async {
+        do {
+            guard
+                let data =
+                    try await item
+                        .loadTransferable(
+                            type: Data.self
+                        ),
+                let image =
+                    UIImage(data: data),
+                let prepared =
+                    ATHLTHAvatarCropper
+                        .prepare(image)
+            else {
+                throw NSError(
+                    domain:
+                        "ATHLTH.ProfilePhoto",
+                    code: 1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "The selected photo could not be loaded.",
+                                norwegian:
+                                    "Det valgte bildet kunne ikke lastes."
+                            )
+                    ]
+                )
+            }
+
+            pendingProfileCropImage =
+                prepared
+            showingProfileCrop = true
+            profilePhotoError = nil
+        } catch {
+            selectedProfilePhoto = nil
+            profilePhotoError =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func saveProfilePhoto(
+        _ jpegData: Data
+    ) async {
+        guard !updatingProfilePhoto
+        else {
+            return
+        }
+
+        updatingProfilePhoto = true
+        profilePhotoError = nil
+
+        defer {
+            updatingProfilePhoto = false
+        }
+
+        do {
+            let avatarURL =
+                try await accountService
+                    .uploadProfileAvatar(
+                        jpegData: jpegData
+                    )
+
+            let bootstrap =
+                try await accountService
+                    .updateProfile(
+                        displayName:
+                            session.profile
+                                .displayName,
+                        username:
+                            session.profile
+                                .username,
+                        bio:
+                            session.profile
+                                .bio,
+                        avatarURL:
+                            avatarURL
+                    )
+
+            session.applyBackendBootstrap(
+                bootstrap
+            )
+            await social.refresh()
+        } catch {
+            profilePhotoError =
+                error.localizedDescription
+        }
     }
 
     @MainActor
