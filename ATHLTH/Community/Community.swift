@@ -687,53 +687,18 @@ final class SupabaseCommunityService {
                 .invalidEvent
         }
 
-        let storagePath =
-            "\(userID.uuidString.lowercased())/" +
-            "event-covers/" +
-            "\(eventID.uuidString.lowercased()).jpg"
-
-        try await client.storage
-            .from("workout-media")
-            .upload(
-                storagePath,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "60",
-                    contentType: "image/jpeg",
-                    upsert: true
-                )
-            )
-
-        let publicURL =
-            try client.storage
-                .from("workout-media")
-                .getPublicURL(
-                    path: storagePath
+        let published =
+            try await ATHLTHPublicImagePublisher
+                .publish(
+                    jpegData: jpegData,
+                    purpose:
+                        .eventCover,
+                    entityID:
+                        eventID,
+                    client: client
                 )
 
-        var components =
-            URLComponents(
-                url: publicURL,
-                resolvingAgainstBaseURL:
-                    false
-            )
-        components?.queryItems = [
-            URLQueryItem(
-                name: "v",
-                value:
-                    String(
-                        Int(
-                            Date()
-                                .timeIntervalSince1970
-                        )
-                    )
-            )
-        ]
-
-        return (
-            components?.url ??
-            publicURL
-        ).absoluteString
+        return published.url.absoluteString
     }
 
     func removeEventCover(
