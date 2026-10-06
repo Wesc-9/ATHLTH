@@ -11412,6 +11412,8 @@ struct CommunityGroupCreateView: View {
     @State private var selectedImageData: Data?
     @State private var cropRequest:
         CommunityImageCropRequest?
+    @State private var headerCropRequest:
+        CommunityImageCropRequest?
     @State private var selectedHeaderPhoto: PhotosPickerItem?
     @State private var selectedHeaderImageData: Data?
     @State private var selectedHeaderArtwork:
@@ -11419,102 +11421,209 @@ struct CommunityGroupCreateView: View {
     @State private var saving = false
 
     var body: some View {
-        let photoButtonTitle =
-            selectedImageData == nil
-                ? "Choose Club Photo"
-                : "Change Club Photo"
-
-        return NavigationStack {
+        NavigationStack {
             Form {
                 Section {
-                    VStack(spacing: 14) {
-                        createCoverPreview
-
-                        PhotosPicker(
-                            selection: $selectedPhoto,
-                            matching: .images
-                        ) {
-                            Label(
-                                photoButtonTitle,
-                                systemImage: "photo.on.rectangle.angled"
+                    createClubPreview
+                        .listRowInsets(
+                            EdgeInsets(
+                                top: 8,
+                                leading: 16,
+                                bottom: 4,
+                                trailing: 16
                             )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
+                        )
+                        .listRowBackground(
+                            Color.clear
+                        )
+                }
 
-                        if let selectedImageData,
-                           let image =
-                            UIImage(
-                                data:
-                                    selectedImageData
-                            ) {
+                Section {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 12
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Choose a ready-made ATHLTH image for the Club header.",
+                                norwegian:
+                                    "Velg et ferdig ATHLTH-bilde til klubbens header."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                        ATHLTHStandardArtworkPicker(
+                            selection: Binding(
+                                get: {
+                                    selectedHeaderArtwork
+                                },
+                                set: { artwork in
+                                    selectedHeaderArtwork =
+                                        artwork
+
+                                    if artwork != nil {
+                                        selectedHeaderPhoto =
+                                            nil
+                                        selectedHeaderImageData =
+                                            nil
+                                    }
+                                }
+                            )
+                        )
+
+                        if selectedHeaderArtwork != nil ||
+                            selectedHeaderImageData != nil {
                             Button {
-                                cropRequest =
-                                    CommunityImageCropRequest(
-                                        image: image,
-                                        target:
-                                            .clubImage
-                                    )
+                                selectedHeaderArtwork =
+                                    nil
+                                selectedHeaderImageData =
+                                    nil
+                                selectedHeaderPhoto =
+                                    nil
                             } label: {
                                 Label(
                                     ATHLTHLocalization.choose(
                                         english:
-                                            "Adjust crop",
+                                            "Reset header",
                                         norwegian:
-                                            "Juster utsnitt"
+                                            "Tilbakestill header"
                                     ),
                                     systemImage:
-                                        "crop"
+                                        "arrow.counterclockwise"
+                                )
+                                .font(
+                                    .caption.weight(
+                                        .semibold
+                                    )
                                 )
                             }
-                            .buttonStyle(.bordered)
-                            .tint(
+                            .buttonStyle(.plain)
+                            .foregroundStyle(
                                 ATHLTHTheme
                                     .accentDeep
                             )
                         }
-
-                        if selectedImageData != nil {
-                            Button(role: .destructive) {
-                                selectedImageData = nil
-                                selectedPhoto = nil
-                            } label: {
-                                Label(
-                                    "Remove Photo",
-                                    systemImage: "trash"
-                                )
-                            }
-                            .font(.caption.weight(.semibold))
-                        }
-
-                        Text(
-                            "This photo becomes the Club hero image and is also used as the Club thumbnail."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+                    .padding(
+                        .vertical,
+                        4
+                    )
                 } header: {
-                    Text("Club photo")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "ATHLTH images",
+                            norwegian:
+                                "ATHLTH-bilder"
+                        )
+                    )
                 }
 
-                Section("Club header") {
-                    CommunityContentCoverPicker(
-                        selectedPhoto:
-                            $selectedHeaderPhoto,
-                        imageData:
-                            $selectedHeaderImageData,
-                        selectedArtwork:
-                            $selectedHeaderArtwork,
-                        placeholderIcon:
-                            "photo.on.rectangle.angled"
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Club info",
+                        norwegian: "Klubbinfo"
+                    )
+                ) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Club name",
+                            norwegian:
+                                "Klubbnavn"
+                        ),
+                        text: $name
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Location (optional)",
+                            norwegian:
+                                "Sted (valgfritt)"
+                        ),
+                        text:
+                            $locationName
+                    )
+                    .textContentType(
+                        .location
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Description",
+                            norwegian:
+                                "Beskrivelse"
+                        ),
+                        text: $summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Visibility",
+                        norwegian: "Synlighet"
+                    )
+                ) {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Club visibility",
+                            norwegian:
+                                "Hvem kan se klubben"
+                        ),
+                        selection:
+                            $visibility
+                    ) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Public",
+                                norwegian:
+                                    "Offentlig"
+                            ),
+                            systemImage:
+                                "globe"
+                        )
+                        .tag("public")
+
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Private",
+                                norwegian:
+                                    "Privat"
+                            ),
+                            systemImage:
+                                "lock.fill"
+                        )
+                        .tag("private")
+                    }
+                    .pickerStyle(
+                        .segmented
                     )
 
                     Text(
-                        "Optional. This wide image is used behind the Club identity. If you leave it empty, the Club photo remains the fallback."
+                        visibility == "public"
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Public Clubs appear in Discover.",
+                                norwegian:
+                                    "Offentlige klubber vises i Utforsk."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Private Clubs stay hidden from Discover.",
+                                norwegian:
+                                    "Private klubber skjules fra Utforsk."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -11522,128 +11631,218 @@ struct CommunityGroupCreateView: View {
                     )
                 }
 
-                Section("Club") {
-                    TextField("Club name", text: $name)
-
-                    TextField(
-                        "Location (optional)",
-                        text: $locationName
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Membership",
+                        norwegian: "Medlemskap"
                     )
-                    .textContentType(.location)
-
-                    Text(
-                        "City, area or place. Leave empty if the Club is not tied to one location."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                    TextField(
-                        "Description",
-                        text: $summary,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
-                }
-
-                Section("Visibility") {
+                ) {
                     Picker(
-                        "Club visibility",
-                        selection: $visibility
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Who can join",
+                            norwegian:
+                                "Hvem kan bli med"
+                        ),
+                        selection:
+                            $joinMode
                     ) {
-                        Label("Public", systemImage: "globe")
-                            .tag("public")
-                        Label("Private", systemImage: "lock.fill")
-                            .tag("private")
-                    }
-                    .pickerStyle(.segmented)
-
-                    Text(
-                        visibility == "public"
-                            ? "Public groups appear in Discover."
-                            : "Private groups stay hidden from Discover and are reached through invitations or an existing membership."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Section("Membership") {
-                    Picker(
-                        "Who can join",
-                        selection: $joinMode
-                    ) {
-                        if visibility == "public" {
-                            Text("Open")
-                                .tag("open")
+                        if visibility ==
+                            "public" {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Open",
+                                    norwegian:
+                                        "Åpen"
+                                )
+                            )
+                            .tag("open")
                         }
 
-                        Text("Approval required")
-                            .tag("approval")
-                        Text("Invite only")
-                            .tag("invite_only")
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Approval required",
+                                norwegian:
+                                    "Krever godkjenning"
+                            )
+                        )
+                        .tag("approval")
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Invite only",
+                                norwegian:
+                                    "Kun invitasjon"
+                            )
+                        )
+                        .tag(
+                            "invite_only"
+                        )
                     }
 
-                    Text(joinModeDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        joinModeDescription
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
-                Section("Member permissions") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Member permissions",
+                        norwegian:
+                            "Medlemstillatelser"
+                    )
+                ) {
                     Toggle(
-                        "Members can create events & challenges",
-                        isOn: $membersCanCreateContent
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Members can create events & challenges",
+                            norwegian:
+                                "Medlemmer kan opprette events og challenges"
+                        ),
+                        isOn:
+                            $membersCanCreateContent
                     )
 
                     Text(
                         membersCanCreateContent
-                            ? "Members can create events and challenges. Owner, Admin and Contributor can always create them."
-                            : "Only Owner, Admin and Contributor can create events and challenges."
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Members can create events and challenges.",
+                                norwegian:
+                                    "Medlemmer kan opprette events og challenges."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Only Owner, Admin and Contributor can create them.",
+                                norwegian:
+                                    "Kun Owner, Admin og Contributor kan opprette dem."
+                            )
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
 
                 Section {
                     Label(
-                        "Owner has full control. Admin has full management access except deleting the group. Contributor can publish and pin updates, create events and challenges, and use @everyone, but cannot manage members.",
-                        systemImage: "person.3.fill"
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Owner has full control. Admin manages the Club, while Contributor can publish Club content.",
+                            norwegian:
+                                "Owner har full kontroll. Admin administrerer klubben, mens Contributor kan publisere klubbinnhold."
+                        ),
+                        systemImage:
+                            "person.3.fill"
                     )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(
+                        .secondary
+                    )
                 }
             }
-            .navigationTitle("Create Club")
-            .navigationBarTitleDisplayMode(.inline)
+            .scrollContentBackground(
+                .hidden
+            )
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        Color(
+                            red: 0.055,
+                            green: 0.49,
+                            blue: 0.32
+                        )
+                        .opacity(0.13)
+                )
+                .ignoresSafeArea()
+            )
+            .tint(
+                Color(
+                    red: 0.025,
+                    green: 0.30,
+                    blue: 0.21
+                )
+            )
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Create Club",
+                    norwegian:
+                        "Opprett klubb"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Cancel",
+                            norwegian:
+                                "Avbryt"
+                        )
+                    ) {
                         dismiss()
                     }
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
                     Button(
                         saving
-                            ? "Creating…"
-                            : "Create"
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Creating…",
+                                norwegian:
+                                    "Oppretter…"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Create",
+                                norwegian:
+                                    "Opprett"
+                            )
                     ) {
                         Task {
                             saving = true
-                            let ok = await groups.createGroup(
-                                name: name,
-                                summary: summary,
-                                locationName: locationName,
-                                visibility: visibility,
-                                joinMode: joinMode,
-                                membersCanCreateContent:
-                                    membersCanCreateContent,
-                                imageJPEGData:
-                                    selectedImageData,
-                                headerImageJPEGData:
-                                    selectedHeaderImageData,
-                                headerArtworkReference:
-                                    selectedHeaderArtwork?
-                                        .reference
-                            )
+                            let ok =
+                                await groups
+                                    .createGroup(
+                                        name:
+                                            name,
+                                        summary:
+                                            summary,
+                                        locationName:
+                                            locationName,
+                                        visibility:
+                                            visibility,
+                                        joinMode:
+                                            joinMode,
+                                        membersCanCreateContent:
+                                            membersCanCreateContent,
+                                        imageJPEGData:
+                                            selectedImageData,
+                                        headerImageJPEGData:
+                                            selectedHeaderImageData,
+                                        headerArtworkReference:
+                                            selectedHeaderArtwork?
+                                                .reference
+                                    )
                             saving = false
 
                             if ok {
@@ -11652,20 +11851,28 @@ struct CommunityGroupCreateView: View {
                         }
                     }
                     .disabled(
-                        name.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).count < 2 ||
+                        name
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .count < 2 ||
                         saving
                     )
                 }
             }
-            .onChange(of: visibility) { _, value in
+            .onChange(
+                of: visibility
+            ) { _, value in
                 if value == "private" &&
                     joinMode == "open" {
-                    joinMode = "invite_only"
+                    joinMode =
+                        "invite_only"
                 }
             }
-            .onChange(of: selectedPhoto) { _, item in
+            .onChange(
+                of: selectedPhoto
+            ) { _, item in
                 guard let item else {
                     return
                 }
@@ -11681,7 +11888,8 @@ struct CommunityGroupCreateView: View {
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that image. Try another photo."
-                            selectedPhoto = nil
+                            selectedPhoto =
+                                nil
                             return
                         }
 
@@ -11691,7 +11899,8 @@ struct CommunityGroupCreateView: View {
                                         data,
                                         maxPixelSize:
                                             2_400,
-                                        quality: 0.92
+                                        quality:
+                                            0.92
                                     ),
                               let image =
                                 UIImage(
@@ -11701,11 +11910,13 @@ struct CommunityGroupCreateView: View {
                         else {
                             groups.errorMessage =
                                 "ATHLTH could not prepare that image. Try another photo."
-                            selectedPhoto = nil
+                            selectedPhoto =
+                                nil
                             return
                         }
 
-                        selectedPhoto = nil
+                        selectedPhoto =
+                            nil
                         cropRequest =
                             CommunityImageCropRequest(
                                 image: image,
@@ -11713,14 +11924,79 @@ struct CommunityGroupCreateView: View {
                                     .clubImage
                             )
                     } catch {
-                        selectedPhoto = nil
+                        selectedPhoto =
+                            nil
                         groups.errorMessage =
-                            error.localizedDescription
+                            error
+                                .localizedDescription
+                    }
+                }
+            }
+            .onChange(
+                of: selectedHeaderPhoto
+            ) { _, item in
+                guard let item else {
+                    return
+                }
+
+                Task {
+                    do {
+                        guard let data =
+                                try await item
+                                    .loadTransferable(
+                                        type:
+                                            Data.self
+                                    )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that header image. Try another photo."
+                            selectedHeaderPhoto =
+                                nil
+                            return
+                        }
+
+                        guard let prepared =
+                                await CommunityImageProcessor
+                                    .prepareJPEG(
+                                        data,
+                                        maxPixelSize:
+                                            2_400,
+                                        quality:
+                                            0.92
+                                    ),
+                              let image =
+                                UIImage(
+                                    data:
+                                        prepared
+                                )
+                        else {
+                            groups.errorMessage =
+                                "ATHLTH could not prepare that header image. Try another photo."
+                            selectedHeaderPhoto =
+                                nil
+                            return
+                        }
+
+                        selectedHeaderPhoto =
+                            nil
+                        headerCropRequest =
+                            CommunityImageCropRequest(
+                                image: image,
+                                target:
+                                    .wideCover
+                            )
+                    } catch {
+                        selectedHeaderPhoto =
+                            nil
+                        groups.errorMessage =
+                            error
+                                .localizedDescription
                     }
                 }
             }
             .fullScreenCover(
-                item: $cropRequest
+                item:
+                    $cropRequest
             ) { request in
                 CommunityImageCropEditor(
                     request: request
@@ -11729,44 +12005,49 @@ struct CommunityGroupCreateView: View {
                         croppedData
                 }
             }
+            .fullScreenCover(
+                item:
+                    $headerCropRequest
+            ) { request in
+                CommunityImageCropEditor(
+                    request: request
+                ) { croppedData in
+                    selectedHeaderImageData =
+                        croppedData
+                    selectedHeaderArtwork =
+                        nil
+                }
+            }
         }
     }
 
     @ViewBuilder
-    private var createCoverPreview: some View {
-        ZStack(alignment: .bottomLeading) {
-            Group {
-                if let selectedImageData,
-                   let image = UIImage(
-                       data: selectedImageData
-                   ) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accentDeep.opacity(0.22),
-                            ATHLTHTheme.cardWarm,
-                            ATHLTHTheme.canvasTop
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            }
+    private var createClubPreview: some View {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            createHeaderPreviewBackground
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(
-                        selectedImageData == nil
-                            ? 0.16
-                            : 0.88
+                    Color.black.opacity(
+                        0.05
                     ),
-                    ATHLTHTheme.cardWarm.opacity(
-                        selectedImageData == nil
-                            ? 0.10
-                            : 0.60
+                    Color.black.opacity(
+                        0.18
+                    ),
+                    Color.black.opacity(
+                        0.74
+                    )
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(
+                        0.38
                     ),
                     Color.clear
                 ],
@@ -11774,53 +12055,543 @@ struct CommunityGroupCreateView: View {
                 endPoint: .trailing
             )
 
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    ATHLTHTheme.canvasBottom.opacity(0.28)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            VStack(
+                spacing: 0
+            ) {
+                HStack(
+                    spacing: 8
+                ) {
+                    Spacer()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("CLUB")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.5)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep.opacity(0.62)
+                    PhotosPicker(
+                        selection:
+                            $selectedHeaderPhoto,
+                        matching:
+                            .images
+                    ) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Change header",
+                                norwegian:
+                                    "Endre header"
+                            ),
+                            systemImage:
+                                "photo"
+                        )
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .padding(
+                            .horizontal,
+                            11
+                        )
+                        .frame(height: 34)
+                        .background(
+                            Color.black
+                                .opacity(
+                                    0.34
+                                ),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white
+                                        .opacity(
+                                            0.28
+                                        ),
+                                    lineWidth:
+                                        0.8
+                                )
+                        }
+                    }
+                    .buttonStyle(
+                        .plain
                     )
 
-                Text(
-                    name.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty
-                        ? "Your Club"
-                        : name
+                    PhotosPicker(
+                        selection:
+                            $selectedPhoto,
+                        matching:
+                            .images
+                    ) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Club photo",
+                                norwegian:
+                                    "Profilbilde"
+                            ),
+                            systemImage:
+                                "person.crop.square"
+                        )
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .padding(
+                            .horizontal,
+                            11
+                        )
+                        .frame(height: 34)
+                        .background(
+                            Color.black
+                                .opacity(
+                                    0.34
+                                ),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color.white
+                                        .opacity(
+                                            0.28
+                                        ),
+                                    lineWidth:
+                                        0.8
+                                )
+                        }
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    12
                 )
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
+                .padding(
+                    .top,
+                    12
+                )
+
+                Spacer()
             }
-            .padding(16)
+
+            HStack(
+                alignment: .bottom,
+                spacing: 12
+            ) {
+                ZStack(
+                    alignment:
+                        .bottomTrailing
+                ) {
+                    createProfileImagePreview
+
+                    PhotosPicker(
+                        selection:
+                            $selectedPhoto,
+                        matching:
+                            .images
+                    ) {
+                        Image(
+                            systemName:
+                                "pencil"
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight:
+                                    .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            width: 26,
+                            height: 26
+                        )
+                        .background(
+                            Color(
+                                red: 0.025,
+                                green: 0.30,
+                                blue: 0.21
+                            ),
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth:
+                                        2
+                                )
+                        }
+                    }
+                    .buttonStyle(
+                        .plain
+                    )
+                    .offset(
+                        x: 4,
+                        y: 4
+                    )
+                }
+                .layoutPriority(1)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(
+                        name
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Your Club",
+                                norwegian:
+                                    "Din klubb"
+                            )
+                            : name
+                    )
+                    .font(
+                        .system(
+                            size: 24,
+                            weight: .bold,
+                            design:
+                                .rounded
+                        )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                    .lineLimit(1)
+                    .minimumScaleFactor(
+                        0.68
+                    )
+
+                    let cleanSummary =
+                        summary
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+
+                    if !cleanSummary.isEmpty {
+                        Text(
+                            cleanSummary
+                        )
+                        .font(
+                            .caption
+                        )
+                        .foregroundStyle(
+                            .white
+                                .opacity(
+                                    0.90
+                                )
+                        )
+                        .lineLimit(1)
+                    }
+
+                    HStack(
+                        spacing: 6
+                    ) {
+                        createPreviewChip(
+                            visibility ==
+                                "private"
+                                ? ATHLTHLocalization.choose(
+                                    english:
+                                        "Private",
+                                    norwegian:
+                                        "Privat"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english:
+                                        "Public",
+                                    norwegian:
+                                        "Offentlig"
+                                ),
+                            icon:
+                                visibility ==
+                                    "private"
+                                    ? "lock.fill"
+                                    : "globe"
+                        )
+
+                        createPreviewChip(
+                            createMembershipPreviewTitle,
+                            icon:
+                                joinMode ==
+                                    "open"
+                                    ? "person.badge.plus"
+                                    : "person.badge.clock"
+                        )
+
+                        let cleanLocation =
+                            locationName
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+
+                        if !cleanLocation
+                            .isEmpty {
+                            createPreviewChip(
+                                cleanLocation,
+                                icon:
+                                    "location.fill"
+                            )
+                        }
+                    }
+                }
+                .frame(
+                    maxWidth:
+                        .infinity,
+                    alignment:
+                        .leading
+                )
+            }
+            .padding(
+                .horizontal,
+                14
+            )
+            .padding(
+                .bottom,
+                14
+            )
         }
-        .frame(height: 150)
-        .frame(maxWidth: .infinity)
+        .frame(height: 242)
+        .frame(
+            maxWidth:
+                .infinity
+        )
         .clipped()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
+                cornerRadius: 24,
+                style:
+                    .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
+                cornerRadius: 24,
+                style:
+                    .continuous
             )
             .stroke(
-                ATHLTHTheme.border,
+                Color.white
+                    .opacity(
+                        0.40
+                    ),
                 lineWidth: 1
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.10),
+            radius: 16,
+            y: 7
+        )
+    }
+
+    @ViewBuilder
+    private var createHeaderPreviewBackground:
+        some View {
+        if let selectedHeaderImageData,
+           let image =
+                UIImage(
+                    data:
+                        selectedHeaderImageData
+                ) {
+            Image(
+                uiImage: image
+            )
+            .resizable()
+            .scaledToFill()
+        } else if let selectedHeaderArtwork,
+                  let image =
+                    selectedHeaderArtwork
+                        .resolvedUIImage {
+            Image(
+                uiImage: image
+            )
+            .resizable()
+            .scaledToFill()
+            .scaleEffect(
+                1.08,
+                anchor:
+                    .center
+            )
+        } else {
+            Image(
+                "CommunityHero"
+            )
+            .resizable()
+            .interpolation(
+                .medium
+            )
+            .scaledToFill()
+        }
+    }
+
+    @ViewBuilder
+    private var createProfileImagePreview:
+        some View {
+        Group {
+            if let selectedImageData,
+               let image =
+                    UIImage(
+                        data:
+                            selectedImageData
+                    ) {
+                Image(
+                    uiImage: image
+                )
+                .resizable()
+                .scaledToFill()
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.025,
+                            green: 0.30,
+                            blue: 0.21
+                        ),
+                        Color(
+                            red: 0.055,
+                            green: 0.49,
+                            blue: 0.32
+                        )
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+                .overlay {
+                    Image(
+                        systemName:
+                            "person.3.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 28,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        .white
+                    )
+                }
+            }
+        }
+        .frame(
+            width: 70,
+            height: 70
+        )
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 18,
+                style:
+                    .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style:
+                    .continuous
+            )
+            .stroke(
+                Color.white,
+                lineWidth: 2
+            )
+        }
+        .shadow(
+            color:
+                Color.black
+                    .opacity(0.22),
+            radius: 8,
+            y: 4
+        )
+    }
+
+    private func createPreviewChip(
+        _ title: String,
+        icon: String
+    ) -> some View {
+        Label(
+            title,
+            systemImage: icon
+        )
+        .font(
+            .system(
+                size: 9,
+                weight:
+                    .semibold
+            )
+        )
+        .foregroundStyle(
+            .white.opacity(
+                0.94
+            )
+        )
+        .lineLimit(1)
+        .minimumScaleFactor(
+            0.70
+        )
+        .padding(
+            .horizontal,
+            7
+        )
+        .frame(height: 24)
+        .background(
+            Color.black
+                .opacity(0.28),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.white
+                        .opacity(
+                            0.22
+                        ),
+                    lineWidth:
+                        0.6
+                )
+        }
+    }
+
+    private var createMembershipPreviewTitle:
+        String {
+        switch joinMode {
+        case "open":
+            return ATHLTHLocalization.choose(
+                english: "Open",
+                norwegian: "Åpen"
+            )
+        case "approval":
+            return ATHLTHLocalization.choose(
+                english:
+                    "Approval",
+                norwegian:
+                    "Godkjenning"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Invite only",
+                norwegian:
+                    "Kun invitasjon"
             )
         }
     }
