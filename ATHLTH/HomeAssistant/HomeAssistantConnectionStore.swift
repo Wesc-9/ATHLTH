@@ -1,6 +1,8 @@
 import AuthenticationServices
 import CryptoKit
+import CoreLocation
 import Foundation
+import MapKit
 import Network
 import Security
 import UserNotifications
@@ -245,6 +247,7 @@ struct HomeAssistantInboundCommand: Codable, Hashable, Identifiable {
 
 private struct HomeAssistantWebhookResponse: Decodable {
     let commands: [HomeAssistantInboundCommand]?
+    let capabilities: [String]?
 }
 
 private struct HomeAssistantWebhookHTTPResult {
@@ -418,6 +421,15 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareWorkoutRouteMap: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareWorkoutRouteMap,
+                forKey: Self.shareWorkoutRouteMapKey
+            )
+        }
+    }
+
     @Published var shareRecovery: Bool {
         didSet {
             UserDefaults.standard.set(
@@ -542,6 +554,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareWorkoutState"
     private static let shareCompletedWorkoutsKey =
         "athlth.homeAssistant.shareCompletedWorkouts"
+    private static let shareWorkoutRouteMapKey =
+        "athlth.homeAssistant.shareWorkoutRouteMap"
     private static let shareRecoveryKey =
         "athlth.homeAssistant.shareRecovery"
     private static let shareTrainingLoadKey =
@@ -786,6 +800,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             defaults,
             key: Self.shareCompletedWorkoutsKey,
             defaultValue: true
+        )
+        shareWorkoutRouteMap = Self.storedBool(
+            defaults,
+            key: Self.shareWorkoutRouteMapKey,
+            defaultValue: false
         )
         shareRecovery = Self.storedBool(
             defaults,
@@ -2079,6 +2098,7 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     func enableAllSharing() {
         shareWorkoutState = true
         shareCompletedWorkouts = true
+        shareWorkoutRouteMap = true
         shareRecovery = true
         shareTrainingLoad = true
         shareSleep = true
