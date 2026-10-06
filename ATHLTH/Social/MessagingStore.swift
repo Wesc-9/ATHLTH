@@ -472,48 +472,53 @@ final class MessagingStore: ObservableObject {
             UNUserNotificationCenter
                 .current()
 
-        let delivered:
-            [UNNotification] =
+        let identifiers:
+            [String] =
             await withCheckedContinuation {
                 continuation in
                 center.getDeliveredNotifications {
                     notifications in
+
+                    // UNNotification is not Sendable. Resolve the identifiers
+                    // inside NotificationCenter's callback and only pass the
+                    // value-type String array across the continuation.
+                    let matchingIdentifiers =
+                        notifications.compactMap {
+                            notification -> String?
+                            in
+                            let userInfo =
+                                notification.request
+                                    .content
+                                    .userInfo
+
+                            guard
+                                userInfo[
+                                    "athlth_entity_type"
+                                ] as? String ==
+                                    "direct_conversation",
+                                let rawID =
+                                    userInfo[
+                                        "athlth_entity_id"
+                                    ] as? String,
+                                UUID(
+                                    uuidString:
+                                        rawID
+                                ) ==
+                                    conversationID
+                            else {
+                                return nil
+                            }
+
+                            return notification
+                                .request
+                                .identifier
+                        }
+
                     continuation.resume(
                         returning:
-                            notifications
+                            matchingIdentifiers
                     )
                 }
-            }
-
-        let identifiers =
-            delivered.compactMap {
-                notification -> String?
-                in
-                let userInfo =
-                    notification.request
-                        .content
-                        .userInfo
-
-                guard
-                    userInfo[
-                        "athlth_entity_type"
-                    ] as? String ==
-                        "direct_conversation",
-                    let rawID =
-                        userInfo[
-                            "athlth_entity_id"
-                        ] as? String,
-                    UUID(
-                        uuidString: rawID
-                    ) ==
-                        conversationID
-                else {
-                    return nil
-                }
-
-                return notification
-                    .request
-                    .identifier
             }
 
         guard !identifiers.isEmpty
