@@ -73,15 +73,34 @@ struct ExerciseLibraryView: View {
         }
     }
 
+    private var selectedSectionIndex:
+        Binding<Int> {
+        Binding(
+            get: {
+                selectedSection == .mine
+                    ? 1
+                    : 0
+            },
+            set: { index in
+                selectedSection =
+                    index == 1
+                        ? .mine
+                        : .library
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if source == nil {
-                Picker("Exercise source", selection: $selectedSection) {
-                    ForEach(ExerciseLibrarySection.allCases) { section in
-                        Text(section.title).tag(section)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ATHLTHPremiumSegmentedControl(
+                    titles:
+                        ExerciseLibrarySection
+                            .allCases
+                            .map(\.title),
+                    selection:
+                        selectedSectionIndex
+                )
                 .padding(.horizontal)
                 .padding(.top, 10)
                 .padding(.bottom, 4)
@@ -206,7 +225,12 @@ struct ExerciseLibraryView: View {
                 }
             }
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme.accent
+            )
+        )
         .navigationTitle(selectionTitle ?? "Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -264,8 +288,37 @@ struct ExerciseLibraryView: View {
             }
             .padding(11)
             .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 14)
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm
+                            .opacity(0.58)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.72),
+                    lineWidth: 0.8
+                )
+            }
+            .shadow(
+                color:
+                    ATHLTHTheme.accentDeep
+                        .opacity(0.055),
+                radius: 10,
+                x: 0,
+                y: 5
             )
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -288,7 +341,8 @@ struct ExerciseLibraryView: View {
                         .background(
                             favoritesOnly
                                 ? ATHLTHTheme.accent
-                                : Color(.secondarySystemGroupedBackground),
+                                : ATHLTHTheme.cardWarm
+                                    .opacity(0.72),
                             in: Capsule()
                         )
                     }
@@ -348,7 +402,10 @@ struct ExerciseLibraryView: View {
         .padding(.horizontal, 11)
         .padding(.vertical, 7)
         .background(
-            active ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
+            active
+                ? ATHLTHTheme.accent
+                : ATHLTHTheme.cardWarm
+                    .opacity(0.72),
             in: Capsule()
         )
     }
@@ -399,10 +456,39 @@ struct ExerciseLibraryView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(11)
+        .padding(12)
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 18)
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme.cardWarm
+                        .opacity(0.62)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.07),
+            radius: 12,
+            x: 0,
+            y: 6
         )
     }
 }
@@ -505,7 +591,12 @@ struct ExerciseDetailView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme.accent
+            )
+        )
         .navigationTitle("Exercise")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -533,7 +624,17 @@ struct ExerciseDetailView: View {
                     .padding(.top, 10)
                     .padding(.bottom, 8)
                 }
-                .background(.ultraThinMaterial)
+                .background(
+                    .ultraThinMaterial
+                )
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(
+                            Color.white
+                                .opacity(0.42)
+                        )
+                        .frame(height: 0.6)
+                }
             }
         }
         .confirmationDialog(
@@ -567,9 +668,48 @@ struct ExerciseDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
+                    )
+                )
             }
         }
+        .padding(10)
+        .background(
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme.cardWarm
+                        .opacity(0.52)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.06),
+            radius: 12,
+            x: 0,
+            y: 6
+        )
     }
 
     private func detailCard<Content: View>(
@@ -581,11 +721,43 @@ struct ExerciseDetailView: View {
                 .font(.headline)
             content()
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
         .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 20)
+            LinearGradient(
+                colors: [
+                    ATHLTHTheme.card,
+                    ATHLTHTheme.cardWarm
+                        .opacity(0.62)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.065),
+            radius: 12,
+            x: 0,
+            y: 6
         )
     }
 }
