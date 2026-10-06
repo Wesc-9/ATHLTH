@@ -1,0 +1,41 @@
+name: Normalize standard artwork
+
+on:
+  push:
+    branches:
+      - release/v1.6.5
+    paths:
+      - "scripts/normalize_standard_artwork.py"
+      - ".github/workflows/normalize-standard-artwork.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release/v1.6.5
+        uses: actions/checkout@v4
+        with:
+          ref: release/v1.6.5
+          fetch-depth: 0
+
+      - name: Install Pillow
+        run: python -m pip install --quiet pillow
+
+      - name: Remove baked frames from standard artwork
+        run: python scripts/normalize_standard_artwork.py
+
+      - name: Commit normalized artwork
+        shell: bash
+        run: |
+          if git diff --quiet -- ATHLTH/Assets.xcassets; then
+            echo "No framed standard artwork found."
+            exit 0
+          fi
+          git config user.name "ATHLTH CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add ATHLTH/Assets.xcassets
+          git commit -m "Normalize standard artwork to full bleed"
+          git push origin HEAD:release/v1.6.5
