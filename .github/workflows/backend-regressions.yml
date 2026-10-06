@@ -1,4 +1,4 @@
-name: ATHLTH 1.6.1 backend regressions
+name: ATHLTH 1.6.5 backend regressions
 
 on:
   workflow_dispatch:
