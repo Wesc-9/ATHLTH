@@ -12408,7 +12408,7 @@ struct CommunityGroupCreateView: View {
         )
     }
 
-    private func createPreviewMediaButton(
+    nonisolated private func createPreviewMediaButton(
         _ title: String,
         icon: String
     ) -> some View {
