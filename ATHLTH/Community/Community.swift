@@ -84,6 +84,35 @@ enum CommunityEventCoverPolicy {
         "GoalRelax"
     ]
 
+    /// Some semantic goal artwork names intentionally share an existing
+    /// full-resolution runtime image. Keep the semantic name in persisted
+    /// event data, but always resolve it to an image set that actually has
+    /// pixels before rendering. This prevents white/empty cover cells.
+    static func displayArtworkName(
+        _ artwork: String
+    ) -> String {
+        switch artwork {
+        case "GoalStrength":
+            return "TrainHero"
+        case "GoalEndurance":
+            return "StrengthPostWorkoutHero"
+        case "GoalConsistency":
+            return "ProgressHero"
+        case "GoalEvent":
+            return "CommunityHero"
+        default:
+            return artwork
+        }
+    }
+
+    /// Every standard goal has a dedicated cropped picker thumbnail,
+    /// including the semantic covers that share a full-resolution image.
+    static func thumbnailArtworkName(
+        _ artwork: String
+    ) -> String {
+        "\(artwork)Thumbnail"
+    }
+
     static func defaultArtwork(
         for activity: CommunityEventActivity
     ) -> String {
@@ -1319,6 +1348,27 @@ struct CommunityEventDetailView: View {
 
                 default:
                     Image(
+                        CommunityEventCoverPolicy
+                            .displayArtworkName(
+                                item.event
+                                    .coverArtworkName ??
+                                CommunityEventCoverPolicy
+                                    .defaultArtwork(
+                                        for:
+                                            item.event
+                                                .activityType
+                                    )
+                            )
+                    )
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+                }
+            }
+        } else {
+            Image(
+                CommunityEventCoverPolicy
+                    .displayArtworkName(
                         item.event
                             .coverArtworkName ??
                         CommunityEventCoverPolicy
@@ -1328,22 +1378,10 @@ struct CommunityEventDetailView: View {
                                         .activityType
                             )
                     )
-                    .resizable()
-                    .scaledToFill()
-                }
-            }
-        } else {
-            Image(
-                item.event.coverArtworkName ??
-                CommunityEventCoverPolicy
-                    .defaultArtwork(
-                        for:
-                            item.event
-                                .activityType
-                    )
             )
             .resizable()
             .scaledToFill()
+            .clipped()
         }
     }
 
@@ -2497,12 +2535,17 @@ struct CommunityEventCreateView: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
+                        .clipped()
                 } else {
                     Image(
-                        selectedCoverArtworkName
+                        CommunityEventCoverPolicy
+                            .displayArtworkName(
+                                selectedCoverArtworkName
+                            )
                     )
                     .resizable()
                     .scaledToFill()
+                    .clipped()
                 }
             }
             .frame(height: 150)
@@ -2618,13 +2661,19 @@ struct CommunityEventCreateView: View {
                                 true
                             createError = nil
                         } label: {
-                            Image(artwork)
+                            Image(
+                                CommunityEventCoverPolicy
+                                    .thumbnailArtworkName(
+                                        artwork
+                                    )
+                            )
                                 .resizable()
                                 .scaledToFill()
                                 .frame(
                                     width: 82,
                                     height: 52
                                 )
+                                .clipped()
                                 .clipShape(
                                     RoundedRectangle(
                                         cornerRadius:
