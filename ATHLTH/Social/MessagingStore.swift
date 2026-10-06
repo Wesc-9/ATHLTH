@@ -330,13 +330,30 @@ final class MessagingStore: ObservableObject {
                 conversationID: conversationID,
                 accept: accept
             )
-            await refresh()
+
             if accept {
-                await refreshConversation(conversationID)
+                // Hydrate the thread immediately so the request bar can turn
+                // into the normal composer without waiting for the inbox
+                // refresh throttle.
+                await refreshConversation(
+                    conversationID
+                )
+            } else {
+                // A declined request leaves the thread, but its delivered push
+                // should disappear from Notification Center immediately.
+                await clearDeliveredNotifications(
+                    for:
+                        conversationID
+                )
+                await refresh(
+                    force: true
+                )
             }
+
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage =
+                error.localizedDescription
             return false
         }
     }
