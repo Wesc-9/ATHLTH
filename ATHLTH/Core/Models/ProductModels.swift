@@ -242,6 +242,8 @@ struct UserProfile: Identifiable, Codable, Hashable {
     var displayName: String
     var bio: String
     var avatarURL: URL?
+    var headerArtworkName: String? = nil
+    var headerImageURL: URL? = nil
     var presence: TrainingPresence
 }
 
