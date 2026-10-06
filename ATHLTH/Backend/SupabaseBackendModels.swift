@@ -6,6 +6,8 @@ struct BackendProfile: Codable, Sendable {
     var displayName: String?
     var bio: String?
     var avatarURL: String?
+    var headerArtworkName: String?
+    var headerImageURL: String?
     var onboardingCompleted: Bool
     var onboardingCompletedAt: Date?
     let createdAt: Date
@@ -17,6 +19,8 @@ struct BackendProfile: Codable, Sendable {
         case displayName = "display_name"
         case bio
         case avatarURL = "avatar_url"
+        case headerArtworkName = "header_artwork_name"
+        case headerImageURL = "header_image_url"
         case onboardingCompleted = "onboarding_completed"
         case onboardingCompletedAt = "onboarding_completed_at"
         case createdAt = "created_at"
