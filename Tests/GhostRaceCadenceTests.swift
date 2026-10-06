@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import ATHLTH
 
+@MainActor
 final class GhostRaceCadenceTests:
     XCTestCase {
     private func makeDefaults() -> UserDefaults {
@@ -18,7 +19,6 @@ final class GhostRaceCadenceTests:
         return defaults
     }
 
-    @MainActor
     func testDefaultGhostCadenceIsOneKilometreWithoutExtraLeadAlerts() {
         let settings =
             AppSettingsStore(
@@ -65,7 +65,6 @@ final class GhostRaceCadenceTests:
         )
     }
 
-    @MainActor
     func testGhostDistanceAndTimeUnitsAreConvertedExactly() {
         let settings =
             AppSettingsStore(
@@ -101,7 +100,6 @@ final class GhostRaceCadenceTests:
         )
     }
 
-    @MainActor
     func testGhostStatusModePersistsAndTransfers() {
         let defaults =
             makeDefaults()
