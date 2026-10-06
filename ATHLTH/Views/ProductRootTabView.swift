@@ -1665,7 +1665,7 @@ struct ATHLTHHomeView: View {
                     )
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ZStack(
                         alignment:
                             .bottomTrailing
@@ -1673,12 +1673,10 @@ struct ATHLTHHomeView: View {
                         GoalCoverView(
                             goal: goal
                         )
-                        // Some Goal artwork files include a small light
-                        // edge in the source image. Overscan the Home
-                        // thumbnail so the artwork always reaches the
-                        // rounded crop on every side.
+                        // Keep the artwork prominent without stealing
+                        // the width needed for readable goal text.
                         .frame(
-                            width: 90,
+                            width: 74,
                             height: 90
                         )
                         .scaleEffect(
@@ -1688,7 +1686,7 @@ struct ATHLTHHomeView: View {
                         .clipped()
                         .clipShape(
                             RoundedRectangle(
-                                cornerRadius: 18,
+                                cornerRadius: 16,
                                 style:
                                     .continuous
                             )
@@ -1716,7 +1714,7 @@ struct ATHLTHHomeView: View {
                         )
                         .background(
                             .black.opacity(
-                                0.58
+                                0.64
                             ),
                             in: Capsule()
                         )
@@ -1725,20 +1723,29 @@ struct ATHLTHHomeView: View {
 
                     VStack(
                         alignment: .leading,
-                        spacing: 3
+                        spacing: 5
                     ) {
                         Text(goal.title)
                             .font(
-                                .caption
-                                    .weight(
-                                        .bold
-                                    )
+                                .system(
+                                    size: 13,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
                             )
                             .foregroundStyle(
                                 ATHLTHTheme
                                     .primaryText
                             )
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(
+                                0.88
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                            .layoutPriority(2)
 
                         Text(
                             homeNextMilestone(
@@ -1749,14 +1756,19 @@ struct ATHLTHHomeView: View {
                         )
                         .font(
                             .system(
-                                size: 9.5
+                                size: 10.5,
+                                weight: .medium
                             )
                         )
                         .foregroundStyle(
                             ATHLTHTheme
-                                .mutedText
+                                .primaryText
+                                .opacity(0.68)
                         )
                         .lineLimit(2)
+                        .minimumScaleFactor(
+                            0.90
+                        )
 
                         ProgressView(
                             value:
@@ -1767,6 +1779,10 @@ struct ATHLTHHomeView: View {
                                 .vitality
                         )
                     }
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
                 }
                 .frame(
                     minHeight:
