@@ -1419,33 +1419,57 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     in: Capsule()
                 )
 
-                Text(challenge.title)
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(challenge.title)
+                        .font(
+                            .system(
+                                size: 18,
+                                weight: .bold
+                            )
                         )
-                    )
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                        .shadow(
+                            color: .black.opacity(0.72),
+                            radius: 3,
+                            y: 1
+                        )
 
-                Text(challenge.subtitle)
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .medium
+                    Text(challenge.subtitle)
+                        .font(
+                            .system(
+                                size: 11,
+                                weight: .semibold
+                            )
                         )
+                        .foregroundStyle(
+                            .white.opacity(0.98)
+                        )
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                        .shadow(
+                            color: .black.opacity(0.72),
+                            radius: 3,
+                            y: 1
+                        )
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(
+                    maxWidth: 276,
+                    alignment: .leading
+                )
+                .background(
+                    Color.black.opacity(0.30),
+                    in: RoundedRectangle(
+                        cornerRadius: 10,
+                        style: .continuous
                     )
-                    .foregroundStyle(
-                        .white.opacity(0.96)
-                    )
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(
-                        maxWidth: 260,
-                        alignment: .leading
-                    )
+                )
 
                 Spacer(minLength: 0)
 
@@ -1537,11 +1561,25 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     }
                     .font(
                         .caption2.weight(
-                            .semibold
+                            .bold
                         )
                     )
                     .foregroundStyle(
-                        .white.opacity(0.96)
+                        .white
+                    )
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(
+                        Color.black.opacity(0.28),
+                        in: RoundedRectangle(
+                            cornerRadius: 8,
+                            style: .continuous
+                        )
+                    )
+                    .shadow(
+                        color: .black.opacity(0.36),
+                        radius: 2,
+                        y: 1
                     )
 
                     Spacer(minLength: 6)
