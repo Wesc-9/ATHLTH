@@ -7279,7 +7279,7 @@ struct CommunityGroupDetailView: View {
                 } else {
                     Button {
                         selectTab(.chat)
-                    } label: 
+                    } label: {
                         referenceActionTile(
                             title: "Chat",
                             detail:
