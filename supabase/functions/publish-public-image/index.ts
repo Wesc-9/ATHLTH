@@ -361,7 +361,9 @@ async function destinationFor(
     case "club_content": {
       if (!groupID || !entityID) return null;
       const kind = String(body.content_kind ?? "");
-      if (!["event", "challenge"].includes(kind)) return null;
+      if (!["event", "events", "challenge", "challenges"].includes(kind)) {
+        return null;
+      }
       if (!(await authorizeGroup(admin, userID, groupID, true))) return null;
       return {
         bucket: "community-content-images",
