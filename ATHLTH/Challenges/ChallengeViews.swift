@@ -709,7 +709,7 @@ struct ChallengeCreationView: View {
     @State private var activeSelectionSheet:
         ChallengeCreationSelectionSheet?
 
-    @State private var visibility: ProfileVisibility = .friends
+    @State private var visibility: ProfileVisibility = .publicProfile
     @State private var shareToCommunity = true
     @State private var creatingChallenge = false
     @State private var createError: String?
