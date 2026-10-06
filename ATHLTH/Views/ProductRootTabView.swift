@@ -2472,7 +2472,7 @@ struct ATHLTHHomeView: View {
     }
 
     private var homeWeeklyCommunityEvents:
-        [CommunityEventItem] {
+        [HomeScheduledCommunityEvent] {
         homeUserCommunityEvents
             .filter {
                 homeWeekInterval
@@ -2483,6 +2483,54 @@ struct ATHLTHHomeView: View {
             .sorted {
                 $0.event.startsAt <
                     $1.event.startsAt
+            }
+            .map {
+                item in
+
+                let cleanMeeting =
+                    item.event
+                        .meetingName
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+
+                let detail =
+                    [
+                        item.event.startsAt
+                            .formatted(
+                                date: .omitted,
+                                time: .shortened
+                            ),
+                        cleanMeeting.isEmpty
+                            ? item.event
+                                .activityType
+                                .title
+                            : cleanMeeting
+                    ]
+                    .filter {
+                        !$0.isEmpty
+                    }
+                    .joined(
+                        separator: " · "
+                    )
+
+                return HomeScheduledCommunityEvent(
+                    id:
+                        "community-" +
+                        item.id.uuidString,
+                    title:
+                        item.event.title,
+                    startsAt:
+                        item.event.startsAt,
+                    activityType:
+                        item.event.activityType
+                            .rawValue,
+                    systemImage:
+                        item.event.activityType
+                            .systemImage,
+                    detail: detail
+                )
             }
     }
 
