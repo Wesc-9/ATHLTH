@@ -584,8 +584,10 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     var isResting: Bool {
-        guard let restEndsAt else { return false }
-        return restEndsAt > Date()
+        // Rest is a manual gate, not just a countdown. Once a rest period
+        // starts it stays active until the athlete explicitly continues,
+        // even after the planned duration has elapsed.
+        restEndsAt != nil
     }
 
     var currentExerciseAllSetsCompleted: Bool {
