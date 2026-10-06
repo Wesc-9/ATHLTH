@@ -1073,8 +1073,8 @@ struct ATHLTHAvatarCropView: View {
                 ) {
                     Button(
                         ATHLTHLocalization.choose(
-                            english: "Use photo",
-                            norwegian: "Bruk bilde"
+                            english: "Continue",
+                            norwegian: "Fortsett"
                         )
                     ) {
                         useCurrentCrop()
