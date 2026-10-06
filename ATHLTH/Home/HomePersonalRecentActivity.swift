@@ -71,6 +71,19 @@ private enum HomeActivityTypeFilter:
         }
     }
 
+    var systemImage: String {
+        switch self {
+        case .all:
+            return "square.grid.2x2.fill"
+        case .running:
+            return "figure.run"
+        case .strength:
+            return "dumbbell.fill"
+        case .other:
+            return "ellipsis"
+        }
+    }
+
     func includes(
         _ activity: WorkoutActivity?
     ) -> Bool {
@@ -2734,8 +2747,9 @@ struct HomePersonalActivityHistoryView:
         ZStack {
             ATHLTHPremiumCanvas(
                 accent:
-                    ATHLTHTheme.accent
-                        .opacity(0.12)
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.17)
             )
             .ignoresSafeArea()
 
@@ -2793,6 +2807,10 @@ struct HomePersonalActivityHistoryView:
         )
         .navigationBarTitleDisplayMode(
             .inline
+        )
+        .toolbarBackground(
+            .hidden,
+            for: .navigationBar
         )
         .task {
             await load()
@@ -3006,37 +3024,71 @@ struct HomePersonalActivityHistoryView:
                         scope = option
                     }
                 } label: {
-                    Text(option.title)
-                        .font(
-                            .caption.weight(
-                                .semibold
+                    HStack(spacing: 6) {
+                        Image(
+                            systemName:
+                                scopeIcon(
+                                    option
+                                )
+                        )
+                        .font(.caption)
+
+                        Text(option.title)
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        scope == option
+                            ? Color.white
+                            : ATHLTHTheme
+                                .primaryText
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity
+                    )
+                    .frame(height: 38)
+                    .background(
+                        scope == option
+                            ? ATHLTHTheme
+                                .accentDeep
+                            : Color.white
+                                .opacity(
+                                    0.74
+                                ),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                scope == option
+                                    ? Color.clear
+                                    : Color.black
+                                        .opacity(
+                                            0.045
+                                        ),
+                                lineWidth:
+                                    0.8
                             )
-                        )
-                        .foregroundStyle(
-                            scope == option
-                                ? Color.white
-                                : ATHLTHTheme
-                                    .primaryText
-                        )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                        .frame(height: 36)
-                        .background(
-                            scope == option
-                                ? ATHLTHTheme
-                                    .accentDeep
-                                : Color.white
-                                    .opacity(
-                                        0.88
-                                    ),
-                            in: Capsule()
-                        )
+                    }
                 }
                 .buttonStyle(.plain)
             }
         }
+        .padding(6)
+        .background(
+            Color.white.opacity(
+                0.54
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
     }
 
     private var typeBar:
@@ -3059,37 +3111,77 @@ struct HomePersonalActivityHistoryView:
                             type = option
                         }
                     } label: {
-                        Text(option.title)
-                            .font(
-                                .caption.weight(
-                                    .semibold
+                        HStack(spacing: 6) {
+                            Image(
+                                systemName:
+                                    option
+                                        .systemImage
+                            )
+                            .font(.caption)
+
+                            Text(option.title)
+                        }
+                        .font(
+                            .caption.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            type == option
+                                ? Color.white
+                                : ATHLTHTheme
+                                    .primaryText
+                        )
+                        .padding(
+                            .horizontal,
+                            13
+                        )
+                        .frame(height: 36)
+                        .background(
+                            type == option
+                                ? ATHLTHTheme
+                                    .accentDeep
+                                : Color.white
+                                    .opacity(
+                                        0.80
+                                    ),
+                            in: Capsule()
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    type == option
+                                        ? Color.clear
+                                        : Color.black
+                                            .opacity(
+                                                0.045
+                                            ),
+                                    lineWidth:
+                                        0.8
                                 )
-                            )
-                            .foregroundStyle(
-                                type == option
-                                    ? Color.white
-                                    : ATHLTHTheme
-                                        .primaryText
-                            )
-                            .padding(
-                                .horizontal,
-                                13
-                            )
-                            .frame(height: 34)
-                            .background(
-                                type == option
-                                    ? ATHLTHTheme
-                                        .accentDeep
-                                    : Color.white
-                                        .opacity(
-                                            0.88
-                                        ),
-                                in: Capsule()
-                            )
+                        }
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(
+                .horizontal,
+                2
+            )
+        }
+    }
+
+    private func scopeIcon(
+        _ option:
+            HomeActivityScopeFilter
+    ) -> String {
+        switch option {
+        case .all:
+            return "square.stack.3d.up.fill"
+        case .mine:
+            return "person.crop.circle.fill"
+        case .following:
+            return "person.2.fill"
         }
     }
 
@@ -3259,12 +3351,12 @@ private struct HomePersonalHistoryCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: 184
+                height: 148
             )
 
             VStack(
                 alignment: .leading,
-                spacing: 12
+                spacing: 10
             ) {
                 HStack(
                     alignment:
@@ -3329,17 +3421,19 @@ private struct HomePersonalHistoryCard:
                         )
                         .foregroundStyle(
                             ATHLTHTheme
-                                .mutedText
+                                .accentDeep
                         )
                         .padding(
                             .horizontal,
-                            8
+                            9
                         )
-                        .frame(height: 26)
+                        .frame(height: 27)
                         .background(
-                            Color.black.opacity(
-                                0.035
-                            ),
+                            ATHLTHTheme
+                                .accentSoft
+                                .opacity(
+                                    0.75
+                                ),
                             in: Capsule()
                         )
                 }
@@ -3378,41 +3472,63 @@ private struct HomePersonalHistoryCard:
                     }
                 }
             }
-            .padding(16)
+            .padding(
+                .horizontal,
+                15
+            )
+            .padding(
+                .vertical,
+                14
+            )
         }
         .background(
-            Color.white.opacity(0.96),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(
+                        0.96
+                    ),
+                    ATHLTHTheme
+                        .surfaceSage
+                        .opacity(0.78)
+                ],
+                startPoint:
+                    .topLeading,
+                endPoint:
+                    .bottomTrailing
+            ),
             in:
                 RoundedRectangle(
-                    cornerRadius: 28,
+                    cornerRadius: 24,
                     style: .continuous
                 )
         )
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 28,
+                cornerRadius: 24,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 28,
+                cornerRadius: 24,
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(
-                    0.04
-                ),
+                ATHLTHTheme
+                    .vitality
+                    .opacity(
+                        0.07
+                    ),
                 lineWidth: 0.8
             )
         }
         .shadow(
             color:
                 Color.black.opacity(
-                    0.045
+                    0.035
                 ),
-            radius: 16,
-            y: 7
+            radius: 12,
+            y: 5
         )
     }
 
@@ -3514,9 +3630,9 @@ private struct HomePersonalHistoryCard:
         some View {
         Rectangle()
             .fill(
-                Color.black.opacity(
-                    0.06
-                )
+                ATHLTHTheme
+                    .divider
+                    .opacity(0.65)
             )
             .frame(
                 width: 1,
