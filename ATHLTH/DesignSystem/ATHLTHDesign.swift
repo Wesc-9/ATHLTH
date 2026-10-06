@@ -67,6 +67,21 @@ extension View {
             enabled
         )
     }
+
+    /// Constrains aspect-fill media to the exact size proposed by its
+    /// container. This prevents wide/tall uploaded images from expanding
+    /// grids, cards or sheets before clipping is applied.
+    func athlthBoundedFill() -> some View {
+        GeometryReader { proxy in
+            self
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+                .clipped()
+        }
+        .clipped()
+    }
 }
 
 struct ATHLTHCard<Content: View>: View {

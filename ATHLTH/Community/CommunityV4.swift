@@ -4609,6 +4609,7 @@ private struct CommunityReferenceClubCard: View {
             fallbackAssetName:
                 "CommunityHero"
         )
+        .athlthBoundedFill()
     }
 }
 
@@ -4682,6 +4683,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
             )
 
             eventCover
+                .athlthBoundedFill()
                 .frame(
                     width: 40,
                     height: 40

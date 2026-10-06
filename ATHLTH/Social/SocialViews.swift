@@ -1649,6 +1649,7 @@ struct FriendProfileView: View {
                 remoteProfileHeaderImage(
                     profile.card
                 )
+                .athlthBoundedFill()
                 .frame(
                     width: proxy.size.width,
                     height: proxy.size.height

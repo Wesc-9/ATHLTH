@@ -11378,6 +11378,7 @@ struct ATHLTHProfileView: View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
                 profileHeaderImage
+                    .athlthBoundedFill()
                     .frame(
                         width: proxy.size.width,
                         height: proxy.size.height
@@ -13660,6 +13661,7 @@ private struct ATHLTHProfileMediaUploadPreview:
                                     .high
                                 )
                                 .scaledToFill()
+                                .athlthBoundedFill()
                                 .frame(
                                     maxWidth:
                                         .infinity
@@ -14011,6 +14013,7 @@ private struct ATHLTHProfileHeaderPickerView:
                                         )
                                         .resizable()
                                         .scaledToFill()
+                                        .athlthBoundedFill()
                                         .frame(
                                             height: 92
                                         )

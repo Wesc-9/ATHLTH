@@ -6064,6 +6064,7 @@ struct CommunityGroupsView: View {
                 fallbackAssetName:
                     "CommunityHero"
             )
+            .athlthBoundedFill()
         } else {
             Image(
                 "CommunityHero"
@@ -6071,6 +6072,7 @@ struct CommunityGroupsView: View {
             .resizable()
             .interpolation(.medium)
             .scaledToFill()
+            .athlthBoundedFill()
         }
     }
 
@@ -6989,6 +6991,7 @@ struct CommunityGroupDetailView: View {
                 fallbackAssetName:
                     "CommunityHero"
             )
+            .athlthBoundedFill()
             .frame(
                 maxWidth: .infinity,
                 maxHeight: .infinity
@@ -8104,6 +8107,7 @@ struct CommunityGroupDetailView: View {
                 fallbackAssetName:
                     "CommunityHero"
             )
+            .athlthBoundedFill()
         } else {
             ZStack {
                 LinearGradient(
@@ -8397,6 +8401,7 @@ struct CommunityGroupDetailView: View {
             fallbackAssetName:
                 "CommunityHero"
         )
+        .athlthBoundedFill()
     }
 
     private func referenceUpcomingChallengeRow(
@@ -11288,6 +11293,7 @@ struct CommunityGroupDetailView: View {
             fallbackAssetName:
                 "CommunityHero"
         )
+        .athlthBoundedFill()
         .frame(maxWidth: .infinity)
         .frame(height: height)
         .clipShape(
@@ -12485,6 +12491,7 @@ struct CommunityGroupCreateView: View {
             )
             .resizable()
             .scaledToFill()
+            .athlthBoundedFill()
         } else if let selectedHeaderArtwork,
                   let image =
                     selectedHeaderArtwork
@@ -12494,6 +12501,7 @@ struct CommunityGroupCreateView: View {
             )
             .resizable()
             .scaledToFill()
+            .athlthBoundedFill()
             .scaleEffect(
                 1.08,
                 anchor:
@@ -14402,6 +14410,7 @@ struct CommunityGroupSettingsView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
             } else if let selectedHeaderArtwork,
                       let image =
                         selectedHeaderArtwork
@@ -14409,6 +14418,7 @@ struct CommunityGroupSettingsView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
             } else if currentGroup.headerImageURL != nil {
                 ATHLTHArtworkImage(
                     reference:

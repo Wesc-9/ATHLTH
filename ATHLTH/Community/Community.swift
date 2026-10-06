@@ -1890,6 +1890,7 @@ struct CommunityEventDetailView: View {
     private func eventHero(_ item: CommunityEventItem) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             eventCover(item)
+                .athlthBoundedFill()
                 .frame(height: 178)
                 .frame(maxWidth: .infinity)
                 .clipShape(
@@ -5888,6 +5889,7 @@ struct CommunityEventCreateView: View {
                     .clipped()
                 }
             }
+            .athlthBoundedFill()
             .frame(height: 150)
             .frame(maxWidth: .infinity)
             .clipped()
