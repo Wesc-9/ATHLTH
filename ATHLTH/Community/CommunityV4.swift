@@ -760,7 +760,7 @@ struct ATHLTHCommunityV4View: View {
                                 CommunityReferenceUpcomingEventCard(
                                     item: event
                                 )
-                                .frame(width: 304)
+                                .frame(width: 252)
                             }
                             .buttonStyle(.plain)
                         }
