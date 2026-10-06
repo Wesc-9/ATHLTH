@@ -1586,7 +1586,13 @@ final class TrophyStore: ObservableObject {
             ]
 
         for claim in claims {
-            guard let evidence =
+            guard !unlocks.contains(
+                where: {
+                    $0.trophyID ==
+                        claim.id
+                }
+            ),
+            let evidence =
                     claim.evidence
             else {
                 continue
