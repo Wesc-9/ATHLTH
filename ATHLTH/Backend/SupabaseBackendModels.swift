@@ -6,8 +6,8 @@ struct BackendProfile: Codable, Sendable {
     var displayName: String?
     var bio: String?
     var avatarURL: String?
-    var headerArtworkName: String?
-    var headerImageURL: String?
+    var headerArtworkName: String? = nil
+    var headerImageURL: String? = nil
     var onboardingCompleted: Bool
     var onboardingCompletedAt: Date?
     let createdAt: Date
