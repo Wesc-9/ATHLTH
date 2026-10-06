@@ -3101,15 +3101,10 @@ struct DirectMessageThreadView: View {
 
             VStack(spacing: 0) {
                 threadHero
-                    .padding(
-                        .horizontal,
-                        8
+                    .frame(
+                        maxWidth: .infinity
                     )
-                    .padding(
-                        .top,
-                        8
-                    )
-                    .zIndex(2)
+                    .zIndex(0)
 
                 Group {
                     if let conversationID {
@@ -3155,15 +3150,22 @@ struct DirectMessageThreadView: View {
                 .athlthConversationPanelChrome()
                 .padding(
                     .horizontal,
-                    4
+                    6
                 )
+                // The white conversation sheet intentionally overlaps
+                // the lower part of the hero image, matching the rest
+                // of ATHLTH's pinned-card visual language.
                 .padding(
                     .top,
-                    -24
+                    -52
                 )
-                .zIndex(1)
+                .zIndex(2)
             }
         }
+        .ignoresSafeArea(
+            .container,
+            edges: .top
+        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(
@@ -3645,7 +3647,7 @@ struct DirectMessageThreadView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 12)
+                .padding(.top, 20)
                 .padding(.bottom, 8)
             }
             .onChange(
