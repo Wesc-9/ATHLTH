@@ -97,6 +97,85 @@ struct OfficialWeeklyChallengeAppearance: Codable, Hashable {
     var resolvedImageOverlayOpacity: Double {
         min(max(imageOverlayOpacity, 0), 0.75)
     }
+
+
+    var readableTextBackdropColor: Color {
+        guard showTextBackdrop else {
+            return .clear
+        }
+
+        let useLightSurface =
+            Self.perceivedLuminance(
+                of: textColorHex
+            ) < 0.46
+
+        let minimumOpacity =
+            useLightSurface
+                ? 0.76
+                : 0.38
+
+        return (
+            useLightSurface
+                ? Color.white
+                : Color.black
+        )
+        .opacity(
+            max(
+                resolvedBackdropOpacity,
+                minimumOpacity
+            )
+        )
+    }
+
+    private static func perceivedLuminance(
+        of hex: String
+    ) -> Double {
+        let cleaned =
+            hex
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .replacingOccurrences(
+                    of: "#",
+                    with: ""
+                )
+
+        guard cleaned.count == 6 ||
+              cleaned.count == 8
+        else {
+            return 1
+        }
+
+        var raw: UInt64 = 0
+        guard Scanner(
+            string: cleaned
+        ).scanHexInt64(&raw)
+        else {
+            return 1
+        }
+
+        if cleaned.count == 8 {
+            raw >>= 8
+        }
+
+        let red =
+            Double(
+                (raw >> 16) & 0xFF
+            ) / 255
+        let green =
+            Double(
+                (raw >> 8) & 0xFF
+            ) / 255
+        let blue =
+            Double(
+                raw & 0xFF
+            ) / 255
+
+        return
+            0.2126 * red +
+            0.7152 * green +
+            0.0722 * blue
+    }
 }
 
 extension Color {
