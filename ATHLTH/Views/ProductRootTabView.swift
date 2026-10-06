@@ -10663,6 +10663,14 @@ struct ATHLTHProfileView: View {
         false
     @State private var profilePhotoError:
         String?
+    @State private var showingHeaderPicker =
+        false
+    @State private var selectedHeaderPhoto:
+        PhotosPickerItem?
+    @State private var pendingHeaderCropRequest:
+        CommunityImageCropRequest?
+    @State private var updatingProfileHeader =
+        false
     @AppStorage(ProfileFeaturedRecordKind.storageKey)
     private var featuredRecordSelectionRaw = ""
     @AppStorage(ProfileMomentFavorites.storageKey)
@@ -10775,6 +10783,60 @@ struct ATHLTHProfileView: View {
                 )
             }
         }
+        .sheet(
+            isPresented:
+                $showingHeaderPicker
+        ) {
+            ATHLTHProfileHeaderPickerView(
+                currentArtwork:
+                    session.profile
+                        .headerArtworkName ??
+                    "ProfileHero",
+                hasCustomImage:
+                    session.profile
+                        .headerImageURL != nil,
+                selectedPhoto:
+                    $selectedHeaderPhoto,
+                isUpdating:
+                    updatingProfileHeader
+            ) { artwork in
+                Task {
+                    await setProfileHeaderArtwork(
+                        artwork
+                    )
+                }
+            }
+        }
+        .onChange(
+            of: selectedHeaderPhoto
+        ) { _, item in
+            guard let item else {
+                return
+            }
+
+            Task {
+                await prepareProfileHeaderPhoto(
+                    item
+                )
+            }
+        }
+        .fullScreenCover(
+            item:
+                $pendingHeaderCropRequest
+        ) { request in
+            CommunityImageCropEditor(
+                request: request
+            ) { jpegData in
+                pendingHeaderCropRequest =
+                    nil
+
+                Task {
+                    await saveProfileHeader(
+                        jpegData
+                    )
+                }
+            }
+        }
         .alert(
             "ATHLTH",
             isPresented:
@@ -10806,11 +10868,7 @@ struct ATHLTHProfileView: View {
     private var profileHero: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
-                Image("ProfileHero")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
+                profileHeaderImage
                     .frame(
                         width: proxy.size.width,
                         height: proxy.size.height
@@ -11047,6 +11105,66 @@ struct ATHLTHProfileView: View {
             alignment: .topTrailing
         ) {
             HStack(spacing: 10) {
+                Button {
+                    showingHeaderPicker =
+                        true
+                } label: {
+                    Group {
+                        if updatingProfileHeader {
+                            ProgressView()
+                                .controlSize(
+                                    .small
+                                )
+                                .tint(.white)
+                        } else {
+                            Image(
+                                systemName:
+                                    "photo.on.rectangle.angled"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        Color.black.opacity(
+                            0.30
+                        ),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color.white.opacity(
+                                    0.30
+                                ),
+                                lineWidth:
+                                    0.8
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    updatingProfileHeader
+                )
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Change profile header",
+                        norwegian:
+                            "Bytt profilheader"
+                    )
+                )
+
                 NavigationLink {
                     ATHLTHSettingsView()
                 } label: {
@@ -12531,6 +12649,47 @@ struct ATHLTHProfileView: View {
     }
 
     @ViewBuilder
+    private var profileHeaderImage:
+        some View {
+        if let url =
+                session.profile
+                    .headerImageURL {
+            ATHLTHStorageImage(
+                url: url,
+                maxPixelSize: 1800
+            ) { phase in
+                switch phase {
+                case .success(
+                    let image
+                ):
+                    image
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                default:
+                    Image(
+                        session.profile
+                            .headerArtworkName ??
+                        "ProfileHero"
+                    )
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                }
+            }
+        } else {
+            Image(
+                session.profile
+                    .headerArtworkName ??
+                "ProfileHero"
+            )
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+        }
+    }
+
+    @ViewBuilder
     private var profileAvatar:
         some View {
         if let avatarURL =
@@ -12702,6 +12861,114 @@ struct ATHLTHProfileView: View {
     }
 
     @MainActor
+    private func prepareProfileHeaderPhoto(
+        _ item: PhotosPickerItem
+    ) async {
+        do {
+            guard
+                let data =
+                    try await item
+                        .loadTransferable(
+                            type: Data.self
+                        ),
+                let image =
+                    UIImage(data: data)
+            else {
+                throw ATHLTHPublicImageError
+                    .invalidImage
+            }
+
+            selectedHeaderPhoto = nil
+            showingHeaderPicker = false
+            pendingHeaderCropRequest =
+                CommunityImageCropRequest(
+                    image: image,
+                    target: .wideCover
+                )
+            profilePhotoError = nil
+        } catch {
+            selectedHeaderPhoto = nil
+            profilePhotoError =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func saveProfileHeader(
+        _ jpegData: Data
+    ) async {
+        guard !updatingProfileHeader
+        else {
+            return
+        }
+
+        updatingProfileHeader = true
+        profilePhotoError = nil
+
+        defer {
+            updatingProfileHeader = false
+        }
+
+        do {
+            let imageURL =
+                try await accountService
+                    .uploadProfileHeader(
+                        jpegData: jpegData
+                    )
+
+            let bootstrap =
+                try await accountService
+                    .updateProfileHeader(
+                        artworkName: nil,
+                        imageURL: imageURL
+                    )
+
+            session.applyBackendBootstrap(
+                bootstrap
+            )
+            await social.refresh()
+        } catch {
+            profilePhotoError =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func setProfileHeaderArtwork(
+        _ artwork: String
+    ) async {
+        guard !updatingProfileHeader
+        else {
+            return
+        }
+
+        updatingProfileHeader = true
+        profilePhotoError = nil
+
+        defer {
+            updatingProfileHeader = false
+        }
+
+        do {
+            let bootstrap =
+                try await accountService
+                    .updateProfileHeader(
+                        artworkName: artwork,
+                        imageURL: nil
+                    )
+
+            session.applyBackendBootstrap(
+                bootstrap
+            )
+            showingHeaderPicker = false
+            await social.refresh()
+        } catch {
+            profilePhotoError =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func refreshProfile(
         forceRefresh: Bool = false
     ) async {
@@ -12801,6 +13068,282 @@ struct ATHLTHProfileView: View {
                 enabled:
                     privacy.shareGoals
             )
+        }
+    }
+}
+
+private struct ATHLTHProfileHeaderPickerView:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let currentArtwork: String
+    let hasCustomImage: Bool
+    @Binding var selectedPhoto:
+        PhotosPickerItem?
+    let isUpdating: Bool
+    let onSelectArtwork:
+        (String) -> Void
+
+    private let artworkOptions = [
+        "ProfileHero",
+        "HomeHero",
+        "TrainHero",
+        "GoalRunning",
+        "GoalMountain",
+        "GoalStrength",
+        "GoalAdventure",
+        "GoalRecovery"
+    ]
+
+    private let columns = [
+        GridItem(
+            .flexible(),
+            spacing: 10
+        ),
+        GridItem(
+            .flexible(),
+            spacing: 10
+        )
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 18
+                ) {
+                    PhotosPicker(
+                        selection:
+                            $selectedPhoto,
+                        matching: .images
+                    ) {
+                        HStack(spacing: 12) {
+                            Image(
+                                systemName:
+                                    "photo.badge.plus"
+                            )
+                            .font(
+                                .system(
+                                    size: 18,
+                                    weight:
+                                        .semibold
+                                )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+                            .frame(
+                                width: 42,
+                                height: 42
+                            )
+                            .background(
+                                ATHLTHTheme
+                                    .accentSoft,
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            13,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+
+                            VStack(
+                                alignment:
+                                    .leading,
+                                spacing: 3
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Choose from Photos",
+                                        norwegian:
+                                            "Velg fra Bilder"
+                                    )
+                                )
+                                .font(
+                                    .headline
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Crop it to the profile header before it is safety checked and published.",
+                                        norwegian:
+                                            "Juster utsnittet før bildet sikkerhetskontrolleres og publiseres."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+
+                            Spacer()
+
+                            if hasCustomImage {
+                                Image(
+                                    systemName:
+                                        "checkmark.circle.fill"
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+                            }
+                        }
+                        .padding(14)
+                        .background(
+                            Color.white.opacity(
+                                0.90
+                            ),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius: 22,
+                                    style:
+                                        .continuous
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdating)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH images",
+                                norwegian:
+                                    "ATHLTH-bilder"
+                            )
+                        )
+                        .font(
+                            .headline
+                        )
+
+                        LazyVGrid(
+                            columns: columns,
+                            spacing: 10
+                        ) {
+                            ForEach(
+                                artworkOptions,
+                                id: \.self
+                            ) { artwork in
+                                Button {
+                                    onSelectArtwork(
+                                        artwork
+                                    )
+                                } label: {
+                                    ZStack(
+                                        alignment:
+                                            .topTrailing
+                                    ) {
+                                        Image(
+                                            artwork
+                                        )
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(
+                                            height: 92
+                                        )
+                                        .clipShape(
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    16,
+                                                style:
+                                                    .continuous
+                                            )
+                                        )
+
+                                        if !hasCustomImage &&
+                                            currentArtwork ==
+                                            artwork {
+                                            Image(
+                                                systemName:
+                                                    "checkmark.circle.fill"
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 20,
+                                                    weight:
+                                                        .semibold
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                .white
+                                            )
+                                            .shadow(
+                                                color:
+                                                    .black
+                                                    .opacity(
+                                                        0.35
+                                                    ),
+                                                radius: 4
+                                            )
+                                            .padding(8)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(
+                                    .plain
+                                )
+                                .disabled(
+                                    isUpdating
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.18)
+                )
+            )
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Profile header",
+                    norwegian:
+                        "Profilheader"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Close",
+                            norwegian:
+                                "Lukk"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
