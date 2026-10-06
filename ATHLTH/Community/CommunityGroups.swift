@@ -6224,6 +6224,7 @@ struct CommunityGroupDetailView: View {
     let group: CommunityGroupRecord
 
     @State private var selectedTab: CommunityGroupsTab = .overview
+    @State private var tabIndicator: CommunityGroupsTab = .overview
     @State private var messageDraft = ""
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
@@ -6410,12 +6411,25 @@ struct CommunityGroupDetailView: View {
                 CommunityGroupsTab.allCases
             ) { tab in
                 Button {
+                    guard selectedTab != tab else {
+                        return
+                    }
+
+                    // Swap the heavy Club content immediately. Animating
+                    // selectedTab itself makes SwiftUI animate the complete
+                    // Overview/Chat/Events/Challenges subtree, which is
+                    // noticeably expensive on device.
+                    selectedTab = tab
+
+                    // Keep the visual feedback local to the small tab control
+                    // so switching feels responsive without rebuilding the
+                    // whole Club screen inside an animation transaction.
                     withAnimation(
-                        .easeInOut(
-                            duration: 0.18
+                        .easeOut(
+                            duration: 0.14
                         )
                     ) {
-                        selectedTab = tab
+                        tabIndicator = tab
                     }
                 } label: {
                     Text(tab.displayTitle)
@@ -6423,13 +6437,13 @@ struct CommunityGroupDetailView: View {
                             .system(
                                 size: 13,
                                 weight:
-                                    selectedTab == tab
+                                    tabIndicator == tab
                                         ? .semibold
                                         : .medium
                             )
                         )
                         .foregroundStyle(
-                            selectedTab == tab
+                            tabIndicator == tab
                                 ? Color.white
                                 : ATHLTHTheme
                                     .primaryText
@@ -6441,7 +6455,7 @@ struct CommunityGroupDetailView: View {
                         )
                         .frame(height: 42)
                         .background {
-                            if selectedTab == tab {
+                            if tabIndicator == tab {
                                 RoundedRectangle(
                                     cornerRadius: 15,
                                     style: .continuous
@@ -6883,10 +6897,14 @@ struct CommunityGroupDetailView: View {
             .padding(.horizontal, 18)
             .padding(.bottom, 18)
         }
+        // A ScrollView proposes an unbounded horizontal ideal size to some
+        // descendants. Pin the hero to the physical viewport so the identity
+        // row (including the Club profile image) cannot be centered in an
+        // oversized header and disappear beyond the left/right edge.
         .frame(
+            width: max(availableWidth, 0),
             height: 238 + max(topInset, 0)
         )
-        .frame(maxWidth: .infinity)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
