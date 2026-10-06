@@ -73,6 +73,81 @@ struct ExerciseLibraryView: View {
         }
     }
 
+    private static let exerciseAlphabet:
+        [String] = (
+            (65...90).compactMap {
+                UnicodeScalar($0)
+                    .map {
+                        String(Character($0))
+                    }
+            } +
+            ["Æ", "Ø", "Å"]
+        )
+
+    private var displayedResults:
+        [ExerciseLibraryEntry] {
+        let trimmedQuery =
+            query.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard trimmedQuery.isEmpty else {
+            return results
+        }
+
+        return results.sorted {
+            $0.name.localizedStandardCompare(
+                $1.name
+            ) == .orderedAscending
+        }
+    }
+
+    private var firstExerciseIDByLetter:
+        [String: UUID] {
+        var firstIDs: [String: UUID] = [:]
+
+        for entry in displayedResults {
+            let letter =
+                exerciseIndexLetter(
+                    for: entry.name
+                )
+
+            if firstIDs[letter] == nil {
+                firstIDs[letter] = entry.id
+            }
+        }
+
+        return firstIDs
+    }
+
+    private func exerciseIndexLetter(
+        for name: String
+    ) -> String {
+        guard let first =
+                name
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .first
+        else {
+            return "#"
+        }
+
+        let letter =
+            String(first)
+                .uppercased(
+                    with:
+                        Locale(
+                            identifier: "nb_NO"
+                        )
+                )
+
+        return Self.exerciseAlphabet
+            .contains(letter)
+            ? letter
+            : "#"
+    }
+
     private var selectedSectionIndex:
         Binding<Int> {
         Binding(
@@ -138,90 +213,141 @@ struct ExerciseLibraryView: View {
                     )
                 }
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(results) { entry in
-                            ZStack(alignment: .topTrailing) {
-                                NavigationLink {
-                                    ExerciseDetailView(
-                                        entry: entry,
-                                        selectionTitle: selectionTitle,
-                                        onSelect: onSelect
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            ForEach(
+                                displayedResults
+                            ) { entry in
+                                ZStack(
+                                    alignment:
+                                        .topTrailing
+                                ) {
+                                    NavigationLink {
+                                        ExerciseDetailView(
+                                            entry: entry,
+                                            selectionTitle:
+                                                selectionTitle,
+                                            onSelect:
+                                                onSelect
+                                        )
+                                    } label: {
+                                        exerciseRow(entry)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .simultaneousGesture(
+                                        TapGesture()
+                                            .onEnded {
+                                                recents
+                                                    .markUsed(
+                                                        .exercise,
+                                                        itemID:
+                                                            entry.id
+                                                                .uuidString,
+                                                        title:
+                                                            entry.name,
+                                                        subtitle:
+                                                            [
+                                                                entry.bodyPart,
+                                                                entry.exercise
+                                                                    .equipment
+                                                                    .first
+                                                            ]
+                                                            .compactMap {
+                                                                $0
+                                                            }
+                                                            .joined(
+                                                                separator:
+                                                                    " · "
+                                                            ),
+                                                        icon:
+                                                            "dumbbell.fill"
+                                                    )
+                                            }
                                     )
-                                } label: {
-                                    exerciseRow(entry)
+
+                                    LibraryFavoriteButton(
+                                        kind: .exercise,
+                                        itemID:
+                                            entry.id
+                                                .uuidString,
+                                        title:
+                                            entry.name,
+                                        subtitle:
+                                            [
+                                                entry.bodyPart,
+                                                entry.exercise
+                                                    .equipment
+                                                    .first
+                                            ]
+                                            .compactMap {
+                                                $0
+                                            }
+                                            .joined(
+                                                separator:
+                                                    " · "
+                                            ),
+                                        icon:
+                                            "dumbbell.fill"
+                                    )
+                                    .padding(8)
                                 }
-                                .buttonStyle(.plain)
-                                .simultaneousGesture(
-                                    TapGesture().onEnded {
-                                        recents.markUsed(
-                                            .exercise,
-                                            itemID: entry.id.uuidString,
-                                            title: entry.name,
-                                            subtitle:
-                                                [
-                                                    entry.bodyPart,
-                                                    entry.exercise.equipment.first
-                                                ]
-                                                .compactMap { $0 }
-                                                .joined(separator: " · "),
-                                            icon: "dumbbell.fill"
+                                .id(entry.id)
+                            }
+
+                            if selectedSection == .library,
+                               let attributionURL =
+                                    URL(
+                                        string:
+                                            "https://repdb.co"
+                                    ) {
+                                Link(
+                                    destination:
+                                        attributionURL
+                                ) {
+                                    HStack(
+                                        spacing: 5
+                                    ) {
+                                        Text(
+                                            "Exercise data by RepDB"
+                                        )
+                                        Image(
+                                            systemName:
+                                                "arrow.up.right"
                                         )
                                     }
-                                )
-
-                                LibraryFavoriteButton(
-                                    kind: .exercise,
-                                    itemID: entry.id.uuidString,
-                                    title: entry.name,
-                                    subtitle:
-                                        [
-                                            entry.bodyPart,
-                                            entry.exercise.equipment.first
-                                        ]
-                                        .compactMap { $0 }
-                                        .joined(separator: " · "),
-                                    icon: "dumbbell.fill"
-                                )
-                                .padding(8)
-                            }
-                        }
-
-                        if selectedSection == .library,
-                           let attributionURL =
-                                URL(
-                                    string:
-                                        "https://repdb.co"
-                                ) {
-                            Link(
-                                destination:
-                                    attributionURL
-                            ) {
-                                HStack(
-                                    spacing: 5
-                                ) {
-                                    Text(
-                                        "Exercise data by RepDB"
-                                    )
-                                    Image(
-                                        systemName:
-                                            "arrow.up.right"
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
                                     )
                                 }
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
+                                .padding(.top, 8)
+                                .padding(
+                                    .bottom,
+                                    4
                                 )
                             }
-                            .padding(.top, 8)
-                            .padding(
-                                .bottom,
-                                4
+                        }
+                        .padding(.leading, 16)
+                        .padding(.trailing, 34)
+                        .padding(.vertical, 16)
+                    }
+                    .overlay(
+                        alignment: .trailing
+                    ) {
+                        if query
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
                             )
+                            .isEmpty {
+                            exerciseAlphabetIndex(
+                                proxy: proxy
+                            )
+                            .padding(.trailing, 4)
                         }
                     }
-                    .padding()
                 }
             }
         }
@@ -259,6 +385,102 @@ struct ExerciseLibraryView: View {
         .refreshable {
             await library.refresh(force: true)
         }
+    }
+
+    private func exerciseAlphabetIndex(
+        proxy: ScrollViewProxy
+    ) -> some View {
+        let targets =
+            firstExerciseIDByLetter
+
+        return VStack(spacing: 0) {
+            ForEach(
+                Self.exerciseAlphabet,
+                id: \.self
+            ) { letter in
+                let targetID =
+                    targets[letter]
+
+                Button {
+                    guard let targetID else {
+                        return
+                    }
+
+                    withAnimation(
+                        .easeOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        proxy.scrollTo(
+                            targetID,
+                            anchor: .top
+                        )
+                    }
+                } label: {
+                    Text(letter)
+                        .font(
+                            .system(
+                                size: 8.5,
+                                weight:
+                                    targetID == nil
+                                        ? .medium
+                                        : .bold,
+                                design: .rounded
+                            )
+                        )
+                        .foregroundStyle(
+                            targetID == nil
+                                ? ATHLTHTheme
+                                    .mutedText
+                                    .opacity(0.24)
+                                : ATHLTHTheme
+                                    .accentDeep
+                        )
+                        .frame(
+                            width: 22,
+                            height: 14
+                        )
+                        .contentShape(
+                            Rectangle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    targetID == nil
+                )
+                .accessibilityLabel(
+                    ATHLTHLocalization.format(
+                        english:
+                            "Jump to exercises beginning with %@",
+                        norwegian:
+                            "Hopp til øvelser som begynner på %@",
+                        letter
+                    )
+                )
+            }
+        }
+        .padding(.vertical, 6)
+        .background(
+            .ultraThinMaterial,
+            in: Capsule()
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color.white.opacity(
+                        0.60
+                    ),
+                    lineWidth: 0.6
+                )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(
+                    0.05
+                ),
+            radius: 8,
+            y: 3
+        )
     }
 
     private var filters: some View {
