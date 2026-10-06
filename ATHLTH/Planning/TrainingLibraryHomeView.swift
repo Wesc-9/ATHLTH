@@ -18,37 +18,8 @@ struct TrainingLibraryHomeView: View {
     @State private var showingCreateWorkout = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            LibraryPremiumIntro(
-                eyebrow: "TRAINING LIBRARY",
-                title: "Everything you train with",
-                subtitle:
-                    "Plans, workouts, exercises and routes — curated, saved and ready when you are.",
-                icon: "square.grid.2x2.fill",
-                accent: ATHLTHTheme.accent
-            ) {
-                HStack(spacing: 8) {
-                    LibraryStatPill(
-                        value: "\(favorites.favorites.count)",
-                        label: "favorites",
-                        icon: "star.fill",
-                        tint: ATHLTHTheme.premiumGold
-                    )
-
-                    LibraryStatPill(
-                        value: "5",
-                        label: "collections",
-                        icon: "square.stack.3d.up.fill",
-                        tint: ATHLTHTheme.accent
-                    )
-                }
-            }
-
-            NavigationLink {
-                AthleteToolsView()
-            } label: {
-                LibraryDestinationTile(title: "Athlete Tools", subtitle: "Races, load, offline packs, fuel and sharing", icon: "figure.run.circle", tint: ATHLTHTheme.accent)
-            }
+        VStack(alignment: .leading, spacing: 18) {
+            libraryHomeHero
 
             if !recents.items.isEmpty {
                 recentSection
@@ -262,6 +233,158 @@ struct TrainingLibraryHomeView: View {
                 workoutRefresh
             )
         }
+    }
+
+    private var libraryHomeHero: some View {
+        HStack(
+            alignment: .center,
+            spacing: 13
+        ) {
+            ZStack {
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme.accent
+                                .opacity(0.16),
+                            ATHLTHTheme.accentDeep
+                                .opacity(0.07)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+                Image(
+                    systemName:
+                        "square.grid.2x2.fill"
+                )
+                .font(
+                    .system(
+                        size: 20,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+            }
+            .frame(
+                width: 52,
+                height: 52
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 17,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(
+                        0.86
+                    ),
+                    lineWidth: 0.8
+                )
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Training Library",
+                        norwegian:
+                            "Treningsbibliotek"
+                    )
+                )
+                .font(
+                    .system(
+                        size: 22,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Plans, workouts, exercises and routes — ready when you need them.",
+                        norwegian:
+                            "Planer, økter, øvelser og ruter – klare når du trenger dem."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(2)
+            }
+
+            Spacer(minLength: 6)
+        }
+        .padding(15)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    ATHLTHTheme.accent
+                        .opacity(0.035)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
+        .overlay(alignment: .bottomLeading) {
+            HStack(spacing: 8) {
+                LibraryStatPill(
+                    value:
+                        "\(favorites.favorites.count)",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "favorites",
+                            norwegian: "favoritter"
+                        ),
+                    icon: "star.fill",
+                    tint:
+                        ATHLTHTheme.premiumGold
+                )
+
+                LibraryStatPill(
+                    value: "4",
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "categories",
+                            norwegian: "kategorier"
+                        ),
+                    icon:
+                        "square.stack.3d.up.fill",
+                    tint:
+                        ATHLTHTheme.accent
+                )
+            }
+            .padding(.horizontal, 15)
+            .offset(y: 16)
+        }
+        .padding(.bottom, 16)
+        .shadow(
+            color:
+                ATHLTHTheme.accentDeep
+                    .opacity(0.035),
+            radius: 12,
+            y: 5
+        )
     }
 
     private var recentSection: some View {
@@ -503,12 +626,12 @@ private struct LibraryDestinationTile: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .top) {
                 Image(systemName: icon)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 46, height: 46)
+                    .frame(width: 42, height: 42)
                     .background(
                         LinearGradient(
                             colors: [
@@ -519,13 +642,13 @@ private struct LibraryDestinationTile: View {
                             endPoint: .bottomTrailing
                         ),
                         in: RoundedRectangle(
-                            cornerRadius: 15,
+                            cornerRadius: 14,
                             style: .continuous
                         )
                     )
                     .overlay {
                         RoundedRectangle(
-                            cornerRadius: 15,
+                            cornerRadius: 14,
                             style: .continuous
                         )
                         .stroke(
@@ -569,10 +692,10 @@ private struct LibraryDestinationTile: View {
                 .fill(tint.opacity(0.26))
                 .frame(width: 34, height: 3)
         }
-        .padding(16)
+        .padding(14)
         .frame(
             maxWidth: .infinity,
-            minHeight: 148,
+            minHeight: 128,
             alignment: .topLeading
         )
         .background(
