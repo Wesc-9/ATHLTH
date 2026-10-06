@@ -10815,7 +10815,7 @@ struct ATHLTHProfileView: View {
                     },
                     onUpload: {
                         let data =
-                            pendingProfilePhotoUploadData
+                            self.pendingProfilePhotoUploadData
                         showingProfilePhotoUploadPreview =
                             false
                         self.pendingProfilePhotoUploadData =
@@ -10910,7 +10910,7 @@ struct ATHLTHProfileView: View {
                     },
                     onUpload: {
                         let data =
-                            pendingProfileHeaderUploadData
+                            self.pendingProfileHeaderUploadData
                         showingProfileHeaderUploadPreview =
                             false
                         self.pendingProfileHeaderUploadData =
