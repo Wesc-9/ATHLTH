@@ -444,12 +444,40 @@ enum StrengthPersonalRecordKind: String, Codable, Hashable {
     }
 }
 
+enum StrengthProgressionRecentTrend:
+    Hashable
+{
+    case readyRepeated(
+        readySessions: Int,
+        totalSessions: Int
+    )
+    case readyLatest(
+        totalSessions: Int
+    )
+    case improving(
+        totalSessions: Int
+    )
+    case stable(
+        totalSessions: Int
+    )
+    case heavy(
+        totalSessions: Int
+    )
+}
+
 struct StrengthProgressionSuggestion: Hashable {
     let previousWeightKilograms: Double
     let previousReps: Int
     let suggestedWeightKilograms: Double
     let suggestedReps: Int
     var reason: String? = nil
+
+    // Recent context is optional so legacy callers/tests stay source compatible.
+    // The active workout can use this to show a small "last time + trend" hint
+    // without performing any expensive analysis while scrolling.
+    var recentSessionCount: Int = 1
+    var recentTrend:
+        StrengthProgressionRecentTrend? = nil
 }
 
 struct StrengthPersonalRecord: Identifiable, Hashable {

@@ -41,6 +41,70 @@ final class AthleteToolsTests: XCTestCase {
         let suggestion = try XCTUnwrap(AthleteStrengthProgression.suggestion(sets: [set(reps: 3, rpe: 10, warmUp: true),set(reps: 10, rir: 3)], targetReps: 10))
         XCTAssertEqual(suggestion.suggestedWeightKilograms, 52.5)
     }
+    func testRecentStrengthTrendRequiresLatestSessionToSupportIncrease() throws {
+        let readyLatest =
+            try XCTUnwrap(
+                AthleteStrengthProgression
+                    .suggestion(
+                        sets: [
+                            set(
+                                reps: 10,
+                                rpe: 7
+                            )
+                        ],
+                        targetReps: 10
+                    )
+            )
+        var readyOlder =
+            readyLatest
+        readyOlder =
+            StrengthProgressionSuggestion(
+                previousWeightKilograms:
+                    47.5,
+                previousReps: 10,
+                suggestedWeightKilograms:
+                    50,
+                suggestedReps: 10
+            )
+
+        XCTAssertEqual(
+            AthleteStrengthProgression
+                .recentTrend(
+                    suggestions: [
+                        readyLatest,
+                        readyOlder
+                    ]
+                ),
+            .readyRepeated(
+                readySessions: 2,
+                totalSessions: 2
+            )
+        )
+
+        let holdLatest =
+            StrengthProgressionSuggestion(
+                previousWeightKilograms:
+                    50,
+                previousReps: 10,
+                suggestedWeightKilograms:
+                    50,
+                suggestedReps: 10
+            )
+
+        XCTAssertEqual(
+            AthleteStrengthProgression
+                .recentTrend(
+                    suggestions: [
+                        holdLatest,
+                        readyOlder
+                    ]
+                ),
+            .improving(
+                totalSessions: 2
+            )
+        )
+    }
+
     func testFuelScheduleIsBoundedAndEndsBeforeWorkoutEnd() {
         let plan = AthleteFuelPlan(durationMinutes: 480, intervalMinutes: 10, carbohydrateGramsPerHour: 60, fluidMLPerHour: 600)
         XCTAssertEqual(plan.reminderOffsets.count, 47)

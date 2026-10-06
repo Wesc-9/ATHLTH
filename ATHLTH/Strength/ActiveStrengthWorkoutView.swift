@@ -1107,6 +1107,16 @@ struct ActiveStrengthWorkoutView: View {
                 exercise: exercise
             )
 
+            if let suggestion =
+                    strength
+                        .progressionSuggestion(
+                            for: exercise
+                        ) {
+                focusedProgressionHint(
+                    suggestion
+                )
+            }
+
             if !canLogOnIPhone(
                 workout
             ) {
@@ -1563,6 +1573,209 @@ struct ActiveStrengthWorkoutView: View {
                 width: 0.5,
                 height: 44
             )
+    }
+
+    private func focusedProgressionHint(
+        _ suggestion:
+            StrengthProgressionSuggestion
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(
+                systemName:
+                    suggestion
+                        .suggestedWeightKilograms >
+                    suggestion
+                        .previousWeightKilograms +
+                    0.01
+                        ? "arrow.up.right.circle.fill"
+                        : "chart.line.uptrend.xyaxis"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                ATHLTHTheme.vitality
+                    .opacity(0.10),
+                in: Circle()
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Last time · (formatWeight(suggestion.previousWeightKilograms)) kg × (suggestion.previousReps)",
+                        norwegian:
+                            "Sist · (formatWeight(suggestion.previousWeightKilograms)) kg × (suggestion.previousReps)"
+                    )
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+                Text(
+                    focusedProgressionTrendText(
+                        suggestion
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Use",
+                    norwegian: "Bruk"
+                )
+            ) {
+                strength.setDraft(
+                    reps:
+                        suggestion
+                            .suggestedReps,
+                    weightKilograms:
+                        suggestion
+                            .suggestedWeightKilograms
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(
+            .horizontal,
+            12
+        )
+        .padding(
+            .vertical,
+            10
+        )
+        .background(
+            ATHLTHTheme
+                .surfaceSage
+                .opacity(0.72),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                ATHLTHTheme.vitality
+                    .opacity(0.14),
+                lineWidth: 1
+            )
+        }
+    }
+
+    private func focusedProgressionTrendText(
+        _ suggestion:
+            StrengthProgressionSuggestion
+    ) -> String {
+        switch suggestion.recentTrend {
+        case let .readyRepeated(
+            readySessions,
+            totalSessions
+        ):
+            return
+                ATHLTHLocalization.format(
+                    english:
+                        "You had reps in reserve in %d of your last %d sessions. A small increase to %@ kg looks reasonable.",
+                    norwegian:
+                        "Du hadde kapasitet igjen i %d av de siste %d øktene. En liten økning til %@ kg ser fornuftig ut.",
+                    readySessions,
+                    totalSessions,
+                    formatWeight(
+                        suggestion
+                            .suggestedWeightKilograms
+                    )
+                )
+
+        case let .readyLatest(
+            totalSessions
+        ):
+            return
+                ATHLTHLocalization.format(
+                    english:
+                        "The latest of your last %d sessions looked controlled. %@ kg can be worth trying if warm-up feels good.",
+                    norwegian:
+                        "Den siste av de siste %d øktene så kontrollert ut. %@ kg kan være verdt å prøve hvis oppvarmingen kjennes bra.",
+                    totalSessions,
+                    formatWeight(
+                        suggestion
+                            .suggestedWeightKilograms
+                    )
+                )
+
+        case let .improving(
+            totalSessions
+        ):
+            return
+                ATHLTHLocalization.format(
+                    english:
+                        "Load has progressed across your last %d sessions. Keep building gradually.",
+                    norwegian:
+                        "Belastningen har økt gjennom de siste %d øktene. Fortsett gradvis.",
+                    totalSessions
+                )
+
+        case let .stable(
+            totalSessions
+        ):
+            return
+                ATHLTHLocalization.format(
+                    english:
+                        "Your last %d sessions are fairly stable. %@",
+                    norwegian:
+                        "De siste %d øktene er ganske stabile. %@",
+                    totalSessions,
+                    suggestion.reason ?? ""
+                )
+
+        case let .heavy(
+            totalSessions
+        ):
+            return
+                ATHLTHLocalization.format(
+                    english:
+                        "The latest of your last %d sessions was very hard. %@",
+                    norwegian:
+                        "Den siste av de siste %d øktene var svært tung. %@",
+                    totalSessions,
+                    suggestion.reason ?? ""
+                )
+
+        case nil:
+            return
+                suggestion.reason ??
+                ATHLTHLocalization.choose(
+                    english:
+                        "Use the previous session as a reference and adjust by feel.",
+                    norwegian:
+                        "Bruk forrige økt som referanse og juster etter dagsform."
+                )
+        }
     }
 
     private func focusedSetEntry(
@@ -2903,8 +3116,23 @@ struct ActiveStrengthWorkoutView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                if let reason = suggestion.reason {
-                    Text(reason).font(.caption).foregroundStyle(.secondary)
+                if suggestion.recentTrend != nil {
+                    Text(
+                        focusedProgressionTrendText(
+                            suggestion
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                } else if let reason =
+                            suggestion.reason {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
                 }
             }
 

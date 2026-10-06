@@ -2156,9 +2156,14 @@ final class StrengthWorkoutStore: ObservableObject {
                 )
                 .lowercased()
 
-        guard !name.isEmpty,
-              exercise.sets.first?.resolvedTargetKind != .time,
-              exercise.sets.first?.resolvedLoadKind != .resistanceLevel
+        guard
+            !name.isEmpty,
+            exercise.sets.first?
+                .resolvedTargetKind !=
+                .time,
+            exercise.sets.first?
+                .resolvedLoadKind !=
+                .resistanceLevel
         else {
             return nil
         }
@@ -2171,15 +2176,108 @@ final class StrengthWorkoutStore: ObservableObject {
                 .plannedReps ??
             draftReps
 
-        let previousExercise = workoutHistory
-            .filter(\.isFinished)
-            .sorted { $0.startedAt > $1.startedAt }
-            .lazy
-            .flatMap(\.exercises)
-            .first { $0.exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name
-                && $0.sets.contains { $0.countsTowardTrainingLoad } }
-        guard let previousExercise else { return nil }
-        return AthleteStrengthProgression.suggestion(sets: previousExercise.sets, targetReps: targetReps)
+        let cutoff =
+            Date()
+                .addingTimeInterval(
+                    -56 * 86_400
+                )
+
+        let recentMatches:
+            [
+                (
+                    date: Date,
+                    exercise:
+                        StrengthExerciseLog
+                )
+            ] =
+            workoutHistory
+                .filter {
+                    $0.isFinished &&
+                    $0.startedAt >= cutoff
+                }
+                .sorted {
+                    $0.startedAt >
+                        $1.startedAt
+                }
+                .compactMap {
+                    workout in
+
+                    guard
+                        let match =
+                            workout
+                                .exercises
+                                .first(
+                                    where: {
+                                        $0.exercise
+                                            .name
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
+                                            )
+                                            .lowercased() ==
+                                            name &&
+                                        $0.sets
+                                            .contains {
+                                                $0
+                                                    .countsTowardTrainingLoad
+                                            }
+                                    }
+                                )
+                    else {
+                        return nil
+                    }
+
+                    return (
+                        date:
+                            workout
+                                .startedAt,
+                        exercise:
+                            match
+                    )
+                }
+                .prefix(4)
+                .map { $0 }
+
+        guard
+            let latest =
+                recentMatches.first,
+            var suggestion =
+                AthleteStrengthProgression
+                    .suggestion(
+                        sets:
+                            latest
+                                .exercise
+                                .sets,
+                        targetReps:
+                            targetReps
+                    )
+        else {
+            return nil
+        }
+
+        let recentSuggestions =
+            recentMatches
+                .compactMap {
+                    AthleteStrengthProgression
+                        .suggestion(
+                            sets:
+                                $0.exercise
+                                    .sets,
+                            targetReps:
+                                targetReps
+                        )
+                }
+
+        suggestion.recentSessionCount =
+            recentSuggestions.count
+        suggestion.recentTrend =
+            AthleteStrengthProgression
+                .recentTrend(
+                    suggestions:
+                        recentSuggestions
+                )
+
+        return suggestion
     }
 
     private func advanceGroupedSetIfNeeded(

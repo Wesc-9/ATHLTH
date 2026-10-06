@@ -102,45 +102,250 @@ enum AthleteLoadEngine {
 }
 
 enum AthleteStrengthProgression {
-    static func suggestion(sets: [StrengthSetLog], targetReps: Int) -> StrengthProgressionSuggestion? {
-        let working = sets.compactMap { set -> StrengthSetLog? in
-            guard set.countsTowardTrainingLoad, set.resolvedTargetKind != .time,
-                  set.resolvedLoadKind == .weightKilograms else { return nil }
-            var result = set
-            if let segments = set.effortSegments, !segments.isEmpty {
-                // A lighter drop-set segment cannot complete the rep target at
-                // the heavier load. Use the strongest segment's own reps.
-                let valid = segments.filter { ($0.reps ?? 0) > 0 && ($0.weightKilograms ?? 0) > 0 }
-                guard let strongest = valid.max(by: { lhs, rhs in
-                    if lhs.weightKilograms == rhs.weightKilograms { return (lhs.reps ?? 0) < (rhs.reps ?? 0) }
-                    return (lhs.weightKilograms ?? 0) < (rhs.weightKilograms ?? 0)
-                }) else { return nil }
-                result.completedReps = strongest.reps
-                result.completedWeightKilograms = strongest.weightKilograms
+    static func suggestion(
+        sets: [StrengthSetLog],
+        targetReps: Int
+    ) -> StrengthProgressionSuggestion? {
+        let working =
+            sets.compactMap {
+                set -> StrengthSetLog? in
+
+                guard
+                    set.countsTowardTrainingLoad,
+                    set.resolvedTargetKind != .time,
+                    set.resolvedLoadKind ==
+                        .weightKilograms
+                else {
+                    return nil
+                }
+
+                var result = set
+
+                if let segments =
+                        set.effortSegments,
+                   !segments.isEmpty {
+                    // A lighter drop-set segment cannot complete the rep
+                    // target at the heavier load. Use the strongest segment.
+                    let valid =
+                        segments.filter {
+                            ($0.reps ?? 0) > 0 &&
+                            ($0.weightKilograms ?? 0) >
+                                0
+                        }
+
+                    guard let strongest =
+                            valid.max(
+                                by: {
+                                    lhs,
+                                    rhs in
+
+                                    if lhs
+                                        .weightKilograms ==
+                                        rhs
+                                        .weightKilograms {
+                                        return
+                                            (lhs.reps ??
+                                                0) <
+                                            (rhs.reps ??
+                                                0)
+                                    }
+
+                                    return
+                                        (lhs
+                                            .weightKilograms ??
+                                            0) <
+                                        (rhs
+                                            .weightKilograms ??
+                                            0)
+                                }
+                            )
+                    else {
+                        return nil
+                    }
+
+                    result.completedReps =
+                        strongest.reps
+                    result
+                        .completedWeightKilograms =
+                        strongest
+                            .weightKilograms
+                }
+
+                guard
+                    (result.completedReps ?? 0) >
+                        0,
+                    (result
+                        .completedWeightKilograms ??
+                        0) > 0
+                else {
+                    return nil
+                }
+
+                return result
             }
-            guard (result.completedReps ?? 0) > 0, (result.completedWeightKilograms ?? 0) > 0 else { return nil }
-            return result
+
+        guard
+            targetReps > 0,
+            let last = working.last,
+            let weight =
+                last.completedWeightKilograms,
+            weight.isFinite,
+            let reps = last.completedReps
+        else {
+            return nil
         }
-        guard targetReps > 0, let last = working.last, let weight = last.completedWeightKilograms,
-              weight.isFinite, let reps = last.completedReps else { return nil }
-        let metTarget = working.allSatisfy { ($0.completedReps ?? 0) >= targetReps }
-        let excessive = working.contains { ($0.rpe ?? 0) >= 9.5 || ($0.rir ?? 10) <= 0 }
-        let missingEffort = working.contains { $0.rpe == nil && $0.rir == nil }
-        let ready = working.allSatisfy { ($0.rpe ?? 0) <= 8 && ($0.rir ?? 10) >= 2 }
-        let increment = weight >= 100 ? 5.0 : 2.5
+
+        let metTarget =
+            working.allSatisfy {
+                ($0.completedReps ?? 0) >=
+                    targetReps
+            }
+        let excessive =
+            working.contains {
+                ($0.rpe ?? 0) >= 9.5 ||
+                ($0.rir ?? 10) <= 0
+            }
+        let missingEffort =
+            working.contains {
+                $0.rpe == nil &&
+                $0.rir == nil
+            }
+        let ready =
+            working.allSatisfy {
+                ($0.rpe ?? 0) <= 8 &&
+                ($0.rir ?? 10) >= 2
+            }
+
+        let increment =
+            weight >= 100
+                ? 5.0
+                : 2.5
         let suggested: Double
         let reason: String
+
         if excessive && !metTarget {
-            suggested = max(0.5, (weight * 0.95 * 2).rounded() / 2)
-            reason = "Target missed with very high effort. Consider a small reduction."
-        } else if metTarget && ready && !missingEffort {
-            suggested = weight + increment
-            reason = "All working sets met the target with effort in reserve."
+            suggested =
+                max(
+                    0.5,
+                    (
+                        weight *
+                        0.95 *
+                        2
+                    )
+                    .rounded() /
+                    2
+                )
+            reason =
+                ATHLTHLocalization.choose(
+                    english:
+                        "The target was missed at very high effort. A small reduction may be smarter today.",
+                    norwegian:
+                        "Målet ble bommet med svært høy innsats. En liten reduksjon kan være smartere i dag."
+                )
+        } else if metTarget &&
+                    ready &&
+                    !missingEffort {
+            suggested =
+                weight + increment
+            reason =
+                ATHLTHLocalization.choose(
+                    english:
+                        "All working sets hit the target with effort in reserve.",
+                    norwegian:
+                        "Alle arbeidssettene traff målet med litt kapasitet igjen."
+                )
         } else {
             suggested = weight
-            reason = missingEffort ? "Record RPE or RIR to guide an increase. Keep this load for now." : "Repeat this load until all working sets meet the target with effort in reserve."
+            reason =
+                missingEffort
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Add RPE or RIR for a safer progression signal. Keep this load for now.",
+                        norwegian:
+                            "Legg inn RPE eller RIR for et sikrere progresjonssignal. Behold belastningen foreløpig."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Repeat this load until the target feels controlled with effort in reserve.",
+                        norwegian:
+                            "Gjenta denne belastningen til målet kjennes kontrollert med litt kapasitet igjen."
+                    )
         }
-        return StrengthProgressionSuggestion(previousWeightKilograms: weight, previousReps: reps,
-                                             suggestedWeightKilograms: suggested, suggestedReps: targetReps, reason: reason)
+
+        return StrengthProgressionSuggestion(
+            previousWeightKilograms:
+                weight,
+            previousReps: reps,
+            suggestedWeightKilograms:
+                suggested,
+            suggestedReps: targetReps,
+            reason: reason
+        )
+    }
+
+    /// Classifies a small recent window. Suggestions must be newest first.
+    /// The latest session remains authoritative; older sessions only add
+    /// confidence/context and never force a larger jump.
+    static func recentTrend(
+        suggestions:
+            [StrengthProgressionSuggestion]
+    ) -> StrengthProgressionRecentTrend? {
+        guard suggestions.count >= 2,
+              let latest =
+                suggestions.first
+        else {
+            return nil
+        }
+
+        let total =
+            suggestions.count
+        let delta =
+            latest
+                .suggestedWeightKilograms -
+            latest
+                .previousWeightKilograms
+
+        if delta < -0.01 {
+            return .heavy(
+                totalSessions: total
+            )
+        }
+
+        if delta > 0.01 {
+            let readyCount =
+                suggestions.filter {
+                    $0.suggestedWeightKilograms >
+                        $0.previousWeightKilograms +
+                        0.01
+                }
+                .count
+
+            if readyCount >= 2 {
+                return .readyRepeated(
+                    readySessions:
+                        readyCount,
+                    totalSessions: total
+                )
+            }
+
+            return .readyLatest(
+                totalSessions: total
+            )
+        }
+
+        if let oldest =
+                suggestions.last,
+           latest.previousWeightKilograms >
+                oldest
+                    .previousWeightKilograms +
+                0.01 {
+            return .improving(
+                totalSessions: total
+            )
+        }
+
+        return .stable(
+            totalSessions: total
+        )
     }
 }
