@@ -6405,32 +6405,40 @@ struct CommunityGroupDetailView: View {
         }
     }
 
+    private func selectTab(
+        _ tab: CommunityGroupsTab
+    ) {
+        if selectedTab != tab {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+
+            withTransaction(transaction) {
+                selectedTab = tab
+            }
+        }
+
+        guard tabIndicator != tab else {
+            return
+        }
+
+        withAnimation(
+            .easeOut(
+                duration: 0.14
+            )
+        ) {
+            tabIndicator = tab
+        }
+    }
+
     private var groupAreaPicker: some View {
         HStack(spacing: 3) {
             ForEach(
                 CommunityGroupsTab.allCases
             ) { tab in
                 Button {
-                    guard selectedTab != tab else {
-                        return
-                    }
-
-                    // Swap the heavy Club content immediately. Animating
-                    // selectedTab itself makes SwiftUI animate the complete
-                    // Overview/Chat/Events/Challenges subtree, which is
-                    // noticeably expensive on device.
-                    selectedTab = tab
-
-                    // Keep the visual feedback local to the small tab control
-                    // so switching feels responsive without rebuilding the
-                    // whole Club screen inside an animation transaction.
-                    withAnimation(
-                        .easeOut(
-                            duration: 0.14
-                        )
-                    ) {
-                        tabIndicator = tab
-                    }
+                    // Swap heavy tab content outside an animation transaction.
+                    // Only the compact selection indicator animates.
+                    selectTab(tab)
                 } label: {
                     Text(tab.displayTitle)
                         .font(
@@ -7270,8 +7278,8 @@ struct CommunityGroupDetailView: View {
                     .buttonStyle(.plain)
                 } else {
                     Button {
-                        selectedTab = .chat
-                    } label: {
+                        selectTab(.chat)
+                    } label: 
                         referenceActionTile(
                             title: "Chat",
                             detail:
@@ -7348,7 +7356,7 @@ struct CommunityGroupDetailView: View {
                         ) {
                         showingCreateEvent = true
                     } else {
-                        selectedTab = .events
+                        selectTab(.events)
                     }
                 } label: {
                     referenceActionTile(
@@ -7459,8 +7467,7 @@ struct CommunityGroupDetailView: View {
                     showingCreateChallenge =
                         true
                 } else {
-                    selectedTab =
-                        .challenges
+                    selectTab(.challenges)
                 }
             } label: {
                 referenceActionTile(
@@ -7659,7 +7666,7 @@ struct CommunityGroupDetailView: View {
             if canCreate {
                 showingCreateChallenge = true
             } else {
-                selectedTab = .challenges
+                selectTab(.challenges)
             }
         } label: {
             HStack(spacing: 14) {
@@ -8160,7 +8167,7 @@ struct CommunityGroupDetailView: View {
                             norwegian: "Se alle"
                         ),
                 action: {
-                    selectedTab = .events
+                    selectTab(.events)
                 }
             )
 
