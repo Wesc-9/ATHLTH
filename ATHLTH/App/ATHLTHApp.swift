@@ -1036,7 +1036,7 @@ struct AppRootView: View {
                 // refresh throttle so a missed/failed device registration
                 // repairs itself as soon as ATHLTH becomes active again.
                 await APNsPushManager.shared
-                    .syncCurrentToken()
+                    .repairRegistrationIfAuthorized()
 
                 if ATHLTHDeviceRole.isIPhone {
                     await deviceRelay
@@ -1613,7 +1613,7 @@ struct AppRootView: View {
                         _ = await notifications
                             .requestSystemNotificationPermissionIfNeeded()
                         await APNsPushManager.shared
-                            .syncCurrentToken()
+                            .repairRegistrationIfAuthorized()
                         await syncPushPreferences()
                     }
                 },
