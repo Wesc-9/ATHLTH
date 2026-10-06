@@ -73,12 +73,6 @@ struct HomeActivityStrengthDetailView: View {
 
                 workoutHeroCard
 
-                if workout.allowsTrainingPlaceCheckIn {
-                    WorkoutPlaceCheckInSection(
-                        workoutID: workout.id
-                    )
-                }
-
                 // Keep strength details lightweight. The full muscle map
                 // remains available in Insights/Recovery, where it is useful,
                 // but we do not render it again inside every workout detail.
