@@ -501,10 +501,13 @@ Deno.serve(async (req: Request) => {
 
   const supabaseURL = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const keyID = Deno.env.get("APNS_KEY_ID");
+
+  // These are Apple Developer identifiers, not secrets. Keeping them
+  // explicit prevents a stale/mismatched environment value from producing
+  // an invalid APNs provider token. The private .p8 key remains secret.
+  const keyID = "BAA9534F38";
+  const teamID = "D3AX7B6RMW";
   const privateKey = Deno.env.get("APNS_PRIVATE_KEY");
-  const teamID =
-    Deno.env.get("APNS_TEAM_ID") ?? "D3AX7B6RMW";
 
   if (!supabaseURL || !serviceRoleKey) {
     return json({ error: "ATHLTH backend is unavailable." }, 503);
