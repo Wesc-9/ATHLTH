@@ -36,6 +36,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var didDisableIdleTimer = false
     @State private var focusedExerciseMediaIndex = 0
     @State private var showingExerciseInstructions = false
+    @State private var showingWorkoutReview = false
 
     var body: some View {
         NavigationStack {
@@ -220,6 +221,13 @@ struct ActiveStrengthWorkoutView: View {
                     )
                     editingSetResult = nil
                     loadDefaultsFromCurrentSet()
+                    showingWorkoutReview =
+                        strength
+                            .activeWorkout?
+                            .exercises
+                            .allSatisfy {
+                                $0.isCompleted
+                            } ?? false
                 }
             }
             .sheet(
@@ -437,6 +445,7 @@ struct ActiveStrengthWorkoutView: View {
 
                 focusedExerciseMediaIndex = 0
                 showingExerciseInstructions = false
+                showingWorkoutReview = false
                 announceNextExerciseIfNeeded()
             }
             .onChange(
@@ -1113,7 +1122,8 @@ struct ActiveStrengthWorkoutView: View {
                 workout
             )
 
-            if workoutComplete {
+            if workoutComplete &&
+                showingWorkoutReview {
                 focusedWorkoutCompletionHero(
                     workout
                 )
@@ -2623,6 +2633,74 @@ struct ActiveStrengthWorkoutView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .overlay(
+                alignment: .topLeading
+            ) {
+                if let pr =
+                        focusedExercisePRHint(
+                            exercise
+                        ) {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                "trophy.fill"
+                        )
+                        .font(.caption2)
+
+                        Text(pr.label)
+                            .font(
+                                .caption2
+                                    .weight(.bold)
+                            )
+
+                        Text(pr.value)
+                            .font(
+                                .caption2
+                                    .monospacedDigit()
+                                    .weight(.semibold)
+                            )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .padding(
+                        .vertical,
+                        6
+                    )
+                    .background(
+                        Color.black
+                            .opacity(0.28),
+                        in: Capsule()
+                    )
+                    .background(
+                        .ultraThinMaterial,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                ATHLTHTheme
+                                    .premiumGold
+                                    .opacity(0.34),
+                                lineWidth: 0.8
+                            )
+                    }
+                    .padding(12)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Personal record, \(pr.label), \(pr.value)",
+                            norwegian:
+                                "Personlig rekord, \(pr.label), \(pr.value)"
+                        )
+                    )
+                }
+            }
 
             focusedExerciseInstructionDisclosure(
                 exercise
@@ -3026,6 +3104,101 @@ struct ActiveStrengthWorkoutView: View {
         .filter {
             !$0.isEmpty
         } ?? []
+    }
+
+    private func focusedExercisePRHint(
+        _ exercise: StrengthExerciseLog
+    ) -> (
+        label: String,
+        value: String
+    )? {
+        func normalized(
+            _ value: String
+        ) -> String {
+            value
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .folding(
+                    options: [
+                        .diacriticInsensitive,
+                        .caseInsensitive
+                    ],
+                    locale: .current
+                )
+                .lowercased()
+        }
+
+        let exerciseKey =
+            normalized(
+                exercise.exercise.name
+            )
+        let targetReps =
+            strength.currentSet?
+                .plannedReps ??
+            strength.draftReps
+
+        if targetReps > 0,
+           let exact =
+                strength
+                    .repPersonalRecords
+                    .first(
+                        where: {
+                            normalized(
+                                $0.exerciseName
+                            ) == exerciseKey &&
+                            $0.reps ==
+                                targetReps
+                        }
+                    ) {
+            if exact.weightKilograms > 0 {
+                return (
+                    label:
+                        "(targetReps)RM",
+                    value:
+                        formatWeight(
+                            exact
+                                .weightKilograms
+                        ) + " kg"
+                )
+            }
+
+            return (
+                label:
+                    ATHLTHLocalization.choose(
+                        english: "Rep PR",
+                        norwegian: "Rep-PR"
+                    ),
+                value:
+                    "(exact.reps) reps"
+            )
+        }
+
+        if let heaviest =
+                strength
+                    .personalRecords
+                    .first(
+                        where: {
+                            $0.kind ==
+                                .heaviestSet &&
+                            normalized(
+                                $0.title
+                            ) == exerciseKey
+                        }
+                    ) {
+            return (
+                label:
+                    ATHLTHLocalization.choose(
+                        english: "PR",
+                        norwegian: "PR"
+                    ),
+                value:
+                    heaviest.value
+            )
+        }
+
+        return nil
     }
 
     private func focusedExerciseInstructionDisclosure(
@@ -4664,6 +4837,38 @@ struct ActiveStrengthWorkoutView: View {
                         )
 
                         Button {
+                            if strength
+                                .addExtraSetToCurrentExercise() {
+                                showingWorkoutReview =
+                                    false
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "One more set",
+                                    norwegian:
+                                        "Ta ett ekstra sett"
+                                ),
+                                systemImage:
+                                    "plus.circle.fill"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(.semibold)
+                            )
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: 44
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+
+                        Button {
                             // Rest never blocks navigation. Clearing the timer
                             // first also guarantees that the next exercise
                             // starts in its normal logging state.
@@ -4770,7 +4975,7 @@ struct ActiveStrengthWorkoutView: View {
                             )
                         )
                     } else {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 12) {
                             Image(
                                 systemName:
                                     "checkmark.seal.fill"
@@ -4794,6 +4999,83 @@ struct ActiveStrengthWorkoutView: View {
                                 ATHLTHTheme
                                     .mutedText
                             )
+
+                            Button {
+                                if strength
+                                    .addExtraSetToCurrentExercise() {
+                                    showingWorkoutReview =
+                                        false
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "One more set",
+                                        norwegian:
+                                            "Ta ett ekstra sett"
+                                    ),
+                                    systemImage:
+                                        "plus.circle.fill"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    minHeight: 44
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(
+                                ATHLTHTheme
+                                    .accentDeep
+                            )
+
+                            Button {
+                                showingWorkoutReview =
+                                    true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Review workout",
+                                        norwegian:
+                                            "Se sammendrag"
+                                    ),
+                                    systemImage:
+                                        "chart.bar.doc.horizontal"
+                                )
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    minHeight: 52
+                                )
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme
+                                                .accentDeep,
+                                            ATHLTHTheme
+                                                .vitality
+                                        ],
+                                        startPoint:
+                                            .leading,
+                                        endPoint:
+                                            .trailing
+                                    ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius: 18,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

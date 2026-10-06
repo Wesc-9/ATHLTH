@@ -2775,6 +2775,156 @@ final class StrengthWorkoutStore: ObservableObject {
         )
     }
 
+    @discardableResult
+    func addExtraSetToCurrentExercise()
+        -> Bool {
+        guard
+            var workout = activeWorkout,
+            workout.exercises.indices
+                .contains(
+                    currentExerciseIndex
+                ),
+            let source =
+                workout.exercises[
+                    currentExerciseIndex
+                ].sets.last
+        else {
+            return false
+        }
+
+        let targetKind =
+            source.resolvedTargetKind
+        let loadKind =
+            source.resolvedLoadKind
+        let newNumber =
+            (
+                workout.exercises[
+                    currentExerciseIndex
+                ].sets
+                .map(\.setNumber)
+                .max() ?? 0
+            ) + 1
+
+        let newSet =
+            StrengthSetLog(
+                id: UUID(),
+                setNumber: newNumber,
+                plannedReps:
+                    targetKind == .reps
+                        ? (
+                            source
+                                .resolvedCompletedReps ??
+                            source.plannedReps ??
+                            draftReps
+                        )
+                        : nil,
+                plannedWeightKilograms:
+                    loadKind ==
+                        .weightKilograms
+                        ? (
+                            source
+                                .completedWeightKilograms ??
+                            source
+                                .plannedWeightKilograms ??
+                            draftWeightKilograms
+                        )
+                        : nil,
+                completedReps: nil,
+                completedWeightKilograms: nil,
+                rpe: nil,
+                completedAt: nil,
+                restSeconds:
+                    source.restSeconds ??
+                    workout.exercises[
+                        currentExerciseIndex
+                    ].restSecondsOverride ??
+                    draftRestSeconds,
+                rir: nil,
+                isWarmUp: false,
+                targetKind:
+                    targetKind,
+                plannedDurationSeconds:
+                    targetKind == .time
+                        ? (
+                            source
+                                .resolvedCompletedDurationSeconds ??
+                            source
+                                .plannedDurationSeconds ??
+                            draftDurationSeconds
+                        )
+                        : nil,
+                completedDurationSeconds:
+                    nil,
+                loadKind: loadKind,
+                plannedResistanceLevel:
+                    loadKind ==
+                        .resistanceLevel
+                        ? (
+                            source
+                                .completedResistanceLevel ??
+                            source
+                                .plannedResistanceLevel ??
+                            draftResistanceLevel
+                        )
+                        : nil,
+                completedResistanceLevel:
+                    nil,
+                completedDistanceMeters:
+                    nil,
+                effortSegments:
+                    nil,
+                actualRestAfterSeconds:
+                    nil
+            )
+
+        workout.exercises[
+            currentExerciseIndex
+        ].sets.append(newSet)
+        workout.exercises[
+            currentExerciseIndex
+        ].completedAt = nil
+        workout.exercises[
+            currentExerciseIndex
+        ].transitionToNextExerciseSeconds =
+            nil
+
+        currentSetIndex =
+            workout.exercises[
+                currentExerciseIndex
+            ].sets.count - 1
+
+        // If this was the final exercise there may not have been a rest timer.
+        // Reconstruct it from the completion time so deciding on an extra set
+        // never loses the true elapsed rest.
+        if restStartedAt == nil,
+           let completedAt =
+                source.completedAt {
+            let restSeconds =
+                max(
+                    newSet.restSeconds ??
+                        draftRestSeconds,
+                    0
+                )
+
+            if restSeconds > 0 {
+                restStartedAt =
+                    completedAt
+                restEndsAt =
+                    completedAt
+                        .addingTimeInterval(
+                            TimeInterval(
+                                restSeconds
+                            )
+                        )
+            }
+        }
+
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
     func skipRest() {
         finalizeActualRestIfNeeded()
         restStartedAt = nil
