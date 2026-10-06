@@ -4795,6 +4795,8 @@ struct StrengthSetResultEditorView: View {
         [StrengthSetEffortSegment]
     @State private var distanceMeters: Double
     @State private var resistanceLevel: Int
+    @FocusState private var focusedWeightIndex:
+        Int?
 
     init(
         target: StrengthSetResultEditTarget,
@@ -4844,151 +4846,53 @@ struct StrengthSetResultEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Actual result",
-                        norwegian: "Faktisk resultat"
-                    )
-                ) {
-                    ForEach(
-                        Array(
-                            segments
-                                .indices
-                        ),
-                        id: \.self
-                    ) { index in
-                        segmentEditor(index)
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.15)
+                )
+                .ignoresSafeArea()
 
-                        if segments.count > 1 {
-                            Button(
-                                role: .destructive
-                            ) {
-                                segments.remove(
-                                    at: index
-                                )
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Remove part",
-                                        norwegian:
-                                            "Fjern del"
-                                    ),
-                                    systemImage:
-                                        "minus.circle"
-                                )
-                            }
-                        }
-                    }
-
-                    Button {
-                        addSegment()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Add load change",
-                                norwegian:
-                                    "Legg til belastningsendring"
-                            ),
-                            systemImage:
-                                "plus.circle.fill"
-                        )
-                    }
-                    .disabled(
-                        target.set
-                            .resolvedTargetKind ==
-                            .time
-                    )
-                }
-
-                if target.exercise
-                    .supportsStrengthDistanceResult {
-                    Section(
-                        ATHLTHLocalization.choose(
-                            english: "Machine result",
-                            norwegian: "Maskinresultat"
-                        )
+                ScrollView {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 16
                     ) {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Distance",
-                                    norwegian: "Distanse"
-                                ),
-                                systemImage: "ruler"
-                            )
+                        editorIntro
 
-                            Spacer()
-
-                            TextField(
-                                "0",
-                                value: $distanceMeters,
-                                format:
-                                    .number
-                                    .precision(
-                                        .fractionLength(
-                                            0...0
-                                        )
-                                    )
+                        ForEach(
+                            Array(
+                                segments.indices
+                            ),
+                            id: \.self
+                        ) { index in
+                            segmentGhostCard(
+                                index
                             )
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(
-                                .trailing
-                            )
-                            .frame(width: 90)
-
-                            Text("m")
-                                .foregroundStyle(
-                                    .secondary
-                                )
                         }
 
-                        Stepper(
-                            value:
-                                $resistanceLevel,
-                            in: 1...10
-                        ) {
-                            HStack {
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english: "Resistance",
-                                        norwegian: "Motstand"
-                                    )
-                                )
-
-                                Spacer()
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Level \(resistanceLevel)",
-                                        norwegian:
-                                            "Steg \(resistanceLevel)"
-                                    )
-                                )
-                                .monospacedDigit()
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                            }
+                        if target.set
+                            .resolvedTargetKind !=
+                            .time {
+                            addLoadChangeButton
                         }
+
+                        if target.exercise
+                            .supportsStrengthDistanceResult {
+                            machineResultCard
+                        }
+
+                        exampleCard
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 38)
                 }
-
-                Section {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Example: if 10 reps were planned at 10 kg, record 8 × 10 kg and add a second part with 2 × 8 kg. ATHLTH will calculate volume from the actual parts.",
-                            norwegian:
-                                "Eksempel: Var målet 10 repetisjoner på 10 kg, kan du registrere 8 × 10 kg og legge til en ny del med 2 × 8 kg. ATHLTH beregner volum fra det du faktisk gjorde."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                .scrollDismissesKeyboard(
+                    .interactively
+                )
             }
             .navigationTitle(
                 "\(target.exerciseName) · " +
@@ -4998,7 +4902,9 @@ struct StrengthSetResultEditorView: View {
                     target.set.setNumber
                 )
             )
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
             .toolbar {
                 ToolbarItem(
                     placement: .cancellationAction
@@ -5022,167 +4928,856 @@ struct StrengthSetResultEditorView: View {
                             norwegian: "Lagre"
                         )
                     ) {
-                        onSave(
-                            segments,
-                            target.exercise
-                                .supportsStrengthDistanceResult
-                                ? max(
-                                    distanceMeters,
-                                    0
-                                )
-                                : nil,
-                            target.set
-                                .resolvedLoadKind ==
-                                .resistanceLevel ||
-                            target.exercise
-                                .supportsStrengthDistanceResult
-                                ? resistanceLevel
-                                : nil
+                        save()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .toolbarBackground(
+                .ultraThinMaterial,
+                for: .navigationBar
+            )
+            .toolbarBackground(
+                .visible,
+                for: .navigationBar
+            )
+        }
+        .presentationBackground(
+            ATHLTHTheme.canvasTop
+        )
+    }
+
+    private var editorIntro: some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "slider.horizontal.3"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 42,
+                height: 42
+            )
+            .background(
+                ATHLTHTheme
+                    .vitalitySoft,
+                in: RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Actual result",
+                        norwegian: "Faktisk resultat"
+                    )
+                )
+                .font(
+                    .title3.weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Adjust what you actually completed.",
+                        norwegian:
+                            "Juster det du faktisk gjennomførte."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func segmentGhostCard(
+        _ index: Int
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            HStack {
+                HStack(spacing: 7) {
+                    Text(
+                        segments.count > 1
+                            ? ATHLTHLocalization.format(
+                                english: "Part %d",
+                                norwegian: "Del %d",
+                                index + 1
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Set result",
+                                norwegian: "Settresultat"
+                            )
+                    )
+                    .font(
+                        .caption.weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+
+                    if segments.count > 1 {
+                        Text(
+                            "\(index + 1)/\(segments.count)"
                         )
-                        dismiss()
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
                     }
                 }
+
+                Spacer()
+
+                if segments.count > 1 {
+                    Button(
+                        role: .destructive
+                    ) {
+                        focusedWeightIndex = nil
+                        segments.remove(
+                            at: index
+                        )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Remove",
+                                norwegian: "Fjern"
+                            ),
+                            systemImage:
+                                "minus.circle"
+                        )
+                        .font(
+                            .caption.weight(.semibold)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Divider()
+                .overlay(
+                    ATHLTHTheme
+                        .divider
+                )
+
+            if target.set
+                .resolvedTargetKind ==
+                .time {
+                ghostIntegerRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ),
+                    value:
+                        TimeInterval(
+                            durationBinding(index)
+                                .wrappedValue
+                        )
+                        .clockDuration,
+                    minus: {
+                        durationBinding(index)
+                            .wrappedValue =
+                            max(
+                                0,
+                                durationBinding(index)
+                                    .wrappedValue -
+                                    15
+                            )
+                    },
+                    plus: {
+                        durationBinding(index)
+                            .wrappedValue =
+                            min(
+                                7_200,
+                                durationBinding(index)
+                                    .wrappedValue +
+                                    15
+                            )
+                    }
+                )
+            } else {
+                ghostIntegerRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Reps",
+                            norwegian: "Repetisjoner"
+                        ),
+                    value:
+                        "\(repsBinding(index).wrappedValue)",
+                    minus: {
+                        repsBinding(index)
+                            .wrappedValue =
+                            max(
+                                0,
+                                repsBinding(index)
+                                    .wrappedValue -
+                                    1
+                            )
+                    },
+                    plus: {
+                        repsBinding(index)
+                            .wrappedValue =
+                            min(
+                                200,
+                                repsBinding(index)
+                                    .wrappedValue +
+                                    1
+                            )
+                    }
+                )
+            }
+
+            if target.set
+                .resolvedLoadKind ==
+                .resistanceLevel {
+                ghostIntegerRow(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Resistance",
+                            norwegian: "Motstand"
+                        ),
+                    value:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Level \(resistanceBinding(index).wrappedValue)",
+                            norwegian:
+                                "Steg \(resistanceBinding(index).wrappedValue)"
+                        ),
+                    minus: {
+                        resistanceBinding(index)
+                            .wrappedValue =
+                            max(
+                                1,
+                                resistanceBinding(index)
+                                    .wrappedValue -
+                                    1
+                            )
+                    },
+                    plus: {
+                        resistanceBinding(index)
+                            .wrappedValue =
+                            min(
+                                10,
+                                resistanceBinding(index)
+                                    .wrappedValue +
+                                    1
+                            )
+                    }
+                )
+            } else {
+                ghostWeightRow(index)
+            }
+        }
+        .padding(16)
+        .background(
+            .ultraThinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white
+                        .opacity(0.60),
+                    ATHLTHTheme
+                        .surfaceSage
+                        .opacity(0.28)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 24,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                focusedWeightIndex ==
+                    index
+                    ? ATHLTHTheme
+                        .vitality
+                        .opacity(0.42)
+                    : Color.white
+                        .opacity(0.78),
+                lineWidth:
+                    focusedWeightIndex ==
+                        index
+                        ? 1.4
+                        : 0.8
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.055),
+            radius: 18,
+            y: 8
+        )
+    }
+
+    private func ghostWeightRow(
+        _ index: Int
+    ) -> some View {
+        HStack(spacing: 12) {
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Weight",
+                        norwegian: "Vekt"
+                    )
+                )
+                .font(
+                    .subheadline.weight(.semibold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Adjust by 2.5 kg or type a value",
+                        norwegian:
+                            "Juster 2,5 kg eller skriv inn verdi"
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer(minLength: 8)
+
+            ghostRoundButton(
+                systemImage: "minus"
+            ) {
+                adjustWeight(
+                    at: index,
+                    by: -2.5
+                )
+            }
+
+            HStack(
+                alignment:
+                    .firstTextBaseline,
+                spacing: 4
+            ) {
+                TextField(
+                    "0",
+                    value:
+                        weightBinding(index),
+                    format:
+                        .number
+                        .precision(
+                            .fractionLength(
+                                0...2
+                            )
+                        )
+                )
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(
+                    .trailing
+                )
+                .font(
+                    .title3
+                        .monospacedDigit()
+                        .weight(.bold)
+                )
+                .frame(width: 64)
+                .focused(
+                    $focusedWeightIndex,
+                    equals: index
+                )
+
+                Text("kg")
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 42)
+            .background(
+                Color.white
+                    .opacity(0.76),
+                in: RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 13,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.16),
+                    lineWidth: 0.8
+                )
+            }
+
+            ghostRoundButton(
+                systemImage: "plus"
+            ) {
+                adjustWeight(
+                    at: index,
+                    by: 2.5
+                )
             }
         }
     }
 
-    @ViewBuilder
-    private func segmentEditor(
-        _ index: Int
+    private func ghostIntegerRow(
+        title: String,
+        value: String,
+        minus: @escaping () -> Void,
+        plus: @escaping () -> Void
     ) -> some View {
-        if segments.indices.contains(
-            index
-        ) {
-            VStack(
-                alignment: .leading,
-                spacing: 10
-            ) {
-                Text(
-                    segments.count > 1
-                        ? ATHLTHLocalization.format(
-                            english: "Part %d",
-                            norwegian: "Del %d",
-                            index + 1
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Set result",
-                            norwegian: "Settresultat"
-                        )
-                )
+        HStack(spacing: 12) {
+            Text(title)
                 .font(
-                    .caption
-                        .weight(.semibold)
+                    .subheadline.weight(.semibold)
                 )
-                .foregroundStyle(.secondary)
 
-                if target.set
-                    .resolvedTargetKind ==
-                    .time {
-                    Stepper(
-                        value:
-                            durationBinding(index),
-                        in: 0...7_200,
-                        step: 15
-                    ) {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Duration",
-                                    norwegian: "Varighet"
-                                )
-                            )
-                            Spacer()
-                            Text(
-                                TimeInterval(
-                                    durationBinding(index)
-                                        .wrappedValue
-                                )
-                                .clockDuration
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-                } else {
-                    Stepper(
-                        value:
-                            repsBinding(index),
-                        in: 0...200
-                    ) {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Reps",
-                                    norwegian: "Repetisjoner"
-                                )
-                            )
-                            Spacer()
-                            Text(
-                                "\(repsBinding(index).wrappedValue)"
-                            )
-                            .monospacedDigit()
-                        }
-                    }
+            Spacer()
+
+            Text(value)
+                .font(
+                    .title3
+                        .monospacedDigit()
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .frame(
+                    minWidth: 54,
+                    alignment: .trailing
+                )
+
+            HStack(spacing: 1) {
+                Button(action: minus) {
+                    Image(
+                        systemName: "minus"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
+                        )
+                    )
+                    .frame(
+                        width: 40,
+                        height: 36
+                    )
                 }
 
-                if target.set
-                    .resolvedLoadKind ==
-                    .resistanceLevel {
-                    Stepper(
-                        value:
-                            resistanceBinding(index),
-                        in: 1...10
-                    ) {
-                        HStack {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Resistance",
-                                    norwegian: "Motstand"
-                                )
-                            )
-                            Spacer()
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Level \(resistanceBinding(index).wrappedValue)",
-                                    norwegian:
-                                        "Steg \(resistanceBinding(index).wrappedValue)"
-                                )
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-                } else {
-                    HStack {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Weight",
-                                norwegian: "Vekt"
-                            )
+                Rectangle()
+                    .fill(
+                        ATHLTHTheme
+                            .divider
+                    )
+                    .frame(
+                        width: 0.5,
+                        height: 24
+                    )
+
+                Button(action: plus) {
+                    Image(
+                        systemName: "plus"
+                    )
+                    .font(
+                        .system(
+                            size: 14,
+                            weight: .bold
                         )
-                        Spacer()
-                        TextField(
-                            "kg",
-                            value:
-                                weightBinding(index),
-                            format:
-                                .number
-                                .precision(
-                                    .fractionLength(
-                                        0...2
-                                    )
-                                )
-                        )
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(
-                            .trailing
-                        )
-                        .frame(width: 90)
-                        Text("kg")
-                            .foregroundStyle(.secondary)
-                    }
+                    )
+                    .frame(
+                        width: 40,
+                        height: 36
+                    )
                 }
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .background(
+                Color.white
+                    .opacity(0.72),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        Color.black
+                            .opacity(0.055),
+                        lineWidth: 0.8
+                    )
+            }
         }
+    }
+
+    private func ghostRoundButton(
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(
+                systemName: systemImage
+            )
+            .font(
+                .system(
+                    size: 14,
+                    weight: .bold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                Color.white
+                    .opacity(0.78),
+                in: Circle()
+            )
+            .overlay {
+                Circle()
+                    .stroke(
+                        Color.black
+                            .opacity(0.055),
+                        lineWidth: 0.8
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var addLoadChangeButton:
+        some View {
+        Button {
+            focusedWeightIndex = nil
+            addSegment()
+        } label: {
+            HStack(spacing: 11) {
+                Image(
+                    systemName:
+                        "plus.circle.fill"
+                )
+                .font(.title3)
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Add load change",
+                            norwegian:
+                                "Legg til belastningsendring"
+                        )
+                    )
+                    .font(
+                        .subheadline.weight(.semibold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Split the set if weight changed during the set.",
+                            norwegian:
+                                "Del opp settet hvis vekten ble endret underveis."
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(
+                    .tertiary
+                )
+            }
+            .padding(14)
+            .background(
+                ATHLTHTheme
+                    .surfaceSage
+                    .opacity(0.66),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme.vitality
+                        .opacity(0.14),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var machineResultCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Machine result",
+                    norwegian: "Maskinresultat"
+                ),
+                systemImage:
+                    "gauge.with.dots.needle.50percent"
+            )
+            .font(.headline)
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+
+            HStack {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Distance",
+                        norwegian: "Distanse"
+                    )
+                )
+                .font(
+                    .subheadline.weight(.semibold)
+                )
+
+                Spacer()
+
+                TextField(
+                    "0",
+                    value: $distanceMeters,
+                    format:
+                        .number
+                        .precision(
+                            .fractionLength(
+                                0...0
+                            )
+                        )
+                )
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(
+                    .trailing
+                )
+                .font(
+                    .title3
+                        .monospacedDigit()
+                        .weight(.bold)
+                )
+                .frame(width: 82)
+
+                Text("m")
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+
+            Divider()
+
+            ghostIntegerRow(
+                title:
+                    ATHLTHLocalization.choose(
+                        english: "Resistance",
+                        norwegian: "Motstand"
+                    ),
+                value:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Level \(resistanceLevel)",
+                        norwegian:
+                            "Steg \(resistanceLevel)"
+                    ),
+                minus: {
+                    resistanceLevel =
+                        max(
+                            1,
+                            resistanceLevel - 1
+                        )
+                },
+                plus: {
+                    resistanceLevel =
+                        min(
+                            10,
+                            resistanceLevel + 1
+                        )
+                }
+            )
+        }
+        .padding(16)
+        .background(
+            .ultraThinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.74),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private var exampleCard:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 10
+        ) {
+            Image(
+                systemName: "sparkles"
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Example: if 10 reps were planned at 10 kg, record 8 × 10 kg and add a second part with 2 × 8 kg. ATHLTH calculates volume from what you actually did.",
+                    norwegian:
+                        "Eksempel: Var målet 10 repetisjoner på 10 kg, kan du registrere 8 × 10 kg og legge til en ny del med 2 × 8 kg. ATHLTH beregner volum fra det du faktisk gjorde."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
+        .padding(14)
+        .background(
+            Color.white
+                .opacity(0.48),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func save() {
+        focusedWeightIndex = nil
+
+        onSave(
+            segments,
+            target.exercise
+                .supportsStrengthDistanceResult
+                ? max(
+                    distanceMeters,
+                    0
+                )
+                : nil,
+            target.set
+                .resolvedLoadKind ==
+                .resistanceLevel ||
+            target.exercise
+                .supportsStrengthDistanceResult
+                ? resistanceLevel
+                : nil
+        )
+        dismiss()
+    }
+
+    private func adjustWeight(
+        at index: Int,
+        by delta: Double
+    ) {
+        guard segments.indices
+            .contains(index)
+        else {
+            return
+        }
+
+        let current =
+            segments[index]
+                .weightKilograms ??
+            0
+        let updated =
+            max(
+                0,
+                current + delta
+            )
+
+        // Keep values on half-kilo boundaries after button changes while
+        // preserving free manual input in the text field.
+        segments[index]
+            .weightKilograms =
+            (updated * 2)
+                .rounded() /
+            2
     }
 
     private func addSegment() {
