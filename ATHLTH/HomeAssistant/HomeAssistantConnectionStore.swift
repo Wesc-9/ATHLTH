@@ -3624,6 +3624,20 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             state["calendar_events"] = .array([])
         }
 
+        if !shareWorkoutRouteMap,
+           storedPairing?
+                .capabilities
+                .contains(
+                    "workout_route_map"
+                ) == true {
+            try? await send(
+                event: "workout_route_map",
+                payload: [
+                    "clear": .bool(true)
+                ]
+            )
+        }
+
         guard !state.isEmpty else {
             return
         }
