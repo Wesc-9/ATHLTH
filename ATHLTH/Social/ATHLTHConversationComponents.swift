@@ -78,7 +78,8 @@ struct ATHLTHConversationHero<
                     )
                     .background(
                         Color.black
-                            .opacity(0.16)
+                            .opacity(0.16),
+                        in: Circle()
                     )
                     .background(
                         .ultraThinMaterial,
