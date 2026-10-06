@@ -1144,6 +1144,10 @@ struct ActiveStrengthWorkoutView: View {
                     workout
                 )
 
+                WorkoutPlaceCheckInSection(
+                    workoutID: workout.id
+                )
+
                 Button {
                     showingFinishConfirmation =
                         true
