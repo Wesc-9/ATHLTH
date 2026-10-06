@@ -2886,51 +2886,25 @@ final class CommunityGroupStore: ObservableObject {
                     return true
                 }
 
-                let path =
-                    "\(groupID.uuidString.lowercased())/cover.jpg"
-
                 do {
-                    try await client.storage
-                        .from("community-group-images")
-                        .upload(
-                            path,
-                            data: imageJPEGData,
-                            options: FileOptions(
-                                cacheControl: "3600",
-                                contentType: "image/jpeg",
-                                upsert: true
+                    let published =
+                        try await ATHLTHPublicImagePublisher
+                            .publish(
+                                jpegData:
+                                    imageJPEGData,
+                                purpose:
+                                    .clubCover,
+                                groupID:
+                                    groupID,
+                                client: client
                             )
-                        )
-
-                    let publicURL = try client.storage
-                        .from("community-group-images")
-                        .getPublicURL(path: path)
-
-                    var components = URLComponents(
-                        url: publicURL,
-                        resolvingAgainstBaseURL: false
-                    )
-                    components?.queryItems = [
-                        URLQueryItem(
-                            name: "v",
-                            value: String(
-                                Int(
-                                    Date()
-                                        .timeIntervalSince1970
-                                )
-                            )
-                        )
-                    ]
-
-                    let finalURL =
-                        components?.url ?? publicURL
 
                     try await client
                         .from("community_groups")
                         .update(
                             CommunityGroupImageUpdate(
                                 imageURL:
-                                    finalURL.absoluteString,
+                                    published.url.absoluteString,
                                 updatedAt: Date()
                             )
                         )
@@ -2948,35 +2922,17 @@ final class CommunityGroupStore: ObservableObject {
             if let headerImageJPEGData {
                 if headerImageJPEGData.count <=
                     5_242_880 {
-                    let path =
-                        "\(groupID.uuidString.lowercased())/header.jpg"
-
                     do {
-                        try await client.storage
-                            .from(
-                                "community-group-images"
-                            )
-                            .upload(
-                                path,
-                                data:
-                                    headerImageJPEGData,
-                                options:
-                                    FileOptions(
-                                        cacheControl:
-                                            "3600",
-                                        contentType:
-                                            "image/jpeg",
-                                        upsert: true
-                                    )
-                            )
-
-                        let publicURL =
-                            try client.storage
-                                .from(
-                                    "community-group-images"
-                                )
-                                .getPublicURL(
-                                    path: path
+                        let published =
+                            try await ATHLTHPublicImagePublisher
+                                .publish(
+                                    jpegData:
+                                        headerImageJPEGData,
+                                    purpose:
+                                        .clubHeader,
+                                    groupID:
+                                        groupID,
+                                    client: client
                                 )
 
                         try await client
@@ -2986,7 +2942,7 @@ final class CommunityGroupStore: ObservableObject {
                             .update(
                                 CommunityGroupHeaderImageUpdate(
                                     headerImageURL:
-                                        publicURL
+                                        published.url
                                             .absoluteString,
                                     updatedAt:
                                         Date()
@@ -3137,45 +3093,24 @@ final class CommunityGroupStore: ObservableObject {
             return false
         }
 
-        let path = "\(group.id.uuidString.lowercased())/cover.jpg"
-
         do {
-            try await client.storage
-                .from("community-group-images")
-                .upload(
-                    path,
-                    data: jpegData,
-                    options: FileOptions(
-                        cacheControl: "3600",
-                        contentType: "image/jpeg",
-                        upsert: true
+            let published =
+                try await ATHLTHPublicImagePublisher
+                    .publish(
+                        jpegData: jpegData,
+                        purpose:
+                            .clubCover,
+                        groupID:
+                            group.id,
+                        client: client
                     )
-                )
-
-            let publicURL = try client.storage
-                .from("community-group-images")
-                .getPublicURL(path: path)
-
-            var components = URLComponents(
-                url: publicURL,
-                resolvingAgainstBaseURL: false
-            )
-            components?.queryItems = [
-                URLQueryItem(
-                    name: "v",
-                    value: String(
-                        Int(Date().timeIntervalSince1970)
-                    )
-                )
-            ]
-
-            let finalURL = components?.url ?? publicURL
 
             try await client
                 .from("community_groups")
                 .update(
                     CommunityGroupImageUpdate(
-                        imageURL: finalURL.absoluteString,
+                        imageURL:
+                            published.url.absoluteString,
                         updatedAt: Date()
                     )
                 )
@@ -3236,47 +3171,24 @@ final class CommunityGroupStore: ObservableObject {
             return false
         }
 
-        let path =
-            "\(group.id.uuidString.lowercased())/header.jpg"
-
         do {
-            try await client.storage
-                .from("community-group-images")
-                .upload(
-                    path,
-                    data: jpegData,
-                    options: FileOptions(
-                        cacheControl: "3600",
-                        contentType: "image/jpeg",
-                        upsert: true
+            let published =
+                try await ATHLTHPublicImagePublisher
+                    .publish(
+                        jpegData: jpegData,
+                        purpose:
+                            .clubHeader,
+                        groupID:
+                            group.id,
+                        client: client
                     )
-                )
-
-            let publicURL = try client.storage
-                .from("community-group-images")
-                .getPublicURL(path: path)
-
-            var components = URLComponents(
-                url: publicURL,
-                resolvingAgainstBaseURL: false
-            )
-            components?.queryItems = [
-                URLQueryItem(
-                    name: "v",
-                    value: String(
-                        Int(Date().timeIntervalSince1970)
-                    )
-                )
-            ]
-
-            let finalURL = components?.url ?? publicURL
 
             try await client
                 .from("community_groups")
                 .update(
                     CommunityGroupHeaderImageUpdate(
                         headerImageURL:
-                            finalURL.absoluteString,
+                            published.url.absoluteString,
                         updatedAt: Date()
                     )
                 )
@@ -4021,29 +3933,22 @@ final class CommunityGroupStore: ObservableObject {
             )
         }
 
-        let path = communityContentImagePath(
-            groupID: groupID,
-            kind: kind,
-            contentID: contentID
-        )
-
-        try await client.storage
-            .from("community-content-images")
-            .upload(
-                path,
-                data: jpegData,
-                options: FileOptions(
-                    cacheControl: "3600",
-                    contentType: "image/jpeg",
-                    upsert: true
+        let published =
+            try await ATHLTHPublicImagePublisher
+                .publish(
+                    jpegData: jpegData,
+                    purpose:
+                        .clubContent,
+                    entityID:
+                        contentID,
+                    groupID:
+                        groupID,
+                    contentKind:
+                        kind,
+                    client: client
                 )
-            )
 
-        let publicURL = try client.storage
-            .from("community-content-images")
-            .getPublicURL(path: path)
-
-        return publicURL.absoluteString
+        return published.url.absoluteString
     }
 
     private func removeCommunityContentImage(
