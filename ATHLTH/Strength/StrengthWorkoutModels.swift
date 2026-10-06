@@ -493,6 +493,26 @@ struct StrengthPersonalRecord: Identifiable, Hashable {
     let score: Double
 }
 
+enum StrengthWorkoutPRKind: Hashable {
+    case repMax(reps: Int)
+    case heaviestWeight
+    case estimatedOneRepMax
+}
+
+struct StrengthWorkoutPersonalRecord:
+    Identifiable,
+    Hashable
+{
+    let id: String
+    let exerciseID: UUID
+    let exerciseName: String
+    let kind: StrengthWorkoutPRKind
+    let value: String
+    let previousValue: String
+    let score: Double
+    let setID: UUID?
+}
+
 struct StrengthRepPersonalRecord: Identifiable, Hashable {
     var id: String {
         "rep-pr-\(exerciseName.lowercased())-\(reps)"

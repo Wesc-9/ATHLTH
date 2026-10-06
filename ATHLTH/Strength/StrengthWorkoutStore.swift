@@ -567,6 +567,357 @@ final class StrengthWorkoutStore: ObservableObject {
             }
     }
 
+    func workoutPersonalRecords(
+        for workout: StrengthWorkoutLog
+    ) -> [StrengthWorkoutPersonalRecord] {
+        struct Effort {
+            let setID: UUID
+            let reps: Int
+            let weight: Double
+        }
+
+        func normalizedName(
+            _ value: String
+        ) -> String {
+            value
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+                .folding(
+                    options: [
+                        .diacriticInsensitive,
+                        .caseInsensitive
+                    ],
+                    locale: .current
+                )
+                .lowercased()
+        }
+
+        func efforts(
+            in exercise:
+                StrengthExerciseLog
+        ) -> [Effort] {
+            exercise.sets.flatMap {
+                set -> [Effort] in
+
+                guard
+                    set.countsTowardTrainingLoad
+                else {
+                    return []
+                }
+
+                if let segments =
+                        set.effortSegments,
+                   !segments.isEmpty {
+                    return segments
+                        .compactMap {
+                            segment in
+
+                            guard
+                                let reps =
+                                    segment.reps,
+                                reps > 0,
+                                let weight =
+                                    segment
+                                        .weightKilograms,
+                                weight > 0
+                            else {
+                                return nil
+                            }
+
+                            return Effort(
+                                setID: set.id,
+                                reps: reps,
+                                weight: weight
+                            )
+                        }
+                }
+
+                guard
+                    let reps =
+                        set.completedReps,
+                    reps > 0,
+                    let weight =
+                        set.completedWeightKilograms,
+                    weight > 0
+                else {
+                    return []
+                }
+
+                return [
+                    Effort(
+                        setID: set.id,
+                        reps: reps,
+                        weight: weight
+                    )
+                ]
+            }
+        }
+
+        var result:
+            [StrengthWorkoutPersonalRecord] = []
+
+        for exercise in workout.exercises {
+            let name =
+                exercise.exercise
+                    .displayName
+            let key =
+                normalizedName(
+                    exercise.exercise.name
+                )
+
+            guard !key.isEmpty else {
+                continue
+            }
+
+            let current =
+                efforts(in: exercise)
+
+            guard !current.isEmpty else {
+                continue
+            }
+
+            let previousExercises =
+                workoutHistory
+                    .filter {
+                        $0.isFinished &&
+                        $0.id != workout.id
+                    }
+                    .flatMap {
+                        $0.exercises
+                    }
+                    .filter {
+                        normalizedName(
+                            $0.exercise.name
+                        ) == key
+                    }
+
+            let previous =
+                previousExercises
+                    .flatMap {
+                        efforts(in: $0)
+                    }
+
+            // A first logged result establishes the baseline but is not
+            // presented as a "new PR". This keeps the celebration meaningful.
+            guard !previous.isEmpty else {
+                continue
+            }
+
+            var exerciseRecords:
+                [StrengthWorkoutPersonalRecord] =
+                []
+
+            var previousByReps:
+                [Int: Double] = [:]
+            var currentByReps:
+                [Int: Effort] = [:]
+
+            for effort in previous
+            where effort.reps <= 20 {
+                previousByReps[
+                    effort.reps
+                ] =
+                    max(
+                        previousByReps[
+                            effort.reps
+                        ] ?? 0,
+                        effort.weight
+                    )
+            }
+
+            for effort in current
+            where effort.reps <= 20 {
+                if let existing =
+                        currentByReps[
+                            effort.reps
+                        ],
+                   existing.weight >=
+                        effort.weight {
+                    continue
+                }
+
+                currentByReps[
+                    effort.reps
+                ] = effort
+            }
+
+            for reps in
+                currentByReps.keys
+                    .sorted() {
+                guard
+                    let currentEffort =
+                        currentByReps[reps],
+                    let previousBest =
+                        previousByReps[reps],
+                    currentEffort.weight >
+                        previousBest + 0.01
+                else {
+                    continue
+                }
+
+                exerciseRecords.append(
+                    StrengthWorkoutPersonalRecord(
+                        id:
+                            "rep-(exercise.id.uuidString)-(reps)",
+                        exerciseID:
+                            exercise.id,
+                        exerciseName: name,
+                        kind:
+                            .repMax(
+                                reps: reps
+                            ),
+                        value:
+                            "(Self.formattedKilograms(currentEffort.weight)) kg × (reps)",
+                        previousValue:
+                            "(Self.formattedKilograms(previousBest)) kg × (reps)",
+                        score:
+                            currentEffort.weight,
+                        setID:
+                            currentEffort.setID
+                    )
+                )
+            }
+
+            if let currentHeaviest =
+                    current.max(
+                        by: {
+                            $0.weight <
+                            $1.weight
+                        }
+                    ),
+               let previousHeaviest =
+                    previous.map(
+                        \.weight
+                    ).max(),
+               currentHeaviest.weight >
+                    previousHeaviest + 0.01,
+               !exerciseRecords
+                    .contains(
+                        where: {
+                            $0.setID ==
+                                currentHeaviest
+                                    .setID
+                        }
+                    ) {
+                exerciseRecords.append(
+                    StrengthWorkoutPersonalRecord(
+                        id:
+                            "weight-(exercise.id.uuidString)",
+                        exerciseID:
+                            exercise.id,
+                        exerciseName: name,
+                        kind:
+                            .heaviestWeight,
+                        value:
+                            "(Self.formattedKilograms(currentHeaviest.weight)) kg",
+                        previousValue:
+                            "(Self.formattedKilograms(previousHeaviest)) kg",
+                        score:
+                            currentHeaviest.weight,
+                        setID:
+                            currentHeaviest.setID
+                    )
+                )
+            }
+
+            // If no exact rep/heaviest record fired, estimated 1RM can still
+            // identify real progression when reps changed between sessions.
+            if exerciseRecords.isEmpty {
+                let currentOneRM =
+                    current
+                        .filter {
+                            $0.reps <= 12
+                        }
+                        .map {
+                            effort in
+                            (
+                                effort:
+                                    effort,
+                                value:
+                                    effort.weight *
+                                    (
+                                        1 +
+                                        Double(
+                                            effort.reps
+                                        ) /
+                                        30.0
+                                    )
+                            )
+                        }
+                        .max {
+                            $0.value <
+                            $1.value
+                        }
+
+                let previousOneRM =
+                    previous
+                        .filter {
+                            $0.reps <= 12
+                        }
+                        .map {
+                            $0.weight *
+                            (
+                                1 +
+                                Double($0.reps) /
+                                30.0
+                            )
+                        }
+                        .max()
+
+                if let currentOneRM,
+                   let previousOneRM,
+                   currentOneRM.value >
+                        previousOneRM + 0.05 {
+                    exerciseRecords.append(
+                        StrengthWorkoutPersonalRecord(
+                            id:
+                                "e1rm-(exercise.id.uuidString)",
+                            exerciseID:
+                                exercise.id,
+                            exerciseName:
+                                name,
+                            kind:
+                                .estimatedOneRepMax,
+                            value:
+                                "(Self.formattedKilograms(currentOneRM.value)) kg",
+                            previousValue:
+                                "(Self.formattedKilograms(previousOneRM)) kg",
+                            score:
+                                currentOneRM.value,
+                            setID:
+                                currentOneRM
+                                    .effort
+                                    .setID
+                        )
+                    )
+                }
+            }
+
+            result.append(
+                contentsOf:
+                    exerciseRecords
+            )
+        }
+
+        return result.sorted {
+            lhs,
+            rhs in
+
+            if lhs.exerciseName ==
+                rhs.exerciseName {
+                return lhs.score >
+                    rhs.score
+            }
+
+            return lhs.exerciseName
+                .localizedCaseInsensitiveCompare(
+                    rhs.exerciseName
+                ) == .orderedAscending
+        }
+    }
+
     var currentExercise: StrengthExerciseLog? {
         guard
             let workout = activeWorkout,

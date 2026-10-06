@@ -1118,6 +1118,10 @@ struct ActiveStrengthWorkoutView: View {
                     workout
                 )
 
+                focusedWorkoutPRSummary(
+                    workout
+                )
+
                 focusedWorkoutSummaryMetrics(
                     workout
                 )
@@ -1331,6 +1335,262 @@ struct ActiveStrengthWorkoutView: View {
                     .opacity(0.45),
                 lineWidth: 0.8
             )
+        }
+    }
+
+    @ViewBuilder
+    private func focusedWorkoutPRSummary(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        let records =
+            strength
+                .workoutPersonalRecords(
+                    for: workout
+                )
+
+        if !records.isEmpty {
+            VStack(
+                alignment: .leading,
+                spacing: 13
+            ) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                ATHLTHTheme
+                                    .premiumGoldSoft
+                            )
+                            .frame(
+                                width: 42,
+                                height: 42
+                            )
+
+                        Image(
+                            systemName:
+                                "medal.fill"
+                        )
+                        .font(.title3)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                    }
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "New personal records",
+                                norwegian:
+                                    "Nye personlige rekorder"
+                            )
+                        )
+                        .font(
+                            .headline.weight(
+                                .bold
+                            )
+                        )
+
+                        Text(
+                            ATHLTHLocalization.format(
+                                english:
+                                    "%d new PRs in this workout",
+                                norwegian:
+                                    "%d nye PR-er i denne økten",
+                                records.count
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+                }
+
+                ForEach(records) {
+                    record in
+                    HStack(spacing: 11) {
+                        Image(
+                            systemName:
+                                prSystemImage(
+                                    record.kind
+                                )
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                        .frame(
+                            width: 32,
+                            height: 32
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .premiumGoldSoft,
+                            in: Circle()
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            HStack(spacing: 6) {
+                                Text(
+                                    record
+                                        .exerciseName
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .lineLimit(1)
+
+                                Text(
+                                    prShortTitle(
+                                        record.kind
+                                    )
+                                )
+                                .font(
+                                    .caption2
+                                        .weight(.bold)
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                                .padding(
+                                    .horizontal,
+                                    6
+                                )
+                                .padding(
+                                    .vertical,
+                                    2
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .premiumGoldSoft,
+                                    in: Capsule()
+                                )
+                            }
+
+                            Text(
+                                record.previousValue +
+                                "  →  " +
+                                record.value
+                            )
+                            .font(
+                                .caption
+                                    .monospacedDigit()
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "sparkles"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+            )
+            .background(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .premiumGoldSoft
+                            .opacity(0.40),
+                        Color.white
+                            .opacity(0.26)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .premiumGold
+                        .opacity(0.23),
+                    lineWidth: 1
+                )
+            }
+        }
+    }
+
+    private func prShortTitle(
+        _ kind: StrengthWorkoutPRKind
+    ) -> String {
+        switch kind {
+        case let .repMax(reps):
+            return "(reps)RM"
+
+        case .heaviestWeight:
+            return
+                ATHLTHLocalization.choose(
+                    english:
+                        "Heaviest",
+                    norwegian:
+                        "Tyngst"
+                )
+
+        case .estimatedOneRepMax:
+            return
+                ATHLTHLocalization.choose(
+                    english:
+                        "Est. 1RM",
+                    norwegian:
+                        "Est. 1RM"
+                )
+        }
+    }
+
+    private func prSystemImage(
+        _ kind: StrengthWorkoutPRKind
+    ) -> String {
+        switch kind {
+        case .repMax:
+            return "trophy.fill"
+        case .heaviestWeight:
+            return "dumbbell.fill"
+        case .estimatedOneRepMax:
+            return "bolt.fill"
         }
     }
 
@@ -1712,7 +1972,13 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedWorkoutExerciseReview(
         _ workout: StrengthWorkoutLog
     ) -> some View {
-        VStack(
+        let workoutPRs =
+            strength
+                .workoutPersonalRecords(
+                    for: workout
+                )
+
+        return VStack(
             alignment: .leading,
             spacing: 12
         ) {
@@ -1752,7 +2018,12 @@ struct ActiveStrengthWorkoutView: View {
                 workout.exercises
             ) { exercise in
                 completionExerciseCard(
-                    exercise
+                    exercise,
+                    records:
+                        workoutPRs.filter {
+                            $0.exerciseID ==
+                                exercise.id
+                        }
                 )
             }
         }
@@ -1760,7 +2031,9 @@ struct ActiveStrengthWorkoutView: View {
 
     private func completionExerciseCard(
         _ exercise:
-            StrengthExerciseLog
+            StrengthExerciseLog,
+        records:
+            [StrengthWorkoutPersonalRecord]
     ) -> some View {
         VStack(
             alignment: .leading,
@@ -1800,6 +2073,38 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 Spacer()
+
+                if !records.isEmpty {
+                    Label(
+                        records.count == 1
+                            ? "PR"
+                            : "PR ×(records.count)",
+                        systemImage:
+                            "medal.fill"
+                    )
+                    .font(
+                        .caption2.weight(
+                            .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .padding(
+                        .vertical,
+                        4
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .premiumGoldSoft,
+                        in: Capsule()
+                    )
+                }
 
                 let volume =
                     exercise.sets
@@ -1907,6 +2212,38 @@ struct ActiveStrengthWorkoutView: View {
                         }
 
                         Spacer()
+
+                        if records.contains(
+                            where: {
+                                $0.setID ==
+                                    set.id
+                            }
+                        ) {
+                            Text("PR")
+                                .font(
+                                    .caption2
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                                .padding(
+                                    .horizontal,
+                                    7
+                                )
+                                .padding(
+                                    .vertical,
+                                    3
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .premiumGoldSoft,
+                                    in: Capsule()
+                                )
+                        }
 
                         Image(
                             systemName:
