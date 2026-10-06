@@ -1585,6 +1585,23 @@ struct AllTrainingPlansView: View {
             }
     }
 
+    private var editorModeIndex:
+        Binding<Int> {
+        Binding(
+            get: {
+                editorMode == .advanced
+                    ? 1
+                    : 0
+            },
+            set: { index in
+                editorMode =
+                    index == 1
+                        ? .advanced
+                        : .basic
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -4696,108 +4713,19 @@ struct SessionEditorView: View {
 
                         Spacer()
 
-                        Picker(
-                            "Editor mode",
-                            selection: $editorMode
-                        ) {
-                            ForEach(
-                                SessionEditorMode.allCases
-                            ) { mode in
-                                Text(mode.title).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 170)
-                        .labelsHidden()
+                        ATHLTHPremiumSegmentedControl(
+                            titles:
+                                SessionEditorMode
+                                    .allCases
+                                    .map(\.title),
+                            selection:
+                                editorModeIndex
+                        )
+                        .frame(width: 182)
                     }
                     .textCase(nil)
                 }
 
-                Section("Spotify") {
-                    Toggle(
-                        "Start Spotify with workout",
-                        isOn: spotifyWorkoutEnabled
-                    )
-                    .disabled(
-                        !spotify.isConfigured ||
-                        (
-                            !spotify.isConnected &&
-                            effectiveSpotifyPlaylist == nil
-                        )
-                    )
-
-                    if spotify.isConnected {
-                        Button {
-                            showingSpotifyPlaylistPicker = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(
-                                    systemName:
-                                        "music.note.list"
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.accent
-                                )
-                                .frame(width: 28)
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text("Playlist")
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .primaryText
-                                        )
-
-                                    Text(
-                                        spotifyWorkoutPlaylistLabel
-                                    )
-                                    .font(.caption)
-                                    .foregroundStyle(
-                                        .secondary
-                                    )
-                                    .lineLimit(1)
-                                }
-
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .font(.caption.bold())
-                                .foregroundStyle(
-                                    .tertiary
-                                )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    } else if spotify.isConfigured {
-                        Button {
-                            spotify.connect()
-                        } label: {
-                            Label(
-                                "Connect Spotify",
-                                systemImage: "link"
-                            )
-                        }
-                    } else {
-                        Text(
-                            "Spotify is not configured in this build."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Text(
-                        effectiveSpotifyPlaylist == nil
-                            ? "No music will be started automatically for this workout."
-                            : "The selected playlist starts when this workout begins on iPhone. Spotify never blocks the workout from starting."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
 
                 if existingWorkout == nil ||
                     kind == .strength {
@@ -4890,6 +4818,23 @@ struct SessionEditorView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent:
+                        editorMode == .advanced
+                            ? ATHLTHTheme.vitality
+                            : ATHLTHTheme.accent
+                )
+            )
+            .tint(
+                ATHLTHTheme.accentDeep
+            )
+            .listSectionSpacing(14)
+            .environment(
+                \.defaultMinListRowHeight,
+                52
+            )
             .navigationTitle(
                 isStandalone
                     ? ATHLTHLocalization.choose(
@@ -5046,7 +4991,100 @@ struct SessionEditorView: View {
     }
 
     @ViewBuilder
+    private var spotifyAdvancedOptions:
+        some View {
+        Section("Spotify") {
+            Toggle(
+                "Start Spotify with workout",
+                isOn: spotifyWorkoutEnabled
+            )
+            .disabled(
+                !spotify.isConfigured ||
+                (
+                    !spotify.isConnected &&
+                    effectiveSpotifyPlaylist == nil
+                )
+            )
+
+            if spotify.isConnected {
+                Button {
+                    showingSpotifyPlaylistPicker = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(
+                            systemName:
+                                "music.note.list"
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accent
+                        )
+                        .frame(width: 28)
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text("Playlist")
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+
+                            Text(
+                                spotifyWorkoutPlaylistLabel
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+            } else if spotify.isConfigured {
+                Button {
+                    spotify.connect()
+                } label: {
+                    Label(
+                        "Connect Spotify",
+                        systemImage: "link"
+                    )
+                }
+            } else {
+                Text(
+                    "Spotify is not configured in this build."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Text(
+                effectiveSpotifyPlaylist == nil
+                    ? "No music will be started automatically for this workout."
+                    : "The selected playlist starts when this workout begins on iPhone. Spotify never blocks the workout from starting."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+
+    }
+
+    @ViewBuilder
     private var advancedOptions: some View {
+        spotifyAdvancedOptions
+
         if kind == .running {
             Section("Performance") {
                 Toggle(
