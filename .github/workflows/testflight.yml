@@ -307,10 +307,27 @@ jobs:
           IOS_APP="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app"
           WATCH_APP="$IOS_APP/Watch/ATHLTH.app"
           WIDGET_APP="$IOS_APP/PlugIns/ATHLTHWidgets.appex"
+          IOS_RELEASE_ENTITLEMENTS="$RUNNER_TEMP/ATHLTH-release.entitlements"
+          SEEDED_IOS_ENTITLEMENTS="$RUNNER_TEMP/ATHLTH-seeded.entitlements"
+
           test -d "$WIDGET_APP"
+
+          # The source entitlements intentionally uses $(APS_ENVIRONMENT) so
+          # Debug gets development and Release gets production. Because this
+          # archive is unsigned, codesign does not perform Xcode build-setting
+          # expansion when we seed the archive manually. Resolve the Release
+          # value explicitly before export so Xcode can select an App Store
+          # provisioning profile that carries the APNs entitlement.
+          cp "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_RELEASE_ENTITLEMENTS"
+          /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$IOS_RELEASE_ENTITLEMENTS"
+
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWatchExtension/ATHLTHWatchExtension.entitlements" "$WATCH_APP"
           codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTHWidgets/ATHLTHWidgets.entitlements" "$WIDGET_APP"
-          codesign --force --sign - --entitlements "$GITHUB_WORKSPACE/ATHLTH/Resources/ATHLTH.entitlements" "$IOS_APP"
+          codesign --force --sign - --entitlements "$IOS_RELEASE_ENTITLEMENTS" "$IOS_APP"
+
+          codesign -d --entitlements :- "$IOS_APP" > "$SEEDED_IOS_ENTITLEMENTS" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$SEEDED_IOS_ENTITLEMENTS" | grep -qx "production"
+          echo "Seeded release APNs entitlement verified as production."
 
       - name: Create validation export options
         shell: bash
