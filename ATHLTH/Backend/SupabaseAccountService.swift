@@ -614,6 +614,41 @@ private struct ProfileHeaderUpdate: Encodable {
         case headerArtworkName = "header_artwork_name"
         case headerImageURL = "header_image_url"
     }
+
+    func encode(
+        to encoder: Encoder
+    ) throws {
+        var container =
+            encoder.container(
+                keyedBy: CodingKeys.self
+            )
+
+        if let headerArtworkName {
+            try container.encode(
+                headerArtworkName,
+                forKey:
+                    .headerArtworkName
+            )
+        } else {
+            try container.encodeNil(
+                forKey:
+                    .headerArtworkName
+            )
+        }
+
+        if let headerImageURL {
+            try container.encode(
+                headerImageURL,
+                forKey:
+                    .headerImageURL
+            )
+        } else {
+            try container.encodeNil(
+                forKey:
+                    .headerImageURL
+            )
+        }
+    }
 }
 
 private struct ProfileUpdate: Encodable {
