@@ -4616,7 +4616,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
     let item: CommunityEventItem
 
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 8) {
             VStack(spacing: 0) {
                 Text(
                     item.event.startsAt
@@ -4630,7 +4630,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
                 .font(
                     .system(
-                        size: 9,
+                        size: 8,
                         weight: .bold
                     )
                 )
@@ -4643,8 +4643,9 @@ private struct CommunityReferenceUpcomingEventCard: View {
                         )
                 )
                 .font(
-                    .title3.weight(
-                        .bold
+                    .system(
+                        size: 18,
+                        weight: .bold
                     )
                 )
 
@@ -4660,7 +4661,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
                 .font(
                     .system(
-                        size: 8,
+                        size: 7.5,
                         weight: .semibold
                     )
                 )
@@ -4669,54 +4670,87 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
             }
             .frame(
-                width: 47,
-                height: 58
+                width: 42,
+                height: 60
             )
             .background(
                 Color.white,
                 in:
                     RoundedRectangle(
-                        cornerRadius: 12,
+                        cornerRadius: 11,
                         style: .continuous
                     )
             )
 
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
+            upcomingArtwork
                 .frame(
-                    width: 104,
-                    height: 58
+                    width: 62,
+                    height: 60
                 )
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: 12,
+                        cornerRadius: 11,
                         style: .continuous
                     )
                 )
 
             VStack(
                 alignment: .leading,
-                spacing: 4
+                spacing: 3
             ) {
                 Text(item.event.title)
                     .font(
-                        .subheadline
-                            .weight(
-                                .bold
-                            )
+                        .system(
+                            size: 12.5,
+                            weight: .bold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
 
-                HStack(spacing: 7) {
+                Label(
+                    item.event.meetingName
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                        ? item.event.activityType.title
+                        : item.event.meetingName,
+                    systemImage:
+                        item.event.meetingName
+                            .trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                            ? item.event.activityType.systemImage
+                            : "location.fill"
+                )
+                .font(
+                    .system(
+                        size: 9.5,
+                        weight: .medium
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+
+                HStack(spacing: 8) {
                     Label(
-                        item.event
-                            .meetingName,
-                        systemImage:
-                            "location.fill"
+                        item.event.startsAt
+                            .formatted(
+                                date: .omitted,
+                                time: .shortened
+                            ),
+                        systemImage: "clock"
                     )
 
                     Label(
@@ -4725,46 +4759,38 @@ private struct CommunityReferenceUpcomingEventCard: View {
                             "person.2.fill"
                     )
                 }
-                .font(.caption2)
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .medium
+                    )
+                )
                 .foregroundStyle(
                     ATHLTHTheme.mutedText
                 )
                 .lineLimit(1)
-
-                Label(
-                    item.event.startsAt
-                        .formatted(
-                            date: .omitted,
-                            time: .shortened
-                        ),
-                    systemImage: "clock"
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
             }
-
-            Spacer(minLength: 2)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
 
             Image(
                 systemName:
                     "chevron.right"
             )
-            .font(.caption.bold())
+            .font(
+                .system(
+                    size: 11,
+                    weight: .bold
+                )
+            )
             .foregroundStyle(
                 ATHLTHTheme.accentDeep
             )
-            .frame(
-                width: 34,
-                height: 34
-            )
-            .background(
-                Color.white,
-                in: Circle()
-            )
+            .frame(width: 14)
         }
-        .padding(9)
+        .padding(8)
         .background(
             Color.white.opacity(0.86),
             in:
@@ -4782,6 +4808,59 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 Color.black.opacity(0.04),
                 lineWidth: 0.7
             )
+        }
+    }
+
+    @ViewBuilder
+    private var upcomingArtwork:
+        some View {
+        if let rawURL =
+                item.event.coverImageURL,
+           let url =
+                URL(string: rawURL) {
+            ATHLTHStorageImage(
+                url: url,
+                maxPixelSize: 220
+            ) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Image(
+                        CommunityEventCoverPolicy
+                            .displayArtworkName(
+                                item.event
+                                    .coverArtworkName ??
+                                CommunityEventCoverPolicy
+                                    .defaultArtwork(
+                                        for:
+                                            item.event
+                                                .activityType
+                                    )
+                            )
+                    )
+                    .resizable()
+                    .scaledToFill()
+                }
+            }
+        } else {
+            Image(
+                CommunityEventCoverPolicy
+                    .displayArtworkName(
+                        item.event
+                            .coverArtworkName ??
+                        CommunityEventCoverPolicy
+                            .defaultArtwork(
+                                for:
+                                    item.event
+                                        .activityType
+                            )
+                    )
+            )
+            .resizable()
+            .scaledToFill()
         }
     }
 }
