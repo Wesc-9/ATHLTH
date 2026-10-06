@@ -560,6 +560,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
+    @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
@@ -1012,7 +1013,11 @@ struct ATHLTHHomeView: View {
                     await loadHomeStreak()
                 }
 
-                _ = await (communityRefresh, activityRefresh)
+                _ = await (
+                    communityRefresh,
+                    groupRefresh,
+                    activityRefresh
+                )
             }
             .onAppear {
                 syncHomeTodayWorkoutToWatch()
@@ -1062,11 +1067,17 @@ struct ATHLTHHomeView: View {
                 }
 
                 async let communityRefresh: Void = community.refresh()
+                async let groupRefresh: Void =
+                    refreshHomeGroupCalendar()
                 async let activityRefresh: Void = social.refreshHomeFeed()
 
                 guard !health.shouldDeferAutomaticHealthWork else {
                     await loadHomeStreak()
-                    _ = await (communityRefresh, activityRefresh)
+                    _ = await (
+                    communityRefresh,
+                    groupRefresh,
+                    activityRefresh
+                )
                     return
                 }
 
@@ -1092,6 +1103,7 @@ struct ATHLTHHomeView: View {
                     streakRefresh,
                     goalsRefresh,
                     communityRefresh,
+                    groupRefresh,
                     activityRefresh
                 )
             }
@@ -1111,6 +1123,13 @@ struct ATHLTHHomeView: View {
                 syncHomeTodayWorkoutToWatch()
             }
         }
+    }
+
+    @MainActor
+    private func refreshHomeGroupCalendar()
+        async {
+        await groups.refresh()
+        await groups.refreshCalendarContent()
     }
 
     @MainActor
@@ -1958,9 +1977,22 @@ struct ATHLTHHomeView: View {
             } ?? []
         let events =
             homeTodayCommunityEvents
+        let groupEvents =
+            homeTodayGroupEvents
         let remainingEventSlots =
             max(
                 2 - workouts.count,
+                0
+            )
+        let visiblePersonalEventCount =
+            min(
+                events.count,
+                remainingEventSlots
+            )
+        let remainingGroupEventSlots =
+            max(
+                remainingEventSlots -
+                visiblePersonalEventCount,
                 0
             )
 
@@ -2018,7 +2050,8 @@ struct ATHLTHHomeView: View {
             .buttonStyle(.plain)
 
             if !workouts.isEmpty ||
-                !events.isEmpty {
+                !events.isEmpty ||
+                !groupEvents.isEmpty {
                 VStack(spacing: 7) {
                     if let plan {
                         ForEach(
@@ -2313,6 +2346,147 @@ struct ATHLTHHomeView: View {
                         )
                     }
                 }
+                    ForEach(
+                        Array(
+                            groupEvents
+                                .prefix(
+                                    remainingGroupEventSlots
+                                )
+                        )
+                    ) { event in
+                        if let group =
+                                groups.group(
+                                    for:
+                                        event.groupID
+                                ) {
+                            NavigationLink {
+                                CommunityGroupEventDetailView(
+                                    group: group,
+                                    event: event
+                                )
+                            } label: {
+                                HStack(
+                                    spacing: 7
+                                ) {
+                                    Text(
+                                        event.startsAt
+                                            .formatted(
+                                                date:
+                                                    .omitted,
+                                                time:
+                                                    .shortened
+                                            )
+                                    )
+                                    .font(
+                                        .system(
+                                            size:
+                                                9.5,
+                                            weight:
+                                                .medium
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .mutedText
+                                    )
+                                    .frame(
+                                        width: 34,
+                                        alignment:
+                                            .leading
+                                    )
+
+                                    Image(
+                                        systemName:
+                                            homeGroupEventSystemImage(
+                                                event.activityType
+                                            )
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 11,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .recoveryBlue
+                                    )
+                                    .frame(
+                                        width: 27,
+                                        height: 27
+                                    )
+                                    .background(
+                                        ATHLTHTheme
+                                            .recoveryBlue
+                                            .opacity(
+                                                0.10
+                                            ),
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    9,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 1
+                                    ) {
+                                        Text(
+                                            event.title
+                                        )
+                                        .font(
+                                            .system(
+                                                size:
+                                                    10.5,
+                                                weight:
+                                                    .semibold
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+                                        .lineLimit(1)
+
+                                        Text(
+                                            event.meetingName
+                                                .trimmingCharacters(
+                                                    in:
+                                                        .whitespacesAndNewlines
+                                                )
+                                                .isEmpty
+                                                ? homeGroupEventActivityTitle(
+                                                    event.activityType
+                                                )
+                                                : event.meetingName
+                                        )
+                                        .font(
+                                            .system(
+                                                size:
+                                                    8.5
+                                            )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                        .lineLimit(1)
+                                    }
+
+                                    Spacer(
+                                        minLength: 0
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
                 .frame(
                     minHeight:
                         homeGoalCalendarContentMinHeight,
@@ -2471,67 +2645,225 @@ struct ATHLTHHomeView: View {
             }
     }
 
-    private var homeWeeklyCommunityEvents:
-        [HomeScheduledCommunityEvent] {
-        homeUserCommunityEvents
-            .filter {
-                homeWeekInterval
-                    .contains(
-                        $0.event.startsAt
-                    )
-            }
-            .sorted {
-                $0.event.startsAt <
-                    $1.event.startsAt
-            }
-            .map {
-                item in
-
-                let cleanMeeting =
-                    item.event
-                        .meetingName
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-
-                let detail =
-                    [
-                        item.event.startsAt
-                            .formatted(
-                                date: .omitted,
-                                time: .shortened
-                            ),
-                        cleanMeeting.isEmpty
-                            ? item.event
-                                .activityType
-                                .title
-                            : cleanMeeting
-                    ]
+    private var homeUserGroupEvents:
+        [CommunityGroupEventRecord] {
+        let acceptedEventIDs =
+            Set(
+                groups
+                    .calendarEventRSVPs
                     .filter {
-                        !$0.isEmpty
+                        $0.status == "going" ||
+                        $0.status == "maybe"
                     }
-                    .joined(
-                        separator: " · "
-                    )
+                    .map(\.eventID)
+            )
 
-                return HomeScheduledCommunityEvent(
-                    id:
-                        "community-" +
-                        item.id.uuidString,
-                    title:
-                        item.event.title,
-                    startsAt:
-                        item.event.startsAt,
-                    activityType:
-                        item.event.activityType
-                            .rawValue,
-                    systemImage:
-                        item.event.activityType
-                            .systemImage,
-                    detail: detail
+        return groups.calendarEvents
+            .filter { event in
+                event.status != "cancelled" &&
+                event.status != "draft" &&
+                (
+                    event.creatorID ==
+                        session.profile.userID ||
+                    acceptedEventIDs.contains(
+                        event.id
+                    )
                 )
             }
+            .sorted {
+                $0.startsAt <
+                    $1.startsAt
+            }
+    }
+
+    private var homeTodayGroupEvents:
+        [CommunityGroupEventRecord] {
+        let calendar =
+            Calendar.current
+
+        return homeUserGroupEvents
+            .filter {
+                calendar.isDateInToday(
+                    $0.startsAt
+                )
+            }
+            .sorted {
+                $0.startsAt <
+                    $1.startsAt
+            }
+    }
+
+    private var homeWeeklyCommunityEvents:
+        [HomeScheduledCommunityEvent] {
+        var scheduled =
+            homeUserCommunityEvents
+                .filter {
+                    homeWeekInterval
+                        .contains(
+                            $0.event.startsAt
+                        )
+                }
+                .map {
+                    item in
+
+                    let cleanMeeting =
+                        item.event
+                            .meetingName
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+
+                    let detail =
+                        [
+                            item.event.startsAt
+                                .formatted(
+                                    date: .omitted,
+                                    time: .shortened
+                                ),
+                            cleanMeeting.isEmpty
+                                ? item.event
+                                    .activityType
+                                    .title
+                                : cleanMeeting
+                        ]
+                        .filter {
+                            !$0.isEmpty
+                        }
+                        .joined(
+                            separator: " · "
+                        )
+
+                    return HomeScheduledCommunityEvent(
+                        id:
+                            "community-" +
+                            item.id.uuidString,
+                        title:
+                            item.event.title,
+                        startsAt:
+                            item.event.startsAt,
+                        activityType:
+                            item.event.activityType
+                                .rawValue,
+                        systemImage:
+                            item.event.activityType
+                                .systemImage,
+                        detail: detail
+                    )
+                }
+
+        scheduled.append(
+            contentsOf:
+                homeUserGroupEvents
+                    .filter {
+                        homeWeekInterval
+                            .contains(
+                                $0.startsAt
+                            )
+                    }
+                    .map {
+                        event in
+
+                        let cleanMeeting =
+                            event.meetingName
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                        let activityTitle =
+                            homeGroupEventActivityTitle(
+                                event.activityType
+                            )
+                        let detail =
+                            [
+                                event.startsAt
+                                    .formatted(
+                                        date: .omitted,
+                                        time: .shortened
+                                    ),
+                                cleanMeeting.isEmpty
+                                    ? activityTitle
+                                    : cleanMeeting
+                            ]
+                            .filter {
+                                !$0.isEmpty
+                            }
+                            .joined(
+                                separator: " · "
+                            )
+
+                        return HomeScheduledCommunityEvent(
+                            id:
+                                "club-" +
+                                event.id.uuidString,
+                            title:
+                                event.title,
+                            startsAt:
+                                event.startsAt,
+                            activityType:
+                                event.activityType,
+                            systemImage:
+                                homeGroupEventSystemImage(
+                                    event.activityType
+                                ),
+                            detail: detail
+                        )
+                    }
+        )
+
+        return scheduled.sorted {
+            $0.startsAt <
+                $1.startsAt
+        }
+    }
+
+    private func homeGroupEventActivityTitle(
+        _ activityType: String
+    ) -> String {
+        switch activityType {
+        case "running":
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case "walking":
+            return ATHLTHLocalization.choose(
+                english: "Walking",
+                norwegian: "Gåtur"
+            )
+        case "cycling":
+            return ATHLTHLocalization.choose(
+                english: "Cycling",
+                norwegian: "Sykling"
+            )
+        case "strength":
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        default:
+            return ATHLTHLocalization.choose(
+                english: "Workout",
+                norwegian: "Økt"
+            )
+        }
+    }
+
+    private func homeGroupEventSystemImage(
+        _ activityType: String
+    ) -> String {
+        switch activityType {
+        case "running":
+            return "figure.run"
+        case "walking":
+            return "figure.walk"
+        case "cycling":
+            return "bicycle"
+        case "strength":
+            return "dumbbell.fill"
+        default:
+            return "figure.mixed.cardio"
+        }
     }
 
     private var homeActiveGoal: ATHLTHGoal? {
