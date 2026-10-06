@@ -11110,11 +11110,11 @@ struct ATHLTHProfileView: View {
             accent:
                 ATHLTHTheme.premiumGold.opacity(0.34),
             immersiveTransition: true,
-            // Let the profile sheet blend into the hero instead of starting
-            // as a separate white panel below the stat row. This mirrors the
-            // softer reference transition while keeping the stats readable.
-            sheetOverlapOverride: 34,
-            transitionFadeHeightOverride: 56
+            // Keep the rounded profile sheet below the stat row with a short,
+            // restrained fade. This matches the cleaner reference transition
+            // instead of pulling a large white dome up over the hero.
+            sheetOverlapOverride: 0,
+            transitionFadeHeightOverride: 22
         ) {
             profileHero
         } content: {
@@ -11125,9 +11125,8 @@ struct ATHLTHProfileView: View {
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
-            // Keep the first profile section visually attached to the hero
-            // transition instead of leaving a large empty rounded area.
-            .padding(.top, 8)
+            // Keep the first card comfortably below the short hero fade.
+            .padding(.top, 24)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
             .frame(maxWidth: .infinity)
