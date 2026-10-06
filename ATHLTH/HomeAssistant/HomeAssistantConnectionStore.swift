@@ -3003,153 +3003,148 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                     )
             )
 
-        let snapshot:
-            MKMapSnapshotter.Snapshot
+        return await withCheckedContinuation {
+            continuation in
 
-        do {
-            snapshot =
-                try await withCheckedThrowingContinuation {
-                    continuation in
-                    MKMapSnapshotter(
-                        options: options
+            MKMapSnapshotter(
+                options: options
+            )
+            .start {
+                snapshot,
+                _ in
+
+                guard let snapshot
+                else {
+                    continuation
+                        .resume(
+                            returning:
+                                nil
+                        )
+                    return
+                }
+
+                // Keep the non-Sendable MapKit snapshot inside the callback
+                // that owns it. Only the final JPEG Data crosses the
+                // continuation boundary, which is Sendable under Swift 6.
+                let renderer =
+                    UIGraphicsImageRenderer(
+                        size: options.size
                     )
-                    .start {
-                        snapshot,
-                        error in
+                let image =
+                    renderer.image {
+                        context in
+                        snapshot.image.draw(
+                            at: .zero
+                        )
 
-                        if let snapshot {
-                            continuation
-                                .resume(
-                                    returning:
-                                        snapshot
+                        let path =
+                            UIBezierPath()
+                        for (
+                            index,
+                            coordinate
+                        ) in coordinates.enumerated() {
+                            let point =
+                                snapshot.point(
+                                    for: coordinate
                                 )
-                        } else {
-                            continuation
-                                .resume(
-                                    throwing:
-                                        error ??
-                                        HomeAssistantConnectionError
-                                            .routeMapFailed
+
+                            if index == 0 {
+                                path.move(
+                                    to: point
                                 )
+                            } else {
+                                path.addLine(
+                                    to: point
+                                )
+                            }
+                        }
+
+                        context.cgContext
+                            .setLineCap(.round)
+                        context.cgContext
+                            .setLineJoin(.round)
+
+                        UIColor.white
+                            .withAlphaComponent(
+                                0.92
+                            )
+                            .setStroke()
+                        path.lineWidth = 8
+                        path.stroke()
+
+                        UIColor(
+                            red: 0.10,
+                            green: 0.48,
+                            blue: 0.33,
+                            alpha: 1
+                        )
+                        .setStroke()
+                        path.lineWidth = 5
+                        path.stroke()
+
+                        if let start =
+                                coordinates.first {
+                            let point =
+                                snapshot.point(
+                                    for: start
+                                )
+                            UIColor(
+                                red: 0.10,
+                                green: 0.48,
+                                blue: 0.33,
+                                alpha: 1
+                            )
+                            .setFill()
+                            UIBezierPath(
+                                ovalIn:
+                                    CGRect(
+                                        x:
+                                            point.x - 7,
+                                        y:
+                                            point.y - 7,
+                                        width: 14,
+                                        height: 14
+                                    )
+                            )
+                            .fill()
+                        }
+
+                        if let finish =
+                                coordinates.last {
+                            let point =
+                                snapshot.point(
+                                    for: finish
+                                )
+                            UIColor.black
+                                .withAlphaComponent(
+                                    0.82
+                                )
+                                .setFill()
+                            UIBezierPath(
+                                ovalIn:
+                                    CGRect(
+                                        x:
+                                            point.x - 7,
+                                        y:
+                                            point.y - 7,
+                                        width: 14,
+                                        height: 14
+                                    )
+                            )
+                            .fill()
                         }
                     }
-                }
-        } catch {
-            return nil
-        }
 
-        let renderer =
-            UIGraphicsImageRenderer(
-                size: options.size
-            )
-        let image =
-            renderer.image {
-                context in
-                snapshot.image.draw(
-                    at: .zero
-                )
-
-                let path =
-                    UIBezierPath()
-                for (
-                    index,
-                    coordinate
-                ) in coordinates.enumerated() {
-                    let point =
-                        snapshot.point(
-                            for: coordinate
-                        )
-
-                    if index == 0 {
-                        path.move(
-                            to: point
-                        )
-                    } else {
-                        path.addLine(
-                            to: point
-                        )
-                    }
-                }
-
-                context.cgContext
-                    .setLineCap(.round)
-                context.cgContext
-                    .setLineJoin(.round)
-
-                UIColor.white
-                    .withAlphaComponent(
-                        0.92
-                    )
-                    .setStroke()
-                path.lineWidth = 8
-                path.stroke()
-
-                UIColor(
-                    red: 0.10,
-                    green: 0.48,
-                    blue: 0.33,
-                    alpha: 1
-                )
-                .setStroke()
-                path.lineWidth = 5
-                path.stroke()
-
-                if let start =
-                        coordinates.first {
-                    let point =
-                        snapshot.point(
-                            for: start
-                        )
-                    UIColor(
-                        red: 0.10,
-                        green: 0.48,
-                        blue: 0.33,
-                        alpha: 1
-                    )
-                    .setFill()
-                    UIBezierPath(
-                        ovalIn:
-                            CGRect(
-                                x:
-                                    point.x - 7,
-                                y:
-                                    point.y - 7,
-                                width: 14,
-                                height: 14
+                continuation
+                    .resume(
+                        returning:
+                            image.jpegData(
+                                compressionQuality:
+                                    0.58
                             )
                     )
-                    .fill()
-                }
-
-                if let finish =
-                        coordinates.last {
-                    let point =
-                        snapshot.point(
-                            for: finish
-                        )
-                    UIColor.black
-                        .withAlphaComponent(
-                            0.82
-                        )
-                        .setFill()
-                    UIBezierPath(
-                        ovalIn:
-                            CGRect(
-                                x:
-                                    point.x - 7,
-                                y:
-                                    point.y - 7,
-                                width: 14,
-                                height: 14
-                            )
-                    )
-                    .fill()
-                }
             }
-
-        return image.jpegData(
-            compressionQuality: 0.58
-        )
+        }
     }
 
     func sendRecovery(score: Int?) async {
