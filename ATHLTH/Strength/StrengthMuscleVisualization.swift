@@ -1199,7 +1199,7 @@ enum StrengthMuscleMapStyle {
     case recoveryLoad
 }
 
-enum StrengthMuscleMapPresentation {
+enum StrengthMuscleMapPresentation: Equatable {
     case standard
     case home
     case insight
