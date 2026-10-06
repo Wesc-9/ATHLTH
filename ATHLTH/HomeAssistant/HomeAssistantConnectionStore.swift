@@ -387,6 +387,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     @Published private(set) var lastLocalConnectionTestSucceeded: Bool? = nil
     @Published private(set) var lastAlternateConnectionTestSucceeded: Bool? = nil
     @Published private(set) var pendingDeliveryCount: Int = 0
+    // Pairing belongs to one signed-in ATHLTH user, not the app session.
+    // Temporarily losing auth must never erase Keychain credentials.
+    @Published private(set) var activeAccountID: UUID?
+    @Published private(set) var pairedAccountID: UUID?
     @Published var syncMode: HomeAssistantSyncMode {
         didSet {
             UserDefaults.standard.set(
@@ -566,6 +570,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareMilestoneEvents"
     private static let processedCommandIDsKey =
         "athlth.homeAssistant.processedCommandIDs"
+    private static let pairingOwnerAccountKey =
+        "athlth.homeAssistant.pairingOwnerAccountID"
 
     private let keychainService = "com.wesc9.athlth.home-assistant"
     private let keychainAccount = "pairing-v1"
@@ -617,11 +623,102 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     }
 
     var isConnected: Bool {
-        storedPairing != nil
+        guard storedPairing != nil,
+              let activeAccountID
+        else {
+            return false
+        }
+        return pairedAccountID == nil ||
+            pairedAccountID == activeAccountID
+    }
+
+    // This is deliberately non-destructive. Authentication restoration can
+    // temporarily report signed-out following an app update or cold launch.
+    // Only the explicit Disconnect action may revoke/delete the HA pairing.
+    func setActiveAccount(_ userID: UUID?) {
+        activeAccountID = userID
+
+        // Keychain can be unavailable while protected data is locked at
+        // startup. Retry restoring credentials after the account is ready.
+        restorePairingIfNeeded()
+
+        guard storedPairing != nil else {
+            connectionState = .disconnected
+            return
+        }
+
+        guard let userID else {
+            connectionState = .disconnected
+            return
+        }
+
+        if let pairedAccountID,
+           pairedAccountID != userID {
+            let message = ATHLTHLocalization.choose(
+                english:
+                    "Home Assistant is paired to a different ATHLTH account. Reconnect from this account to use it.",
+                norwegian:
+                    "Home Assistant er paret med en annen ATHLTH-konto. Koble til fra denne kontoen for å bruke integrasjonen."
+            )
+            lastErrorMessage = message
+            connectionState = .error(message)
+            return
+        }
+
+        if pairedAccountID == nil {
+            // Existing installations have no owner metadata. Bind once to
+            // the account that first resumes the previously saved pairing.
+            setPairingOwner(userID)
+        }
+
+        lastErrorMessage = nil
+        connectionState = .connected
+    }
+
+    func restorePairingIfNeeded() {
+        guard storedPairing == nil else { return }
+
+        guard let restored = Self.readStoredPairing(
+            service: keychainService,
+            account: keychainAccount
+        ) else {
+            // Do not mutate either account pairing or the saved retry queue
+            // when iOS Keychain isn't readable yet.
+            return
+        }
+
+        storedPairing = restored
+        connectedInstanceName = restored.instanceName
+        connectedInstanceURL = restored.instanceURL
+        connectedAlternateURL = restored.alternateURL
+
+        let restoredPending = Self.readPendingDeliveries(
+            service: keychainService,
+            account: pendingDeliveryAccount
+        )
+        pendingDeliveries = Self.filteredPendingDeliveries(
+            restoredPending,
+            pairingWebhookID: restored.webhookID
+        )
+        hasPersistedPendingDeliveries =
+            !restoredPending.isEmpty
+        updatePendingDeliveryCountIfNeeded()
+        if pendingDeliveries.count != restoredPending.count {
+            persistPendingDeliveries()
+        }
+    }
+
+    private func setPairingOwner(_ userID: UUID) {
+        pairedAccountID = userID
+        UserDefaults.standard.set(
+            userID.uuidString,
+            forKey: Self.pairingOwnerAccountKey
+        )
     }
 
     var watchConfiguration: WatchHomeAssistantConfiguration {
-        guard shareWorkoutState,
+        guard isConnected,
+              shareWorkoutState,
               let pairing = storedPairing
         else {
             return .disabled
@@ -659,6 +756,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
     override init() {
         let defaults = UserDefaults.standard
+        pairedAccountID = defaults.string(
+            forKey: Self.pairingOwnerAccountKey
+        ).flatMap(UUID.init(uuidString:))
         let restored = Self.readStoredPairing(
             service: "com.wesc9.athlth.home-assistant",
             account: "pairing-v1"
@@ -784,8 +884,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             !restoredPending.isEmpty
         updatePendingDeliveryCountIfNeeded()
 
-        if pendingDeliveries.count !=
-            restoredPending.count {
+        if restored != nil,
+           pendingDeliveries.count != restoredPending.count {
             persistPendingDeliveries()
         }
     }
@@ -1087,6 +1187,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             service: keychainService,
             account: keychainAccount
         )
+        pairedAccountID = nil
+        UserDefaults.standard.removeObject(
+            forKey: Self.pairingOwnerAccountKey
+        )
         clearPendingDeliveries()
         storedPairing = nil
         connectedInstanceName = nil
@@ -1105,7 +1209,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         event: String,
         payload: [String: HomeAssistantJSONValue] = [:]
     ) async throws {
-        guard let pairing = storedPairing else {
+        guard isConnected,
+              let pairing = storedPairing else {
             throw HomeAssistantConnectionError.notConnected
         }
 
@@ -1822,7 +1927,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
     }
 
     func sendConnectionTest() async {
-        guard let pairing = storedPairing else {
+        guard isConnected,
+              let pairing = storedPairing else {
             return
         }
 
@@ -2936,6 +3042,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
             try storePairing(pairing)
             storedPairing = pairing
+            if let activeAccountID {
+                setPairingOwner(activeAccountID)
+            }
             connectedInstanceName =
                 instanceName
             connectedInstanceURL =
@@ -3249,6 +3358,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
                 try storePairing(pairing)
                 storedPairing = pairing
+                if let activeAccountID {
+                    setPairingOwner(activeAccountID)
+                }
                 connectedInstanceName = instanceName
                 connectedInstanceURL = baseURL
                 connectedAlternateURL =
