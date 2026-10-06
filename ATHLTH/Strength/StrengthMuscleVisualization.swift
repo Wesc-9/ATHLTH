@@ -1199,10 +1199,17 @@ enum StrengthMuscleMapStyle {
     case recoveryLoad
 }
 
+enum StrengthMuscleMapPresentation {
+    case standard
+    case home
+    case insight
+}
+
 struct StrengthMuscleMapView: View {
     let profile: StrengthMuscleProfile
     var compact = false
     var style: StrengthMuscleMapStyle = .activation
+    var presentation: StrengthMuscleMapPresentation = .standard
     var activationTint:
         Color = Color(
             red: 0.14,
@@ -1239,8 +1246,18 @@ struct StrengthMuscleMapView: View {
                 profile: profile,
                 side: side,
                 style: style,
+                presentation:
+                    presentation,
                 activationTint:
                     activationTint
+            )
+            .shadow(
+                color:
+                    figureShadowColor,
+                radius:
+                    compact ? 2.5 : 4,
+                y:
+                    compact ? 1.5 : 2.5
             )
 
             if !compact {
@@ -1250,6 +1267,22 @@ struct StrengthMuscleMapView: View {
                         ATHLTHTheme.mutedText
                     )
             }
+        }
+    }
+
+    private var figureShadowColor: Color {
+        switch presentation {
+        case .standard:
+            return .clear
+        case .home:
+            return Color.black.opacity(0.08)
+        case .insight:
+            return Color(
+                red: 0.08,
+                green: 0.24,
+                blue: 0.18
+            )
+            .opacity(0.07)
         }
     }
 
@@ -1284,6 +1317,8 @@ private struct StrengthBodyFigureCanvas:
     let profile: StrengthMuscleProfile
     let side: StrengthBodySide
     let style: StrengthMuscleMapStyle
+    let presentation:
+        StrengthMuscleMapPresentation
     let activationTint:
         Color
 
@@ -1361,8 +1396,42 @@ private struct StrengthBodyFigureCanvas:
         let outline: Color
         let highlight: Color
 
-        switch style {
-        case .activation:
+        switch (presentation, style) {
+        case (.home, .activation):
+            base =
+                Color(
+                    red: 0.885,
+                    green: 0.882,
+                    blue: 0.872
+                )
+            outline =
+                Color(
+                    red: 0.25,
+                    green: 0.24,
+                    blue: 0.23
+                )
+                .opacity(0.18)
+            highlight =
+                Color.white.opacity(0.46)
+
+        case (.insight, .recoveryLoad):
+            base =
+                Color(
+                    red: 0.928,
+                    green: 0.924,
+                    blue: 0.900
+                )
+            outline =
+                Color(
+                    red: 0.08,
+                    green: 0.24,
+                    blue: 0.18
+                )
+                .opacity(0.14)
+            highlight =
+                Color.white.opacity(0.40)
+
+        case (_, .activation):
             base =
                 Color(
                     red: 0.855,
@@ -1379,7 +1448,7 @@ private struct StrengthBodyFigureCanvas:
             highlight =
                 Color.white.opacity(0.38)
 
-        case .recoveryLoad:
+        case (_, .recoveryLoad):
             base =
                 Color(
                     red: 0.905,
@@ -1872,11 +1941,21 @@ private struct StrengthBodyFigureCanvas:
 
         switch style {
         case .activation:
+            let baseOpacity =
+                presentation == .home
+                    ? 0.28
+                    : 0.22
+            let intensityOpacity =
+                presentation == .home
+                    ? 0.68
+                    : 0.74
+
             fill =
                 activationTint
                     .opacity(
-                        0.22 +
-                        intensity * 0.74
+                        baseOpacity +
+                        intensity *
+                        intensityOpacity
                     )
 
         case .recoveryLoad:
@@ -2512,6 +2591,26 @@ private struct StrengthBodyFigureCanvas:
             path,
             with: .color(fill)
         )
+
+        if presentation != .standard {
+            context.stroke(
+                path,
+                with:
+                    .color(
+                        Color.black
+                            .opacity(
+                                presentation == .home
+                                    ? 0.075
+                                    : 0.050
+                            )
+                    ),
+                lineWidth:
+                    emphasis > 0.72
+                        ? 1.15
+                        : 0.75
+            )
+        }
+
         context.stroke(
             path,
             with:
@@ -2628,24 +2727,60 @@ private struct StrengthBodyFigureCanvas:
             min(max(score, 0), 1)
 
         let green = (
-            red: 0.24,
-            green: 0.70,
-            blue: 0.43
+            red:
+                presentation == .insight
+                    ? 0.22
+                    : 0.24,
+            green:
+                presentation == .insight
+                    ? 0.66
+                    : 0.70,
+            blue:
+                presentation == .insight
+                    ? 0.43
+                    : 0.43
         )
         let yellow = (
-            red: 0.95,
-            green: 0.78,
-            blue: 0.18
+            red:
+                presentation == .insight
+                    ? 0.88
+                    : 0.95,
+            green:
+                presentation == .insight
+                    ? 0.72
+                    : 0.78,
+            blue:
+                presentation == .insight
+                    ? 0.27
+                    : 0.18
         )
         let orange = (
-            red: 0.96,
-            green: 0.48,
-            blue: 0.14
+            red:
+                presentation == .insight
+                    ? 0.92
+                    : 0.96,
+            green:
+                presentation == .insight
+                    ? 0.47
+                    : 0.48,
+            blue:
+                presentation == .insight
+                    ? 0.20
+                    : 0.14
         )
         let red = (
-            red: 0.86,
-            green: 0.17,
-            blue: 0.19
+            red:
+                presentation == .insight
+                    ? 0.82
+                    : 0.86,
+            green:
+                presentation == .insight
+                    ? 0.24
+                    : 0.17,
+            blue:
+                presentation == .insight
+                    ? 0.22
+                    : 0.19
         )
 
         let color: (
