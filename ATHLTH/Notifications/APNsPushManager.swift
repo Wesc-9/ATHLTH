@@ -16,6 +16,9 @@ final class APNsPushManager: ObservableObject {
 
     @Published private(set) var lastRegistrationError: String?
     @Published private(set) var isRegisteredWithBackend = false
+    @Published private(set) var hasDeviceToken = false
+    @Published private(set) var isSystemRegistered = false
+    @Published private(set) var lastBackendSyncAt: Date?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -31,6 +34,17 @@ final class APNsPushManager: ObservableObject {
             UserDefaults.standard.string(
                 forKey: Self.storedTokenKey
             )
+        self.hasDeviceToken =
+            !(self.deviceTokenHex?.isEmpty ?? true)
+        self.isSystemRegistered =
+            UIApplication.shared
+                .isRegisteredForRemoteNotifications
+    }
+
+    var environmentLabel: String {
+        Self.apnsEnvironment == "production"
+            ? "Production"
+            : "Sandbox"
     }
 
     func receive(deviceToken: Data) {
@@ -49,6 +63,8 @@ final class APNsPushManager: ObservableObject {
         registrationRetryTask = nil
 
         deviceTokenHex = token
+        hasDeviceToken = !token.isEmpty
+        isSystemRegistered = true
         UserDefaults.standard.set(
             token,
             forKey: Self.storedTokenKey
@@ -62,15 +78,101 @@ final class APNsPushManager: ObservableObject {
     func didFailToRegister(_ error: Error) {
         lastRegistrationError =
             error.localizedDescription
+        isSystemRegistered = false
         isRegisteredWithBackend = false
-        scheduleRegistrationRecovery()
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  await self
+                    .systemNotificationsAllowed()
+            else {
+                return
+            }
+
+            self.scheduleRegistrationRecovery()
+        }
+    }
+
+    /// Repairs the full client side of the push path without prompting.
+    /// Apple recommends requesting alert permission before APNs registration;
+    /// this method therefore registers only when permission is already allowed.
+    func repairRegistrationIfAuthorized() async {
+        isSystemRegistered =
+            UIApplication.shared
+                .isRegisteredForRemoteNotifications
+
+        guard await systemNotificationsAllowed()
+        else {
+            await refreshBackendRegistrationStatus()
+            return
+        }
+
+        ensureSystemRegistration(force: true)
+
+        if hasDeviceToken {
+            await syncCurrentToken()
+        } else {
+            scheduleRegistrationRecovery()
+        }
+    }
+
+    func refreshBackendRegistrationStatus() async {
+        guard let userID =
+                client.auth.currentUser?.id
+        else {
+            isRegisteredWithBackend = false
+            return
+        }
+
+        do {
+            let rows:
+                [NotificationDeviceProbe] =
+                    try await client
+                        .from(
+                            "notification_devices"
+                        )
+                        .select("id")
+                        .eq(
+                            "user_id",
+                            value: userID
+                        )
+                        .eq(
+                            "device_id",
+                            value:
+                                Self
+                                    .deviceIdentifier
+                        )
+                        .eq(
+                            "app_bundle_id",
+                            value:
+                                Bundle.main
+                                    .bundleIdentifier ??
+                                "com.wesc9.athlth"
+                        )
+                        .eq(
+                            "apns_environment",
+                            value:
+                                Self
+                                    .apnsEnvironment
+                        )
+                        .limit(1)
+                        .execute()
+                        .value
+
+            isRegisteredWithBackend =
+                !rows.isEmpty
+        } catch {
+            isRegisteredWithBackend = false
+            lastRegistrationError =
+                error.localizedDescription
+        }
     }
 
     func syncCurrentToken() async {
         guard let userID =
                 client.auth.currentUser?.id
         else {
-            ensureSystemRegistration()
+            isRegisteredWithBackend = false
             return
         }
 
@@ -78,16 +180,23 @@ final class APNsPushManager: ObservableObject {
                 deviceTokenHex,
               !token.isEmpty
         else {
-            // A remote notification cannot be delivered until APNs has given
-            // this installation a device token. Force a fresh registration
-            // attempt and keep a short bounded recovery loop for installations
-            // where the callback was missed around sign-in/app updates.
-            ensureSystemRegistration(
-                force: true
-            )
-            scheduleRegistrationRecovery()
+            hasDeviceToken = false
+
+            // Do not try to register with APNs before notification
+            // authorization has been decided. This follows Apple's
+            // recommended ordering and avoids silent launch-time failures.
+            if await systemNotificationsAllowed() {
+                ensureSystemRegistration(
+                    force: true
+                )
+                scheduleRegistrationRecovery()
+            }
+
+            isRegisteredWithBackend = false
             return
         }
+
+        hasDeviceToken = true
 
         let params = RegisterNotificationDeviceParams(
             deviceID: Self.deviceIdentifier,
@@ -107,6 +216,10 @@ final class APNsPushManager: ObservableObject {
                 .execute()
 
             isRegisteredWithBackend = true
+            isSystemRegistered =
+                UIApplication.shared
+                    .isRegisteredForRemoteNotifications
+            lastBackendSyncAt = Date()
             lastRegistrationError = nil
             registrationRetryTask?
                 .cancel()
@@ -139,6 +252,31 @@ final class APNsPushManager: ObservableObject {
 
         UIApplication.shared
             .registerForRemoteNotifications()
+        isSystemRegistered =
+            UIApplication.shared
+                .isRegisteredForRemoteNotifications
+    }
+
+    private func systemNotificationsAllowed()
+        async -> Bool {
+        let settings =
+            await UNUserNotificationCenter
+                .current()
+                .notificationSettings()
+
+        switch settings.authorizationStatus {
+        case .authorized,
+             .provisional,
+             .ephemeral:
+            return true
+
+        case .notDetermined,
+             .denied:
+            return false
+
+        @unknown default:
+            return false
+        }
     }
 
     private func scheduleRegistrationRecovery() {
@@ -152,7 +290,9 @@ final class APNsPushManager: ObservableObject {
                 let delays:
                     [Duration] = [
                         .seconds(2),
-                        .seconds(8)
+                        .seconds(8),
+                        .seconds(30),
+                        .seconds(120)
                     ]
 
                 for delay in delays {
@@ -167,9 +307,18 @@ final class APNsPushManager: ObservableObject {
                         return
                     }
 
+                    guard await self
+                        .systemNotificationsAllowed()
+                    else {
+                        self.registrationRetryTask =
+                            nil
+                        return
+                    }
+
                     if let token =
                             self.deviceTokenHex,
                        !token.isEmpty {
+                        self.hasDeviceToken = true
                         self.registrationRetryTask =
                             nil
                         await self
@@ -181,6 +330,13 @@ final class APNsPushManager: ObservableObject {
                         .ensureSystemRegistration(
                             force: true
                         )
+                }
+
+                if let self,
+                   self.deviceTokenHex?.isEmpty != false {
+                    self.hasDeviceToken = false
+                    self.lastRegistrationError =
+                        "APNs did not return a device token."
                 }
 
                 self?
@@ -231,6 +387,7 @@ final class APNsPushManager: ObservableObject {
                 .rpc("unregister_notification_device", params: params)
                 .execute()
             isRegisteredWithBackend = false
+            lastBackendSyncAt = nil
         } catch {
             lastRegistrationError = error.localizedDescription
         }
@@ -258,6 +415,12 @@ final class APNsPushManager: ObservableObject {
         UserDefaults.standard.set(generated, forKey: key)
         return generated
     }
+}
+
+private struct NotificationDeviceProbe:
+    Decodable
+{
+    let id: UUID
 }
 
 private struct NotificationPreferenceWrite: Encodable {
@@ -324,9 +487,14 @@ final class ATHLTHAppDelegate: NSObject,
         ATHLTHHomeAssistantBackgroundRefresh.register()
         HealthKitManager.shared.prepareBackgroundObserversAtLaunch()
 
-        // APNs registration is independent from alert permission. The user
-        // still controls alert/sound/badge permission in ATHLTH Settings/iOS.
-        application.registerForRemoteNotifications()
+        // Apple recommends requesting user-facing notification permission
+        // before registering with APNs. If permission was already granted on
+        // a previous launch, repair registration immediately. If it is still
+        // undecided, the in-app primer will request it first.
+        Task { @MainActor in
+            await APNsPushManager.shared
+                .repairRegistrationIfAuthorized()
+        }
         return true
     }
 

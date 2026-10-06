@@ -617,7 +617,7 @@ struct AppRootView: View {
             // Keep launch responsive: load only Home-critical account
             // context first and let independent network work overlap.
             async let pushToken: Void =
-                APNsPushManager.shared.syncCurrentToken()
+                APNsPushManager.shared.repairRegistrationIfAuthorized()
             async let pushPreferences: Void =
                 syncPushPreferences()
             async let socialHome: Void =
@@ -1453,7 +1453,7 @@ struct AppRootView: View {
             scheduleNotificationPermissionPrimerIfNeeded()
 
             Task {
-                await APNsPushManager.shared.syncCurrentToken()
+                await APNsPushManager.shared.repairRegistrationIfAuthorized()
                 await syncPushPreferences()
                 await submitLatestStoreProofIfPossible()
                 await refreshSocialHomeCore(

@@ -2923,6 +2923,8 @@ private struct ATHLTHNotificationSettingsView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @ObservedObject private var push =
+        APNsPushManager.shared
 
     var body: some View {
         Form {
@@ -2947,6 +2949,94 @@ private struct ATHLTHNotificationSettingsView: View {
                 }
             }
 
+            Section(
+                ATHLTHLocalization.choose(
+                    english: "Push status",
+                    norwegian: "Push-status"
+                )
+            ) {
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "APNs token",
+                        norwegian: "APNs-token"
+                    ),
+                    value:
+                        push.hasDeviceToken
+                            ? ATHLTHLocalization.choose(
+                                english: "Received",
+                                norwegian: "Mottatt"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Missing",
+                                norwegian: "Mangler"
+                            )
+                )
+
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "iOS registration",
+                        norwegian: "iOS-registrering"
+                    ),
+                    value:
+                        push.isSystemRegistered
+                            ? ATHLTHLocalization.choose(
+                                english: "Registered",
+                                norwegian: "Registrert"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Not registered",
+                                norwegian: "Ikke registrert"
+                            )
+                )
+
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "ATHLTH backend",
+                        norwegian: "ATHLTH-backend"
+                    ),
+                    value:
+                        push.isRegisteredWithBackend
+                            ? ATHLTHLocalization.choose(
+                                english: "Registered",
+                                norwegian: "Registrert"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Missing",
+                                norwegian: "Mangler"
+                            )
+                )
+
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "APNs environment",
+                        norwegian: "APNs-miljø"
+                    ),
+                    value: push.environmentLabel
+                )
+
+                if let error =
+                        push.lastRegistrationError,
+                   !error.isEmpty {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Repair push registration",
+                        norwegian: "Reparer push-registrering"
+                    )
+                ) {
+                    Task {
+                        await push
+                            .repairRegistrationIfAuthorized()
+                        await push
+                            .refreshBackendRegistrationStatus()
+                    }
+                }
+            }
+
             Section("ATHLTH alerts") {
                 Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
                 Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
@@ -2964,6 +3054,10 @@ private struct ATHLTHNotificationSettingsView: View {
         .task {
             await notifications.refreshAuthorizationStatus()
             await notifications.reconcileSystemPreferences()
+            await push
+                .repairRegistrationIfAuthorized()
+            await push
+                .refreshBackendRegistrationStatus()
         }
         .onChange(of: settings.challengeNotificationsEnabled) { _, _ in
             Task {

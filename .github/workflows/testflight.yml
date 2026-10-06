@@ -375,6 +375,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$IOS_ENT" | grep -qx "group.com.wesc9.athlth"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$WIDGET_ENT" | grep -qx "group.com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$IOS_ENT" | grep -qx "production"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$APP/Info.plist" | grep -q "remote-notification"
 
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Info.plist")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_APP/Info.plist")
@@ -411,6 +413,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :com.apple.developer.healthkit" "$WATCH_ENT" | grep -qx "true"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$IOS_ENT" | grep -qx "group.com.wesc9.athlth"
           /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$WIDGET_ENT" | grep -qx "group.com.wesc9.athlth"
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$IOS_ENT" | grep -qx "production"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$APP/Info.plist" | grep -q "remote-notification"
 
           /usr/libexec/PlistBuddy -c "Print :WKCompanionAppBundleIdentifier" "$WATCH_APP/Info.plist" | grep -qx "com.wesc9.athlth"
           /usr/libexec/PlistBuddy -c "Print :WKBackgroundModes:0" "$WATCH_APP/Info.plist" | grep -qx "workout-processing"
