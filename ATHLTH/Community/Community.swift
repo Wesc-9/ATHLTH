@@ -386,6 +386,120 @@ private struct CommunityEventWrite: Encodable {
     }
 }
 
+
+private struct CommunityEventUpdate: Encodable {
+    let title: String
+    let summary: String
+    let activityType: String
+    let visibility: String
+    let startsAt: Date
+    let meetingName: String
+    let meetingDetails: String?
+    let latitude: Double?
+    let longitude: Double?
+    let maxParticipants: Int?
+    let paceLabel: String?
+    let routeID: UUID?
+    let routeTitle: String?
+    let routeCoordinates: [RouteCoordinate]?
+    let routeDistanceKilometers: Double?
+    let routeElevationGainMeters: Double?
+    let routeStartName: String?
+    let routeEndName: String?
+    let coverArtworkName: String?
+    let coverImageURL: String?
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case summary
+        case activityType = "activity_type"
+        case visibility
+        case startsAt = "starts_at"
+        case meetingName = "meeting_name"
+        case meetingDetails = "meeting_details"
+        case latitude
+        case longitude
+        case maxParticipants = "max_participants"
+        case paceLabel = "pace_label"
+        case routeID = "route_id"
+        case routeTitle = "route_title"
+        case routeCoordinates = "route_coordinates"
+        case routeDistanceKilometers =
+            "route_distance_kilometers"
+        case routeElevationGainMeters =
+            "route_elevation_gain_meters"
+        case routeStartName = "route_start_name"
+        case routeEndName = "route_end_name"
+        case coverArtworkName = "cover_artwork_name"
+        case coverImageURL = "cover_image_url"
+        case updatedAt = "updated_at"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container =
+            encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(title, forKey: .title)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(
+            activityType,
+            forKey: .activityType
+        )
+        try container.encode(
+            visibility,
+            forKey: .visibility
+        )
+        try container.encode(startsAt, forKey: .startsAt)
+        try container.encode(
+            meetingName,
+            forKey: .meetingName
+        )
+        try container.encode(
+            meetingDetails,
+            forKey: .meetingDetails
+        )
+        try container.encode(latitude, forKey: .latitude)
+        try container.encode(longitude, forKey: .longitude)
+        try container.encode(
+            maxParticipants,
+            forKey: .maxParticipants
+        )
+        try container.encode(paceLabel, forKey: .paceLabel)
+        try container.encode(routeID, forKey: .routeID)
+        try container.encode(routeTitle, forKey: .routeTitle)
+        try container.encode(
+            routeCoordinates,
+            forKey: .routeCoordinates
+        )
+        try container.encode(
+            routeDistanceKilometers,
+            forKey: .routeDistanceKilometers
+        )
+        try container.encode(
+            routeElevationGainMeters,
+            forKey: .routeElevationGainMeters
+        )
+        try container.encode(
+            routeStartName,
+            forKey: .routeStartName
+        )
+        try container.encode(
+            routeEndName,
+            forKey: .routeEndName
+        )
+        try container.encode(
+            coverArtworkName,
+            forKey: .coverArtworkName
+        )
+        try container.encode(
+            coverImageURL,
+            forKey: .coverImageURL
+        )
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
+}
+
 private struct CommunityParticipantWrite: Encodable {
     let eventID: UUID
     let userID: UUID
@@ -668,6 +782,107 @@ final class SupabaseCommunityService {
             .execute()
 
         return eventID
+    }
+
+
+    func updateEvent(
+        eventID: UUID,
+        draft: CommunityEventDraft
+    ) async throws {
+        guard let currentUserID else {
+            throw CommunityEventError.notAuthenticated
+        }
+
+        let cleanTitle =
+            draft.title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        let cleanMeeting =
+            draft.meetingName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+        guard !cleanTitle.isEmpty else {
+            throw CommunityEventError.invalidEvent
+        }
+
+        let resolvedCoordinate:
+            CLLocationCoordinate2D?
+        if let latitude = draft.latitude,
+           let longitude = draft.longitude {
+            resolvedCoordinate =
+                CLLocationCoordinate2D(
+                    latitude: latitude,
+                    longitude: longitude
+                )
+        } else if !cleanMeeting.isEmpty {
+            resolvedCoordinate =
+                await resolveMeetingCoordinate(
+                    cleanMeeting
+                )
+        } else {
+            resolvedCoordinate = nil
+        }
+
+        try await client
+            .from("community_events")
+            .update(
+                CommunityEventUpdate(
+                    title: cleanTitle,
+                    summary:
+                        draft.summary
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            ),
+                    activityType:
+                        draft.activityType.rawValue,
+                    visibility:
+                        draft.visibility.rawValue,
+                    startsAt: draft.startsAt,
+                    meetingName: cleanMeeting,
+                    meetingDetails:
+                        draft.meetingDetails
+                            .nilIfBlank,
+                    latitude:
+                        resolvedCoordinate?
+                            .latitude,
+                    longitude:
+                        resolvedCoordinate?
+                            .longitude,
+                    maxParticipants:
+                        draft.maxParticipants,
+                    paceLabel:
+                        draft.paceLabel
+                            .nilIfBlank,
+                    routeID: draft.routeID,
+                    routeTitle:
+                        draft.routeTitle,
+                    routeCoordinates:
+                        draft.routeCoordinates,
+                    routeDistanceKilometers:
+                        draft
+                            .routeDistanceKilometers,
+                    routeElevationGainMeters:
+                        draft
+                            .routeElevationGainMeters,
+                    routeStartName:
+                        draft.routeStartName,
+                    routeEndName:
+                        draft.routeEndName,
+                    coverArtworkName:
+                        draft.coverArtworkName,
+                    coverImageURL:
+                        draft.coverImageURL,
+                    updatedAt: Date()
+                )
+            )
+            .eq("id", value: eventID)
+            .eq(
+                "creator_id",
+                value: currentUserID
+            )
+            .execute()
     }
 
     func uploadEventCover(
@@ -990,6 +1205,25 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
+
+    func update(
+        _ item: CommunityEventItem,
+        with draft: CommunityEventDraft
+    ) async -> Bool {
+        do {
+            try await service.updateEvent(
+                eventID: item.id,
+                draft: draft
+            )
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func uploadEventCover(
         eventID: UUID,
         jpegData: Data
@@ -1300,14 +1534,7 @@ private struct CommunityEventListRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-                Label(
-                    ATHLTHLocalization.format(
-                            english: "%d joined",
-                            norwegian: "%d deltar",
-                            item.participantCount
-                        ),
-                    systemImage: "person.2.fill"
-                )
+                heroAttendanceSummary(item)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
@@ -1322,6 +1549,10 @@ struct CommunityEventDetailView: View {
 
     let eventID: UUID
 
+    @State private var showingEditEvent = false
+    @State private var showingCancelConfirmation =
+        false
+
     var body: some View {
         ScrollView {
             if let item = community.item(id: eventID) {
@@ -1329,6 +1560,13 @@ struct CommunityEventDetailView: View {
                     eventHero(item)
                     eventDetails(item)
                     participants(item)
+
+                    if item.event.creatorID ==
+                        session.profile.userID &&
+                        item.event.status !=
+                        "cancelled" {
+                        cancelEventButton(item)
+                    }
                 }
                 .padding()
             } else {
@@ -1359,6 +1597,60 @@ struct CommunityEventDetailView: View {
             .hidden,
             for: .navigationBar
         )
+        .sheet(
+            isPresented: $showingEditEvent
+        ) {
+            if let item =
+                community.item(id: eventID) {
+                CommunityEventEditView(
+                    item: item
+                )
+                .environmentObject(community)
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Cancel Event?",
+                norwegian: "Avlyse arrangement?"
+            ),
+            isPresented:
+                $showingCancelConfirmation,
+            titleVisibility: .visible
+        ) {
+            if let item =
+                community.item(id: eventID) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel Event",
+                        norwegian: "Avlys arrangement"
+                    ),
+                    role: .destructive
+                ) {
+                    Task {
+                        await community.cancel(
+                            item
+                        )
+                    }
+                }
+            }
+
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Keep Event",
+                    norwegian: "Behold arrangement"
+                ),
+                role: .cancel
+            ) {}
+        } message: {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Participants will see that the event has been cancelled.",
+                    norwegian:
+                        "Deltakere vil se at arrangementet er avlyst."
+                )
+            )
+        }
     }
 
     private func eventHero(_ item: CommunityEventItem) -> some View {
@@ -1494,68 +1786,166 @@ struct CommunityEventDetailView: View {
     }
 
     @ViewBuilder
-    private func actionButton(_ item: CommunityEventItem) -> some View {
-        if item.event.creatorID == session.profile.userID {
-            Button(role: .destructive) {
-                Task { await community.cancel(item) }
+    private func actionButton(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if item.event.creatorID ==
+            session.profile.userID {
+            Button {
+                showingEditEvent = true
             } label: {
-                Label("Cancel Event", systemImage: "xmark.circle")
-                    .frame(maxWidth: .infinity)
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Edit Event",
+                        norwegian:
+                            "Rediger arrangement"
+                    ),
+                    systemImage: "pencil"
+                )
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.vitality)
+            .padding(.top, 4)
+        } else if community.isJoined(item) {
+            HStack(spacing: 10) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Going",
+                        norwegian: "Deltar"
+                    ),
+                    systemImage:
+                        "checkmark.circle.fill"
+                )
+                .font(
+                    .subheadline.weight(.semibold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 42
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in: Capsule()
+                )
+
+                Menu {
+                    Button {
+                        Task {
+                            await community.maybe(
+                                item
+                            )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Maybe",
+                                norwegian: "Kanskje"
+                            ),
+                            systemImage:
+                                "questionmark.circle"
+                        )
+                    }
+
+                    Button(
+                        role: .destructive
+                    ) {
+                        Task {
+                            await community.leave(
+                                item
+                            )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Can't go",
+                                norwegian:
+                                    "Kan ikke delta"
+                            ),
+                            systemImage:
+                                "xmark.circle"
+                        )
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Change response",
+                            norwegian:
+                                "Endre svar"
+                        ),
+                        systemImage:
+                            "ellipsis.circle"
+                    )
+                    .font(
+                        .caption.weight(.semibold)
+                    )
+                    .frame(
+                        minHeight: 42
+                    )
+                }
+                .buttonStyle(.bordered)
+            }
             .padding(.top, 4)
         } else {
             HStack(spacing: 10) {
-                if community.isJoined(item) {
-                    Button {
-                        Task {
-                            await community.leave(item)
-                        }
-                    } label: {
-                        Label(
-                            "Deltar",
-                            systemImage:
-                                "checkmark.circle.fill"
+                Button {
+                    Task {
+                        await community.join(
+                            item
                         )
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.vitality)
-                } else {
-                    Button {
-                        Task {
-                            await community.join(item)
-                        }
-                    } label: {
-                        Label(
-                            "Delta",
-                            systemImage:
-                                "person.badge.plus"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.vitality)
-                    .disabled(
-                        item.event.maxParticipants.map {
-                            item.participantCount >= $0
-                        } ?? false
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Going",
+                            norwegian: "Delta"
+                        ),
+                        systemImage:
+                            "person.badge.plus"
                     )
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .disabled(
+                    item.event
+                        .maxParticipants
+                        .map {
+                            item.participantCount >=
+                                $0
+                        } ?? false
+                )
 
                 Button {
                     Task {
-                        if community.isMaybe(item) {
-                            await community.leave(item)
+                        if community.isMaybe(
+                            item
+                        ) {
+                            await community.leave(
+                                item
+                            )
                         } else {
-                            await community.maybe(item)
+                            await community.maybe(
+                                item
+                            )
                         }
                     }
                 } label: {
                     Label(
-                        community.isMaybe(item)
-                            ? "Kanskje"
-                            : "Kanskje",
+                        ATHLTHLocalization.choose(
+                            english: "Maybe",
+                            norwegian: "Kanskje"
+                        ),
                         systemImage:
                             community.isMaybe(item)
                                 ? "questionmark.circle.fill"
@@ -1564,6 +1954,11 @@ struct CommunityEventDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .tint(
+                    community.isMaybe(item)
+                        ? ATHLTHTheme.vitality
+                        : .secondary
+                )
             }
             .padding(.top, 4)
         }
@@ -1657,40 +2052,249 @@ struct CommunityEventDetailView: View {
         }
     }
 
-    private func participants(_ item: CommunityEventItem) -> some View {
-        ATHLTHCard {
-            Text("People")
-                .font(.headline)
+    private func participants(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let going =
+            participantProfiles(
+                item,
+                status: .going
+            )
+        let maybe =
+            participantProfiles(
+                item,
+                status: .maybe
+            )
 
-            HStack(spacing: 10) {
-                if let creator = item.creator {
-                    CommunityAvatar(profile: creator, size: 40)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(creator.resolvedName)
-                            .font(.subheadline.weight(.semibold))
-                        Text("Host")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Label("Event host", systemImage: "person.crop.circle")
-                        .font(.subheadline)
-                }
+        return ATHLTHCard {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "People",
+                    norwegian: "Deltakere"
+                )
+            )
+            .font(.headline)
 
-                Spacer()
+            Text(
+                ATHLTHLocalization.format(
+                    english: "Going · %d",
+                    norwegian: "Deltar · %d",
+                    item.participantCount
+                )
+            )
+            .font(
+                .caption.weight(.semibold)
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .padding(.top, 6)
+
+            if let creator = item.creator {
+                attendeeRow(
+                    profile: creator,
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Host",
+                            norwegian: "Arrangør"
+                        )
+                )
+            } else {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Event host",
+                        norwegian: "Arrangør"
+                    ),
+                    systemImage:
+                        "person.crop.circle"
+                )
+                .font(.subheadline)
+                .padding(.top, 8)
             }
-            .padding(.top, 8)
 
-            ForEach(item.participantProfiles) { profile in
+            ForEach(going) { profile in
+                attendeeRow(
+                    profile: profile,
+                    subtitle: nil
+                )
+            }
+
+            if !maybe.isEmpty {
                 Divider()
-                HStack(spacing: 10) {
-                    CommunityAvatar(profile: profile, size: 36)
-                    Text(profile.resolvedName)
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
+                    .padding(.vertical, 8)
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english: "Maybe · %d",
+                        norwegian: "Kanskje · %d",
+                        maybe.count
+                    )
+                )
+                .font(
+                    .caption.weight(
+                        .semibold
+                    )
+                )
+                .foregroundStyle(
+                    .secondary
+                )
+
+                ForEach(maybe) { profile in
+                    attendeeRow(
+                        profile: profile,
+                        subtitle: nil
+                    )
                 }
             }
         }
+    }
+
+    private func participantProfiles(
+        _ item: CommunityEventItem,
+        status: CommunityEventAttendance
+    ) -> [SocialProfileCard] {
+        let matchingIDs =
+            Set(
+                item.participantRows
+                    .filter {
+                        $0.attendanceStatus ==
+                            status &&
+                        $0.userID !=
+                            item.event.creatorID
+                    }
+                    .map(\.userID)
+            )
+
+        return item.participantProfiles
+            .filter {
+                matchingIDs.contains(
+                    $0.userID
+                )
+            }
+    }
+
+    @ViewBuilder
+    private func attendeeRow(
+        profile: SocialProfileCard,
+        subtitle: String?
+    ) -> some View {
+        Divider()
+
+        HStack(spacing: 10) {
+            CommunityAvatar(
+                profile: profile,
+                size: 36
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 2
+            ) {
+                Text(profile.resolvedName)
+                    .font(
+                        .subheadline
+                            .weight(.medium)
+                    )
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    private func heroAttendanceSummary(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let profiles =
+            ([item.creator]
+                .compactMap { $0 }) +
+            participantProfiles(
+                item,
+                status: .going
+            )
+
+        return HStack(spacing: 7) {
+            if profiles.isEmpty {
+                Image(
+                    systemName:
+                        "person.2.fill"
+                )
+                .font(.caption)
+            } else {
+                HStack(spacing: -7) {
+                    ForEach(
+                        Array(
+                            profiles.prefix(3)
+                        )
+                    ) { profile in
+                        CommunityAvatar(
+                            profile: profile,
+                            size: 25
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    ATHLTHTheme
+                                        .surfaceSage,
+                                    lineWidth: 2
+                                )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                ATHLTHLocalization.format(
+                    english: "%d joined",
+                    norwegian: "%d deltar",
+                    item.participantCount
+                )
+            )
+        }
+    }
+
+    private func cancelEventButton(
+        _ item: CommunityEventItem
+    ) -> some View {
+        Button(role: .destructive) {
+            showingCancelConfirmation =
+                true
+        } label: {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Cancel Event",
+                    norwegian:
+                        "Avlys arrangement"
+                ),
+                systemImage: "xmark.circle"
+            )
+            .font(
+                .subheadline.weight(.semibold)
+            )
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 46
+            )
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
+        .accessibilityHint(
+            ATHLTHLocalization.choose(
+                english:
+                    "Moves this event to cancelled.",
+                norwegian:
+                    "Flytter arrangementet til avlyst."
+            )
+        )
     }
 
     private func eventRoute(
@@ -2662,6 +3266,408 @@ private struct CommunityEventMapPlacePickerView:
                     .coordinate
                     .longitude
         )
+    }
+}
+
+
+private struct CommunityEventEditView: View {
+    @Environment(\.dismiss)
+    private var dismiss
+    @EnvironmentObject
+    private var community:
+        CommunityEventStore
+
+    let item: CommunityEventItem
+
+    @State private var draft:
+        CommunityEventDraft
+    @State private var limitParticipants:
+        Bool
+    @State private var maxParticipants: Int
+    @State private var isSaving = false
+
+    init(item: CommunityEventItem) {
+        self.item = item
+
+        var initial =
+            CommunityEventDraft()
+        initial.title = item.event.title
+        initial.summary =
+            item.event.summary
+        initial.activityType =
+            item.event.activityType
+        initial.visibility =
+            ProfileVisibility(
+                rawValue:
+                    item.event.visibility
+            ) ?? .publicProfile
+        initial.startsAt =
+            item.event.startsAt
+        initial.meetingName =
+            item.event.meetingName
+        initial.meetingDetails =
+            item.event.meetingDetails ?? ""
+        initial.latitude =
+            item.event.latitude
+        initial.longitude =
+            item.event.longitude
+        initial.maxParticipants =
+            item.event.maxParticipants
+        initial.paceLabel =
+            item.event.paceLabel ?? ""
+        initial.routeID =
+            item.event.routeID
+        initial.routeTitle =
+            item.event.routeTitle
+        initial.routeCoordinates =
+            item.event.routeCoordinates
+        initial.routeDistanceKilometers =
+            item.event
+                .routeDistanceKilometers
+        initial.routeElevationGainMeters =
+            item.event
+                .routeElevationGainMeters
+        initial.routeStartName =
+            item.event.routeStartName
+        initial.routeEndName =
+            item.event.routeEndName
+        initial.coverArtworkName =
+            item.event.coverArtworkName
+        initial.coverImageURL =
+            item.event.coverImageURL
+
+        _draft = State(
+            initialValue: initial
+        )
+        _limitParticipants =
+            State(
+                initialValue:
+                    item.event
+                        .maxParticipants != nil
+            )
+        _maxParticipants =
+            State(
+                initialValue:
+                    item.event
+                        .maxParticipants ?? 20
+            )
+    }
+
+    private var canSave: Bool {
+        !draft.title
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .isEmpty &&
+        !isSaving
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Event",
+                        norwegian: "Arrangement"
+                    )
+                ) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Event name",
+                            norwegian:
+                                "Navn på arrangement"
+                        ),
+                        text: $draft.title
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "Description",
+                            norwegian: "Beskrivelse"
+                        ),
+                        text: $draft.summary,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Activity",
+                            norwegian: "Aktivitet"
+                        ),
+                        selection:
+                            $draft.activityType
+                    ) {
+                        ForEach(
+                            CommunityEventActivity
+                                .allCases
+                        ) { activity in
+                            Label(
+                                activity.title,
+                                systemImage:
+                                    activity
+                                        .systemImage
+                            )
+                            .tag(activity)
+                        }
+                    }
+
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Starts",
+                            norwegian: "Starter"
+                        ),
+                        selection:
+                            $draft.startsAt,
+                        displayedComponents: [
+                            .date,
+                            .hourAndMinute
+                        ]
+                    )
+
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Who can see it",
+                            norwegian:
+                                "Hvem kan se det"
+                        ),
+                        selection:
+                            $draft.visibility
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Public",
+                                norwegian:
+                                    "Offentlig"
+                            )
+                        )
+                        .tag(
+                            ProfileVisibility
+                                .publicProfile
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Friends",
+                                norwegian: "Følgere"
+                            )
+                        )
+                        .tag(
+                            ProfileVisibility
+                                .friends
+                        )
+                    }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Meet",
+                        norwegian: "Oppmøte"
+                    )
+                ) {
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Meeting point",
+                            norwegian: "Møtested"
+                        ),
+                        text:
+                            $draft.meetingName
+                    )
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Meeting details",
+                            norwegian: "Detaljer"
+                        ),
+                        text:
+                            $draft.meetingDetails,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...4)
+
+                    if draft.activityType ==
+                        .running ||
+                        draft.activityType ==
+                        .walking {
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Pace / level",
+                                norwegian:
+                                    "Fart / nivå"
+                            ),
+                            text:
+                                $draft.paceLabel
+                        )
+                    }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Participants",
+                        norwegian: "Deltakere"
+                    )
+                ) {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Limit participants",
+                            norwegian:
+                                "Begrens antall deltakere"
+                        ),
+                        isOn:
+                            $limitParticipants
+                    )
+
+                    if limitParticipants {
+                        Stepper(
+                            value:
+                                $maxParticipants,
+                            in: 2...500
+                        ) {
+                            Text(
+                                ATHLTHLocalization.format(
+                                    english:
+                                        "Maximum %d",
+                                    norwegian:
+                                        "Maks %d",
+                                    maxParticipants
+                                )
+                            )
+                        }
+                    }
+                }
+
+                if item.event.routeID != nil ||
+                    item.event
+                        .routeCoordinates?
+                        .isEmpty == false {
+                    Section {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "The current route is kept when you save.",
+                                norwegian:
+                                    "Gjeldende rute beholdes når du lagrer."
+                            ),
+                            systemImage: "map"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Edit Event",
+                    norwegian:
+                        "Rediger arrangement"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        isSaving
+                            ? ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Saving…",
+                                    norwegian:
+                                        "Lagrer…"
+                                )
+                            : ATHLTHLocalization
+                                .choose(
+                                    english: "Save",
+                                    norwegian: "Lagre"
+                                )
+                    ) {
+                        save()
+                    }
+                    .disabled(!canSave)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        var updated = draft
+        updated.maxParticipants =
+            limitParticipants
+                ? maxParticipants
+                : nil
+
+        let oldMeeting =
+            item.event.meetingName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+        let newMeeting =
+            updated.meetingName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        if oldMeeting != newMeeting {
+            updated.latitude = nil
+            updated.longitude = nil
+        }
+
+        if updated.activityType !=
+            .running &&
+            updated.activityType !=
+            .walking {
+            updated.paceLabel = ""
+            updated.routeID = nil
+            updated.routeTitle = nil
+            updated.routeCoordinates = nil
+            updated.routeDistanceKilometers =
+                nil
+            updated.routeElevationGainMeters =
+                nil
+            updated.routeStartName = nil
+            updated.routeEndName = nil
+        }
+
+        Task {
+            isSaving = true
+            let saved =
+                await community.update(
+                    item,
+                    with: updated
+                )
+            isSaving = false
+
+            if saved {
+                dismiss()
+            }
+        }
     }
 }
 
