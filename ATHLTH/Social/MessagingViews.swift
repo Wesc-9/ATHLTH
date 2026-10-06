@@ -3086,6 +3086,9 @@ struct DirectMessageThreadView: View {
     @State private var isSending = false
     @State private var loadError: String?
     @State private var savedFeedback: String?
+    @State private var requestResponseInFlight = false
+    @State private var requestResponseAccepting: Bool?
+    @State private var requestResponseError: String?
 
     var body: some View {
         ZStack {
@@ -3990,32 +3993,41 @@ struct DirectMessageThreadView: View {
     }
 
     private var incomingRequestBar: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Image(
-                    systemName:
-                        "envelope.badge.fill"
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .vitality
-                )
-                .frame(
-                    width: 36,
-                    height: 36
-                )
-                .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 11,
+        VStack(spacing: 13) {
+            HStack(spacing: 11) {
+                ZStack {
+                    RoundedRectangle(
+                        cornerRadius: 13,
                         style: .continuous
                     )
+                    .fill(
+                        ATHLTHTheme
+                            .vitalitySoft
+                    )
+
+                    Image(
+                        systemName:
+                            "envelope.badge.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+                }
+                .frame(
+                    width: 42,
+                    height: 42
                 )
 
                 VStack(
                     alignment: .leading,
-                    spacing: 2
+                    spacing: 3
                 ) {
                     Text(
                         ATHLTHLocalization.choose(
@@ -4027,7 +4039,11 @@ struct DirectMessageThreadView: View {
                     )
                     .font(
                         .subheadline
-                            .weight(.semibold)
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
                     )
 
                     Text(
@@ -4043,68 +4059,184 @@ struct DirectMessageThreadView: View {
                         ATHLTHTheme
                             .mutedText
                     )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
                 }
 
                 Spacer()
             }
 
-            HStack(spacing: 10) {
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Decline",
-                        norwegian: "Avslå"
+            if let requestResponseError {
+                HStack(spacing: 7) {
+                    Image(
+                        systemName:
+                            "exclamationmark.circle.fill"
                     )
-                ) {
-                    Task {
-                        guard
-                            let conversationID
-                        else {
-                            return
-                        }
 
-                        if await messaging
-                            .respondToMessageRequest(
-                                conversationID,
-                                accept: false
-                            ) {
-                            dismiss()
-                        }
-                    }
+                    Text(
+                        requestResponseError
+                    )
+                    .lineLimit(2)
+
+                    Spacer()
                 }
-                .buttonStyle(.bordered)
-                .frame(
-                    maxWidth: .infinity
+                .font(
+                    .caption
+                        .weight(.medium)
                 )
+                .foregroundStyle(
+                    .red
+                        .opacity(0.82)
+                )
+            }
 
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Accept",
-                        norwegian: "Godta"
+            HStack(spacing: 10) {
+                Button {
+                    respondToIncomingRequest(
+                        accept: false
                     )
-                ) {
-                    Task {
-                        guard
-                            let conversationID
-                        else {
-                            return
+                } label: {
+                    HStack(spacing: 7) {
+                        if requestResponseInFlight &&
+                            requestResponseAccepting == false {
+                            ProgressView()
+                                .tint(
+                                    ATHLTHTheme
+                                        .primaryText
+                                )
+                        } else {
+                            Image(
+                                systemName:
+                                    "xmark"
+                            )
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .bold
+                                )
+                            )
                         }
 
-                        _ = await messaging
-                            .respondToMessageRequest(
-                                conversationID,
-                                accept: true
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Decline",
+                                norwegian: "Avslå"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 48)
+                    .background(
+                        Color.white
+                            .opacity(0.76),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                ATHLTHTheme
+                                    .border,
+                                lineWidth: 0.9
                             )
                     }
                 }
-                .buttonStyle(
-                    .borderedProminent
+                .buttonStyle(.plain)
+                .disabled(
+                    requestResponseInFlight
                 )
-                .tint(
-                    ATHLTHTheme
-                        .vitality
+                .opacity(
+                    requestResponseInFlight &&
+                    requestResponseAccepting == true
+                        ? 0.58
+                        : 1
                 )
-                .frame(
-                    maxWidth: .infinity
+
+                Button {
+                    respondToIncomingRequest(
+                        accept: true
+                    )
+                } label: {
+                    HStack(spacing: 7) {
+                        if requestResponseInFlight &&
+                            requestResponseAccepting == true {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(
+                                systemName:
+                                    "checkmark"
+                            )
+                            .font(
+                                .system(
+                                    size: 14,
+                                    weight: .bold
+                                )
+                            )
+                        }
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Accept",
+                                norwegian: "Godta"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.bold)
+                        )
+                    }
+                    .foregroundStyle(
+                        .white
+                    )
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 48)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme
+                                    .vitality,
+                                ATHLTHTheme
+                                    .accentDeep
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        ),
+                        in: Capsule()
+                    )
+                    .shadow(
+                        color:
+                            ATHLTHTheme
+                                .vitality
+                                .opacity(0.20),
+                        radius: 10,
+                        y: 5
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    requestResponseInFlight
+                )
+                .opacity(
+                    requestResponseInFlight &&
+                    requestResponseAccepting == false
+                        ? 0.58
+                        : 1
                 )
 
                 Menu {
@@ -4115,24 +4247,50 @@ struct DirectMessageThreadView: View {
                         ),
                         role: .destructive
                     ) {
-                        Task {
+                        Task { @MainActor in
                             guard
-                                let conversationID
+                                let conversationID,
+                                !requestResponseInFlight
                             else {
                                 return
                             }
 
-                            _ = await messaging
-                                .respondToMessageRequest(
-                                    conversationID,
-                                    accept: false
+                            requestResponseInFlight =
+                                true
+                            requestResponseError =
+                                nil
+
+                            let declined =
+                                await messaging
+                                    .respondToMessageRequest(
+                                        conversationID,
+                                        accept: false
+                                    )
+
+                            if declined {
+                                await social.block(
+                                    friend.userID
                                 )
-                            await social.block(
-                                friend.userID
-                            )
-                            await messaging
-                                .refresh()
-                            dismiss()
+                                await messaging
+                                    .refresh(
+                                        force: true
+                                    )
+                                dismiss()
+                            } else {
+                                requestResponseError =
+                                    messaging
+                                        .errorMessage ??
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Could not update the request. Try again.",
+                                            norwegian:
+                                                "Kunne ikke oppdatere forespørselen. Prøv igjen."
+                                        )
+                            }
+
+                            requestResponseInFlight =
+                                false
                         }
                     }
                 } label: {
@@ -4140,41 +4298,83 @@ struct DirectMessageThreadView: View {
                         systemName:
                             "ellipsis"
                     )
-                    .frame(
-                        width: 38,
-                        height: 38
+                    .font(
+                        .system(
+                            size: 17,
+                            weight: .bold
+                        )
                     )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .frame(
+                        width: 48,
+                        height: 48
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.76),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                ATHLTHTheme
+                                    .border,
+                                lineWidth: 0.9
+                            )
+                    }
                 }
+                .disabled(
+                    requestResponseInFlight
+                )
             }
         }
         .padding(14)
         .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .background(
             LinearGradient(
                 colors: [
-                    ATHLTHTheme.card,
-                    ATHLTHTheme.cardWarm
-                        .opacity(0.82)
+                    ATHLTHTheme
+                        .card,
+                    ATHLTHTheme
+                        .cardWarm
+                        .opacity(0.90)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
             in: RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 22,
+                cornerRadius: 24,
                 style: .continuous
             )
             .stroke(
-                ATHLTHTheme
-                    .vitality
-                    .opacity(0.13),
-                lineWidth: 0.8
+                Color.white
+                    .opacity(0.78),
+                lineWidth: 0.9
             )
         }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.08),
+            radius: 14,
+            y: 6
+        )
         .padding(
             .horizontal,
             12
@@ -4188,6 +4388,49 @@ struct DirectMessageThreadView: View {
                 .canvasBottom
                 .opacity(0.92)
         )
+    }
+
+    private func respondToIncomingRequest(
+        accept: Bool
+    ) {
+        guard
+            let conversationID,
+            !requestResponseInFlight
+        else {
+            return
+        }
+
+        requestResponseInFlight = true
+        requestResponseAccepting = accept
+        requestResponseError = nil
+
+        Task { @MainActor in
+            let success =
+                await messaging
+                    .respondToMessageRequest(
+                        conversationID,
+                        accept: accept
+                    )
+
+            requestResponseInFlight = false
+            requestResponseAccepting = nil
+
+            guard success else {
+                requestResponseError =
+                    messaging.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Could not update the request. Try again.",
+                        norwegian:
+                            "Kunne ikke oppdatere forespørselen. Prøv igjen."
+                    )
+                return
+            }
+
+            if !accept {
+                dismiss()
+            }
+        }
     }
 
     private var outgoingRequestBar: some View {
