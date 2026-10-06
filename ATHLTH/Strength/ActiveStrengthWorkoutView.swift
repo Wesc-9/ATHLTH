@@ -3224,155 +3224,80 @@ struct ActiveStrengthWorkoutView: View {
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
     ) -> some View {
-        ATHLTHCard {
-            TimelineView(
-                .periodic(
-                    from: .now,
-                    by: 1
-                )
-            ) { context in
-                let completedAt =
-                    exercise.completedAt ??
+        TimelineView(
+            .periodic(
+                from: .now,
+                by: 1
+            )
+        ) { context in
+            let completedAt =
+                exercise.completedAt ??
+                context.date
+            let elapsed =
+                max(
                     context.date
-                let elapsed =
-                    max(
-                        context.date
-                            .timeIntervalSince(
-                                completedAt
-                            ),
-                        0
-                    )
-                let rawRemaining =
-                    strength
-                        .restEndsAt?
                         .timeIntervalSince(
-                            context.date
-                        ) ?? 0
-                let remaining =
-                    max(
-                        rawRemaining,
-                        0
-                    )
-                let overtime =
-                    max(
-                        -rawRemaining,
-                        0
-                    )
+                            completedAt
+                        ),
+                    0
+                )
+            let rawRemaining =
+                strength
+                    .restEndsAt?
+                    .timeIntervalSince(
+                        context.date
+                    ) ?? 0
+            let remaining =
+                max(
+                    rawRemaining,
+                    0
+                )
+            let overtime =
+                max(
+                    -rawRemaining,
+                    0
+                )
+            let hasTimedRest =
+                strength.restEndsAt != nil
 
-                VStack(spacing: 14) {
-                    Image(
-                        systemName:
-                            strength
-                                .hasNextExercise
-                                ? "arrow.right.circle.fill"
-                                : "checkmark.seal.fill"
-                    )
-                    .font(
-                        .system(size: 30)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
-
-                    Text(
-                        strength
-                            .hasNextExercise
-                            ? ATHLTHLocalization.choose(
-                                english:
-                                    "Exercise complete",
-                                norwegian:
-                                    "Øvelse fullført"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english:
-                                    "Workout exercises complete",
-                                norwegian:
-                                    "Alle øvelser fullført"
-                            )
-                    )
-                    .font(
-                        .title3
-                            .weight(.bold)
-                    )
-
-                    if strength
-                        .hasNextExercise {
-                        if remaining > 0 {
-                            VStack(spacing: 4) {
-                                Text(
-                                    remaining
-                                        .clockDuration
-                                )
-                                .font(
-                                    .system(
-                                        size: 48,
-                                        weight: .bold,
-                                        design: .rounded
+            VStack(spacing: 0) {
+                VStack(spacing: 16) {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            ATHLTHTheme
+                                                .premiumGold
+                                                .opacity(0.30),
+                                            ATHLTHTheme
+                                                .vitality
+                                                .opacity(0.16)
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
                                     )
                                 )
-                                .monospacedDigit()
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Programmed rest",
-                                        norwegian:
-                                            "Planlagt pause"
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                            }
-                        } else if strength
-                            .restEndsAt != nil {
-                            VStack(spacing: 4) {
-                                Text(
-                                    "+" +
-                                    overtime
-                                        .clockDuration
-                                )
-                                .font(
-                                    .system(
-                                        size: 48,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                )
-                                .monospacedDigit()
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .premiumGold
+                                .frame(
+                                    width: 48,
+                                    height: 48
                                 )
 
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Extra rest",
-                                        norwegian:
-                                            "Ekstra pause"
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                            }
-                        } else {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Ready when you are",
-                                    norwegian:
-                                        "Klar når du er"
-                                )
+                            Image(
+                                systemName:
+                                    strength
+                                        .hasNextExercise
+                                        ? "arrow.right"
+                                        : "checkmark"
                             )
                             .font(
-                                .headline
+                                .system(
+                                    size: 19,
+                                    weight: .bold
+                                )
                             )
                             .foregroundStyle(
                                 ATHLTHTheme
@@ -3380,7 +3305,123 @@ struct ActiveStrengthWorkoutView: View {
                             )
                         }
 
-                        HStack(spacing: 5) {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                strength
+                                    .hasNextExercise
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Exercise complete",
+                                        norwegian:
+                                            "Øvelse fullført"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english:
+                                            "Workout exercises complete",
+                                        norwegian:
+                                            "Alle øvelser fullført"
+                                    )
+                            )
+                            .font(
+                                .title3
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                            if strength.hasNextExercise {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "The rest is a recommendation — continue whenever you feel ready.",
+                                        norwegian:
+                                            "Pausen er en anbefaling – gå videre når du føler deg klar."
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                                .fixedSize(
+                                    horizontal: false,
+                                    vertical: true
+                                )
+                            }
+                        }
+
+                        Spacer()
+                    }
+
+                    if strength.hasNextExercise {
+                        VStack(spacing: 6) {
+                            Text(
+                                remaining > 0
+                                    ? remaining
+                                        .clockDuration
+                                    : hasTimedRest
+                                        ? "+" +
+                                            overtime
+                                                .clockDuration
+                                        : ATHLTHLocalization.choose(
+                                            english: "Ready",
+                                            norwegian: "Klar"
+                                        )
+                            )
+                            .font(
+                                .system(
+                                    size: 52,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .monospacedDigit()
+                            .foregroundStyle(
+                                remaining > 0
+                                    ? ATHLTHTheme
+                                        .primaryText
+                                    : ATHLTHTheme
+                                        .premiumGold
+                            )
+
+                            Text(
+                                remaining > 0
+                                    ? ATHLTHLocalization.choose(
+                                        english:
+                                            "Recommended rest",
+                                        norwegian:
+                                            "Anbefalt pause"
+                                    )
+                                    : hasTimedRest
+                                        ? ATHLTHLocalization.choose(
+                                            english:
+                                                "Extra rest",
+                                            norwegian:
+                                                "Ekstra pause"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english:
+                                                "Continue when ready",
+                                            norwegian:
+                                                "Fortsett når du er klar"
+                                        )
+                            )
+                            .font(
+                                .caption
+                                    .weight(.semibold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        HStack(spacing: 6) {
                             Image(
                                 systemName:
                                     "stopwatch"
@@ -3403,88 +3444,205 @@ struct ActiveStrengthWorkoutView: View {
                         )
 
                         Button {
+                            // Rest never blocks navigation. Clearing the timer
+                            // first also guarantees that the next exercise
+                            // starts in its normal logging state.
+                            strength.skipRest()
                             strength
                                 .moveToNextExercise()
                         } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Next exercise",
-                                    norwegian:
-                                        "Neste øvelse"
-                                ),
-                                systemImage:
-                                    "arrow.right"
+                            HStack(spacing: 10) {
+                                Image(
+                                    systemName:
+                                        "arrow.right"
+                                )
+                                .font(
+                                    .system(
+                                        size: 16,
+                                        weight: .bold
+                                    )
+                                )
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Next exercise now",
+                                        norwegian:
+                                            "Neste øvelse nå"
+                                    )
+                                )
+                                .font(
+                                    .headline
+                                )
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(
+                                    .caption
+                                        .weight(.bold)
+                                )
+                                .opacity(0.82)
+                            }
+                            .foregroundStyle(
+                                .white
                             )
-                            .font(.headline)
+                            .padding(
+                                .horizontal,
+                                18
+                            )
                             .frame(
                                 maxWidth:
-                                    .infinity
+                                    .infinity,
+                                minHeight: 54
                             )
-                            .frame(height: 52)
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        ATHLTHTheme
+                                            .accentDeep,
+                                        ATHLTHTheme
+                                            .vitality
+                                    ],
+                                    startPoint:
+                                        .leading,
+                                    endPoint:
+                                        .trailing
+                                ),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius: 19,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                            .overlay {
+                                RoundedRectangle(
+                                    cornerRadius: 19,
+                                    style:
+                                        .continuous
+                                )
+                                .stroke(
+                                    Color.white
+                                        .opacity(0.22),
+                                    lineWidth: 1
+                                )
+                            }
+                            .shadow(
+                                color:
+                                    ATHLTHTheme
+                                        .accentDeep
+                                        .opacity(0.16),
+                                radius: 12,
+                                y: 6
+                            )
                         }
-                        .buttonStyle(
-                            .borderedProminent
-                        )
-                        .tint(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-                        // The athlete controls the transition. The button is
-                        // available during the planned rest as well as after it.
-                    } else {
-                        Text(
+                        .buttonStyle(.plain)
+                        .accessibilityHint(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "All planned exercises are complete.",
+                                    "Skips the remaining recommended rest and opens the next exercise.",
                                 norwegian:
-                                    "Alle planlagte øvelser er fullført."
+                                    "Hopper over resten av den anbefalte pausen og åpner neste øvelse."
                             )
                         )
-                        .font(.subheadline)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
+                    } else {
+                        VStack(spacing: 10) {
+                            Image(
+                                systemName:
+                                    "checkmark.seal.fill"
+                            )
+                            .font(.title2)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
 
-                        Button {
-                            showingFinishConfirmation =
-                                true
-                        } label: {
-                            Label(
+                            Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Finish workout",
+                                        "All planned exercises are complete.",
                                     norwegian:
-                                        "Avslutt økten"
-                                ),
-                                systemImage:
-                                    "flag.checkered"
+                                        "Alle planlagte øvelser er fullført."
+                                )
                             )
-                            .font(.headline)
-                            .frame(
-                                maxWidth:
-                                    .infinity
+                            .font(.subheadline)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
                             )
-                            .frame(height: 52)
                         }
-                        .buttonStyle(
-                            .borderedProminent
-                        )
-                        .tint(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
                     }
                 }
-                .frame(
-                    maxWidth: .infinity
+                .padding(20)
+            }
+            .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+            )
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.62),
+                        ATHLTHTheme
+                            .surfaceSage
+                            .opacity(0.26),
+                        ATHLTHTheme
+                            .premiumGoldSoft
+                            .opacity(0.18)
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 28,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 28,
+                    style: .continuous
                 )
-                .padding(
-                    .vertical,
-                    8
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white
+                                .opacity(0.90),
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(0.16),
+                            ATHLTHTheme
+                                .vitality
+                                .opacity(0.12)
+                        ],
+                        startPoint:
+                            .topLeading,
+                        endPoint:
+                            .bottomTrailing
+                    ),
+                    lineWidth: 1
                 )
             }
+            .shadow(
+                color:
+                    ATHLTHTheme
+                        .accentDeep
+                        .opacity(0.07),
+                radius: 20,
+                y: 9
+            )
         }
     }
 
