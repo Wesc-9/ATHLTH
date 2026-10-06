@@ -1666,9 +1666,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                                     url:
                                         profile.avatarURL
                                             .flatMap(
-                                                URL.init(
-                                                    string:
-                                                        )
+                                                URL.init(string:)
                                             ),
                                     fallback:
                                         profile
