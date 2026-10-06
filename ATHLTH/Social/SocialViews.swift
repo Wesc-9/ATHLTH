@@ -1646,16 +1646,14 @@ struct FriendProfileView: View {
     ) -> some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
-                Image("ProfileHero")
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: proxy.size.height
-                    )
-                    .clipped()
+                remoteProfileHeaderImage(
+                    profile.card
+                )
+                .frame(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+                .clipped()
 
                 LinearGradient(
                     stops: [
@@ -1796,6 +1794,50 @@ struct FriendProfileView: View {
         }
         .frame(height: 236)
         .clipped()
+    }
+
+    @ViewBuilder
+    private func remoteProfileHeaderImage(
+        _ profile:
+            SocialProfileCard
+    ) -> some View {
+        if let raw =
+                profile.headerImageURL,
+           let url =
+                URL(string: raw) {
+            ATHLTHStorageImage(
+                url: url,
+                maxPixelSize: 1800
+            ) { phase in
+                switch phase {
+                case .success(
+                    let image
+                ):
+                    image
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFill()
+                default:
+                    Image(
+                        profile
+                            .headerArtworkName ??
+                        "ProfileHero"
+                    )
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                }
+            }
+        } else {
+            Image(
+                profile
+                    .headerArtworkName ??
+                "ProfileHero"
+            )
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+        }
     }
 
     private func relationshipPill(
