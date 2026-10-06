@@ -1102,72 +1102,955 @@ struct ActiveStrengthWorkoutView: View {
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
     ) -> some View {
+        let workoutComplete =
+            workout.exercises
+                .allSatisfy {
+                    $0.isCompleted
+                }
+
         VStack(spacing: 14) {
             focusedWorkoutStatus(
                 workout
             )
 
-            focusedExerciseHero(
-                workout: workout,
-                exercise: exercise
+            if workoutComplete {
+                focusedWorkoutCompletionHero(
+                    workout
+                )
+
+                focusedWorkoutSummaryMetrics(
+                    workout
+                )
+
+                focusedWorkoutRestSummary(
+                    workout
+                )
+
+                focusedWorkoutExerciseReview(
+                    workout
+                )
+
+                Button {
+                    showingFinishConfirmation =
+                        true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Finish workout",
+                            norwegian:
+                                "Avslutt økten"
+                        ),
+                        systemImage:
+                            "flag.checkered"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 56
+                    )
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme
+                                    .accentDeep,
+                                ATHLTHTheme
+                                    .vitality
+                            ],
+                            startPoint:
+                                .leading,
+                            endPoint:
+                                .trailing
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 20,
+                                style:
+                                    .continuous
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            } else {
+                focusedExerciseHero(
+                    workout: workout,
+                    exercise: exercise
+                )
+
+                if let suggestion =
+                        strength
+                            .progressionSuggestion(
+                                for: exercise
+                            ) {
+                    focusedProgressionHint(
+                        suggestion
+                    )
+                }
+
+                if !canLogOnIPhone(
+                    workout
+                ) {
+                    watchInputCompanionCard(
+                        workout: workout
+                    )
+                } else if strength
+                    .currentExerciseAllSetsCompleted {
+                    VStack(spacing: 12) {
+                        focusedExerciseTransition(
+                            workout: workout,
+                            exercise: exercise
+                        )
+
+                        if let latest =
+                                latestCompletedSet(
+                                    in: exercise
+                                ) {
+                            postSetResultButton(
+                                exercise: exercise,
+                                set: latest
+                            )
+                        }
+                    }
+                } else if strength.isResting {
+                    VStack(spacing: 12) {
+                        focusedSetRest(
+                            exercise: exercise
+                        )
+
+                        if let latest =
+                                latestCompletedSet(
+                                    in: exercise
+                                ) {
+                            postSetResultButton(
+                                exercise: exercise,
+                                set: latest
+                            )
+                        }
+                    }
+                } else {
+                    focusedSetEntry(
+                        exercise: exercise
+                    )
+                }
+            }
+        }
+    }
+
+    private func focusedWorkoutCompletionHero(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        ZStack(
+            alignment: .bottomLeading
+        ) {
+            Image(
+                "StrengthPostWorkoutHero"
+            )
+            .resizable()
+            .interpolation(.high)
+            .scaledToFill()
+            .athlthBoundedFill()
+            .frame(height: 190)
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black
+                        .opacity(0.68)
+                ],
+                startPoint: .center,
+                endPoint: .bottom
             )
 
-            if let suggestion =
-                    strength
-                        .progressionSuggestion(
-                            for: exercise
-                        ) {
-                focusedProgressionHint(
-                    suggestion
+            VStack(
+                alignment: .leading,
+                spacing: 5
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Workout complete",
+                        norwegian:
+                            "Økten er gjennomført"
+                    ),
+                    systemImage:
+                        "checkmark.seal.fill"
+                )
+                .font(
+                    .caption.weight(.bold)
+                )
+                .foregroundStyle(
+                    .white.opacity(0.86)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Review before saving",
+                        norwegian:
+                            "Se gjennom før du lagrer"
+                    )
+                )
+                .font(
+                    .title2.weight(.bold)
+                )
+                .foregroundStyle(.white)
+
+                Text(
+                    ATHLTHLocalization.format(
+                        english:
+                            "%d exercises · %d working sets",
+                        norwegian:
+                            "%d øvelser · %d arbeidssett",
+                        workout.exercises.count,
+                        workout.totalWorkingSets
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .white.opacity(0.82)
                 )
             }
+            .padding(16)
+        }
+        .frame(height: 190)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.45),
+                lineWidth: 0.8
+            )
+        }
+    }
 
-            if !canLogOnIPhone(
-                workout
-            ) {
-                watchInputCompanionCard(
-                    workout: workout
+    private func focusedWorkoutSummaryMetrics(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        TimelineView(
+            .periodic(
+                from: .now,
+                by: 1
+            )
+        ) { context in
+            let totalDuration =
+                max(
+                    context.date
+                        .timeIntervalSince(
+                            workout.startedAt
+                        ),
+                    0
                 )
-            } else if strength
-                .currentExerciseAllSetsCompleted {
-                VStack(spacing: 12) {
-                    focusedExerciseTransition(
-                        workout: workout,
-                        exercise: exercise
-                    )
+            let restDuration =
+                workout
+                    .totalActualRestSeconds
+            let activeDuration =
+                max(
+                    totalDuration -
+                    restDuration,
+                    0
+                )
 
-                    if let latest =
-                            latestCompletedSet(
-                                in: exercise
-                            ) {
-                        postSetResultButton(
-                            exercise: exercise,
-                            set: latest
-                        )
-                    }
-                }
-            } else if strength.isResting {
-                VStack(spacing: 12) {
-                    focusedSetRest(
-                        exercise: exercise
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .flexible(),
+                        spacing: 10
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 10
                     )
+                ],
+                spacing: 10
+            ) {
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Total time",
+                            norwegian:
+                                "Total tid"
+                        ),
+                    value:
+                        totalDuration
+                            .clockDuration,
+                    icon: "clock.fill"
+                )
 
-                    if let latest =
-                            latestCompletedSet(
-                                in: exercise
-                            ) {
-                        postSetResultButton(
-                            exercise: exercise,
-                            set: latest
-                        )
-                    }
-                }
-            } else {
-                focusedSetEntry(
-                    exercise: exercise
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Active time",
+                            norwegian:
+                                "Aktiv tid"
+                        ),
+                    value:
+                        activeDuration
+                            .clockDuration,
+                    icon: "bolt.fill"
+                )
+
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Rest",
+                            norwegian: "Pause"
+                        ),
+                    value:
+                        restDuration
+                            .clockDuration,
+                    icon:
+                        "pause.circle.fill"
+                )
+
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Volume",
+                            norwegian: "Volum"
+                        ),
+                    value:
+                        formatWorkoutVolume(
+                            workout
+                                .totalVolumeKilograms
+                        ),
+                    icon: "scalemass.fill"
+                )
+
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Reps",
+                            norwegian:
+                                "Repetisjoner"
+                        ),
+                    value:
+                        "\(workout.totalCompletedReps)",
+                    icon: "repeat"
+                )
+
+                completionMetric(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Working sets",
+                            norwegian:
+                                "Arbeidssett"
+                        ),
+                    value:
+                        "\(workout.totalWorkingSets)",
+                    icon: "list.number"
                 )
             }
         }
+    }
+
+    private func completionMetric(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            HStack(spacing: 6) {
+                Image(
+                    systemName: icon
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+
+                Text(title)
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+            }
+
+            Text(value)
+                .font(
+                    .title3
+                        .monospacedDigit()
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(14)
+        .background(
+            .ultraThinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func focusedWorkoutRestSummary(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        let rests =
+            workout.exercises
+                .flatMap { exercise in
+                    exercise.sets
+                        .compactMap {
+                            $0.actualRestAfterSeconds
+                        }
+                }
+
+        if !rests.isEmpty {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Rest overview",
+                            norwegian:
+                                "Pauseoversikt"
+                        ),
+                        systemImage:
+                            "stopwatch.fill"
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "%d rests",
+                            norwegian:
+                                "%d pauser",
+                            rests.count
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    restSummaryPill(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Average",
+                                norwegian:
+                                    "Snitt"
+                            ),
+                        value:
+                            workout
+                                .averageActualRestSeconds
+                                .clockDuration
+                    )
+
+                    restSummaryPill(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Longest",
+                                norwegian:
+                                    "Lengste"
+                            ),
+                        value:
+                            workout
+                                .longestActualRestSeconds
+                                .clockDuration
+                    )
+                }
+
+                ForEach(
+                    workout.exercises
+                ) { exercise in
+                    let exerciseRests =
+                        exercise.sets
+                            .compactMap {
+                                $0.actualRestAfterSeconds
+                            }
+
+                    if !exerciseRests.isEmpty {
+                        HStack {
+                            Text(
+                                exercise.exercise
+                                    .displayName
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .lineLimit(1)
+
+                            Spacer()
+
+                            Text(
+                                exerciseRests
+                                    .map {
+                                        $0.clockDuration
+                                    }
+                                    .joined(
+                                        separator: " · "
+                                    )
+                            )
+                            .font(
+                                .caption
+                                    .monospacedDigit()
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(
+                .ultraThinMaterial,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 22,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme.vitality
+                        .opacity(0.12),
+                    lineWidth: 1
+                )
+            }
+        }
+    }
+
+    private func restSummaryPill(
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 3
+        ) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+            Text(value)
+                .font(
+                    .headline
+                        .monospacedDigit()
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(12)
+        .background(
+            ATHLTHTheme
+                .surfaceSage
+                .opacity(0.55),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func focusedWorkoutExerciseReview(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 12
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Exercise results",
+                            norwegian:
+                                "Øvelsesresultater"
+                        )
+                    )
+                    .font(.headline)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Tap a set to correct reps, weight or load splits before saving.",
+                            norwegian:
+                                "Trykk på et sett for å rette reps, vekt eller belastningsendringer før du lagrer."
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+            }
+
+            ForEach(
+                workout.exercises
+            ) { exercise in
+                completionExerciseCard(
+                    exercise
+                )
+            }
+        }
+    }
+
+    private func completionExerciseCard(
+        _ exercise:
+            StrengthExerciseLog
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 10
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        exercise.exercise
+                            .displayName
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+
+                    Text(
+                        ATHLTHLocalization.format(
+                            english:
+                                "%d completed sets",
+                            norwegian:
+                                "%d fullførte sett",
+                            exercise.sets
+                                .filter {
+                                    $0.isCompleted
+                                }
+                                .count
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                }
+
+                Spacer()
+
+                let volume =
+                    exercise.sets
+                        .reduce(0.0) {
+                            $0 +
+                            $1.volumeKilograms
+                        }
+
+                if volume > 0 {
+                    Text(
+                        formatWorkoutVolume(
+                            volume
+                        )
+                    )
+                    .font(
+                        .caption
+                            .monospacedDigit()
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+            }
+
+            Divider()
+
+            ForEach(
+                exercise.sets.filter {
+                    $0.isCompleted
+                }
+            ) { set in
+                Button {
+                    editingSetResult =
+                        StrengthSetResultEditTarget(
+                            exerciseID:
+                                exercise.id,
+                            exerciseName:
+                                exercise.exercise
+                                    .displayName,
+                            exercise:
+                                exercise.exercise,
+                            set: set
+                        )
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(
+                            "\(set.setNumber)"
+                        )
+                        .font(
+                            .caption
+                                .monospacedDigit()
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+                        .frame(
+                            width: 28,
+                            height: 28
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft,
+                            in: Circle()
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                strengthSetResultText(
+                                    set
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                            if let rest =
+                                    set
+                                        .actualRestAfterSeconds {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Rest after set: \(rest.clockDuration)",
+                                        norwegian:
+                                            "Pause etter sett: \(rest.clockDuration)"
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .mutedText
+                                )
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(
+                            systemName:
+                                "pencil"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .frame(
+                            width: 32,
+                            height: 32
+                        )
+                        .background(
+                            Color.white
+                                .opacity(0.62),
+                            in: Circle()
+                        )
+                    }
+                    .contentShape(
+                        Rectangle()
+                    )
+                }
+                .buttonStyle(.plain)
+
+                if set.id !=
+                    exercise.sets
+                        .filter({
+                            $0.isCompleted
+                        })
+                        .last?
+                        .id {
+                    Divider()
+                }
+            }
+        }
+        .padding(15)
+        .background(
+            .ultraThinMaterial,
+            in:
+                RoundedRectangle(
+                    cornerRadius: 20,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.72),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func strengthSetResultText(
+        _ set: StrengthSetLog
+    ) -> String {
+        if let segments =
+                set.effortSegments,
+           segments.count > 1 {
+            let parts =
+                segments.compactMap {
+                    segment -> String? in
+
+                    guard let reps =
+                            segment.reps
+                    else {
+                        return nil
+                    }
+
+                    if let weight =
+                            segment
+                                .weightKilograms {
+                        return
+                            "\(reps)×\(formatWeight(weight)) kg"
+                    }
+
+                    return "\(reps) reps"
+                }
+
+            if !parts.isEmpty {
+                return parts.joined(
+                    separator: " + "
+                )
+            }
+        }
+
+        if set.resolvedTargetKind ==
+            .time {
+            return
+                TimeInterval(
+                    set.resolvedCompletedDurationSeconds ??
+                    0
+                )
+                .clockDuration
+        }
+
+        let reps =
+            set.resolvedCompletedReps ??
+            0
+
+        if set.resolvedLoadKind ==
+            .resistanceLevel {
+            return
+                ATHLTHLocalization.choose(
+                    english:
+                        "\(reps) reps · level \(set.completedResistanceLevel ?? set.plannedResistanceLevel ?? 0)",
+                    norwegian:
+                        "\(reps) reps · steg \(set.completedResistanceLevel ?? set.plannedResistanceLevel ?? 0)"
+                )
+        }
+
+        if let weight =
+                set.completedWeightKilograms {
+            return
+                "\(reps) × " +
+                formatWeight(weight) +
+                " kg"
+        }
+
+        return "\(reps) reps"
+    }
+
+    private func formatWorkoutVolume(
+        _ value: Double
+    ) -> String {
+        if value >= 1_000 {
+            let tonnes =
+                value / 1_000
+            return
+                String(
+                    format: "%.1f t",
+                    tonnes
+                )
+        }
+
+        return
+            formatWeight(value) +
+            " kg"
     }
 
     private func focusedWorkoutStatus(

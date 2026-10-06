@@ -282,6 +282,10 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     // 8 reps @ 10 kg + 2 reps @ 8 kg in the same planned 10-rep set.
     var effortSegments: [StrengthSetEffortSegment]? = nil
 
+    // Actual time from set completion until the athlete explicitly continues.
+    // Optional keeps older workout history fully decodable.
+    var actualRestAfterSeconds: TimeInterval? = nil
+
     var resolvedLoadKind: StrengthExerciseLoadKind {
         loadKind ??
             (plannedResistanceLevel != nil ||
@@ -557,6 +561,50 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
             .reduce(0) {
                 $0 + $1.volumeKilograms
             }
+    }
+
+    var totalCompletedReps: Int {
+        exercises
+            .flatMap(\.sets)
+            .compactMap {
+                $0.resolvedCompletedReps
+            }
+            .reduce(0, +)
+    }
+
+    var totalActualRestSeconds: TimeInterval {
+        exercises
+            .flatMap(\.sets)
+            .compactMap {
+                $0.actualRestAfterSeconds
+            }
+            .reduce(0, +)
+    }
+
+    var longestActualRestSeconds: TimeInterval {
+        exercises
+            .flatMap(\.sets)
+            .compactMap {
+                $0.actualRestAfterSeconds
+            }
+            .max() ?? 0
+    }
+
+    var averageActualRestSeconds: TimeInterval {
+        let values =
+            exercises
+                .flatMap(\.sets)
+                .compactMap {
+                    $0.actualRestAfterSeconds
+                }
+
+        guard !values.isEmpty else {
+            return 0
+        }
+
+        return
+            values.reduce(0, +) /
+            Double(values.count)
     }
 
     var isFinished: Bool {

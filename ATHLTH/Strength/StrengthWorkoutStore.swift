@@ -11,6 +11,7 @@ final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var currentExerciseIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var currentSetIndex = 0 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var restEndsAt: Date? { didSet { scheduleCheckpointPersist() } }
+    @Published private(set) var restStartedAt: Date? { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftReps = 8 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftDurationSeconds = 60 { didSet { scheduleCheckpointPersist() } }
     @Published private(set) var draftWeightKilograms = 20.0 { didSet { scheduleCheckpointPersist() } }
@@ -61,6 +62,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var exerciseIndex: Int
         var setIndex: Int
         var restEndsAt: Date?
+        var restStartedAt: Date? = nil
         var reps: Int
         var durationSeconds: Int? = nil
         var weight: Double
@@ -114,6 +116,8 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = checkpoint?.exerciseIndex ?? 0
         currentSetIndex = checkpoint?.setIndex ?? 0
         restEndsAt = checkpoint?.restEndsAt
+        restStartedAt =
+            checkpoint?.restStartedAt
         draftReps = checkpoint?.reps ?? 8
         draftDurationSeconds =
             checkpoint?.durationSeconds ?? 60
@@ -166,6 +170,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 exerciseIndex: currentExerciseIndex,
                 setIndex: currentSetIndex,
                 restEndsAt: restEndsAt,
+                restStartedAt:
+                    restStartedAt,
                 reps: draftReps,
                 durationSeconds: draftDurationSeconds,
                 weight: draftWeightKilograms,
@@ -991,6 +997,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        restStartedAt = nil
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
     }
@@ -1213,6 +1220,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        restStartedAt = nil
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
     }
@@ -1383,6 +1391,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        restStartedAt = nil
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
     }
@@ -1529,28 +1538,40 @@ final class StrengthWorkoutStore: ObservableObject {
             // the next exercise. We keep the current exercise selected until
             // "Ready for next exercise" is tapped so transition time can be
             // measured accurately.
-            restEndsAt =
-                hasNextExercise &&
+            if hasNextExercise &&
                 automaticRestTimer &&
-                resolvedRestSeconds > 0
-                    ? Date()
+                resolvedRestSeconds > 0 {
+                let restStart = Date()
+                restStartedAt =
+                    restStart
+                restEndsAt =
+                    restStart
                         .addingTimeInterval(
                             TimeInterval(
                                 resolvedRestSeconds
                             )
                         )
-                    : nil
+            } else {
+                restStartedAt = nil
+                restEndsAt = nil
+            }
         } else {
-            restEndsAt =
-                automaticRestTimer &&
-                resolvedRestSeconds > 0
-                    ? Date()
+            if automaticRestTimer &&
+                resolvedRestSeconds > 0 {
+                let restStart = Date()
+                restStartedAt =
+                    restStart
+                restEndsAt =
+                    restStart
                         .addingTimeInterval(
                             TimeInterval(
                                 resolvedRestSeconds
                             )
                         )
-                    : nil
+            } else {
+                restStartedAt = nil
+                restEndsAt = nil
+            }
             advanceSetIndex(
                 in:
                     workout.exercises[
@@ -2142,6 +2163,7 @@ final class StrengthWorkoutStore: ObservableObject {
             insertionIndex
         currentSetIndex = 0
         restEndsAt = nil
+        restStartedAt = nil
         activeWorkout = workout
         reloadDraftFromCurrentSet()
     }
@@ -2333,6 +2355,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 nextSameRound
             currentSetIndex =
                 completedSetIndex
+            restStartedAt = nil
             restEndsAt = nil
             return true
         }
@@ -2348,16 +2371,22 @@ final class StrengthWorkoutStore: ObservableObject {
                 currentExerciseIndex = index
                 currentSetIndex =
                     nextSetIndex
-                restEndsAt =
-                    automaticRestTimer &&
-                    restSeconds > 0
-                        ? Date()
+                if automaticRestTimer &&
+                    restSeconds > 0 {
+                    let restStart = Date()
+                    restStartedAt =
+                        restStart
+                    restEndsAt =
+                        restStart
                             .addingTimeInterval(
                                 TimeInterval(
                                     restSeconds
                                 )
                             )
-                        : nil
+                } else {
+                    restStartedAt = nil
+                    restEndsAt = nil
+                }
                 return true
             }
         }
@@ -2396,15 +2425,103 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func skipRest() {
+        finalizeActualRestIfNeeded()
+        restStartedAt = nil
         restEndsAt = nil
     }
 
     func addRest(seconds: Int) {
-        let base = max(restEndsAt ?? Date(), Date())
-        restEndsAt = base.addingTimeInterval(TimeInterval(max(seconds, 0)))
+        let now = Date()
+        if restStartedAt == nil {
+            restStartedAt = now
+        }
+
+        let base =
+            max(
+                restEndsAt ?? now,
+                now
+            )
+        restEndsAt =
+            base.addingTimeInterval(
+                TimeInterval(
+                    max(seconds, 0)
+                )
+            )
+    }
+
+    private func finalizeActualRestIfNeeded() {
+        guard
+            let restStartedAt,
+            var workout = activeWorkout
+        else {
+            return
+        }
+
+        var candidate:
+            (
+                exerciseIndex: Int,
+                setIndex: Int,
+                completedAt: Date
+            )?
+
+        for exerciseIndex in
+            workout.exercises.indices {
+            for setIndex in
+                workout.exercises[
+                    exerciseIndex
+                ].sets.indices {
+                let set =
+                    workout.exercises[
+                        exerciseIndex
+                    ].sets[setIndex]
+
+                guard
+                    let completedAt =
+                        set.completedAt,
+                    set.actualRestAfterSeconds ==
+                        nil
+                else {
+                    continue
+                }
+
+                if candidate == nil ||
+                    completedAt >
+                        candidate!.completedAt {
+                    candidate = (
+                        exerciseIndex:
+                            exerciseIndex,
+                        setIndex:
+                            setIndex,
+                        completedAt:
+                            completedAt
+                    )
+                }
+            }
+        }
+
+        guard let candidate else {
+            return
+        }
+
+        workout.exercises[
+            candidate.exerciseIndex
+        ].sets[
+            candidate.setIndex
+        ].actualRestAfterSeconds =
+            max(
+                Date()
+                    .timeIntervalSince(
+                        restStartedAt
+                    ),
+                0
+            )
+
+        activeWorkout = workout
     }
 
     func moveToNextExercise() {
+        finalizeActualRestIfNeeded()
+        restStartedAt = nil
         guard
             var workout = activeWorkout,
             workout.exercises.indices
@@ -2481,6 +2598,10 @@ final class StrengthWorkoutStore: ObservableObject {
         averageHeartRate: Double? = nil,
         maxHeartRate: Double? = nil
     ) {
+        finalizeActualRestIfNeeded()
+        restStartedAt = nil
+        restEndsAt = nil
+
         guard var workout = activeWorkout else { return }
 
         workout.endedAt =
@@ -2509,6 +2630,7 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = nil
         recoveredCheckpointSavedAt = nil
         restEndsAt = nil
+        restStartedAt = nil
         currentExerciseIndex = 0
         currentSetIndex = 0
         draftReps = 8
@@ -2545,6 +2667,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
+        restStartedAt = nil
         draftReps = 8
         draftDurationSeconds = 60
         draftWeightKilograms = 20
