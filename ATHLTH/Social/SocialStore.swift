@@ -3006,6 +3006,7 @@ final class SocialStore: ObservableObject {
                     title: event.localizedTitle,
                     message: event.localizedMessage,
                     createdAt: event.createdAt,
+                    readAt: event.readAt,
                     challengeID: event.entityType == "challenge"
                         ? event.entityID
                         : nil,
