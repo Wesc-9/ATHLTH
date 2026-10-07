@@ -10928,101 +10928,8 @@ struct CommunityGroupDetailView: View {
                 .background(.ultraThinMaterial)
             }
 
-            if let pendingChatImageData,
-               let preview =
-                    UIImage(
-                        data:
-                            pendingChatImageData
-                    ) {
-                HStack(spacing: 11) {
-                    Image(uiImage: preview)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(
-                            width: 72,
-                            height: 72
-                        )
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 14,
-                                style: .continuous
-                            )
-                        )
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text(
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Photo attached",
-                                    norwegian:
-                                        "Bilde lagt ved"
-                                )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-
-                        Text(
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Add a message or send the photo as it is.",
-                                    norwegian:
-                                        "Skriv en melding eller send bildet som det er."
-                                )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                    }
-
-                    Spacer()
-
-                    Button {
-                        pendingChatImageData =
-                            nil
-                    } label: {
-                        Image(
-                            systemName:
-                                "xmark"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-                        .frame(
-                            width: 32,
-                            height: 32
-                        )
-                        .background(
-                            Color.white
-                                .opacity(0.90),
-                            in: Circle()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(
-                        sendingGroupMessage
-                    )
-                }
-                .padding(
-                    .horizontal,
-                    14
-                )
-                .padding(.top, 9)
-                .frame(maxWidth: 760)
-                .frame(maxWidth: .infinity)
-                .background(
-                    .ultraThinMaterial
-                )
+            if pendingChatImageData != nil {
+                chatAttachmentPreview
             }
 
             HStack(alignment: .bottom, spacing: 9) {
@@ -11191,6 +11098,90 @@ struct CommunityGroupDetailView: View {
                 )
             }
         }
+    }
+
+    private var chatAttachmentPreviewImage: UIImage {
+        guard
+            let data = pendingChatImageData,
+            let image = UIImage(data: data)
+        else {
+            return UIImage()
+        }
+
+        return image
+    }
+
+    private var chatAttachmentPreview: some View {
+        HStack(spacing: 11) {
+            Image(uiImage: chatAttachmentPreviewImage)
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    width: 72,
+                    height: 72
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Photo attached",
+                        norwegian: "Bilde lagt ved"
+                    )
+                )
+                .font(
+                    .subheadline.weight(.semibold)
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Add a message or send the photo as it is.",
+                        norwegian:
+                            "Skriv en melding eller send bildet som det er."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+
+            Button {
+                pendingChatImageData = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .frame(
+                        width: 32,
+                        height: 32
+                    )
+                    .background(
+                        Color.white.opacity(0.90),
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(sendingGroupMessage)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 9)
+        .frame(maxWidth: 760)
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
     }
 
     private func sendGroupMessage() async {
