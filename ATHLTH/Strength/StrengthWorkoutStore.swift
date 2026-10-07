@@ -1184,7 +1184,16 @@ final class StrengthWorkoutStore: ObservableObject {
                                         isWarmUp:
                                             set.isWarmUp
                                     )
-                                }
+                                },
+                            isCompleted:
+                                item.isCompleted,
+                            firstPendingSetIndex:
+                                item.sets
+                                    .firstIndex(
+                                        where: {
+                                            !$0.isCompleted
+                                        }
+                                    )
                         )
                     },
             startedAt:
