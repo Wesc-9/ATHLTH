@@ -8896,6 +8896,27 @@ struct PlannedExerciseEditorView: View {
 
             Divider()
 
+            if useIndividualSetTargets {
+                Toggle(
+                    loadKind == .resistanceLevel
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Plan resistance per set",
+                            norwegian:
+                                "Planlegg motstand per sett"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Plan weight per set",
+                            norwegian:
+                                "Planlegg vekt per sett"
+                        ),
+                    isOn: $useLoadTarget
+                )
+
+                Divider()
+            }
+
             HStack {
                 VStack(
                     alignment: .leading,
