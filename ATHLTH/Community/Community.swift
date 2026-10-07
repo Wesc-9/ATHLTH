@@ -2966,88 +2966,96 @@ struct CommunityEventDetailView: View {
             .tint(ATHLTHTheme.vitality)
             .padding(.top, 4)
         } else if community.isJoined(item) {
-            HStack(spacing: 10) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Going",
-                        norwegian: "Deltar"
-                    ),
-                    systemImage:
-                        "checkmark.circle.fill"
-                )
-                .font(
-                    .subheadline.weight(.semibold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: 42
-                )
-                .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
-                    in: Capsule()
-                )
-
-                Menu {
-                    Button {
-                        Task {
-                            await community.maybe(
+            VStack(spacing: 7) {
+                Button {
+                    Task {
+                        if hasMeetingCoordinate(
+                            item
+                        ) {
+                            await verifyAndCheckIn(
+                                item,
+                                automatic: false
+                            )
+                        } else {
+                            await manualCheckIn(
                                 item
                             )
                         }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Maybe",
-                                norwegian: "Kanskje"
-                            ),
-                            systemImage:
-                                "questionmark.circle"
-                        )
-                    }
-
-                    Button(
-                        role: .destructive
-                    ) {
-                        Task {
-                            await community.leave(
-                                item
-                            )
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Can't go",
-                                norwegian:
-                                    "Kan ikke delta"
-                            ),
-                            systemImage:
-                                "xmark.circle"
-                        )
                     }
                 } label: {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Change response",
-                            norwegian:
-                                "Endre svar"
-                        ),
+                        community.isCheckedIn(
+                            item
+                        )
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Checked in",
+                                norwegian:
+                                    "Sjekket inn"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Check in",
+                                norwegian:
+                                    "Innsjekk"
+                            ),
                         systemImage:
-                            "ellipsis.circle"
+                            community.isCheckedIn(
+                                item
+                            )
+                                ? "checkmark.seal.fill"
+                                : "mappin.and.ellipse"
                     )
                     .font(
-                        .caption.weight(.semibold)
+                        .headline.weight(
+                            .semibold
+                        )
                     )
                     .frame(
-                        minHeight: 42
+                        maxWidth:
+                            .infinity,
+                        minHeight: 44
                     )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    community.isCheckedIn(
+                        item
+                    )
+                        ? ATHLTHTheme
+                            .vitality
+                        : (
+                            canCheckInNow(
+                                item
+                            )
+                                ? ATHLTHTheme
+                                    .vitality
+                                : Color.gray
+                        )
+                )
+                .disabled(
+                    community.isCheckedIn(
+                        item
+                    ) ||
+                    !canCheckInNow(
+                        item
+                    )
+                )
+
+                if !community
+                    .isCheckedIn(item) {
+                    Text(
+                        checkInAvailabilityText(
+                            item
+                        )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                }
             }
             .padding(.top, 4)
         } else {
