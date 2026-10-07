@@ -448,7 +448,9 @@ struct WorkoutStartOptionsView: View {
             }
             .sheet(item: $exerciseBeingEdited) { exercise in
                 PlannedExerciseEditorView(
-                    exercise: exercise
+                    exercise: exercise,
+                    advancedMode:
+                        trackingMode == .advanced
                 ) { updated in
                     if let index =
                         configuredExercises
