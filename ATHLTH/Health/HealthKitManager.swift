@@ -74,6 +74,11 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
     @Published private(set) var authorizationReviewNeeded = false
 
+    // True only for the one-time safe-launch migration path. If the previous
+    // process actually died during a Health refresh, keep the stricter
+    // next-launch recovery behavior to avoid recreating a crash loop.
+    private var canResumeDeferredHealthWorkThisLaunch = false
+
     var hasTrainingHealthData: Bool {
         !workouts.isEmpty ||
         sleep.totalAsleep > 0 ||
@@ -229,6 +234,8 @@ final class HealthKitManager: ObservableObject {
 
         automaticRefreshSuspended = shouldUseSafeLaunch
         deferFullRefreshUntilNextLaunch = shouldUseSafeLaunch
+        canResumeDeferredHealthWorkThisLaunch =
+            needsSafeLaunchMigration && !interruptedRefresh
 
         // A process termination during a Health refresh must never create an
         // endless crash loop. The next launch starts with automatic Health
@@ -1242,6 +1249,30 @@ final class HealthKitManager: ObservableObject {
     func resumeAutomaticRefresh() {
         automaticRefreshSuspended = false
         UserDefaults.standard.set(false, forKey: refreshInProgressKey)
+    }
+
+    @discardableResult
+    func resumeDeferredHealthWorkAfterStableLaunch() -> Bool {
+        guard canResumeDeferredHealthWorkThisLaunch else {
+            // Preserve the strict crash-recovery path: clear only the
+            // automatic-refresh latch, while the full-refresh deferral remains
+            // in force until the next clean launch.
+            resumeAutomaticRefresh()
+            return false
+        }
+
+        canResumeDeferredHealthWorkThisLaunch = false
+        automaticRefreshSuspended = false
+        deferFullRefreshUntilNextLaunch = false
+
+        let defaults = UserDefaults.standard
+        defaults.set(false, forKey: refreshInProgressKey)
+        defaults.set(
+            currentSafeRefreshVersion,
+            forKey: safeRefreshVersionKey
+        )
+        objectWillChange.send()
+        return true
     }
 
     func resumeUserInitiatedHealthSync() {
