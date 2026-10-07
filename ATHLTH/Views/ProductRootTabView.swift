@@ -11559,8 +11559,8 @@ struct ATHLTHProfileView: View {
                                 )
                             )
                             .offset(
-                                x: 7,
-                                y: 7
+                                x: 4,
+                                y: 4
                             )
                         }
 
