@@ -6910,7 +6910,13 @@ struct SessionEditorView: View {
                             targetRIR:
                                 $0.targetRIR,
                             isWarmUp:
-                                $0.isWarmUp
+                                $0.isWarmUp,
+                            setType:
+                                $0.setType,
+                            tempo:
+                                $0.tempo,
+                            notes:
+                                $0.notes
                         )
                     }
             )
@@ -7297,7 +7303,13 @@ struct SessionEditorView: View {
                             targetRIR:
                                 $0.targetRIR,
                             isWarmUp:
-                                $0.isWarmUp
+                                $0.isWarmUp,
+                            setType:
+                                $0.setType,
+                            tempo:
+                                $0.tempo,
+                            notes:
+                                $0.notes
                         )
                     }
             )
@@ -9147,6 +9159,16 @@ struct PlannedExerciseEditorView: View {
                                         binding.wrappedValue
                                     target.isWarmUp =
                                         value
+
+                                    if value {
+                                        target.setType =
+                                            .warmUp
+                                    } else if target.setType ==
+                                        .warmUp {
+                                        target.setType =
+                                            .work
+                                    }
+
                                     binding.wrappedValue =
                                         target
                                 }
@@ -9364,6 +9386,12 @@ struct PlannedExerciseEditorView: View {
                     )
                 }
             }
+
+            if advancedMode {
+                advancedSetDetails(
+                    target: binding
+                )
+            }
         }
         .padding(12)
         .background(
@@ -9391,6 +9419,297 @@ struct PlannedExerciseEditorView: View {
                 lineWidth: 0.8
             )
         }
+    }
+
+    private func advancedSetDetails(
+        target:
+            Binding<PlannedExerciseSetTarget>
+    ) -> some View {
+        DisclosureGroup {
+            VStack(
+                alignment: .leading,
+                spacing: 11
+            ) {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 2
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Set type",
+                                norwegian: "Settype"
+                            )
+                        )
+                        .font(.caption.weight(.semibold))
+
+                        Text(
+                            (
+                                target
+                                    .wrappedValue
+                                    .setType ??
+                                (
+                                    target
+                                        .wrappedValue
+                                        .isWarmUp == true
+                                        ? PlannedStrengthSetType
+                                            .warmUp
+                                        : .work
+                                )
+                            )
+                            .title
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Menu {
+                        ForEach(
+                            PlannedStrengthSetType
+                                .allCases
+                        ) { type in
+                            Button {
+                                var updated =
+                                    target
+                                        .wrappedValue
+                                updated.setType =
+                                    type
+                                updated.isWarmUp =
+                                    type == .warmUp
+                                target.wrappedValue =
+                                    updated
+                            } label: {
+                                Label(
+                                    type.title,
+                                    systemImage:
+                                        type.systemImage
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(
+                                (
+                                    target
+                                        .wrappedValue
+                                        .setType ??
+                                    (
+                                        target
+                                            .wrappedValue
+                                            .isWarmUp ==
+                                            true
+                                            ? PlannedStrengthSetType
+                                                .warmUp
+                                            : .work
+                                    )
+                                )
+                                .title
+                            )
+
+                            Image(
+                                systemName:
+                                    "chevron.down"
+                            )
+                            .font(.caption2.bold())
+                        }
+                        .font(
+                            .caption.weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .padding(
+                            .horizontal,
+                            10
+                        )
+                        .frame(height: 34)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Capsule()
+                        )
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Tempo",
+                                norwegian: "Tempo"
+                            )
+                        )
+                        .font(.caption.weight(.semibold))
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Eccentric · pause · concentric · top",
+                                norwegian:
+                                    "Ned · pause · opp · topp"
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    TextField(
+                        "3-1-1-0",
+                        text:
+                            Binding(
+                                get: {
+                                    target
+                                        .wrappedValue
+                                        .tempo ??
+                                    ""
+                                },
+                                set: { value in
+                                    var updated =
+                                        target
+                                            .wrappedValue
+                                    let trimmed =
+                                        value
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
+                                            )
+                                    updated.tempo =
+                                        trimmed.isEmpty
+                                            ? nil
+                                            : trimmed
+                                    target
+                                        .wrappedValue =
+                                        updated
+                                }
+                            )
+                    )
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(
+                        .trailing
+                    )
+                    .font(
+                        .subheadline
+                        .monospacedDigit()
+                        .weight(.semibold)
+                    )
+                    .frame(width: 88)
+                    .padding(
+                        .horizontal,
+                        9
+                    )
+                    .frame(height: 34)
+                    .background(
+                        Color.black.opacity(0.025),
+                        in: RoundedRectangle(
+                            cornerRadius: 9,
+                            style: .continuous
+                        )
+                    )
+                }
+
+                Divider()
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 5
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Set note",
+                            norwegian: "Notat for settet"
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Optional cue for this set",
+                            norwegian:
+                                "Valgfri beskjed for akkurat dette settet"
+                        ),
+                        text:
+                            Binding(
+                                get: {
+                                    target
+                                        .wrappedValue
+                                        .notes ??
+                                    ""
+                                },
+                                set: { value in
+                                    var updated =
+                                        target
+                                            .wrappedValue
+                                    let trimmed =
+                                        value
+                                            .trimmingCharacters(
+                                                in:
+                                                    .whitespacesAndNewlines
+                                            )
+                                    updated.notes =
+                                        trimmed.isEmpty
+                                            ? nil
+                                            : trimmed
+                                    target
+                                        .wrappedValue =
+                                        updated
+                                }
+                            ),
+                        axis: .vertical
+                    )
+                    .lineLimit(1...3)
+                    .textFieldStyle(.plain)
+                    .padding(10)
+                    .background(
+                        Color.black.opacity(0.025),
+                        in: RoundedRectangle(
+                            cornerRadius: 10,
+                            style: .continuous
+                        )
+                    )
+                }
+            }
+            .padding(.top, 9)
+        } label: {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        "slider.horizontal.3"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.premiumGold
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Advanced set details",
+                        norwegian:
+                            "Avanserte settdetaljer"
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+
+                Spacer()
+            }
+        }
+        .padding(.top, 2)
     }
 
     private func setMetricStepper(
@@ -9804,7 +10123,15 @@ struct PlannedExerciseEditorView: View {
                         source.targetRPE,
                     targetRIR:
                         source.targetRIR,
-                    isWarmUp: false
+                    isWarmUp: false,
+                    setType:
+                        source.setType == .warmUp
+                            ? .work
+                            : source.setType,
+                    tempo:
+                        source.tempo,
+                    notes:
+                        source.notes
                 )
             )
         }
@@ -9898,7 +10225,13 @@ struct PlannedExerciseEditorView: View {
                     targetRIR:
                         first.targetRIR,
                     isWarmUp:
-                        existing.isWarmUp
+                        existing.isWarmUp,
+                    setType:
+                        existing.setType,
+                    tempo:
+                        first.tempo,
+                    notes:
+                        first.notes
                 )
             }
     }
@@ -10001,7 +10334,27 @@ struct PlannedExerciseEditorView: View {
                         )
                         : nil,
                 isWarmUp:
-                    target.isWarmUp
+                    target.isWarmUp,
+                setType:
+                    advancedMode
+                        ? (
+                            target.setType ??
+                            (
+                                target.isWarmUp ==
+                                    true
+                                    ? .warmUp
+                                    : .work
+                            )
+                        )
+                        : target.setType,
+                tempo:
+                    advancedMode
+                        ? target.tempo
+                        : target.tempo,
+                notes:
+                    advancedMode
+                        ? target.notes
+                        : target.notes
             )
         }
     }
