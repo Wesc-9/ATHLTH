@@ -11284,7 +11284,8 @@ struct ATHLTHProfileView: View {
                     Binding(
                         get: {
                             session.profile
-                                .headerDimStrength
+                                .headerDimStrength ??
+                            0
                         },
                         set: { value in
                             session.profile
@@ -11429,7 +11430,8 @@ struct ATHLTHProfileView: View {
                         min(
                             max(
                                 session.profile
-                                    .headerDimStrength,
+                                    .headerDimStrength ??
+                                0,
                                 0
                             ),
                             0.45
