@@ -9050,6 +9050,14 @@ struct CommunityGroupDetailView: View {
             groups.profileCard(
                 for: update.authorID
             )
+        let comments =
+            groups.announcementComments(
+                for: update.id,
+                in: group.id
+            )
+        let commentsExpanded =
+            expandedPostComments
+                .contains(update.id)
 
         return VStack(
             alignment: .leading,
@@ -9226,8 +9234,78 @@ struct CommunityGroupDetailView: View {
                     vertical: true
                 )
 
-            HStack {
-                Spacer()
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.16
+                        )
+                    ) {
+                        if commentsExpanded {
+                            expandedPostComments
+                                .remove(
+                                    update.id
+                                )
+                        } else {
+                            expandedPostComments
+                                .insert(
+                                    update.id
+                                )
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(
+                            systemName:
+                                commentsExpanded
+                                    ? "bubble.left.fill"
+                                    : "bubble.left"
+                        )
+
+                        if !comments.isEmpty {
+                            Text(
+                                "\(comments.count)"
+                            )
+                            .monospacedDigit()
+                        }
+                    }
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        commentsExpanded
+                            ? clubForest
+                            : ATHLTHTheme
+                                .mutedText
+                    )
+                    .padding(
+                        .horizontal,
+                        11
+                    )
+                    .frame(height: 32)
+                    .background(
+                        commentsExpanded
+                            ? clubMint
+                            : Color.white,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                clubEmerald
+                                    .opacity(
+                                        commentsExpanded
+                                            ? 0.20
+                                            : 0.06
+                                    ),
+                                lineWidth:
+                                    0.7
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
 
                 Button {
                     Task {
@@ -9288,6 +9366,154 @@ struct CommunityGroupDetailView: View {
                     }
                 }
                 .buttonStyle(.plain)
+
+                Spacer()
+            }
+
+            if commentsExpanded {
+                Divider()
+                    .opacity(0.55)
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    if comments.isEmpty {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "No comments yet. Start the conversation.",
+                                    norwegian:
+                                        "Ingen kommentarer ennå. Start samtalen."
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    } else {
+                        ForEach(comments) {
+                            comment in
+                            referenceAnnouncementCommentRow(
+                                comment
+                            )
+                        }
+                    }
+
+                    HStack(
+                        alignment: .bottom,
+                        spacing: 8
+                    ) {
+                        TextField(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Write a comment…",
+                                    norwegian:
+                                        "Skriv en kommentar…"
+                                ),
+                            text: Binding(
+                                get: {
+                                    announcementCommentDrafts[
+                                        update.id
+                                    ] ?? ""
+                                },
+                                set: {
+                                    announcementCommentDrafts[
+                                        update.id
+                                    ] = $0
+                                }
+                            ),
+                            axis: .vertical
+                        )
+                        .lineLimit(1...3)
+                        .font(.subheadline)
+                        .padding(
+                            .horizontal,
+                            12
+                        )
+                        .padding(
+                            .vertical,
+                            9
+                        )
+                        .background(
+                            clubMint
+                                .opacity(0.62),
+                            in:
+                                RoundedRectangle(
+                                    cornerRadius:
+                                        14,
+                                    style:
+                                        .continuous
+                                )
+                        )
+
+                        Button {
+                            Task {
+                                await postAnnouncementComment(
+                                    on:
+                                        update
+                                )
+                            }
+                        } label: {
+                            Group {
+                                if postingAnnouncementCommentID ==
+                                    update.id {
+                                    ProgressView()
+                                        .tint(
+                                            .white
+                                        )
+                                } else {
+                                    Image(
+                                        systemName:
+                                            "arrow.up"
+                                    )
+                                    .font(
+                                        .caption
+                                            .bold()
+                                    )
+                                }
+                            }
+                            .foregroundStyle(
+                                .white
+                            )
+                            .frame(
+                                width: 38,
+                                height: 38
+                            )
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        clubForest,
+                                        clubEmerald
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                ),
+                                in: Circle()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            (
+                                announcementCommentDrafts[
+                                    update.id
+                                ] ?? ""
+                            )
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty ||
+                            postingAnnouncementCommentID !=
+                                nil
+                        )
+                    }
+                }
             }
         }
         .padding(11)
@@ -9308,6 +9534,196 @@ struct CommunityGroupDetailView: View {
                 Color.black.opacity(0.04),
                 lineWidth: 0.7
             )
+        }
+    }
+
+    @ViewBuilder
+    private func referenceAnnouncementCommentRow(
+        _ comment:
+            CommunityGroupContentCommentRecord
+    ) -> some View {
+        let profile =
+            groups.profileCard(
+                for:
+                    comment.authorID
+            )
+        let canDelete =
+            comment.authorID ==
+                session.profile.userID ||
+            groups.canManage(
+                currentGroup
+            )
+
+        HStack(
+            alignment: .top,
+            spacing: 8
+        ) {
+            if let profile {
+                CommunityGroupProfileAvatar(
+                    profile: profile,
+                    size: 30
+                )
+            } else {
+                Circle()
+                    .fill(
+                        clubMint
+                    )
+                    .frame(
+                        width: 30,
+                        height: 30
+                    )
+                    .overlay {
+                        Image(
+                            systemName:
+                                "person.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 11,
+                                weight:
+                                    .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            clubForest
+                        )
+                    }
+            }
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                HStack(spacing: 6) {
+                    Text(
+                        profile?
+                            .resolvedName ??
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Club member",
+                                norwegian:
+                                    "Club-medlem"
+                            )
+                    )
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+
+                    Text(
+                        comment.createdAt,
+                        style: .relative
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        .tertiary
+                    )
+                }
+
+                Text(comment.body)
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+
+            Spacer(minLength: 4)
+
+            if canDelete {
+                Menu {
+                    Button(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Delete comment",
+                                norwegian:
+                                    "Slett kommentar"
+                            ),
+                        role: .destructive
+                    ) {
+                        Task {
+                            _ =
+                                await groups
+                                    .deleteAnnouncementComment(
+                                        groupID:
+                                            group.id,
+                                        commentID:
+                                            comment.id
+                                    )
+                        }
+                    }
+                } label: {
+                    Image(
+                        systemName:
+                            "ellipsis"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .frame(
+                        width: 24,
+                        height: 24
+                    )
+                }
+            }
+        }
+    }
+
+    private func postAnnouncementComment(
+        on update:
+            CommunityGroupAnnouncementRecord
+    ) async {
+        guard postingAnnouncementCommentID ==
+                nil
+        else {
+            return
+        }
+
+        let draft =
+            announcementCommentDrafts[
+                update.id
+            ] ?? ""
+        let clean =
+            draft.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+        guard !clean.isEmpty else {
+            return
+        }
+
+        postingAnnouncementCommentID =
+            update.id
+        announcementCommentDrafts[
+            update.id
+        ] = ""
+
+        let posted =
+            await groups
+                .postAnnouncementComment(
+                    groupID:
+                        group.id,
+                    announcementID:
+                        update.id,
+                    body: clean
+                )
+
+        postingAnnouncementCommentID =
+            nil
+
+        if !posted {
+            announcementCommentDrafts[
+                update.id
+            ] = draft
         }
     }
 
