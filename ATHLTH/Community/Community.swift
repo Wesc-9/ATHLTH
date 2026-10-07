@@ -3847,6 +3847,38 @@ struct CommunityEventDetailView: View {
 
                 Spacer()
 
+                if item.isCompetition {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Competition",
+                            norwegian:
+                                "Konkurranse"
+                        ),
+                        systemImage:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .caption2
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .frame(height: 26)
+                    .background(
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.12),
+                        in: Capsule()
+                    )
+                }
+
                 eventLifecycleBadge(
                     item.event.status
                 )
