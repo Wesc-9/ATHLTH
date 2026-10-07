@@ -1,6 +1,19 @@
 import Foundation
 import Supabase
 
+private struct MessagingInboxBadgeRow:
+    Decodable,
+    Sendable
+{
+    let id: UUID
+    let readAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case readAt = "read_at"
+    }
+}
+
 final class SupabaseMessagingService: Sendable {
     private let client: SupabaseClient
 
@@ -10,6 +23,37 @@ final class SupabaseMessagingService: Sendable {
 
     var currentUserID: UUID? {
         client.auth.currentUser?.id
+    }
+
+    func unreadInboxEventCount()
+        async throws -> Int {
+        guard let currentUserID else {
+            throw SocialServiceError
+                .notAuthenticated
+        }
+
+        let rows:
+            [MessagingInboxBadgeRow] =
+            try await client
+                .from(
+                    "social_inbox_events"
+                )
+                .select(
+                    "id,read_at"
+                )
+                .eq(
+                    "recipient_id",
+                    value:
+                        currentUserID
+                )
+                .limit(250)
+                .execute()
+                .value
+
+        return rows.filter {
+            $0.readAt == nil
+        }
+        .count
     }
 
     func getOrCreateConversation(with otherUserID: UUID) async throws -> UUID {
