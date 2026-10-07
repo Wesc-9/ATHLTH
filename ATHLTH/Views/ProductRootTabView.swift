@@ -3530,45 +3530,63 @@ struct ATHLTHHomeView: View {
                     index,
                     planned in
 
+                    let setTargets =
+                        planned
+                            .resolvedSetTargets
                     let setCount =
-                        max(
-                            planned.sets,
-                            1
-                        )
+                        setTargets.count
                     let plans =
-                        (1...setCount)
-                            .map {
-                                setNumber in
+                        Array(
+                            setTargets.enumerated()
+                        )
+                        .map {
+                            index,
+                            target in
 
-                                WatchStrengthSetPlan(
-                                    setNumber:
-                                        setNumber,
-                                    reps:
-                                        planned
-                                            .resolvedTargetReps,
-                                    durationSeconds:
-                                        planned
-                                            .resolvedTargetDurationSeconds,
-                                    weightKilograms:
-                                        planned
-                                            .resolvedLoadKind ==
+                            WatchStrengthSetPlan(
+                                setNumber:
+                                    index + 1,
+                                reps:
+                                    planned
+                                        .resolvedTargetKind ==
+                                        .reps
+                                        ? target.reps
+                                        : nil,
+                                durationSeconds:
+                                    planned
+                                        .resolvedTargetKind ==
+                                        .time
+                                        ? target
+                                            .durationSeconds
+                                        : nil,
+                                weightKilograms:
+                                    planned
+                                        .resolvedLoadKind ==
+                                        .weightKilograms
+                                        ? target
                                             .weightKilograms
-                                            ? planned
-                                                .targetWeightKilograms
-                                            : nil,
-                                    resistanceLevel:
-                                        planned
-                                            .resolvedLoadKind ==
+                                        : nil,
+                                resistanceLevel:
+                                    planned
+                                        .resolvedLoadKind ==
+                                        .resistanceLevel
+                                        ? target
                                             .resistanceLevel
-                                            ? planned
-                                                .resolvedTargetResistanceLevel
-                                            : nil,
-                                    restSeconds:
-                                        planned
-                                            .restSeconds,
-                                    isWarmUp: nil
-                                )
-                            }
+                                        : nil,
+                                restSeconds:
+                                    target
+                                        .restSeconds,
+                                targetRPE:
+                                    target
+                                        .targetRPE,
+                                targetRIR:
+                                    target
+                                        .targetRIR,
+                                isWarmUp:
+                                    target
+                                        .isWarmUp
+                            )
+                        }
 
                     return WatchStrengthExerciseSummary(
                         index: index,
@@ -3691,6 +3709,11 @@ struct ATHLTHHomeView: View {
     ) -> Double? {
         workout.exercises
             .first?
+            .resolvedSetTargets
+            .first?
+            .targetRPE ??
+        workout.exercises
+            .first?
             .targetRPE ??
         8
     }
@@ -3698,6 +3721,11 @@ struct ATHLTHHomeView: View {
     private func plannedDefaultRIR(
         _ workout: PlannedSession
     ) -> Double? {
+        workout.exercises
+            .first?
+            .resolvedSetTargets
+            .first?
+            .targetRIR ??
         workout.exercises
             .first?
             .targetRIR ??
