@@ -422,6 +422,7 @@ private enum CommunityDirectDuelMetric:
     String,
     CaseIterable,
     Identifiable {
+    case workoutCount
     case runningDistance
     case strengthVolume
 
@@ -429,6 +430,11 @@ private enum CommunityDirectDuelMetric:
 
     var title: String {
         switch self {
+        case .workoutCount:
+            return ATHLTHLocalization.choose(
+                english: "Workouts · count",
+                norwegian: "Treningsøkter · antall"
+            )
         case .runningDistance:
             return ATHLTHLocalization.choose(
                 english: "Running · distance",
@@ -444,6 +450,11 @@ private enum CommunityDirectDuelMetric:
 
     var requestTitle: String {
         switch self {
+        case .workoutCount:
+            return ATHLTHLocalization.choose(
+                english: "H2H · Workouts",
+                norwegian: "H2H · Økter"
+            )
         case .runningDistance:
             return ATHLTHLocalization.choose(
                 english: "H2H · Running",
@@ -459,6 +470,11 @@ private enum CommunityDirectDuelMetric:
 
     var subtitle: String {
         switch self {
+        case .workoutCount:
+            return ATHLTHLocalization.choose(
+                english: "Most completed workouts over 7 days",
+                norwegian: "Flest gjennomførte treningsøkter på 7 dager"
+            )
         case .runningDistance:
             return ATHLTHLocalization.choose(
                 english: "Most verified distance over 7 days",
@@ -474,6 +490,11 @@ private enum CommunityDirectDuelMetric:
 
     var sport: ATHLTHChallengeSport {
         switch self {
+        case .workoutCount:
+            // Direct H2H workout count is evaluated by the matchup
+            // view across all completed workout types. Running is only
+            // used as the transport sport for the shared challenge record.
+            return .running
         case .runningDistance:
             return .running
         case .strengthVolume:
@@ -483,6 +504,10 @@ private enum CommunityDirectDuelMetric:
 
     var scoring: ATHLTHChallengeScoring {
         switch self {
+        case .workoutCount:
+            // The direct matchup calculates count from completed workouts.
+            // Keep an existing backend scoring value for challenge transport.
+            return .mostDistance
         case .runningDistance:
             return .mostDistance
         case .strengthVolume:
@@ -492,6 +517,8 @@ private enum CommunityDirectDuelMetric:
 
     var systemImage: String {
         switch self {
+        case .workoutCount:
+            return "checkmark.circle.fill"
         case .runningDistance:
             return "figure.run"
         case .strengthVolume:
@@ -507,6 +534,12 @@ private enum CommunityDirectDuelMetric:
         }
 
         switch self {
+        case .workoutCount:
+            return ATHLTHLocalization.format(
+                english: "%d workouts",
+                norwegian: "%d økter",
+                Int(score.rounded())
+            )
         case .runningDistance:
             return String(
                 format: "%.1f km",
