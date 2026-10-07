@@ -745,6 +745,186 @@ struct TrainingPlanWeek: Identifiable, Codable, Hashable {
     var days: [TrainingPlanDay]
 }
 
+enum TrainingPlanBuilderMode: String, Codable, Hashable, CaseIterable, Identifiable {
+    case basic
+    case advanced
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .basic:
+            return ATHLTHLocalization.choose(
+                english: "Basic",
+                norwegian: "Basic"
+            )
+        case .advanced:
+            return ATHLTHLocalization.choose(
+                english: "Advanced",
+                norwegian: "Avansert"
+            )
+        }
+    }
+}
+
+enum TrainingPlanFocus: String, Codable, Hashable, CaseIterable, Identifiable {
+    case generalFitness
+    case strength
+    case hypertrophy
+    case running
+    case hybrid
+    case endurance
+    case mobilityRehab
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .generalFitness:
+            return ATHLTHLocalization.choose(
+                english: "General fitness",
+                norwegian: "Form"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .hypertrophy:
+            return ATHLTHLocalization.choose(
+                english: "Build muscle",
+                norwegian: "Bygge muskler"
+            )
+        case .running:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .hybrid:
+            return ATHLTHLocalization.choose(
+                english: "Hybrid",
+                norwegian: "Hybrid"
+            )
+        case .endurance:
+            return ATHLTHLocalization.choose(
+                english: "Endurance",
+                norwegian: "Utholdenhet"
+            )
+        case .mobilityRehab:
+            return ATHLTHLocalization.choose(
+                english: "Mobility / rehab",
+                norwegian: "Mobilitet / rehab"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .generalFitness:
+            return "figure.mixed.cardio"
+        case .strength:
+            return "dumbbell.fill"
+        case .hypertrophy:
+            return "figure.strengthtraining.traditional"
+        case .running:
+            return "figure.run"
+        case .hybrid:
+            return "arrow.triangle.2.circlepath"
+        case .endurance:
+            return "heart.fill"
+        case .mobilityRehab:
+            return "figure.flexibility"
+        }
+    }
+
+    var suggestedWorkoutPattern: [WorkoutKind] {
+        switch self {
+        case .generalFitness:
+            return [.strength, .running, .walking]
+        case .strength:
+            return [.strength, .strength, .mobility]
+        case .hypertrophy:
+            return [.strength, .strength, .strength]
+        case .running:
+            return [.running, .running, .running]
+        case .hybrid:
+            return [.strength, .running]
+        case .endurance:
+            return [.running, .walking, .running]
+        case .mobilityRehab:
+            return [.mobility, .strength, .recovery]
+        }
+    }
+}
+
+enum TrainingPlanGoalType: String, Codable, Hashable, CaseIterable, Identifiable {
+    case getStronger
+    case buildMuscle
+    case runFaster
+    case raceReady
+    case improveFitness
+    case maintain
+    case returnAfterBreak
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .getStronger:
+            return ATHLTHLocalization.choose(
+                english: "Get stronger",
+                norwegian: "Bli sterkere"
+            )
+        case .buildMuscle:
+            return ATHLTHLocalization.choose(
+                english: "Build muscle",
+                norwegian: "Bygge muskler"
+            )
+        case .runFaster:
+            return ATHLTHLocalization.choose(
+                english: "Run faster",
+                norwegian: "Løpe raskere"
+            )
+        case .raceReady:
+            return ATHLTHLocalization.choose(
+                english: "Race ready",
+                norwegian: "Konkurranseform"
+            )
+        case .improveFitness:
+            return ATHLTHLocalization.choose(
+                english: "Improve fitness",
+                norwegian: "Bedre form"
+            )
+        case .maintain:
+            return ATHLTHLocalization.choose(
+                english: "Maintain",
+                norwegian: "Vedlikeholde"
+            )
+        case .returnAfterBreak:
+            return ATHLTHLocalization.choose(
+                english: "Return after a break",
+                norwegian: "Tilbake etter pause"
+            )
+        }
+    }
+}
+
+struct TrainingPlanBuilderProfile: Codable, Hashable {
+    var mode: TrainingPlanBuilderMode
+    var primaryFocus: TrainingPlanFocus?
+    var secondaryFocus: TrainingPlanFocus? = nil
+    var primaryFocusWeightPercent: Int? = nil
+    var goal: TrainingPlanGoalType?
+    var goalDetail: String? = nil
+    var competitionDate: Date? = nil
+    var sessionsPerWeek: Int
+    var preferredDayIndexes: [Int]
+    var injuriesOrLimitations: String? = nil
+    var priorityMuscles: [String] = []
+    var equipmentContext: String? = nil
+    var weeklyTimeBudgetMinutes: Int? = nil
+}
+
 struct TrainingPlan: Identifiable, Codable, Hashable {
     let id: UUID
     var ownerID: UUID
@@ -763,6 +943,7 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourcePlanID: UUID? = nil
     var sharedSourceVersion: Int? = nil
+    var builderProfile: TrainingPlanBuilderProfile? = nil
 }
 
 struct RouteCoordinate: Codable, Hashable {
