@@ -13,6 +13,7 @@ enum ATHLTHPublicImagePurpose: String, Sendable {
     case clubCover = "club_cover"
     case clubHeader = "club_header"
     case clubContent = "club_content"
+    case clubChatMessage = "club_chat_message"
 }
 
 struct ATHLTHPublishedPublicImage: Sendable {
