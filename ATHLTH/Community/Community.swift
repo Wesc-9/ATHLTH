@@ -2089,6 +2089,7 @@ struct CommunityEventDetailView: View {
         case route
         case chat
         case participants
+        case results
 
         var id: String { rawValue }
 
@@ -2114,6 +2115,11 @@ struct CommunityEventDetailView: View {
                     english: "People",
                     norwegian: "Deltakere"
                 )
+            case .results:
+                return ATHLTHLocalization.choose(
+                    english: "Results",
+                    norwegian: "Resultater"
+                )
             }
         }
 
@@ -2127,6 +2133,8 @@ struct CommunityEventDetailView: View {
                 return "bubble.left.and.bubble.right.fill"
             case .participants:
                 return "person.2.fill"
+            case .results:
+                return "trophy.fill"
             }
         }
     }
@@ -2143,6 +2151,8 @@ struct CommunityEventDetailView: View {
     @State private var manualCheckInFallback =
         false
     @State private var attemptedAutomaticCheckIn =
+        false
+    @State private var showingCompetitionResultEntry =
         false
 
     var body: some View {
@@ -2203,6 +2213,35 @@ struct CommunityEventDetailView: View {
                     item: item
                 )
                 .environmentObject(community)
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingCompetitionResultEntry
+        ) {
+            if let item =
+                    community.item(
+                        id: eventID
+                    ),
+               let metric =
+                    item.event
+                        .competitionMetric {
+                CommunityEventCompetitionResultEntryView(
+                    metric: metric,
+                    currentValue:
+                        currentCompetitionResult(
+                            item
+                        )?
+                        .competitionResultValue
+                ) {
+                    value in
+
+                    await community
+                        .submitCompetitionResult(
+                            item,
+                            value: value
+                        )
+                }
             }
         }
         .confirmationDialog(
@@ -2277,6 +2316,10 @@ struct CommunityEventDetailView: View {
                 .route,
                 at: 1
             )
+        }
+
+        if item.isCompetition {
+            tabs.append(.results)
         }
 
         return tabs
@@ -2395,6 +2438,7 @@ struct CommunityEventDetailView: View {
                 spacing: 16
             ) {
                 eventStartWeatherCard(item)
+                competitionOverviewCard(item)
                 routeSpotlight(item)
                 eventDetails(
                     item,
@@ -2456,6 +2500,11 @@ struct CommunityEventDetailView: View {
                 checkInCard(item)
                 participants(item)
             }
+
+        case .results:
+            competitionResultsContent(
+                item
+            )
         }
     }
 
