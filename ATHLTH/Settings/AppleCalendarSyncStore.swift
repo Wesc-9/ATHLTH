@@ -273,6 +273,87 @@ final class AppleCalendarSyncStore: ObservableObject {
         )
     }
 
+    /// Adds or refreshes one Community event in the ATHLTH calendar
+    /// without enabling full automatic calendar sync.
+    @discardableResult
+    func addCommunityEvent(
+        _ item: CommunityEventItem,
+        currentUserID: UUID
+    ) async -> Bool {
+        errorMessage = nil
+
+        do {
+            let granted =
+                try await requestFullAccessIfNeeded()
+
+            guard granted else {
+                return false
+            }
+
+            let calendar =
+                try ensureCalendar()
+            let key =
+                managedKey(
+                    type: "event",
+                    id: item.id
+                )
+            let existing =
+                managedEvents(
+                    in: calendar
+                )
+                .first {
+                    managedKey(
+                        from: $0
+                    ) == key
+                }
+            let event =
+                existing ??
+                EKEvent(
+                    eventStore: eventStore
+                )
+
+            let attendance:
+                CalendarAttendanceState
+
+            if item.event.creatorID ==
+                currentUserID {
+                attendance = .going
+            } else if item
+                .participantRows
+                .first(
+                    where: {
+                        $0.userID ==
+                            currentUserID
+                    }
+                )?
+                .attendanceStatus ==
+                .maybe {
+                attendance = .maybe
+            } else {
+                attendance = .going
+            }
+
+            configure(
+                event,
+                communityEvent: item,
+                attendance: attendance,
+                calendar: calendar
+            )
+
+            try eventStore.save(
+                event,
+                span: .thisEvent,
+                commit: true
+            )
+
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
     func syncIfEnabled(
         plan: TrainingPlan?,
         communityEvents: [CommunityEventItem] = [],
