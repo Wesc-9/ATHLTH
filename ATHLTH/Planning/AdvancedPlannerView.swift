@@ -8726,6 +8726,87 @@ struct PlannedExerciseEditorView: View {
                     )
                 }
 
+                if !original.embeddedExercise.instructions.isEmpty ||
+                    original.embeddedExercise.videoURL != nil {
+                    Section(
+                        ATHLTHLocalization.choose(
+                            english: "Technique",
+                            norwegian: "Teknikk"
+                        )
+                    ) {
+                        if !original.embeddedExercise.instructions.isEmpty {
+                            VStack(
+                                alignment: .leading,
+                                spacing: 9
+                            ) {
+                                ForEach(
+                                    Array(
+                                        original
+                                            .embeddedExercise
+                                            .instructions
+                                            .prefix(4)
+                                            .enumerated()
+                                    ),
+                                    id: \.offset
+                                ) { index, instruction in
+                                    HStack(
+                                        alignment: .top,
+                                        spacing: 9
+                                    ) {
+                                        Text("\(index + 1)")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(
+                                                ATHLTHTheme.accentDeep
+                                            )
+                                            .frame(
+                                                width: 22,
+                                                height: 22
+                                            )
+                                            .background(
+                                                ATHLTHTheme.accentSoft,
+                                                in: Circle()
+                                            )
+
+                                        Text(instruction)
+                                            .font(.caption)
+                                            .foregroundStyle(
+                                                ATHLTHTheme.primaryText
+                                                    .opacity(0.82)
+                                            )
+                                    }
+                                }
+                            }
+                        }
+
+                        if let videoURL =
+                                original
+                                    .embeddedExercise
+                                    .videoURL {
+                            Link(
+                                destination: videoURL
+                            ) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Open technique video",
+                                        norwegian:
+                                            "Åpne teknikkvideo"
+                                    ),
+                                    systemImage:
+                                        "play.rectangle.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                            }
+                        }
+                    }
+                    .listRowBackground(
+                        ATHLTHTheme.card
+                    )
+                }
+
                 Section(
                     ATHLTHLocalization.choose(
                         english: "Notes",
