@@ -4658,6 +4658,9 @@ struct CommunityEventMapPlacePickerView:
     @Environment(\.dismiss)
     private var dismiss
 
+    let initialName: String
+    let initialLatitude: Double?
+    let initialLongitude: Double?
     let onSelect:
         (CommunityEventMapPlace) -> Void
 
@@ -4666,186 +4669,91 @@ struct CommunityEventMapPlacePickerView:
         [CommunityEventMapPlace] = []
     @State private var isSearching =
         false
+    @State private var isResolvingPoint =
+        false
     @State private var searchError:
         String?
+    @State private var selectedPlace:
+        CommunityEventMapPlace?
+    @State private var selectedCoordinate:
+        CLLocationCoordinate2D?
+    @State private var position:
+        MapCameraPosition = .automatic
+    @State private var didApplyInitialPosition =
+        false
+
+    init(
+        initialName: String = "",
+        initialLatitude: Double? = nil,
+        initialLongitude: Double? = nil,
+        onSelect:
+            @escaping (CommunityEventMapPlace) -> Void
+    ) {
+        self.initialName = initialName
+        self.initialLatitude = initialLatitude
+        self.initialLongitude = initialLongitude
+        self.onSelect = onSelect
+    }
 
     var body: some View {
-        List {
-            if query
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .count < 2 {
-                Section {
-                    ContentUnavailableView {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Search Apple Maps",
-                                norwegian:
-                                    "Søk i Apple Maps"
-                            ),
-                            systemImage:
-                                "mappin.and.ellipse"
+        ScrollView {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                mapCard
+
+                if let selectedPlace {
+                    selectedPlaceCard(
+                        selectedPlace
+                    )
+                } else {
+                    HStack(
+                        alignment: .top,
+                        spacing: 10
+                    ) {
+                        Image(
+                            systemName:
+                                "hand.tap.fill"
                         )
-                    } description: {
+                        .foregroundStyle(
+                            ATHLTHTheme.vitality
+                        )
+
                         Text(
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Search for an address, gym, park or other meeting point.",
+                                    "Search for an address or tap directly on the map to choose the exact meeting point.",
                                 norwegian:
-                                    "Søk etter adresse, treningssenter, park eller annet møtested."
+                                    "Søk etter en adresse, eller trykk direkte i kartet for å velge nøyaktig møtested."
                             )
                         )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
                     }
+                    .padding(.horizontal, 4)
                 }
-                .listRowBackground(
-                    Color.clear
-                )
-            } else if isSearching &&
-                        results.isEmpty {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .padding(
-                        .vertical,
-                        24
+
+                if query
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
                     )
-                }
-                .listRowBackground(
-                    Color.clear
-                )
-            } else if let searchError,
-                      results.isEmpty {
-                Section {
-                    ContentUnavailableView(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Could not search Maps",
-                            norwegian:
-                                "Kunne ikke søke i Maps"
-                        ),
-                        systemImage:
-                            "exclamationmark.triangle",
-                        description:
-                            Text(searchError)
-                    )
-                }
-                .listRowBackground(
-                    Color.clear
-                )
-            } else {
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Places",
-                        norwegian: "Steder"
-                    )
-                ) {
-                    ForEach(results) {
-                        place in
-                        Button {
-                            onSelect(place)
-                            dismiss()
-                        } label: {
-                            HStack(
-                                spacing: 12
-                            ) {
-                                Image(
-                                    systemName:
-                                        "mappin.circle.fill"
-                                )
-                                .font(
-                                    .system(
-                                        size: 18,
-                                        weight:
-                                            .semibold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .vitality
-                                )
-                                .frame(
-                                    width: 40,
-                                    height: 40
-                                )
-                                .background(
-                                    ATHLTHTheme
-                                        .vitalitySoft,
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                12,
-                                            style:
-                                                .continuous
-                                        )
-                                )
-
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 3
-                                ) {
-                                    Text(
-                                        place
-                                            .displayName
-                                    )
-                                    .font(
-                                        .subheadline
-                                            .weight(
-                                                .semibold
-                                            )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
-
-                                    if !place
-                                        .subtitle
-                                        .isEmpty {
-                                        Text(
-                                            place
-                                                .subtitle
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-                                        .lineLimit(2)
-                                    }
-                                }
-
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                            }
-                            .padding(
-                                .vertical,
-                                3
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .count >= 2 {
+                    searchResultsSection
+                } else {
+                    searchHintCard
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 108)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(
-            .hidden
-        )
+        .scrollIndicators(.hidden)
         .background(
             ATHLTHPremiumCanvas(
                 accent:
@@ -4880,9 +4788,789 @@ struct CommunityEventMapPlacePickerView:
                         "Adresse eller sted"
                 )
         )
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 10) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel",
+                        norwegian: "Avbryt"
+                    )
+                ) {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    guard let selectedPlace
+                    else {
+                        return
+                    }
+
+                    onSelect(selectedPlace)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 7) {
+                        if isResolvingPoint {
+                            ProgressView()
+                                .tint(.white)
+                        }
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Use meeting point",
+                                norwegian:
+                                    "Bruk møtested"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .frame(
+                        maxWidth: .infinity
+                    )
+                    .frame(height: 48)
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+                .disabled(
+                    selectedPlace == nil ||
+                    isResolvingPoint
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+        }
         .task(id: query) {
             await searchMaps()
         }
+        .onAppear {
+            applyInitialPositionIfNeeded()
+        }
+    }
+
+    private var mapCard:
+        some View {
+        MapReader { proxy in
+            Map(position: $position) {
+                if let selectedCoordinate {
+                    Marker(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Meeting point",
+                            norwegian:
+                                "Møtested"
+                        ),
+                        coordinate:
+                            selectedCoordinate
+                    )
+                    .tint(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                UserAnnotation()
+            }
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .onTapGesture {
+                point in
+
+                guard
+                    let coordinate =
+                        proxy.convert(
+                            point,
+                            from: .local
+                        )
+                else {
+                    return
+                }
+
+                selectedCoordinate =
+                    coordinate
+                position =
+                    .region(
+                        MKCoordinateRegion(
+                            center:
+                                coordinate,
+                            span:
+                                MKCoordinateSpan(
+                                    latitudeDelta:
+                                        0.012,
+                                    longitudeDelta:
+                                        0.012
+                                )
+                        )
+                    )
+
+                Task {
+                    await resolveMapPoint(
+                        coordinate
+                    )
+                }
+            }
+        }
+        .frame(height: 300)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.90),
+                lineWidth: 0.9
+            )
+        }
+        .shadow(
+            color:
+                ATHLTHTheme
+                    .accentDeep
+                    .opacity(0.07),
+            radius: 14,
+            y: 7
+        )
+        .overlay(
+            alignment: .topLeading
+        ) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Tap map to place pin",
+                    norwegian:
+                        "Trykk i kartet for å sette punkt"
+                ),
+                systemImage:
+                    "hand.tap"
+            )
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(
+                .ultraThinMaterial,
+                in: Capsule()
+            )
+            .padding(10)
+        }
+    }
+
+    private func selectedPlaceCard(
+        _ place: CommunityEventMapPlace
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName:
+                    "mappin.circle.fill"
+            )
+            .font(
+                .system(
+                    size: 19,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+            .frame(
+                width: 42,
+                height: 42
+            )
+            .background(
+                ATHLTHTheme.vitalitySoft,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Selected meeting point",
+                        norwegian:
+                            "Valgt møtested"
+                    )
+                )
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+
+                Text(place.displayName)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(2)
+
+                if !place.subtitle.isEmpty {
+                    Text(place.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            if isResolvingPoint {
+                ProgressView()
+            } else {
+                Image(
+                    systemName:
+                        "checkmark.circle.fill"
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+            }
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.72),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.88),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultsSection:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 9
+        ) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "SEARCH RESULTS",
+                    norwegian:
+                        "SØKERESULTATER"
+                )
+            )
+            .font(.caption2.weight(.bold))
+            .tracking(1.4)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .padding(.horizontal, 3)
+
+            if isSearching &&
+                results.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .frame(height: 90)
+            } else if let searchError,
+                      results.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Could not search Maps",
+                        norwegian:
+                            "Kunne ikke søke i Maps"
+                    ),
+                    systemImage:
+                        "exclamationmark.triangle",
+                    description:
+                        Text(searchError)
+                )
+                .frame(minHeight: 120)
+            } else if results.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No places found",
+                        norwegian:
+                            "Fant ingen steder"
+                    ),
+                    systemImage:
+                        "mappin.slash"
+                )
+                .frame(minHeight: 110)
+            } else {
+                VStack(spacing: 7) {
+                    ForEach(results) {
+                        place in
+
+                        Button {
+                            selectSearchResult(
+                                place
+                            )
+                        } label: {
+                            HStack(
+                                spacing: 11
+                            ) {
+                                Image(
+                                    systemName:
+                                        "mappin.circle.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 16,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .vitality
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .vitalitySoft,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                11,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        place
+                                            .displayName
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    if !place
+                                        .subtitle
+                                        .isEmpty {
+                                        Text(
+                                            place
+                                                .subtitle
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .mutedText
+                                        )
+                                        .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        selectedPlace?.id ==
+                                        place.id
+                                        ? "checkmark.circle.fill"
+                                        : "chevron.right"
+                                )
+                                .font(.caption.bold())
+                                .foregroundStyle(
+                                    selectedPlace?.id ==
+                                    place.id
+                                    ? ATHLTHTheme
+                                        .vitality
+                                    : .secondary
+                                )
+                            }
+                            .padding(.horizontal, 11)
+                            .frame(minHeight: 58)
+                            .background(
+                                Color.white
+                                    .opacity(0.68),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            16,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var searchHintCard:
+        some View {
+        HStack(
+            alignment: .top,
+            spacing: 12
+        ) {
+            Image(
+                systemName:
+                    "magnifyingglass"
+            )
+            .font(
+                .system(
+                    size: 16,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                ATHLTHTheme.accentSoft,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Search Apple Maps",
+                        norwegian:
+                            "Søk i Apple Maps"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(
+                            .semibold
+                        )
+                )
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Search for a street address, gym, park or other place. You can also ignore search and place the pin manually.",
+                        norwegian:
+                            "Søk etter gateadresse, treningssenter, park eller annet sted. Du kan også hoppe over søket og sette punktet manuelt i kartet."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.62),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+    }
+
+    private func applyInitialPositionIfNeeded() {
+        guard !didApplyInitialPosition
+        else {
+            return
+        }
+
+        didApplyInitialPosition = true
+
+        guard
+            let initialLatitude,
+            let initialLongitude
+        else {
+            position =
+                .userLocation(
+                    followsHeading: false,
+                    fallback: .automatic
+                )
+            return
+        }
+
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude:
+                    initialLatitude,
+                longitude:
+                    initialLongitude
+            )
+
+        selectedCoordinate = coordinate
+        position =
+            .region(
+                MKCoordinateRegion(
+                    center: coordinate,
+                    span:
+                        MKCoordinateSpan(
+                            latitudeDelta:
+                                0.012,
+                            longitudeDelta:
+                                0.012
+                        )
+                )
+            )
+
+        let cleanName =
+            initialName
+                .trimmingCharacters(
+                    in:
+                        .whitespacesAndNewlines
+                )
+
+        selectedPlace =
+            CommunityEventMapPlace(
+                id:
+                    "\(initialLatitude)|\(initialLongitude)|\(cleanName)",
+                displayName:
+                    cleanName.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Selected point",
+                            norwegian:
+                                "Valgt punkt"
+                        )
+                        : cleanName,
+                subtitle: "",
+                latitude:
+                    initialLatitude,
+                longitude:
+                    initialLongitude
+            )
+    }
+
+    private func selectSearchResult(
+        _ place: CommunityEventMapPlace
+    ) {
+        selectedPlace = place
+
+        let coordinate =
+            CLLocationCoordinate2D(
+                latitude:
+                    place.latitude,
+                longitude:
+                    place.longitude
+            )
+        selectedCoordinate =
+            coordinate
+
+        withAnimation(
+            .easeOut(duration: 0.20)
+        ) {
+            position =
+                .region(
+                    MKCoordinateRegion(
+                        center: coordinate,
+                        span:
+                            MKCoordinateSpan(
+                                latitudeDelta:
+                                    0.012,
+                                longitudeDelta:
+                                    0.012
+                            )
+                    )
+                )
+        }
+    }
+
+    @MainActor
+    private func resolveMapPoint(
+        _ coordinate:
+            CLLocationCoordinate2D
+    ) async {
+        isResolvingPoint = true
+        searchError = nil
+
+        defer {
+            isResolvingPoint = false
+        }
+
+        do {
+            let placemarks =
+                try await CLGeocoder()
+                    .reverseGeocodeLocation(
+                        CLLocation(
+                            latitude:
+                                coordinate
+                                    .latitude,
+                            longitude:
+                                coordinate
+                                    .longitude
+                        )
+                    )
+
+            guard let placemark =
+                    placemarks.first
+            else {
+                selectedPlace =
+                    fallbackPlace(
+                        coordinate
+                    )
+                return
+            }
+
+            let street =
+                [
+                    placemark
+                        .subThoroughfare,
+                    placemark
+                        .thoroughfare
+                ]
+                .compactMap { $0 }
+                .filter {
+                    !$0.isEmpty
+                }
+                .joined(
+                    separator: " "
+                )
+            let city =
+                [
+                    placemark.postalCode,
+                    placemark.locality
+                ]
+                .compactMap { $0 }
+                .filter {
+                    !$0.isEmpty
+                }
+                .joined(
+                    separator: " "
+                )
+            let subtitle =
+                [
+                    street,
+                    city,
+                    placemark
+                        .administrativeArea
+                ]
+                .filter {
+                    !$0.isEmpty
+                }
+                .joined(
+                    separator: ", "
+                )
+            let name =
+                placemark.name ??
+                (!street.isEmpty
+                    ? street
+                    : ATHLTHLocalization.choose(
+                        english:
+                            "Selected point",
+                        norwegian:
+                            "Valgt punkt"
+                    ))
+
+            selectedPlace =
+                CommunityEventMapPlace(
+                    id:
+                        "\(coordinate.latitude)|\(coordinate.longitude)|\(name)",
+                    displayName:
+                        name,
+                    subtitle:
+                        subtitle,
+                    latitude:
+                        coordinate.latitude,
+                    longitude:
+                        coordinate.longitude
+                )
+        } catch {
+            selectedPlace =
+                fallbackPlace(
+                    coordinate
+                )
+        }
+    }
+
+    private func fallbackPlace(
+        _ coordinate:
+            CLLocationCoordinate2D
+    ) -> CommunityEventMapPlace {
+        CommunityEventMapPlace(
+            id:
+                "\(coordinate.latitude)|\(coordinate.longitude)|manual",
+            displayName:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Pinned location",
+                    norwegian:
+                        "Valgt punkt"
+                ),
+            subtitle:
+                String(
+                    format:
+                        "%.5f, %.5f",
+                    coordinate.latitude,
+                    coordinate.longitude
+                ),
+            latitude:
+                coordinate.latitude,
+            longitude:
+                coordinate.longitude
+        )
     }
 
     @MainActor
@@ -5035,7 +5723,6 @@ struct CommunityEventMapPlacePickerView:
         )
     }
 }
-
 
 private struct CommunityEventEditView: View {
     @Environment(\.dismiss)
