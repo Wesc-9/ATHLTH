@@ -207,6 +207,7 @@ final class AppSessionStore: ObservableObject {
             avatarURL: nil,
             headerArtworkName: nil,
             headerImageURL: nil,
+            headerDimStrength: 0,
             presence: TrainingPresence(
                 state: .available,
                 workoutTitle: nil,
@@ -254,6 +255,14 @@ final class AppSessionStore: ObservableObject {
             bootstrap.profile.headerArtworkName
         profile.headerImageURL =
             bootstrap.profile.headerImageURL.flatMap(URL.init(string:))
+        profile.headerDimStrength =
+            min(
+                max(
+                    bootstrap.profile.headerDimStrength ?? 0,
+                    0
+                ),
+                0.45
+            )
 
         accountCreatedAt = bootstrap.profile.createdAt
         defaults.set(accountCreatedAt, forKey: "session.accountCreatedAt")
