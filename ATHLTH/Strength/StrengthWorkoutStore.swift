@@ -769,9 +769,9 @@ final class StrengthWorkoutStore: ObservableObject {
                                 reps: reps
                             ),
                         value:
-                            "(Self.formattedKilograms(currentEffort.weight)) kg × (reps)",
+                            "\(Self.formattedKilograms(currentEffort.weight)) kg × \(reps)",
                         previousValue:
-                            "(Self.formattedKilograms(previousBest)) kg × (reps)",
+                            "\(Self.formattedKilograms(previousBest)) kg × \(reps)",
                         score:
                             currentEffort.weight,
                         setID:
@@ -811,9 +811,9 @@ final class StrengthWorkoutStore: ObservableObject {
                         kind:
                             .heaviestWeight,
                         value:
-                            "(Self.formattedKilograms(currentHeaviest.weight)) kg",
+                            "\(Self.formattedKilograms(currentHeaviest.weight)) kg",
                         previousValue:
-                            "(Self.formattedKilograms(previousHeaviest)) kg",
+                            "\(Self.formattedKilograms(previousHeaviest)) kg",
                         score:
                             currentHeaviest.weight,
                         setID:
@@ -881,9 +881,9 @@ final class StrengthWorkoutStore: ObservableObject {
                             kind:
                                 .estimatedOneRepMax,
                             value:
-                                "(Self.formattedKilograms(currentOneRM.value)) kg",
+                                "\(Self.formattedKilograms(currentOneRM.value)) kg",
                             previousValue:
-                                "(Self.formattedKilograms(previousOneRM)) kg",
+                                "\(Self.formattedKilograms(previousOneRM)) kg",
                             score:
                                 currentOneRM.value,
                             setID:
