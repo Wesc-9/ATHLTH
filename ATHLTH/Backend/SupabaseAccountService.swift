@@ -499,6 +499,30 @@ final class SupabaseAccountService: ObservableObject {
         return try await loadCurrentUser()
     }
 
+    func updateProfileHeaderDimStrength(
+        _ strength: Double
+    ) async throws -> BackendUserBootstrap {
+        guard let userID = currentUserID else {
+            throw SupabaseAccountError.notAuthenticated
+        }
+
+        let clamped =
+            min(max(strength, 0), 0.45)
+
+        try await client
+            .from("profiles")
+            .update(
+                ProfileHeaderAppearanceUpdate(
+                    headerDimStrength:
+                        clamped
+                )
+            )
+            .eq("id", value: userID)
+            .execute()
+
+        return try await loadCurrentUser()
+    }
+
     func removeProfileHeaderImage() async throws -> BackendUserBootstrap {
         guard let userID = currentUserID else {
             throw SupabaseAccountError.notAuthenticated
@@ -604,6 +628,20 @@ private struct DeleteAccountResponse: Decodable {
 
 private struct UsernameAvailabilityParams: Encodable {
     let candidate: String
+}
+
+private struct ProfileHeaderAppearanceUpdate:
+    Encodable
+{
+    let headerDimStrength: Double
+
+    enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case headerDimStrength =
+            "header_dim_strength"
+    }
 }
 
 private struct ProfileHeaderUpdate: Encodable {
