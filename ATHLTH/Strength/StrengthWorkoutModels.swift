@@ -84,9 +84,23 @@ struct StrengthAudioCoachConfiguration:
     var announceRestCountdown = true
     var announceRestComplete = true
     var announceNextExercise = true
+
+    // Optional additions preserve decoding of saved strength settings from
+    // earlier 1.6.8 builds while allowing richer, less repetitive coaching.
+    var announceNextSetDetails: Bool? = nil
+    var announceExerciseProgress: Bool? = nil
+
     var announceWorkoutStatus = false
     var workoutStatusIntervalMinutes = 15
     var restCountdownSeconds = 10
+
+    var shouldAnnounceNextSetDetails: Bool {
+        announceNextSetDetails ?? true
+    }
+
+    var shouldAnnounceExerciseProgress: Bool {
+        announceExerciseProgress ?? false
+    }
 
     var watchConfiguration:
         WatchAudioCoachConfiguration {
@@ -129,6 +143,12 @@ struct StrengthAudioCoachConfiguration:
         configuration
             .announceStrengthNextExercise =
             announceNextExercise
+        configuration
+            .announceStrengthNextSetDetails =
+            shouldAnnounceNextSetDetails
+        configuration
+            .announceStrengthExerciseProgress =
+            shouldAnnounceExerciseProgress
         configuration
             .strengthStatusIntervalSeconds =
             announceWorkoutStatus
