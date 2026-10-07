@@ -923,6 +923,159 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    private func upcomingStrengthExerciseCoachPhrase(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) -> (
+        english: String,
+        norwegian: String
+    )? {
+        guard
+            snapshot.currentExerciseComplete,
+            snapshot.hasNextExercise,
+            let queue =
+                snapshot.exerciseQueue,
+            !queue.isEmpty
+        else {
+            return nil
+        }
+
+        let later =
+            queue
+                .filter {
+                    $0.index >
+                        snapshot.exerciseIndex &&
+                    $0.isCompleted != true
+                }
+                .sorted {
+                    $0.index < $1.index
+                }
+                .first
+        let earlier =
+            queue
+                .filter {
+                    $0.index <
+                        snapshot.exerciseIndex &&
+                    $0.isCompleted != true
+                }
+                .sorted {
+                    $0.index < $1.index
+                }
+                .first
+
+        guard let next =
+                later ?? earlier
+        else {
+            return nil
+        }
+
+        var english =
+            "Next exercise. \(next.name)."
+        var norwegian =
+            "Neste øvelse. \(next.name)."
+
+        let pendingIndex =
+            next.firstPendingSetIndex ??
+            0
+
+        if let plans =
+                next.setPlans,
+           plans.indices.contains(
+                pendingIndex
+           ) {
+            let target =
+                strengthSetPlanTargetPhrase(
+                    plans[pendingIndex]
+                )
+
+            if !target.english.isEmpty {
+                english +=
+                    " \(target.english)"
+                norwegian +=
+                    " \(target.norwegian)"
+            }
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
+    private func strengthSetPlanTargetPhrase(
+        _ plan:
+            WatchStrengthSetPlan
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        var english = ""
+        var norwegian = ""
+
+        if let reps =
+                plan.reps,
+           reps > 0 {
+            english =
+                "\(reps) reps"
+            norwegian =
+                "\(reps) repetisjoner"
+        } else if let seconds =
+                    plan.durationSeconds,
+                  seconds > 0 {
+            let duration =
+                strengthCoachDurationPhrase(
+                    seconds
+                )
+            english =
+                duration.english
+            norwegian =
+                duration.norwegian
+        }
+
+        if let level =
+                plan.resistanceLevel,
+           level > 0 {
+            english +=
+                english.isEmpty
+                    ? "Resistance level \(level)"
+                    : " at resistance level \(level)"
+            norwegian +=
+                norwegian.isEmpty
+                    ? "Motstand \(level)"
+                    : " på motstand \(level)"
+        } else if let weight =
+                    plan.weightKilograms,
+                  weight > 0 {
+            let formatted =
+                weight.rounded() ==
+                    weight
+                    ? String(Int(weight))
+                    : String(
+                        format: "%.1f",
+                        weight
+                    )
+
+            english +=
+                english.isEmpty
+                    ? "\(formatted) kilograms"
+                    : " at \(formatted) kilograms"
+            norwegian +=
+                norwegian.isEmpty
+                    ? "\(formatted) kilo"
+                    : " på \(formatted) kilo"
+        }
+
+        if !english.isEmpty {
+            english += "."
+            norwegian += "."
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
     private func strengthSnapshotTargetPhrase(
         _ snapshot:
             WatchStrengthSessionSnapshot
@@ -1174,17 +1327,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
 
                 if let currentSnapshot =
-                        self.strengthSession,
-                   let nextSet =
-                        self.strengthNextSetCoachPhrase(
-                            currentSnapshot
-                        ) {
-                    englishParts.append(
-                        nextSet.english
-                    )
-                    norwegianParts.append(
-                        nextSet.norwegian
-                    )
+                        self.strengthSession {
+                    if currentSnapshot
+                        .currentExerciseComplete {
+                        if self
+                            .audioCoachConfiguration
+                            .shouldAnnounceStrengthNextExercise,
+                           let nextExercise =
+                                self
+                                    .upcomingStrengthExerciseCoachPhrase(
+                                        currentSnapshot
+                                    ) {
+                            englishParts.append(
+                                nextExercise
+                                    .english
+                            )
+                            norwegianParts.append(
+                                nextExercise
+                                    .norwegian
+                            )
+                        }
+                    } else if let nextSet =
+                                self.strengthNextSetCoachPhrase(
+                                    currentSnapshot
+                                ) {
+                        englishParts.append(
+                            nextSet.english
+                        )
+                        norwegianParts.append(
+                            nextSet.norwegian
+                        )
+                    }
                 }
 
                 if !englishParts.isEmpty {
