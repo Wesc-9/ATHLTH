@@ -3233,9 +3233,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
                         .frame(
-                            maxWidth: .infinity,
-                            height: 48
+                            maxWidth: .infinity
                         )
+                        .frame(height: 48)
                         .background(
                             ATHLTHTheme.accentDeep,
                             in: RoundedRectangle(
