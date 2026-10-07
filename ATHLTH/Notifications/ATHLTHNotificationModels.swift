@@ -97,6 +97,7 @@ struct ATHLTHNotificationDraft: Hashable {
     let title: String
     let message: String
     let createdAt: Date
+    let readAt: Date?
     let goalID: UUID?
     let workoutID: UUID?
     let challengeID: UUID?
@@ -112,6 +113,7 @@ struct ATHLTHNotificationDraft: Hashable {
         title: String,
         message: String,
         createdAt: Date = Date(),
+        readAt: Date? = nil,
         goalID: UUID? = nil,
         workoutID: UUID? = nil,
         challengeID: UUID? = nil,
@@ -126,6 +128,7 @@ struct ATHLTHNotificationDraft: Hashable {
         self.title = title
         self.message = message
         self.createdAt = createdAt
+        self.readAt = readAt
         self.goalID = goalID
         self.workoutID = workoutID
         self.challengeID = challengeID
