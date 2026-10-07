@@ -248,12 +248,30 @@ final class MessagingStore: ObservableObject {
                     refreshedMessages
             }
             lastRefreshAt = Date()
+            await syncApplicationIconBadge()
         } catch is CancellationError {
             return
         } catch {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func syncApplicationIconBadge()
+        async {
+        guard let count =
+                try? await service
+                    .unreadInboxEventCount()
+        else {
+            return
+        }
+
+        try? await
+            UNUserNotificationCenter
+                .current()
+                .setBadgeCount(
+                    count
+                )
     }
 
     func openConversation(with userID: UUID) async throws -> UUID {
