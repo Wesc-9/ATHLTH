@@ -217,6 +217,67 @@ struct ATHLTHApp: App {
     }
 }
 
+private struct ATHLTHCompatibilityPreviewRootView: View {
+    @State private var trainNavigationRequest:
+        ATHLTHTrainNavigationRequest?
+
+    private let requestedTab: Int
+
+    init() {
+        let prefix =
+            "--athlth-compatibility-tab="
+        let tab =
+            ProcessInfo.processInfo.arguments
+                .first(
+                    where: {
+                        $0.hasPrefix(prefix)
+                    }
+                )
+                .flatMap {
+                    Int(
+                        $0.dropFirst(
+                            prefix.count
+                        )
+                    )
+                } ??
+            0
+
+        requestedTab =
+            min(
+                max(tab, 0),
+                4
+            )
+    }
+
+    @ViewBuilder
+    var body: some View {
+        switch requestedTab {
+        case 1:
+            ATHLTHRecoveryView(
+                isActive: true
+            ) { _ in }
+
+        case 2:
+            ATHLTHTrainView(
+                navigationRequest:
+                    $trainNavigationRequest
+            )
+
+        case 3:
+            ATHLTHExploreView()
+
+        case 4:
+            ATHLTHCommunityV4View()
+
+        default:
+            ATHLTHHomeView(
+                onSelectTab: { _ in },
+                onOpenTrain: { _ in }
+            )
+        }
+    }
+}
+
 private struct ATHLTHLaunchGateView: View {
     var body: some View {
         ZStack {
@@ -1551,8 +1612,19 @@ struct AppRootView: View {
         )
     }
 
+    @ViewBuilder
     private var lifecycleContent: some View {
-        lifecycleAccountContent
+        if appSession.previewModeEnabled {
+            // CI compatibility renders should exercise the requested product
+            // surface without starting the production lifecycle graph. The
+            // full graph now owns enough network, backup, notification and
+            // realtime observers that constructing every tab at once can
+            // starve the simulator's first frame and leave a blank launch
+            // surface even though the app process is healthy.
+            ATHLTHCompatibilityPreviewRootView()
+        } else {
+            lifecycleAccountContent
+        }
     }
 
     var body: some View {
