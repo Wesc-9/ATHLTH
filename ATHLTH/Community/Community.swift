@@ -8732,6 +8732,29 @@ private struct CommunityEventEditView: View {
                     }
                 }
             }
+            .onChange(
+                of: draft.activityType
+            ) {
+                _,
+                activity in
+
+                let options =
+                    CommunityEventCompetitionMetric
+                        .options(
+                            for: activity
+                        )
+
+                if !options.contains(
+                    draft.competitionMetric
+                ) {
+                    draft.competitionMetric =
+                        CommunityEventCompetitionMetric
+                            .defaultMetric(
+                                for:
+                                    activity
+                            )
+                }
+            }
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Edit Event",
