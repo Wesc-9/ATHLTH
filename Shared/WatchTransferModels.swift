@@ -1250,12 +1250,16 @@ struct WatchGhostRaceTransfer: Codable, Hashable {
 
 struct WatchWorkoutMirrorCommand: Codable, Hashable {
     var command: WatchWorkoutCommand
+    // Optional keeps pause/resume/end payloads and older paired builds
+    // decodable while allowing treadmill incline changes during a workout.
+    var treadmillInclinePercent: Double? = nil
 }
 
 enum WatchWorkoutCommand: String, Codable, Hashable {
     case end
     case pause
     case resume
+    case setTreadmillIncline
 }
 
 enum WatchSpotifyCommandKind: String, Codable, Hashable {
