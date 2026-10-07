@@ -1815,6 +1815,8 @@ struct CommunityEventDetailView: View {
         false
     @StateObject private var checkInLocation =
         ChallengeLocationStore()
+    @StateObject private var eventWeather =
+        CommunityEventWeatherStore()
     @State private var checkInMessage: String?
     @State private var manualCheckInFallback =
         false
@@ -1926,6 +1928,15 @@ struct CommunityEventDetailView: View {
         }
         .task(id: eventID) {
             await attemptAutomaticCheckIn()
+        }
+        .task(
+            id:
+                community
+                    .item(id: eventID)?
+                    .event
+                    .updatedAt
+        ) {
+            await loadEventStartWeather()
         }
     }
 
@@ -2061,13 +2072,12 @@ struct CommunityEventDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
+                eventStartWeatherCard(item)
                 routeSpotlight(item)
                 eventDetails(
                     item,
                     includeRoute: false
                 )
-                participantsPreview(item)
-                checkInCard(item)
 
                 if item.event.creatorID ==
                     session.profile.userID {
@@ -2088,8 +2098,9 @@ struct CommunityEventDetailView: View {
             routeTabContent(item)
 
         case .chat:
-            CommunityEventSocialSection(
-                item: item
+            CommunityEventChatView(
+                event: item.event,
+                embedded: true
             )
 
         case .participants:
