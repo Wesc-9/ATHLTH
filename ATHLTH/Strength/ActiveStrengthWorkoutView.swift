@@ -864,6 +864,93 @@ struct ActiveStrengthWorkoutView: View {
         )
     }
 
+    private func upcomingExerciseCoachPhrase()
+        -> (
+            english: String,
+            norwegian: String
+        )? {
+        guard
+            let workout =
+                strength.activeWorkout,
+            strength
+                .currentExerciseAllSetsCompleted,
+            strength.hasNextExercise
+        else {
+            return nil
+        }
+
+        let currentIndex =
+            strength.currentExerciseIndex
+        let later =
+            workout.exercises.indices
+                .dropFirst(
+                    currentIndex + 1
+                )
+                .first {
+                    !workout
+                        .exercises[$0]
+                        .isCompleted
+                }
+        let earlier =
+            workout.exercises.indices
+                .prefix(currentIndex)
+                .first {
+                    !workout
+                        .exercises[$0]
+                        .isCompleted
+                }
+
+        guard let nextIndex =
+                later ?? earlier
+        else {
+            return nil
+        }
+
+        let exercise =
+            workout.exercises[
+                nextIndex
+            ]
+        guard let set =
+                exercise.sets.first(
+                    where: {
+                        !$0.isCompleted
+                    }
+                )
+        else {
+            return (
+                "Next exercise. \(exercise.exercise.displayName).",
+                "Neste øvelse. \(exercise.exercise.displayName)."
+            )
+        }
+
+        let target =
+            strengthTargetCoachPhrase(
+                set: set,
+                fallbackReps: nil,
+                fallbackDurationSeconds:
+                    nil,
+                fallbackWeightKilograms:
+                    nil,
+                fallbackResistanceLevel:
+                    nil
+            )
+
+        var english =
+            "Next exercise. \(exercise.exercise.displayName)."
+        var norwegian =
+            "Neste øvelse. \(exercise.exercise.displayName)."
+
+        if !target.english.isEmpty {
+            english += " \(target.english)"
+            norwegian += " \(target.norwegian)"
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
     private func strengthTargetCoachPhrase(
         set: StrengthSetLog,
         fallbackReps: Int?,
@@ -1136,8 +1223,21 @@ struct ActiveStrengthWorkoutView: View {
                         )
                     }
 
-                    if let nextSet =
-                            nextSetCoachPhrase() {
+                    if strength
+                        .currentExerciseAllSetsCompleted {
+                        if coachConfiguration
+                            .announceNextExercise,
+                           let nextExercise =
+                                upcomingExerciseCoachPhrase() {
+                            englishParts.append(
+                                nextExercise.english
+                            )
+                            norwegianParts.append(
+                                nextExercise.norwegian
+                            )
+                        }
+                    } else if let nextSet =
+                                nextSetCoachPhrase() {
                         englishParts.append(
                             nextSet.english
                         )
