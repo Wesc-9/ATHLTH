@@ -1623,7 +1623,7 @@ private struct CommunityGroupUpdate: Encodable {
     let visibility: String
     let joinMode: String
     let membersCanCreateContent: Bool
-    let themeKey: String
+    let themeKey: String?
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -3208,10 +3208,19 @@ final class CommunityGroupStore: ObservableObject {
                     membersCanCreateContent ??
                     group.membersCanCreateContent,
                 themeKey:
-                    CommunityClubTheme(
-                        rawValue: themeKey ?? group.themeKey ?? ""
-                    )?.rawValue ??
-                    CommunityClubTheme.emerald.rawValue,
+                    group.themeKey == nil
+                        ? nil
+                        : (
+                            CommunityClubTheme(
+                                rawValue:
+                                    themeKey ??
+                                    group.themeKey ??
+                                    ""
+                            )?.rawValue ??
+                            CommunityClubTheme
+                                .emerald
+                                .rawValue
+                        ),
                 updatedAt: Date()
             )
 
