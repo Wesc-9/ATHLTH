@@ -2653,49 +2653,12 @@ struct TrainingPlanCreationView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if creationMode == nil {
-                    creationModeChoice
-                } else if creationMode == .simple {
-                    simpleForm
-                } else {
-                    advancedForm
-                }
-            }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(
-                        creationMode == nil || !showsSourceChooser
-                            ? "Cancel"
-                            : "Back"
-                    ) {
-                        if creationMode == nil || !showsSourceChooser {
-                            dismiss()
-                        } else {
-                            creationMode = nil
-                        }
-                    }
-                }
-            }
-        }
-        .alert(
-            "Plan Conflict",
-            isPresented: Binding(
-                get: { creationError != nil },
-                set: { shown in
-                    if !shown {
-                        creationError = nil
-                    }
-                }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(creationError ?? "")
-        }
+        ATHLTHTrainingPlanBuilderFlow(
+            startsAtSourceChoice:
+                showsSourceChooser,
+            initialAdvanced:
+                creationMode == .advanced
+        )
     }
 
     private var navigationTitle: String {
