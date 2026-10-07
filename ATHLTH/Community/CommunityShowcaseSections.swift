@@ -880,9 +880,9 @@ struct CommunityFriendsVsFriendsDetailView: View {
                                 ATHLTHLocalization
                                     .choose(
                                         english:
-                                            "Seven days. One category. The request starts when your friend accepts.",
+                                            "Seven days. One category. Your friend receives a request before the duel becomes active.",
                                         norwegian:
-                                            "Syv dager. Én gren. Duellen starter når vennen din godtar."
+                                            "Syv dager. Én gren. Vennen din får en forespørsel før duellen blir aktiv."
                                     )
                             )
                             .font(.caption)
@@ -1168,13 +1168,31 @@ struct CommunityFriendsVsFriendsDetailView: View {
                                 selectedFriendID ==
                                     friend.userID
                                     ? ATHLTHTheme
-                                        .accentDeep
+                                        .vitality
                                     : Color.white
                                         .opacity(
-                                            0.94
+                                            0.88
                                         ),
                                 in: Capsule()
                             )
+                            .overlay {
+                                Capsule()
+                                    .stroke(
+                                        selectedFriendID ==
+                                            friend.userID
+                                            ? Color.white
+                                                .opacity(
+                                                    0.18
+                                                )
+                                            : ATHLTHTheme
+                                                .vitality
+                                                .opacity(
+                                                    0.08
+                                                ),
+                                        lineWidth:
+                                            0.8
+                                    )
+                            }
                         }
                         .buttonStyle(.plain)
                     }
@@ -1323,13 +1341,13 @@ struct CommunityFriendsVsFriendsDetailView: View {
             LinearGradient(
                 colors: [
                     Color.white
-                        .opacity(0.98),
+                        .opacity(0.96),
+                    ATHLTHTheme
+                        .vitalitySoft
+                        .opacity(0.76),
                     ATHLTHTheme
                         .vitality
-                        .opacity(0.075),
-                    ATHLTHTheme
-                        .accentSoft
-                        .opacity(0.42)
+                        .opacity(0.075)
                 ],
                 startPoint:
                     .topLeading,
@@ -1533,13 +1551,13 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 }
                 .foregroundStyle(
                     ATHLTHTheme
-                        .accentDeep
+                        .vitality
                 )
                 .padding(.horizontal, 14)
                 .frame(height: 46)
                 .background(
                     ATHLTHTheme
-                        .accentSoft,
+                        .vitalitySoft,
                     in:
                         RoundedRectangle(
                             cornerRadius: 14,
@@ -1547,6 +1565,18 @@ struct CommunityFriendsVsFriendsDetailView: View {
                                 .continuous
                         )
                 )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.10),
+                        lineWidth: 0.8
+                    )
+                }
             }
             .buttonStyle(.plain)
             .disabled(
@@ -1901,10 +1931,13 @@ struct CommunityFriendsVsFriendsDetailView: View {
             LinearGradient(
                 colors: [
                     Color.white
-                        .opacity(0.97),
+                        .opacity(0.96),
+                    ATHLTHTheme
+                        .vitalitySoft
+                        .opacity(0.36),
                     ATHLTHTheme
                         .surfaceStone
-                        .opacity(0.72)
+                        .opacity(0.54)
                 ],
                 startPoint:
                     .topLeading,
