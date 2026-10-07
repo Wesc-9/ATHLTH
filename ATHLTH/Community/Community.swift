@@ -7966,6 +7966,361 @@ struct CommunityEventMapPlacePickerView:
     }
 }
 
+private struct CommunityEventCompetitionResultEntryView:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+
+    let metric:
+        CommunityEventCompetitionMetric
+    let currentValue: Double?
+    let onSubmit:
+        (Double) async -> Bool
+
+    @State private var minutes: Int
+    @State private var seconds: Int
+    @State private var valueText: String
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(
+        metric:
+            CommunityEventCompetitionMetric,
+        currentValue: Double?,
+        onSubmit:
+            @escaping (Double) async -> Bool
+    ) {
+        self.metric = metric
+        self.currentValue =
+            currentValue
+        self.onSubmit = onSubmit
+
+        let totalSeconds =
+            max(
+                Int(
+                    (currentValue ?? 0)
+                        .rounded()
+                ),
+                0
+            )
+
+        _minutes = State(
+            initialValue:
+                totalSeconds / 60
+        )
+        _seconds = State(
+            initialValue:
+                totalSeconds % 60
+        )
+
+        let initialText: String
+        if metric == .fastestTime {
+            initialText = ""
+        } else if let currentValue {
+            initialText =
+                metric == .highestWeight
+                    ? String(
+                        format:
+                            "%.1f",
+                        currentValue
+                    )
+                    : String(
+                        format:
+                            "%.0f",
+                        currentValue
+                    )
+        } else {
+            initialText = ""
+        }
+
+        _valueText =
+            State(
+                initialValue:
+                    initialText
+            )
+    }
+
+    private var resolvedValue: Double? {
+        switch metric {
+        case .fastestTime:
+            let total =
+                (minutes * 60) +
+                seconds
+            return total > 0
+                ? Double(total)
+                : nil
+
+        case .highestWeight,
+             .mostReps,
+             .points:
+            let normalized =
+                valueText
+                    .replacingOccurrences(
+                        of: ",",
+                        with: "."
+                    )
+            guard
+                let value =
+                    Double(normalized),
+                value > 0
+            else {
+                return nil
+            }
+            return value
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Label(
+                        metric.title,
+                        systemImage:
+                            metric.systemImage
+                    )
+                    .font(
+                        .headline
+                    )
+
+                    switch metric {
+                    case .fastestTime:
+                        HStack(spacing: 12) {
+                            Stepper(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Minutes",
+                                    norwegian:
+                                        "Minutter"
+                                ),
+                                value:
+                                    $minutes,
+                                in: 0...600
+                            )
+
+                            Text(
+                                "\(minutes)"
+                            )
+                            .font(
+                                .headline
+                                    .monospacedDigit()
+                            )
+                            .frame(
+                                minWidth: 30
+                            )
+                        }
+
+                        HStack(spacing: 12) {
+                            Stepper(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Seconds",
+                                    norwegian:
+                                        "Sekunder"
+                                ),
+                                value:
+                                    $seconds,
+                                in: 0...59
+                            )
+
+                            Text(
+                                String(
+                                    format:
+                                        "%02d",
+                                    seconds
+                                )
+                            )
+                            .font(
+                                .headline
+                                    .monospacedDigit()
+                            )
+                            .frame(
+                                minWidth: 30
+                            )
+                        }
+
+                    case .highestWeight:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Kilograms",
+                                norwegian:
+                                    "Kilogram"
+                            ),
+                            text:
+                                $valueText
+                        )
+                        .keyboardType(
+                            .decimalPad
+                        )
+
+                    case .mostReps:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Repetitions",
+                                norwegian:
+                                    "Repetisjoner"
+                            ),
+                            text:
+                                $valueText
+                        )
+                        .keyboardType(
+                            .numberPad
+                        )
+
+                    case .points:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Points",
+                                norwegian:
+                                    "Poeng"
+                            ),
+                            text:
+                                $valueText
+                        )
+                        .keyboardType(
+                            .decimalPad
+                        )
+                    }
+
+                    if let resolvedValue {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Result",
+                                    norwegian:
+                                        "Resultat"
+                                )
+                            )
+                            .foregroundStyle(
+                                .secondary
+                            )
+
+                            Spacer()
+
+                            Text(
+                                metric
+                                    .formattedResult(
+                                        resolvedValue
+                                    )
+                            )
+                            .font(
+                                .headline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                        }
+                    }
+                } footer: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "The result is tied to your check-in for this event. You can correct it later.",
+                            norwegian:
+                                "Resultatet knyttes til innsjekken din for dette arrangementet. Du kan korrigere det senere."
+                        )
+                    )
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(
+                                .red
+                            )
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Register result",
+                    norwegian:
+                        "Registrer resultat"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel",
+                            norwegian: "Avbryt"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Save",
+                            norwegian: "Lagre"
+                        )
+                    ) {
+                        save()
+                    }
+                    .disabled(
+                        resolvedValue == nil ||
+                        isSaving
+                    )
+                }
+            }
+        }
+        .presentationDetents(
+            [.medium, .large]
+        )
+    }
+
+    private func save() {
+        guard
+            let value =
+                resolvedValue,
+            !isSaving
+        else {
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+
+        Task {
+            let saved =
+                await onSubmit(
+                    value
+                )
+
+            isSaving = false
+
+            if saved {
+                dismiss()
+            } else {
+                errorMessage =
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The result could not be saved. Check your check-in and try again.",
+                        norwegian:
+                            "Resultatet kunne ikke lagres. Kontroller innsjekken og prøv igjen."
+                    )
+            }
+        }
+    }
+}
+
 private struct CommunityEventEditView: View {
     @Environment(\.dismiss)
     private var dismiss
