@@ -52,6 +52,7 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
     var socialEventKind: String?
     var socialEntityType: String?
     var socialEntityID: UUID?
+    var groupID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -67,7 +68,8 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         backendEventID: UUID? = nil,
         socialEventKind: String? = nil,
         socialEntityType: String? = nil,
-        socialEntityID: UUID? = nil
+        socialEntityID: UUID? = nil,
+        groupID: UUID? = nil
     ) {
         self.id = id
         self.eventKey = eventKey
@@ -83,6 +85,7 @@ struct ATHLTHNotificationItem: Identifiable, Codable, Hashable {
         self.socialEventKind = socialEventKind
         self.socialEntityType = socialEntityType
         self.socialEntityID = socialEntityID
+        self.groupID = groupID
     }
 
     var isUnread: Bool { readAt == nil }
@@ -101,6 +104,7 @@ struct ATHLTHNotificationDraft: Hashable {
     let socialEventKind: String?
     let socialEntityType: String?
     let socialEntityID: UUID?
+    let groupID: UUID?
 
     init(
         eventKey: String,
@@ -114,7 +118,8 @@ struct ATHLTHNotificationDraft: Hashable {
         backendEventID: UUID? = nil,
         socialEventKind: String? = nil,
         socialEntityType: String? = nil,
-        socialEntityID: UUID? = nil
+        socialEntityID: UUID? = nil,
+        groupID: UUID? = nil
     ) {
         self.eventKey = eventKey
         self.kind = kind
@@ -128,5 +133,6 @@ struct ATHLTHNotificationDraft: Hashable {
         self.socialEventKind = socialEventKind
         self.socialEntityType = socialEntityType
         self.socialEntityID = socialEntityID
+        self.groupID = groupID
     }
 }
