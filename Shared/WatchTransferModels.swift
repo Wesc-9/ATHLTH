@@ -869,6 +869,8 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var secondaryMuscles: [String]? = nil
     var equipment: [String]? = nil
     var setPlans: [WatchStrengthSetPlan]? = nil
+    var isCompleted: Bool? = nil
+    var firstPendingSetIndex: Int? = nil
 }
 
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
