@@ -1665,16 +1665,32 @@ final class StrengthWorkoutStore: ObservableObject {
             completedAt: nil
         )
 
-        let wasEmpty = workout.exercises.isEmpty
+        let wasEmpty =
+            workout.exercises.isEmpty
+        let previousExercisesComplete =
+            !wasEmpty &&
+            workout.exercises
+                .allSatisfy {
+                    $0.isCompleted
+                }
+
         workout.exercises.append(log)
         activeWorkout = workout
 
-        if wasEmpty {
-            currentExerciseIndex = 0
+        if wasEmpty ||
+            previousExercisesComplete {
+            currentExerciseIndex =
+                max(
+                    workout.exercises.count - 1,
+                    0
+                )
             currentSetIndex = 0
             restEndsAt = nil
+            restStartedAt = nil
             reloadDraftFromCurrentSet()
         }
+
+        persistCheckpointNow()
     }
 
     func start(
