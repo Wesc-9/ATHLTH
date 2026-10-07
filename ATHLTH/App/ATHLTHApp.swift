@@ -720,11 +720,12 @@ struct AppRootView: View {
         _ = await health.restoreAuthorizationStateFromSystem()
 
         if health.needsHealthRefreshRecovery {
-            // Give the UI a stable launch first. Clearing the recovery
-            // latch here only affects future launches because this
-            // process remains deferred until it exits.
+            // Give the UI a stable first render before touching HealthKit.
+            // One-time safe-launch migrations can then resume in this same
+            // process; a genuinely interrupted Health refresh keeps the
+            // stricter next-launch deferral to avoid a crash loop.
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            health.resumeAutomaticRefresh()
+            _ = health.resumeDeferredHealthWorkAfterStableLaunch()
         }
 
         guard health.hasRequestedAuthorization,
