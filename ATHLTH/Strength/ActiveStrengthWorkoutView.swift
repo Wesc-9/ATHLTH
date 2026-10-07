@@ -697,13 +697,304 @@ struct ActiveStrengthWorkoutView: View {
             return
         }
 
+        let phrase =
+            nextExerciseCoachPhrase(
+                workout: workout,
+                exercise: exercise,
+                configuration:
+                    configuration
+            )
+
         strengthCoach.speak(
             english:
-                "Next exercise. \(exercise.exercise.displayName).",
+                phrase.english,
             norwegian:
-                "Neste øvelse. \(exercise.exercise.displayName).",
+                phrase.norwegian,
             configuration:
                 configuration.audioCoach
+        )
+    }
+
+    private func nextExerciseCoachPhrase(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog,
+        configuration:
+            StrengthAdvancedConfiguration
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        var english = [
+            "Next exercise. \(exercise.exercise.displayName)."
+        ]
+        var norwegian = [
+            "Neste øvelse. \(exercise.exercise.displayName)."
+        ]
+
+        if configuration.audioCoach
+            .shouldAnnounceExerciseProgress {
+            english.append(
+                "Exercise \(strength.currentExerciseIndex + 1) of \(workout.exercises.count)."
+            )
+            norwegian.append(
+                "Øvelse \(strength.currentExerciseIndex + 1) av \(workout.exercises.count)."
+            )
+        }
+
+        let remainingSets =
+            exercise.sets
+                .filter {
+                    !$0.isCompleted
+                }
+
+        if !remainingSets.isEmpty {
+            english.append(
+                "\(remainingSets.count) sets remaining."
+            )
+            norwegian.append(
+                "\(remainingSets.count) sett gjenstår."
+            )
+        }
+
+        if let first =
+                remainingSets.first {
+            let target =
+                strengthTargetCoachPhrase(
+                    set: first,
+                    fallbackReps: nil,
+                    fallbackDurationSeconds:
+                        nil,
+                    fallbackWeightKilograms:
+                        nil,
+                    fallbackResistanceLevel:
+                        nil
+                )
+
+            if !target.english.isEmpty {
+                english.append(
+                    "First target. \(target.english)"
+                )
+                norwegian.append(
+                    "Første mål. \(target.norwegian)"
+                )
+            }
+
+            let rest =
+                exercise
+                    .restSecondsOverride ??
+                first.restSeconds ??
+                configuration
+                    .restCues
+                    .defaultRestSeconds
+
+            if rest > 0 {
+                english.append(
+                    "\(rest) seconds rest."
+                )
+                norwegian.append(
+                    "\(rest) sekunder hvile."
+                )
+            }
+        }
+
+        return (
+            english.joined(
+                separator: " "
+            ),
+            norwegian.joined(
+                separator: " "
+            )
+        )
+    }
+
+    private func nextSetCoachPhrase()
+        -> (
+            english: String,
+            norwegian: String
+        )? {
+        guard
+            let workout =
+                strength.activeWorkout,
+            let configuration =
+                workout
+                    .advancedConfiguration,
+            configuration.audioCoach
+                .shouldAnnounceNextSetDetails,
+            !strength
+                .currentExerciseAllSetsCompleted,
+            let exercise =
+                strength.currentExercise,
+            let set =
+                strength.currentSet
+        else {
+            return nil
+        }
+
+        let target =
+            strengthTargetCoachPhrase(
+                set: set,
+                fallbackReps:
+                    strength.draftReps,
+                fallbackDurationSeconds:
+                    strength
+                        .draftDurationSeconds,
+                fallbackWeightKilograms:
+                    strength
+                        .draftWeightKilograms,
+                fallbackResistanceLevel:
+                    strength
+                        .draftResistanceLevel
+            )
+
+        var english =
+            "Next set. Set \(set.setNumber) of \(exercise.sets.count)."
+        var norwegian =
+            "Neste sett. Sett \(set.setNumber) av \(exercise.sets.count)."
+
+        if !target.english.isEmpty {
+            english +=
+                " \(target.english)"
+            norwegian +=
+                " \(target.norwegian)"
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
+    private func strengthTargetCoachPhrase(
+        set: StrengthSetLog,
+        fallbackReps: Int?,
+        fallbackDurationSeconds: Int?,
+        fallbackWeightKilograms:
+            Double?,
+        fallbackResistanceLevel: Int?
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        var english = ""
+        var norwegian = ""
+
+        switch set.resolvedTargetKind {
+        case .reps:
+            if let reps =
+                    set.plannedReps ??
+                    fallbackReps,
+               reps > 0 {
+                english =
+                    "\(reps) reps"
+                norwegian =
+                    "\(reps) repetisjoner"
+            }
+
+        case .time:
+            if let seconds =
+                    set
+                        .plannedDurationSeconds ??
+                    fallbackDurationSeconds,
+               seconds > 0 {
+                let duration =
+                    coachDurationPhrase(
+                        seconds
+                    )
+                english =
+                    duration.english
+                norwegian =
+                    duration.norwegian
+            }
+        }
+
+        switch set.resolvedLoadKind {
+        case .weightKilograms:
+            if let weight =
+                    set
+                        .plannedWeightKilograms ??
+                    fallbackWeightKilograms,
+               weight > 0 {
+                let formatted =
+                    weight.rounded() ==
+                        weight
+                        ? String(
+                            Int(weight)
+                        )
+                        : String(
+                            format:
+                                "%.1f",
+                            weight
+                        )
+
+                english +=
+                    english.isEmpty
+                        ? "\(formatted) kilograms"
+                        : " at \(formatted) kilograms"
+                norwegian +=
+                    norwegian.isEmpty
+                        ? "\(formatted) kilo"
+                        : " på \(formatted) kilo"
+            }
+
+        case .resistanceLevel:
+            if let level =
+                    set
+                        .plannedResistanceLevel ??
+                    fallbackResistanceLevel,
+               level > 0 {
+                english +=
+                    english.isEmpty
+                        ? "Resistance level \(level)"
+                        : " at resistance level \(level)"
+                norwegian +=
+                    norwegian.isEmpty
+                        ? "Motstand \(level)"
+                        : " på motstand \(level)"
+            }
+        }
+
+        if !english.isEmpty {
+            english += "."
+            norwegian += "."
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
+    private func coachDurationPhrase(
+        _ seconds: Int
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        let bounded =
+            max(seconds, 0)
+        let minutes =
+            bounded / 60
+        let remainder =
+            bounded % 60
+
+        if minutes > 0,
+           remainder > 0 {
+            return (
+                "\(minutes) minutes and \(remainder) seconds",
+                "\(minutes) minutter og \(remainder) sekunder"
+            )
+        }
+
+        if minutes > 0 {
+            return (
+                "\(minutes) minutes",
+                "\(minutes) minutter"
+            )
+        }
+
+        return (
+            "\(remainder) seconds",
+            "\(remainder) sekunder"
         )
     }
 
@@ -823,17 +1114,56 @@ struct ActiveStrengthWorkoutView: View {
                         )
                 }
 
-                if coachConfiguration.enabled &&
-                    coachConfiguration
+                if coachConfiguration.enabled {
+                    var englishParts:
+                        [String] = []
+                    var norwegianParts:
+                        [String] = []
+
+                    if coachConfiguration
                         .announceRestComplete {
-                    strengthCoach.speak(
-                        english:
-                            "Rest complete. Ready for the next set.",
-                        norwegian:
-                            "Hvilen er ferdig. Klar for neste sett.",
-                        configuration:
-                            coachConfiguration
-                    )
+                        englishParts.append(
+                            strength
+                                .currentExerciseAllSetsCompleted
+                                ? "Rest complete. Ready for the next exercise."
+                                : "Rest complete."
+                        )
+                        norwegianParts.append(
+                            strength
+                                .currentExerciseAllSetsCompleted
+                                ? "Hvilen er ferdig. Klar for neste øvelse."
+                                : "Hvilen er ferdig."
+                        )
+                    }
+
+                    if let nextSet =
+                            nextSetCoachPhrase() {
+                        englishParts.append(
+                            nextSet.english
+                        )
+                        norwegianParts.append(
+                            nextSet.norwegian
+                        )
+                    }
+
+                    if !englishParts.isEmpty {
+                        strengthCoach.speak(
+                            english:
+                                englishParts
+                                    .joined(
+                                        separator:
+                                            " "
+                                    ),
+                            norwegian:
+                                norwegianParts
+                                    .joined(
+                                        separator:
+                                            " "
+                                    ),
+                            configuration:
+                                coachConfiguration
+                        )
+                    }
                 }
             }
     }
@@ -890,14 +1220,43 @@ struct ActiveStrengthWorkoutView: View {
                         strength
                             .currentExercise?
                             .exercise
-                            .name ??
+                            .displayName ??
                         active.title
+                    let totalSets =
+                        active.exercises
+                            .flatMap(\.sets)
+                            .count
+                    let exercisePosition =
+                        min(
+                            strength
+                                .currentExerciseIndex +
+                            1,
+                            max(
+                                active
+                                    .exercises
+                                    .count,
+                                1
+                            )
+                        )
+
+                    var english =
+                        "\(active.totalCompletedSets) of \(totalSets) sets complete. Current exercise: \(exerciseName)."
+                    var norwegian =
+                        "\(active.totalCompletedSets) av \(totalSets) sett fullført. Nåværende øvelse: \(exerciseName)."
+
+                    if configuration
+                        .audioCoach
+                        .shouldAnnounceExerciseProgress {
+                        english +=
+                            " Exercise \(exercisePosition) of \(active.exercises.count)."
+                        norwegian +=
+                            " Øvelse \(exercisePosition) av \(active.exercises.count)."
+                    }
 
                     strengthCoach.speak(
-                        english:
-                            "\(active.totalCompletedSets) sets complete. Current exercise: \(exerciseName).",
+                        english: english,
                         norwegian:
-                            "\(active.totalCompletedSets) sett fullført. Nåværende øvelse: \(exerciseName).",
+                            norwegian,
                         configuration:
                             configuration.audioCoach
                     )
