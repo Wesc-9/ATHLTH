@@ -2797,13 +2797,15 @@ struct HomeWeeklyProgressStrip:
     var body: some View {
         VStack(
             alignment: .leading,
-            spacing: 8
+            spacing: 6
         ) {
             HStack(spacing: 7) {
                 Text("Ukens fremdrift")
                     .font(
-                        .subheadline
-                            .weight(.bold)
+                        .system(
+                            size: 13,
+                            weight: .bold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
@@ -2814,8 +2816,10 @@ struct HomeWeeklyProgressStrip:
 
                 Text(progressText)
                     .font(
-                        .caption
-                            .weight(.semibold)
+                        .system(
+                            size: 11,
+                            weight: .semibold
+                        )
                     )
                     .foregroundStyle(
                         ATHLTHTheme
@@ -2831,7 +2835,7 @@ struct HomeWeeklyProgressStrip:
             )
             .scaleEffect(
                 x: 1,
-                y: 0.72,
+                y: 0.62,
                 anchor: .center
             )
 
@@ -2877,8 +2881,15 @@ struct HomeWeeklyProgressStrip:
                     }
                 }
             }
+
+            Divider()
+                .opacity(0.30)
+                .padding(.top, 1)
+
+            compactWeekMetrics
         }
-        .padding(11)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
         .background(
             Color.white.opacity(0.90),
             in: RoundedRectangle(
@@ -3021,7 +3032,7 @@ struct HomeWeeklyProgressStrip:
                 date
             )
 
-        return VStack(spacing: 4) {
+        return VStack(spacing: 3) {
             ZStack {
                 Circle()
                     .fill(
@@ -3123,8 +3134,8 @@ struct HomeWeeklyProgressStrip:
                 }
             }
             .frame(
-                width: 30,
-                height: 30
+                width: 27,
+                height: 27
             )
             .overlay {
                 if isToday {
@@ -3143,7 +3154,7 @@ struct HomeWeeklyProgressStrip:
             )
             .font(
                 .system(
-                    size: 9,
+                    size: 8.5,
                     weight:
                         isToday
                             ? .bold
@@ -3193,8 +3204,8 @@ struct HomeWeeklyProgressStrip:
                         .opacity(0.35)
             )
             .frame(
-                width: 30,
-                height: 30
+                width: 27,
+                height: 27
             )
             .background(
                 Color.white.opacity(
@@ -3293,6 +3304,178 @@ struct HomeWeeklyProgressStrip:
                     $0.startDate
                 )
         }
+    }
+
+    private var compactWeekMetrics:
+        some View {
+        HStack(spacing: 4) {
+            compactWeekMetric(
+                icon: "figure.run",
+                value:
+                    visibleWeekRunningDistanceKilometers >
+                        0
+                        ? String(
+                            format: "%.1f km",
+                            locale:
+                                Locale.current,
+                            visibleWeekRunningDistanceKilometers
+                        )
+                        : "—",
+                accessibilityTitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Running distance",
+                        norwegian:
+                            "Løpedistanse"
+                    )
+            )
+
+            compactWeekMetric(
+                icon: "stopwatch.fill",
+                value:
+                    visibleWeekDurationText,
+                accessibilityTitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Training time",
+                        norwegian:
+                            "Treningstid"
+                    )
+            )
+
+            compactWeekMetric(
+                icon: "dumbbell.fill",
+                value:
+                    "\(visibleWeekStrengthSessions)",
+                accessibilityTitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Strength workouts",
+                        norwegian:
+                            "Styrkeøkter"
+                    )
+            )
+
+            compactWeekMetric(
+                icon:
+                    "checkmark.circle.fill",
+                value:
+                    "\(visibleWorkouts.count)",
+                accessibilityTitle:
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Workouts",
+                        norwegian:
+                            "Økter"
+                    )
+            )
+        }
+    }
+
+    private func compactWeekMetric(
+        icon: String,
+        value: String,
+        accessibilityTitle: String
+    ) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(
+                    .system(
+                        size: 9,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+
+            Text(value)
+                .font(
+                    .system(
+                        size: 10.5,
+                        weight: .semibold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .frame(
+            maxWidth: .infinity
+        )
+        .accessibilityElement(
+            children: .ignore
+        )
+        .accessibilityLabel(
+            accessibilityTitle
+        )
+        .accessibilityValue(value)
+    }
+
+    private var visibleWeekRunningDistanceKilometers:
+        Double {
+        visibleWorkouts
+            .filter {
+                $0.activity == .running
+            }
+            .compactMap(
+                \.distanceMeters
+            )
+            .reduce(0, +) /
+            1_000
+    }
+
+    private var visibleWeekDurationMinutes:
+        Double {
+        visibleWorkouts.reduce(0) {
+            $0 +
+                max(
+                    $1.duration / 60,
+                    0
+                )
+        }
+    }
+
+    private var visibleWeekStrengthSessions:
+        Int {
+        visibleWorkouts
+            .filter {
+                $0.activity == .strength
+            }
+            .count
+    }
+
+    private var visibleWeekDurationText:
+        String {
+        guard visibleWeekDurationMinutes >
+                0
+        else {
+            return "—"
+        }
+
+        let total =
+            Int(
+                visibleWeekDurationMinutes
+                    .rounded()
+            )
+        let hours =
+            total / 60
+        let minutes =
+            total % 60
+
+        if hours == 0 {
+            return "\(minutes)m"
+        }
+
+        return
+            minutes == 0
+                ? "\(hours)t"
+                : "\(hours)t \(minutes)m"
     }
 
     private var plannedCount:
