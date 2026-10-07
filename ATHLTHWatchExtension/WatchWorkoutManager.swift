@@ -1801,6 +1801,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 min(max(rest, 0), 600)
         }
 
+        if let targetRPE =
+                plan.targetRPE {
+            snapshot.draftRPE =
+                min(
+                    max(targetRPE, 1),
+                    10
+                )
+        }
+
+        if let targetRIR =
+                plan.targetRIR {
+            snapshot.draftRIR =
+                min(
+                    max(targetRIR, 0),
+                    5
+                )
+        }
+
         snapshot.isWarmUp =
             plan.isWarmUp
     }
