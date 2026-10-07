@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 
 @MainActor
 final class SocialStore: ObservableObject {
@@ -227,6 +228,7 @@ final class SocialStore: ObservableObject {
             if inboxEvents != inbox {
                 inboxEvents = inbox
             }
+            syncApplicationIconBadge()
             applyWorkoutSessions(
                 sessions: workoutSessions,
                 participants: workoutParticipants,
@@ -377,6 +379,7 @@ final class SocialStore: ObservableObject {
             if inboxEvents != loadedInbox {
                 inboxEvents = loadedInbox
             }
+            syncApplicationIconBadge()
             lastHomeFeedRefreshAt = Date()
 
             if let notificationStore {
@@ -2583,6 +2586,7 @@ final class SocialStore: ObservableObject {
         do {
             try await service.markInboxEventRead(eventID)
             inboxEvents = try await service.loadInboxEvents()
+            syncApplicationIconBadge()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -2624,6 +2628,7 @@ final class SocialStore: ObservableObject {
             inboxEvents =
                 try await service
                     .loadInboxEvents()
+            syncApplicationIconBadge()
         } catch {
             errorMessage =
                 error.localizedDescription
@@ -2654,9 +2659,74 @@ final class SocialStore: ObservableObject {
             inboxEvents =
                 try await service
                     .loadInboxEvents()
+            syncApplicationIconBadge()
         } catch {
             errorMessage =
                 error.localizedDescription
+        }
+    }
+
+    func markNotificationCenterInboxRead()
+        async {
+        let matching =
+            inboxEvents.filter {
+                $0.readAt == nil &&
+                !isMessageInboxOwned(
+                    $0
+                )
+            }
+
+        guard !matching.isEmpty else {
+            syncApplicationIconBadge()
+            return
+        }
+
+        do {
+            for event in matching {
+                try await service
+                    .markInboxEventRead(
+                        event.id
+                    )
+            }
+
+            inboxEvents =
+                try await service
+                    .loadInboxEvents()
+            syncApplicationIconBadge()
+        } catch {
+            errorMessage =
+                error.localizedDescription
+        }
+    }
+
+    private func isMessageInboxOwned(
+        _ event: SocialInboxEvent
+    ) -> Bool {
+        switch event.kind
+            .lowercased() {
+        case "message",
+             "message_request",
+             "message_request_accepted":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func syncApplicationIconBadge() {
+        let unread =
+            inboxEvents.filter {
+                $0.readAt == nil
+            }
+            .count
+
+        Task {
+            try? await
+                UNUserNotificationCenter
+                    .current()
+                    .setBadgeCount(
+                        unread
+                    )
         }
     }
 
@@ -2990,6 +3060,7 @@ final class SocialStore: ObservableObject {
         blockedUsers = []
         mutedUserIDs = []
         inboxEvents = []
+        syncApplicationIconBadge()
         workoutSessions = []
         workoutParticipants = []
         workoutInvites = []
