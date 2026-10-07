@@ -1805,7 +1805,9 @@ struct ATHLTHNotificationCenterView: View {
         } else if let groupID =
                     notificationGroupID(item) {
             CommunityGroupNotificationDestination(
-                groupID: groupID
+                groupID: groupID,
+                initialTab:
+                    notificationGroupTab(item)
             )
         } else {
             let eventKind =
@@ -1835,6 +1837,23 @@ struct ATHLTHNotificationCenterView: View {
                     initialTab: .feed
                 )
             }
+        }
+    }
+
+    private func notificationGroupTab(
+        _ item: ATHLTHNotificationItem
+    ) -> CommunityGroupsTab {
+        switch item.socialEventKind?
+            .lowercased() {
+        case "group_message",
+             "mention":
+            return .chat
+        case "group_event":
+            return .events
+        case "group_challenge":
+            return .challenges
+        default:
+            return .overview
         }
     }
 
@@ -1928,6 +1947,7 @@ private struct CommunityGroupNotificationDestination: View {
     @EnvironmentObject private var groups: CommunityGroupStore
 
     let groupID: UUID
+    let initialTab: CommunityGroupsTab
 
     @State private var finishedLookup = false
 
@@ -1944,7 +1964,8 @@ private struct CommunityGroupNotificationDestination: View {
         Group {
             if let group = resolvedGroup {
                 CommunityGroupDetailView(
-                    group: group
+                    group: group,
+                    initialTab: initialTab
                 )
             } else if finishedLookup {
                 ContentUnavailableView(
