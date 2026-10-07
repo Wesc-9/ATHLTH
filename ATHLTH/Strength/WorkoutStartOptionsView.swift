@@ -7,6 +7,7 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -44,6 +45,7 @@ struct WorkoutStartOptionsView: View {
     @State private var configuredExercises:
         [PlannedExercise]
     @State private var showingExerciseLibrary = false
+    @State private var showingAIExercisePlanner = false
     @State private var exerciseBeingEdited:
         PlannedExercise?
 
@@ -444,6 +446,26 @@ struct WorkoutStartOptionsView: View {
                         addExercise(entry.exercise)
                         showingExerciseLibrary = false
                     }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingAIExercisePlanner
+            ) {
+                StrengthAIExercisePlannerView(
+                    existingExercises:
+                        configuredExercises,
+                    recentWorkouts:
+                        strengthWorkout
+                            .workoutHistory
+                ) {
+                    additions in
+
+                    configuredExercises
+                        .append(
+                            contentsOf:
+                                additions
+                        )
                 }
             }
             .sheet(item: $exerciseBeingEdited) { exercise in
@@ -1058,6 +1080,114 @@ struct WorkoutStartOptionsView: View {
                     )
             )
             .padding(.top, 8)
+
+            Button {
+                showingAIExercisePlanner =
+                    true
+            } label: {
+                HStack(spacing: 9) {
+                    Image(
+                        systemName:
+                            "sparkles"
+                    )
+                    .font(
+                        .system(
+                            size: 15,
+                            weight:
+                                .semibold
+                        )
+                    )
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "AI choose for me",
+                            norwegian:
+                                "AI velg for meg"
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+
+                    Spacer()
+
+                    Text("ATHLTH+")
+                        .font(
+                            .caption2
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .padding(
+                            .horizontal,
+                            7
+                        )
+                        .frame(height: 23)
+                        .background(
+                            Color.white
+                                .opacity(0.72),
+                            in: Capsule()
+                        )
+                }
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .accentDeep
+                )
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+                .frame(height: 46)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(
+                                    0.16
+                                ),
+                            ATHLTHTheme
+                                .vitality
+                                .opacity(
+                                    0.10
+                                )
+                        ],
+                        startPoint:
+                            .leading,
+                        endPoint:
+                            .trailing
+                    ),
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 14,
+                            style:
+                                .continuous
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.30),
+                        lineWidth: 0.8
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 7)
         }
     }
 
