@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.6.7
+      - release/v1.6.8
     paths:
       - .github/archive-preflight-trigger
   pull_request:
