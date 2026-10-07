@@ -18367,7 +18367,16 @@ struct CommunityGroupEventCreateView: View {
                     $showingMeetingSearch
             ) {
                 NavigationStack {
-                    CommunityEventMapPlacePickerView {
+                    CommunityEventMapPlacePickerView(
+                        initialName:
+                            meetingName,
+                        initialLatitude:
+                            advancedOptions
+                                .meetingLatitude,
+                        initialLongitude:
+                            advancedOptions
+                                .meetingLongitude
+                    ) {
                         place in
 
                         meetingName =
