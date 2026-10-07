@@ -52,10 +52,7 @@ begin
       add constraint community_event_competition_result_value_check
       check (
         competition_result_value is null
-        or (
-          isfinite(competition_result_value)
-          and competition_result_value > 0
-        )
+        or competition_result_value > 0
       );
   end if;
 end
