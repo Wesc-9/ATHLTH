@@ -565,13 +565,72 @@ struct PlannedWorkoutDetailView: View {
                                 in: Circle()
                             )
 
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(exercise.embeddedExercise.displayName)
                                 .font(.subheadline.weight(.semibold))
 
                             Text(exerciseSummary(exercise))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
+
+                            if exercise.hasIndividualSetTargets {
+                                VStack(spacing: 5) {
+                                    ForEach(
+                                        Array(
+                                            exercise
+                                                .resolvedSetTargets
+                                                .enumerated()
+                                        ),
+                                        id: \.element.id
+                                    ) { setIndex, target in
+                                        HStack(spacing: 7) {
+                                            Text(
+                                                ATHLTHLocalization.choose(
+                                                    english:
+                                                        "Set \(setIndex + 1)",
+                                                    norwegian:
+                                                        "Sett \(setIndex + 1)"
+                                                )
+                                            )
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.primaryText
+                                            )
+                                            .frame(
+                                                width: 42,
+                                                alignment: .leading
+                                            )
+
+                                            Text(
+                                                individualSetSummary(
+                                                    target,
+                                                    exercise: exercise
+                                                )
+                                            )
+                                            .font(
+                                                .caption2
+                                                .monospacedDigit()
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText
+                                            )
+                                            .lineLimit(1)
+
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 9)
+                                        .frame(minHeight: 29)
+                                        .background(
+                                            Color.primary.opacity(0.025),
+                                            in: RoundedRectangle(
+                                                cornerRadius: 9,
+                                                style: .continuous
+                                            )
+                                        )
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
                         }
 
                         Spacer()
@@ -898,6 +957,104 @@ struct PlannedWorkoutDetailView: View {
         }
     }
 
+    private func individualSetSummary(
+        _ target: PlannedExerciseSetTarget,
+        exercise: PlannedExercise
+    ) -> String {
+        var parts: [String] = []
+
+        if exercise.resolvedTargetKind == .reps {
+            if let reps = target.reps {
+                parts.append(
+                    ATHLTHLocalization.choose(
+                        english: "\(reps) reps",
+                        norwegian: "\(reps) reps"
+                    )
+                )
+            }
+        } else if let duration =
+                    target.durationSeconds {
+            let minutes =
+                duration / 60
+            let seconds =
+                duration % 60
+            parts.append(
+                minutes > 0
+                    ? String(
+                        format: "%d:%02d",
+                        minutes,
+                        seconds
+                    )
+                    : "\(seconds)s"
+            )
+        }
+
+        if exercise.resolvedLoadKind ==
+            .weightKilograms,
+           let weight =
+                target.weightKilograms {
+            parts.append(
+                String(
+                    format: "%.1f kg",
+                    weight
+                )
+            )
+        } else if exercise.resolvedLoadKind ==
+                    .resistanceLevel,
+                  let level =
+                    target.resistanceLevel {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Resistance \(level)",
+                    norwegian:
+                        "Motstand \(level)"
+                )
+            )
+        }
+
+        if let rest =
+                target.restSeconds {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english: "\(rest)s rest",
+                    norwegian: "\(rest)s hvile"
+                )
+            )
+        }
+
+        if let rpe =
+                target.targetRPE {
+            parts.append(
+                String(
+                    format: "RPE %.1f",
+                    rpe
+                )
+            )
+        }
+
+        if let rir =
+                target.targetRIR {
+            parts.append(
+                String(
+                    format: "RIR %.1f",
+                    rir
+                )
+            )
+        }
+
+        if target.isWarmUp == true {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english: "Warm-up",
+                    norwegian: "Oppvarming"
+                )
+            )
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
     private func exerciseSummary(
         _ exercise: PlannedExercise
     ) -> String {
@@ -912,8 +1069,14 @@ struct PlannedWorkoutDetailView: View {
             parts.append(load)
         }
 
-        if let rest = exercise.restSeconds {
-            parts.append("\(rest)s rest")
+        if !exercise.hasIndividualSetTargets,
+           let rest = exercise.restSeconds {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english: "\(rest)s rest",
+                    norwegian: "\(rest)s hvile"
+                )
+            )
         }
 
         return parts.joined(separator: " · ")
