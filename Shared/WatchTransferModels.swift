@@ -1297,9 +1297,17 @@ struct WatchHomeAssistantConfiguration: Codable, Hashable {
     }
 }
 
+struct WatchWorkoutActivityState: Codable, Hashable {
+    let isActive: Bool
+    let title: String?
+    let updatedAt: Date
+}
+
 enum WatchTransferKind: String {
     case route
     case workoutResult
+    case workoutActivityState
+    case workoutStartGuard
     case workoutCommand
     case workoutRouteSelection
     case audioCoachConfiguration
@@ -1338,4 +1346,6 @@ enum WatchTransferMetadataKey {
     static let workoutStartedAt = "workoutStartedAt"
     static let probeID = "probeID"
     static let sentAt = "sentAt"
+    static let workoutAllowed = "workoutAllowed"
+    static let workoutActive = "workoutActive"
 }
