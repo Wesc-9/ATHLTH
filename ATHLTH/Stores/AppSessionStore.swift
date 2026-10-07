@@ -2045,6 +2045,285 @@ final class AppSessionStore: ObservableObject {
         return plan
     }
 
+    @discardableResult
+    func createConfiguredTrainingPlan(
+        title: String,
+        summary: String,
+        weekCount: Int,
+        startDate: Date?,
+        endDate: Date? = nil,
+        visibility: ProfileVisibility = .privateOnly,
+        builderProfile: TrainingPlanBuilderProfile,
+        seedSuggestedWeek: Bool
+    ) -> TrainingPlan? {
+        let resolvedWeekCount =
+            min(max(weekCount, 1), 52)
+        let resolvedStart =
+            Calendar.current.startOfDay(
+                for: startDate ?? Date()
+            )
+        let resolvedEnd =
+            endDate.map {
+                Calendar.current.startOfDay(
+                    for: max($0, resolvedStart)
+                )
+            } ??
+            Calendar.current.date(
+                byAdding: .day,
+                value:
+                    max(
+                        resolvedWeekCount * 7 - 1,
+                        0
+                    ),
+                to: resolvedStart
+            )
+
+        let normalizedDays =
+            Array(
+                Set(
+                    builderProfile
+                        .preferredDayIndexes
+                        .filter {
+                            (1...7).contains($0)
+                        }
+                )
+            )
+            .sorted()
+        let targetDays =
+            normalizedDays.isEmpty
+                ? [1, 3, 5]
+                : normalizedDays
+        let pattern =
+            builderProfile
+                .primaryFocus?
+                .suggestedWorkoutPattern ??
+            [.strength, .running]
+
+        func suggestedTitle(
+            kind: WorkoutKind,
+            slot: Int
+        ) -> String {
+            switch kind {
+            case .strength:
+                if builderProfile.primaryFocus ==
+                    .hypertrophy {
+                    let names = [
+                        ATHLTHLocalization.choose(
+                            english: "Upper body",
+                            norwegian: "Overkropp"
+                        ),
+                        ATHLTHLocalization.choose(
+                            english: "Lower body",
+                            norwegian: "Underkropp"
+                        ),
+                        ATHLTHLocalization.choose(
+                            english: "Full body",
+                            norwegian: "Helkropp"
+                        )
+                    ]
+                    return names[
+                        slot % names.count
+                    ]
+                }
+
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Strength \(Character(UnicodeScalar(65 + (slot % 4))!))",
+                    norwegian:
+                        "Styrke \(Character(UnicodeScalar(65 + (slot % 4))!))"
+                )
+
+            case .running:
+                let names = [
+                    ATHLTHLocalization.choose(
+                        english: "Easy run",
+                        norwegian: "Rolig løp"
+                    ),
+                    ATHLTHLocalization.choose(
+                        english: "Intervals",
+                        norwegian: "Intervaller"
+                    ),
+                    ATHLTHLocalization.choose(
+                        english: "Long run",
+                        norwegian: "Langtur"
+                    )
+                ]
+                return names[
+                    slot % names.count
+                ]
+
+            case .walking:
+                return ATHLTHLocalization.choose(
+                    english: "Walk",
+                    norwegian: "Gåtur"
+                )
+
+            case .mobility:
+                return ATHLTHLocalization.choose(
+                    english: "Mobility",
+                    norwegian: "Mobilitet"
+                )
+
+            case .recovery:
+                return ATHLTHLocalization.choose(
+                    english: "Active recovery",
+                    norwegian: "Aktiv restitusjon"
+                )
+
+            case .custom:
+                return ATHLTHLocalization.choose(
+                    english: "Workout",
+                    norwegian: "Treningsøkt"
+                )
+            }
+        }
+
+        func makeSession(
+            kind: WorkoutKind,
+            slot: Int
+        ) -> PlannedSession {
+            let duration: Int
+            let distance: Double?
+
+            switch kind {
+            case .running:
+                duration = 45
+                distance = nil
+            case .walking:
+                duration = 45
+                distance = nil
+            case .strength:
+                duration = 55
+                distance = nil
+            case .mobility:
+                duration = 25
+                distance = nil
+            case .recovery:
+                duration = 30
+                distance = nil
+            case .custom:
+                duration = 45
+                distance = nil
+            }
+
+            return PlannedSession(
+                id: UUID(),
+                title:
+                    suggestedTitle(
+                        kind: kind,
+                        slot: slot
+                    ),
+                kind: kind,
+                scheduledStart: nil,
+                durationMinutes: duration,
+                targetDistanceKilometers:
+                    distance,
+                targetPaceSecondsPerKilometer:
+                    nil,
+                routeID: nil,
+                exercises: [],
+                notes: nil,
+                runningWorkout: nil
+            )
+        }
+
+        var weeks =
+            (1...resolvedWeekCount)
+                .map(makeEmptyWeek)
+
+        if seedSuggestedWeek {
+            for weekIndex in weeks.indices {
+                for (
+                    slot,
+                    dayIndex
+                ) in targetDays.enumerated() {
+                    guard
+                        let actualDayIndex =
+                            weeks[weekIndex]
+                                .days
+                                .firstIndex(
+                                    where: {
+                                        $0.dayIndex ==
+                                        dayIndex
+                                    }
+                                )
+                    else {
+                        continue
+                    }
+
+                    let kind =
+                        pattern[
+                            slot %
+                            max(
+                                pattern.count,
+                                1
+                            )
+                        ]
+
+                    weeks[weekIndex]
+                        .days[actualDayIndex]
+                        .sessions = [
+                            makeSession(
+                                kind: kind,
+                                slot: slot
+                            )
+                        ]
+                }
+            }
+        }
+
+        let trimmedSummary =
+            summary
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+        let fallbackSummary =
+            [
+                builderProfile.primaryFocus?.title,
+                builderProfile.goal?.title
+            ]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+
+        let plan = TrainingPlan(
+            id: UUID(),
+            ownerID: profile.userID,
+            title:
+                title
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .isEmpty
+                    ? ATHLTHLocalization.choose(
+                        english: "My Training Plan",
+                        norwegian: "Min treningsplan"
+                    )
+                    : title
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+            summary:
+                trimmedSummary.isEmpty
+                    ? fallbackSummary
+                    : trimmedSummary,
+            visibility: visibility,
+            version: 1,
+            weeks: weeks,
+            tags: [],
+            createdAt: Date(),
+            updatedAt: Date(),
+            startDate: resolvedStart,
+            endDate: resolvedEnd,
+            builderProfile: builderProfile
+        )
+
+        guard addTrainingPlan(plan) else {
+            return nil
+        }
+
+        return plan
+    }
+
     func replaceActivePlan(with plan: TrainingPlan) {
         var replacement = plan
 
