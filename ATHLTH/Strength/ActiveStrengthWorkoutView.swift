@@ -881,8 +881,8 @@ struct ActiveStrengthWorkoutView: View {
         switch set.resolvedTargetKind {
         case .reps:
             if let reps =
-                    set.plannedReps ??
-                    fallbackReps,
+                    fallbackReps ??
+                    set.plannedReps,
                reps > 0 {
                 english =
                     "\(reps) reps"
@@ -892,9 +892,9 @@ struct ActiveStrengthWorkoutView: View {
 
         case .time:
             if let seconds =
+                    fallbackDurationSeconds ??
                     set
-                        .plannedDurationSeconds ??
-                    fallbackDurationSeconds,
+                        .plannedDurationSeconds,
                seconds > 0 {
                 let duration =
                     coachDurationPhrase(
@@ -910,9 +910,9 @@ struct ActiveStrengthWorkoutView: View {
         switch set.resolvedLoadKind {
         case .weightKilograms:
             if let weight =
+                    fallbackWeightKilograms ??
                     set
-                        .plannedWeightKilograms ??
-                    fallbackWeightKilograms,
+                        .plannedWeightKilograms,
                weight > 0 {
                 let formatted =
                     weight.rounded() ==
@@ -938,9 +938,9 @@ struct ActiveStrengthWorkoutView: View {
 
         case .resistanceLevel:
             if let level =
+                    fallbackResistanceLevel ??
                     set
-                        .plannedResistanceLevel ??
-                    fallbackResistanceLevel,
+                        .plannedResistanceLevel,
                level > 0 {
                 english +=
                     english.isEmpty
