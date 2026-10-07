@@ -6504,8 +6504,19 @@ struct CommunityGroupDetailView: View {
 
     let group: CommunityGroupRecord
 
-    @State private var selectedTab: CommunityGroupsTab = .overview
-    @State private var tabIndicator: CommunityGroupsTab = .overview
+    @State private var selectedTab: CommunityGroupsTab
+    @State private var tabIndicator: CommunityGroupsTab
+
+    init(
+        group: CommunityGroupRecord,
+        initialTab: CommunityGroupsTab = .overview
+    ) {
+        self.group = group
+        _selectedTab =
+            State(initialValue: initialTab)
+        _tabIndicator =
+            State(initialValue: initialTab)
+    }
     @State private var messageDraft = ""
     @State private var selectedChatPhoto: PhotosPickerItem?
     @State private var pendingChatImageData: Data?
