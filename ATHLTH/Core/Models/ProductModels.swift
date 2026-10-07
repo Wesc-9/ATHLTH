@@ -517,6 +517,40 @@ extension ExerciseSnapshot {
     }
 }
 
+struct PlannedExerciseSetTarget: Identifiable, Codable, Hashable {
+    let id: UUID
+    var reps: Int?
+    var durationSeconds: Int?
+    var weightKilograms: Double?
+    var resistanceLevel: Int?
+    var restSeconds: Int?
+    var targetRPE: Double?
+    var targetRIR: Double?
+    var isWarmUp: Bool? = nil
+
+    init(
+        id: UUID = UUID(),
+        reps: Int? = nil,
+        durationSeconds: Int? = nil,
+        weightKilograms: Double? = nil,
+        resistanceLevel: Int? = nil,
+        restSeconds: Int? = nil,
+        targetRPE: Double? = nil,
+        targetRIR: Double? = nil,
+        isWarmUp: Bool? = nil
+    ) {
+        self.id = id
+        self.reps = reps
+        self.durationSeconds = durationSeconds
+        self.weightKilograms = weightKilograms
+        self.resistanceLevel = resistanceLevel
+        self.restSeconds = restSeconds
+        self.targetRPE = targetRPE
+        self.targetRIR = targetRIR
+        self.isWarmUp = isWarmUp
+    }
+}
+
 struct PlannedExercise: Identifiable, Codable, Hashable {
     let id: UUID
     var exerciseID: UUID?
@@ -541,6 +575,108 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     // machine settings such as a RowErg damper/resistance level.
     var loadKind: StrengthExerciseLoadKind? = nil
     var targetResistanceLevel: Int? = nil
+
+    // Optional keeps older plans fully compatible. When present, each set can
+    // carry its own prescription instead of inheriting one exercise-wide
+    // value for reps/time, load, rest and effort.
+    var setTargets: [PlannedExerciseSetTarget]? = nil
+
+    var hasIndividualSetTargets: Bool {
+        guard let setTargets else {
+            return false
+        }
+
+        return !setTargets.isEmpty
+    }
+
+    var resolvedSetTargets: [PlannedExerciseSetTarget] {
+        let count = max(sets, 1)
+        let fallback =
+            PlannedExerciseSetTarget(
+                reps:
+                    resolvedTargetKind == .reps
+                        ? reps
+                        : nil,
+                durationSeconds:
+                    resolvedTargetKind == .time
+                        ? resolvedTargetDurationSeconds
+                        : nil,
+                weightKilograms:
+                    resolvedLoadKind == .weightKilograms
+                        ? targetWeightKilograms
+                        : nil,
+                resistanceLevel:
+                    resolvedLoadKind == .resistanceLevel
+                        ? resolvedTargetResistanceLevel
+                        : nil,
+                restSeconds: restSeconds,
+                targetRPE: targetRPE,
+                targetRIR: targetRIR
+            )
+
+        guard let setTargets,
+              !setTargets.isEmpty
+        else {
+            return (0..<count).map { _ in
+                PlannedExerciseSetTarget(
+                    reps: fallback.reps,
+                    durationSeconds:
+                        fallback.durationSeconds,
+                    weightKilograms:
+                        fallback.weightKilograms,
+                    resistanceLevel:
+                        fallback.resistanceLevel,
+                    restSeconds:
+                        fallback.restSeconds,
+                    targetRPE:
+                        fallback.targetRPE,
+                    targetRIR:
+                        fallback.targetRIR
+                )
+            }
+        }
+
+        var resolved =
+            Array(setTargets.prefix(count))
+
+        if resolved.count < count {
+            let source =
+                resolved.last ??
+                fallback
+
+            for _ in resolved.count..<count {
+                resolved.append(
+                    PlannedExerciseSetTarget(
+                        reps:
+                            source.reps ??
+                            fallback.reps,
+                        durationSeconds:
+                            source.durationSeconds ??
+                            fallback.durationSeconds,
+                        weightKilograms:
+                            source.weightKilograms ??
+                            fallback.weightKilograms,
+                        resistanceLevel:
+                            source.resistanceLevel ??
+                            fallback.resistanceLevel,
+                        restSeconds:
+                            source.restSeconds ??
+                            fallback.restSeconds,
+                        targetRPE:
+                            source.targetRPE ??
+                            fallback.targetRPE,
+                        targetRIR:
+                            source.targetRIR ??
+                            fallback.targetRIR,
+                        isWarmUp:
+                            source.isWarmUp
+                    )
+                )
+            }
+        }
+
+        return resolved
+    }
 
     var resolvedLoadKind: StrengthExerciseLoadKind {
         loadKind ??
@@ -583,6 +719,70 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     }
 
     var compactLoadSummary: String? {
+        if hasIndividualSetTargets {
+            switch resolvedLoadKind {
+            case .weightKilograms:
+                let values =
+                    resolvedSetTargets
+                        .compactMap(\.weightKilograms)
+
+                guard !values.isEmpty else {
+                    return nil
+                }
+
+                let rounded =
+                    values.map {
+                        String(
+                            format: "%.1f",
+                            $0
+                        )
+                    }
+
+                if Set(rounded).count == 1,
+                   let first = values.first {
+                    return String(
+                        format: "%.1f kg",
+                        first
+                    )
+                }
+
+                return
+                    rounded
+                        .map { "\($0) kg" }
+                        .joined(separator: " / ")
+
+            case .resistanceLevel:
+                let values =
+                    resolvedSetTargets
+                        .compactMap(\.resistanceLevel)
+
+                guard !values.isEmpty else {
+                    return nil
+                }
+
+                if Set(values).count == 1,
+                   let first = values.first {
+                    return ATHLTHLocalization.choose(
+                        english: "Resistance \(first)",
+                        norwegian: "Motstand \(first)"
+                    )
+                }
+
+                return ATHLTHLocalization.choose(
+                    english:
+                        "Resistance " +
+                        values
+                            .map(String.init)
+                            .joined(separator: " / "),
+                    norwegian:
+                        "Motstand " +
+                        values
+                            .map(String.init)
+                            .joined(separator: " / ")
+                )
+            }
+        }
+
         switch resolvedLoadKind {
         case .weightKilograms:
             guard let targetWeightKilograms else {
@@ -607,44 +807,89 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     }
 
     var compactTargetSummary: String {
+        if hasIndividualSetTargets {
+            switch resolvedTargetKind {
+            case .reps:
+                let values =
+                    resolvedSetTargets
+                        .compactMap(\.reps)
+
+                if values.count == resolvedSetTargets.count,
+                   Set(values).count == 1,
+                   let first = values.first {
+                    return "\(sets) × \(first)"
+                }
+
+                let joined =
+                    resolvedSetTargets
+                        .map {
+                            $0.reps.map(String.init) ?? "—"
+                        }
+                        .joined(separator: " / ")
+
+                return ATHLTHLocalization.choose(
+                    english: "\(joined) reps",
+                    norwegian: "\(joined) reps"
+                )
+
+            case .time:
+                let values =
+                    resolvedSetTargets
+                        .map {
+                            formattedPlannedDuration(
+                                $0.durationSeconds ??
+                                resolvedTargetDurationSeconds ??
+                                0
+                            )
+                        }
+
+                if Set(values).count == 1,
+                   let first = values.first {
+                    return "\(sets) × \(first)"
+                }
+
+                return values.joined(separator: " / ")
+            }
+        }
+
         switch resolvedTargetKind {
         case .reps:
             return
                 "\(sets) × \(reps ?? 0)"
 
         case .time:
-            let totalSeconds =
-                max(
-                    resolvedTargetDurationSeconds ??
-                        embeddedExercise
-                            .defaultStrengthTargetDurationSeconds,
-                    0
-                )
-            let hours =
-                totalSeconds / 3_600
-            let minutes =
-                (totalSeconds % 3_600) / 60
-            let seconds =
-                totalSeconds % 60
-            let duration =
-                hours > 0
-                    ? String(
-                        format:
-                            "%d:%02d:%02d",
-                        hours,
-                        minutes,
-                        seconds
-                    )
-                    : String(
-                        format:
-                            "%02d:%02d",
-                        minutes,
-                        seconds
-                    )
-
             return
-                "\(sets) × \(duration)"
+                "\(sets) × \(formattedPlannedDuration(resolvedTargetDurationSeconds ?? 0))"
         }
+    }
+
+    private func formattedPlannedDuration(
+        _ seconds: Int
+    ) -> String {
+        let totalSeconds =
+            max(seconds, 0)
+        let hours =
+            totalSeconds / 3_600
+        let minutes =
+            (totalSeconds % 3_600) / 60
+        let seconds =
+            totalSeconds % 60
+
+        return
+            hours > 0
+                ? String(
+                    format:
+                        "%d:%02d:%02d",
+                    hours,
+                    minutes,
+                    seconds
+                )
+                : String(
+                    format:
+                        "%02d:%02d",
+                    minutes,
+                    seconds
+                )
     }
 }
 
