@@ -106,6 +106,60 @@ final class ExerciseLibraryStore: ObservableObject {
         loadCustomExercises()
     }
 
+    func localizedBodyPartTitle(
+        _ value: String
+    ) -> String {
+        let normalized =
+            value
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                .lowercased()
+
+        let norwegian: String
+        switch normalized {
+        case "back":
+            norwegian = "Rygg"
+        case "chest":
+            norwegian = "Bryst"
+        case "core":
+            norwegian = "Kjerne"
+        case "forearms", "lower arms":
+            norwegian = "Underarmer"
+        case "full body":
+            norwegian = "Hele kroppen"
+        case "lower legs", "calves":
+            norwegian = "Legger"
+        case "quads", "quadriceps":
+            norwegian = "Forside lår"
+        case "shoulders":
+            norwegian = "Skuldre"
+        case "upper arms":
+            norwegian = "Overarmer"
+        case "upper legs":
+            norwegian = "Lår"
+        case "biceps":
+            norwegian = "Biceps"
+        case "triceps":
+            norwegian = "Triceps"
+        case "glutes":
+            norwegian = "Setemuskler"
+        case "hamstrings":
+            norwegian = "Bakside lår"
+        case "neck":
+            norwegian = "Nakke"
+        case "cardio":
+            norwegian = "Kondisjon"
+        default:
+            return value
+        }
+
+        return ATHLTHLocalization.choose(
+            english: value,
+            norwegian: norwegian
+        )
+    }
+
     var allExercises: [ExerciseLibraryEntry] {
         if let cachedAllExercises {
             return cachedAllExercises
