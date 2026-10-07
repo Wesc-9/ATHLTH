@@ -517,6 +517,69 @@ extension ExerciseSnapshot {
     }
 }
 
+enum PlannedStrengthSetType: String, Codable, Hashable, CaseIterable, Identifiable {
+    case warmUp
+    case work
+    case backOff
+    case drop
+    case failure
+    case cluster
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .warmUp:
+            return ATHLTHLocalization.choose(
+                english: "Warm-up",
+                norwegian: "Oppvarming"
+            )
+        case .work:
+            return ATHLTHLocalization.choose(
+                english: "Work",
+                norwegian: "Arbeidssett"
+            )
+        case .backOff:
+            return ATHLTHLocalization.choose(
+                english: "Back-off",
+                norwegian: "Back-off"
+            )
+        case .drop:
+            return ATHLTHLocalization.choose(
+                english: "Drop set",
+                norwegian: "Droppsett"
+            )
+        case .failure:
+            return ATHLTHLocalization.choose(
+                english: "To failure",
+                norwegian: "Til utmattelse"
+            )
+        case .cluster:
+            return ATHLTHLocalization.choose(
+                english: "Cluster",
+                norwegian: "Klyngesett"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .warmUp:
+            return "flame"
+        case .work:
+            return "dumbbell.fill"
+        case .backOff:
+            return "arrow.down.right"
+        case .drop:
+            return "arrow.down.to.line"
+        case .failure:
+            return "bolt.fill"
+        case .cluster:
+            return "square.grid.2x2.fill"
+        }
+    }
+}
+
 struct PlannedExerciseSetTarget: Identifiable, Codable, Hashable {
     let id: UUID
     var reps: Int?
@@ -527,6 +590,9 @@ struct PlannedExerciseSetTarget: Identifiable, Codable, Hashable {
     var targetRPE: Double?
     var targetRIR: Double?
     var isWarmUp: Bool? = nil
+    var setType: PlannedStrengthSetType? = nil
+    var tempo: String? = nil
+    var notes: String? = nil
 
     init(
         id: UUID = UUID(),
@@ -537,7 +603,10 @@ struct PlannedExerciseSetTarget: Identifiable, Codable, Hashable {
         restSeconds: Int? = nil,
         targetRPE: Double? = nil,
         targetRIR: Double? = nil,
-        isWarmUp: Bool? = nil
+        isWarmUp: Bool? = nil,
+        setType: PlannedStrengthSetType? = nil,
+        tempo: String? = nil,
+        notes: String? = nil
     ) {
         self.id = id
         self.reps = reps
@@ -548,6 +617,9 @@ struct PlannedExerciseSetTarget: Identifiable, Codable, Hashable {
         self.targetRPE = targetRPE
         self.targetRIR = targetRIR
         self.isWarmUp = isWarmUp
+        self.setType = setType
+        self.tempo = tempo
+        self.notes = notes
     }
 }
 
@@ -669,7 +741,13 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
                             source.targetRIR ??
                             fallback.targetRIR,
                         isWarmUp:
-                            source.isWarmUp
+                            source.isWarmUp,
+                        setType:
+                            source.setType,
+                        tempo:
+                            source.tempo,
+                        notes:
+                            source.notes
                     )
                 )
             }
