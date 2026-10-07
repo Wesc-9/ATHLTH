@@ -3241,129 +3241,443 @@ struct CommunityEventDetailView: View {
         let checkedIn =
             checkedInRows(item)
 
-        return ATHLTHCard {
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "People",
-                    norwegian: "Deltakere"
+        return VStack(
+            alignment: .leading,
+            spacing: 14
+        ) {
+            HStack(spacing: 10) {
+                participantStatTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Going",
+                            norwegian: "Deltar"
+                        ),
+                    value:
+                        "\(item.participantCount)",
+                    icon:
+                        "person.2.fill",
+                    tint:
+                        ATHLTHTheme.vitality
                 )
-            )
-            .font(.headline)
 
-            Text(
-                ATHLTHLocalization.format(
-                    english: "Going · %d",
-                    norwegian: "Deltar · %d",
-                    item.participantCount
+                participantStatTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Checked in",
+                            norwegian:
+                                "Sjekket inn"
+                        ),
+                    value:
+                        "\(checkedIn.count)",
+                    icon:
+                        "checkmark.seal.fill",
+                    tint:
+                        ATHLTHTheme.vitality
                 )
-            )
-            .font(
-                .caption.weight(.semibold)
-            )
-            .foregroundStyle(
-                ATHLTHTheme.vitality
-            )
-            .padding(.top, 6)
 
-            if let creator = item.creator {
-                attendeeRow(
-                    profile: creator,
-                    subtitle:
+                participantStatTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Maybe",
+                            norwegian: "Kanskje"
+                        ),
+                    value:
+                        "\(maybe.count)",
+                    icon:
+                        "questionmark.circle.fill",
+                    tint:
+                        Color.orange
+                )
+            }
+
+            ATHLTHCard {
+                HStack {
+                    Text(
                         ATHLTHLocalization.choose(
                             english: "Host",
                             norwegian: "Arrangør"
                         )
-                )
-            } else {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Event host",
-                        norwegian: "Arrangør"
-                    ),
-                    systemImage:
-                        "person.crop.circle"
-                )
-                .font(.subheadline)
-                .padding(.top, 8)
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "star.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                }
+
+                if let creator =
+                        item.creator {
+                    participantCardRow(
+                        profile:
+                            creator,
+                        badge:
+                            ATHLTHLocalization.choose(
+                                english: "Host",
+                                norwegian:
+                                    "Arrangør"
+                            ),
+                        badgeIcon:
+                            "star.fill",
+                        tint:
+                            ATHLTHTheme
+                                .premiumGold
+                    )
+                    .padding(.top, 8)
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Event host",
+                            norwegian:
+                                "Arrangør"
+                        ),
+                        systemImage:
+                            "person.crop.circle"
+                    )
+                    .font(.subheadline)
+                    .padding(.top, 8)
+                }
             }
 
-            ForEach(going) { profile in
-                attendeeRow(
-                    profile: profile,
-                    subtitle: nil
-                )
+            ATHLTHCard {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Participants",
+                            norwegian:
+                                "Deltakere"
+                        )
+                    )
+                    .font(.headline)
+
+                    Spacer()
+
+                    Text(
+                        "\(going.count)"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .padding(
+                        .horizontal,
+                        8
+                    )
+                    .frame(height: 24)
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in: Capsule()
+                    )
+                }
+
+                if going.isEmpty {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "No other participants have joined yet.",
+                            norwegian:
+                                "Ingen andre deltakere har meldt seg på ennå."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        .secondary
+                    )
+                    .padding(.top, 8)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(going) {
+                            profile in
+
+                            participantCardRow(
+                                profile:
+                                    profile,
+                                badge:
+                                    checkedIn
+                                        .contains(
+                                            where: {
+                                                $0.userID ==
+                                                    profile
+                                                        .userID
+                                            }
+                                        )
+                                        ? ATHLTHLocalization.choose(
+                                            english:
+                                                "Checked in",
+                                            norwegian:
+                                                "Sjekket inn"
+                                        )
+                                        : nil,
+                                badgeIcon:
+                                    "checkmark.circle.fill",
+                                tint:
+                                    ATHLTHTheme
+                                        .vitality
+                            )
+                        }
+                    }
+                    .padding(.top, 8)
+                }
             }
 
             if !checkedIn.isEmpty {
-                Divider()
-                    .padding(.vertical, 8)
+                ATHLTHCard {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Arrived",
+                                norwegian:
+                                    "Ankommet"
+                            )
+                        )
+                        .font(.headline)
 
-                Text(
-                    ATHLTHLocalization.format(
-                        english:
-                            "Checked in · %d",
-                        norwegian:
-                            "Sjekket inn · %d",
-                        checkedIn.count
-                    )
-                )
-                .font(
-                    .caption.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
+                        Spacer()
 
-                ForEach(
-                    checkedIn,
-                    id: \.userID
-                ) { row in
-                    if let profile =
-                        profile(
-                            for: row.userID,
-                            in: item
-                        ) {
-                        attendeeRow(
-                            profile: profile,
-                            subtitle:
-                                checkInSubtitle(
-                                    row
-                                )
+                        Label(
+                            "\(checkedIn.count)",
+                            systemImage:
+                                "checkmark.seal.fill"
+                        )
+                        .font(
+                            .caption
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
                         )
                     }
+
+                    VStack(spacing: 8) {
+                        ForEach(
+                            checkedIn,
+                            id: \.userID
+                        ) {
+                            row in
+
+                            if let profile =
+                                    profile(
+                                        for:
+                                            row.userID,
+                                        in: item
+                                    ) {
+                                participantCardRow(
+                                    profile:
+                                        profile,
+                                    badge:
+                                        checkInSubtitle(
+                                            row
+                                        ),
+                                    badgeIcon:
+                                        "location.fill",
+                                    tint:
+                                        ATHLTHTheme
+                                            .vitality
+                                )
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
                 }
             }
 
             if !maybe.isEmpty {
-                Divider()
-                    .padding(.vertical, 8)
+                ATHLTHCard {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Maybe",
+                                norwegian: "Kanskje"
+                            )
+                        )
+                        .font(.headline)
 
-                Text(
-                    ATHLTHLocalization.format(
-                        english: "Maybe · %d",
-                        norwegian: "Kanskje · %d",
-                        maybe.count
-                    )
-                )
-                .font(
-                    .caption.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    .secondary
-                )
+                        Spacer()
 
-                ForEach(maybe) { profile in
-                    attendeeRow(
-                        profile: profile,
-                        subtitle: nil
-                    )
+                        Text(
+                            "\(maybe.count)"
+                        )
+                        .font(
+                            .caption
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    VStack(spacing: 8) {
+                        ForEach(maybe) {
+                            profile in
+
+                            participantCardRow(
+                                profile:
+                                    profile,
+                                badge: nil,
+                                badgeIcon:
+                                    "questionmark.circle",
+                                tint:
+                                    .secondary
+                            )
+                        }
+                    }
+                    .padding(.top, 8)
                 }
             }
         }
+    }
+
+    private func participantStatTile(
+        title: String,
+        value: String,
+        icon: String,
+        tint: Color
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .subheadline
+                    .weight(.semibold)
+            )
+            .foregroundStyle(tint)
+
+            Text(value)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(
+                    0.75
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(12)
+        .background(
+            Color.white
+                .opacity(0.90),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 16,
+                    style:
+                        .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+            .stroke(
+                tint.opacity(0.12),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func participantCardRow(
+        profile: SocialProfileCard,
+        badge: String?,
+        badgeIcon: String,
+        tint: Color
+    ) -> some View {
+        NavigationLink {
+            FriendProfileView(
+                userID:
+                    profile.userID
+            )
+        } label: {
+            HStack(spacing: 11) {
+                CommunityAvatar(
+                    profile: profile,
+                    size: 44
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        profile.resolvedName
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    if let badge {
+                        Label(
+                            badge,
+                            systemImage:
+                                badgeIcon
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            tint
+                        )
+                        .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    .tertiary
+                )
+            }
+            .padding(10)
+            .background(
+                ATHLTHTheme
+                    .surfaceSage
+                    .opacity(0.55),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style:
+                            .continuous
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
 
