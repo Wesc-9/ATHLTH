@@ -7344,6 +7344,17 @@ private struct CommunityEventEditView: View {
             item.event.maxParticipants
         initial.paceLabel =
             item.event.paceLabel ?? ""
+        initial.competitionEnabled =
+            item.event.competitionEnabled ==
+            true
+        initial.competitionMetric =
+            item.event.competitionMetric ??
+            CommunityEventCompetitionMetric
+                .defaultMetric(
+                    for:
+                        item.event
+                            .activityType
+                )
         initial.routeID =
             item.event.routeID
         initial.routeTitle =
@@ -7485,6 +7496,82 @@ private struct CommunityEventEditView: View {
                         .tag(
                             ProfileVisibility
                                 .friends
+                        )
+                    }
+                }
+
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Competition",
+                        norwegian: "Konkurranse"
+                    )
+                ) {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Competition mode",
+                            norwegian:
+                                "Konkurransemodus"
+                        ),
+                        isOn:
+                            $draft
+                                .competitionEnabled
+                    )
+                    .disabled(
+                        item.event
+                            .startsAt <=
+                            Date()
+                    )
+
+                    if draft
+                        .competitionEnabled {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Ranking",
+                                norwegian:
+                                    "Rangering"
+                            ),
+                            selection:
+                                $draft
+                                    .competitionMetric
+                        ) {
+                            ForEach(
+                                CommunityEventCompetitionMetric
+                                    .options(
+                                        for:
+                                            draft
+                                                .activityType
+                                    )
+                            ) {
+                                metric in
+
+                                Label(
+                                    metric.title,
+                                    systemImage:
+                                        metric
+                                            .systemImage
+                                )
+                                .tag(metric)
+                            }
+                        }
+                        .disabled(
+                            item.event
+                                .startsAt <=
+                                Date()
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Event competition is tied to this start time and check-in. Challenges remain separate for competitions over time.",
+                                norwegian:
+                                    "Konkurransen gjelder dette arrangementet og krever innsjekk. Challenges brukes fortsatt for konkurranser over tid."
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
                         )
                     }
                 }
