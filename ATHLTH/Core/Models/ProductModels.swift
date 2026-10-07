@@ -244,7 +244,7 @@ struct UserProfile: Identifiable, Codable, Hashable {
     var avatarURL: URL?
     var headerArtworkName: String? = nil
     var headerImageURL: URL? = nil
-    var headerDimStrength: Double = 0
+    var headerDimStrength: Double? = nil
     var presence: TrainingPresence
 }
 
