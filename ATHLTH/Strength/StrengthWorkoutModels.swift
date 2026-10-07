@@ -262,6 +262,12 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var rpe: Double?
     var completedAt: Date?
     var restSeconds: Int?
+
+    // Planned effort targets are separate from the athlete's logged result.
+    // Optional fields keep all existing workout history decodable.
+    var plannedRPE: Double? = nil
+    var plannedRIR: Double? = nil
+
     // Optional fields preserve decoding of workouts created before this strength upgrade.
     var rir: Double? = nil
     var isWarmUp: Bool? = nil
