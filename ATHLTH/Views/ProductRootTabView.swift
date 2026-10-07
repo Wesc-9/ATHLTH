@@ -4716,6 +4716,14 @@ private struct PlannedWorkoutSelection: Identifiable {
     var id: UUID { workout.id }
 }
 
+private struct ATHLTHTrainUpcomingWorkout: Identifiable {
+    let planID: UUID
+    let date: Date
+    let workout: PlannedSession
+
+    var id: UUID { workout.id }
+}
+
 private struct ATHLTHTrainSectionSwitcher: View {
     let titles: [String]
     @Binding var selection: Int
@@ -5515,14 +5523,37 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var todayContent: some View {
-        HStack(
-            alignment: .top,
-            spacing: 14
-        ) {
-            VStack(
-                alignment: .leading,
-                spacing: 6
-            ) {
+        todayHeader
+
+        unfinishedWorkoutRecoveryCards
+
+        if let plan = session.activePlan {
+            todayWorkoutHero(plan)
+
+            todayQuickTrainSection
+
+            todayWeekProgressCard(plan)
+
+            let upcoming =
+                trainUpcomingWorkouts(
+                    in: plan,
+                    limit: 3
+                )
+            if !upcoming.isEmpty {
+                todayNextUpSection(upcoming)
+            }
+
+            todayTrainingTools
+        } else {
+            noActivePlanCard
+            todayQuickTrainSection
+            todayTrainingTools
+        }
+    }
+
+    private var todayHeader: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(
                     ATHLTHLocalization.choose(
                         english: "TODAY",
@@ -5530,187 +5561,758 @@ struct ATHLTHTrainView: View {
                     )
                 )
                 .font(.caption2.weight(.bold))
-                .tracking(2.4)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .tracking(2.3)
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Ready for today?",
-                        norwegian: "Klar for i dag?"
+                        english: "Today's training",
+                        norwegian: "Dagens trening"
                     )
                 )
                 .font(
                     .system(
-                        size: 29,
+                        size: 31,
                         weight: .bold,
-                        design: .rounded
+                        design: .serif
                     )
                 )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
                 Text(
-                    session.activePlan == nil
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Train freely, or build a plan around what you want to achieve.",
-                            norwegian:
-                                "Tren fritt, eller bygg en plan rundt det du vil oppnå."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english:
-                                "Today's sessions, quick starts and training tools in one place.",
-                            norwegian:
-                                "Dagens økter, hurtigstart og treningsverktøy samlet på ett sted."
-                        )
+                    Date.now.formatted(
+                        .dateTime
+                            .weekday(.wide)
+                            .day()
+                            .month(.wide)
+                    )
                 )
                 .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 8)
 
-            VStack(spacing: 1) {
-                Text(
-                    Date.now.formatted(
-                        .dateTime.day()
-                    )
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
+            Button {
+                selectedSection = 1
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                Text(
-                    Date.now.formatted(
-                        .dateTime.weekday(
-                            .abbreviated
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Plan",
+                            norwegian: "Plan"
                         )
                     )
-                    .uppercased()
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold,
-                        design: .rounded
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .frame(width: 58, height: 58)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.92),
+                            ATHLTHTheme.cardWarm.opacity(0.55)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
                     )
                 )
-                .tracking(0.8)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+                    .stroke(
+                        Color.white.opacity(0.90),
+                        lineWidth: 0.8
+                    )
+                }
             }
-            .frame(
-                width: 54,
-                height: 58
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Open training plan",
+                    norwegian: "Åpne treningsplan"
+                )
             )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func todayWorkoutHero(
+        _ plan: TrainingPlan
+    ) -> some View {
+        let sessions = todaySessions(in: plan)
+        let healthCompletedIDs =
+            healthCompletedTodaySessionIDs(sessions)
+        let manuallyCompletedIDs =
+            manuallyCompletedTodaySessionIDs(
+                planID: plan.id,
+                sessions: sessions
+            )
+        let completedIDs =
+            healthCompletedIDs.union(
+                manuallyCompletedIDs
+            )
+        let primary =
+            sessions.first(
+                where: {
+                    !completedIDs.contains($0.id)
+                }
+            ) ?? sessions.first
+
+        if let primary {
+            let isHealthCompleted =
+                healthCompletedIDs.contains(primary.id)
+            let isCompleted =
+                completedIDs.contains(primary.id)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "TODAY'S WORKOUT",
+                            norwegian: "DAGENS ØKT"
+                        )
+                    )
+                    .font(.system(size: 9.5, weight: .bold))
+                    .tracking(1.55)
+                    .foregroundStyle(
+                        Color.white.opacity(0.72)
+                    )
+
+                    Spacer()
+
+                    Text(
+                        trainTodayPlanPositionText(plan)
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        Color.white.opacity(0.68)
+                    )
+                }
+
+                Text(primary.title)
+                    .font(
+                        .system(
+                            size: 30,
+                            weight: .bold,
+                            design: .serif
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 8)
+
+                Text(plan.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(
+                        Color.white.opacity(0.72)
+                    )
+                    .lineLimit(1)
+                    .padding(.top, 3)
+
+                HStack(spacing: 0) {
+                    todayHeroMetric(
+                        icon: primary.kind.systemImage,
+                        title: ATHLTHLocalization.choose(
+                            english: "Type",
+                            norwegian: "Type"
+                        ),
+                        value: primary.kind.title
+                    )
+
+                    todayHeroDivider
+
+                    todayHeroMetric(
+                        icon: "clock",
+                        title: ATHLTHLocalization.choose(
+                            english: "Duration",
+                            norwegian: "Varighet"
+                        ),
+                        value:
+                            primary.durationMinutes.map {
+                                "\($0) min"
+                            } ??
+                            ATHLTHLocalization.choose(
+                                english: "Open",
+                                norwegian: "Åpen"
+                            )
+                    )
+
+                    todayHeroDivider
+
+                    todayHeroMetric(
+                        icon: "scope",
+                        title: ATHLTHLocalization.choose(
+                            english: "Content",
+                            norwegian: "Innhold"
+                        ),
+                        value:
+                            todayWorkoutFocusSummary(primary)
+                    )
+                }
+                .padding(.top, 18)
+
+                if let notes =
+                    primary.notes?
+                        .trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                   !notes.isEmpty {
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: "quote.bubble.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.champagne
+                            )
+                            .padding(.top, 1)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "NOTE",
+                                    norwegian: "NOTAT"
+                                )
+                            )
+                            .font(.system(size: 8.5, weight: .bold))
+                            .tracking(1.25)
+                            .foregroundStyle(
+                                Color.white.opacity(0.56)
+                            )
+
+                            Text(notes)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    Color.white.opacity(0.80)
+                                )
+                                .lineLimit(3)
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.white.opacity(0.075),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
+                        )
+                    )
+                    .padding(.top, 16)
+                }
+
+                if !primary.exercises.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(
+                            Array(
+                                primary.exercises
+                                    .prefix(3)
+                                    .enumerated()
+                            ),
+                            id: \.element.id
+                        ) { index, exercise in
+                            todayExercisePreviewRow(
+                                exercise,
+                                index: index + 1
+                            )
+
+                            if index <
+                                min(
+                                    primary.exercises.count,
+                                    3
+                                ) - 1 {
+                                Rectangle()
+                                    .fill(
+                                        Color.white.opacity(0.08)
+                                    )
+                                    .frame(height: 1)
+                                    .padding(.leading, 38)
+                            }
+                        }
+
+                        if primary.exercises.count > 3 {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "+ \(primary.exercises.count - 3) more exercises",
+                                    norwegian:
+                                        "+ \(primary.exercises.count - 3) øvelser til"
+                                )
+                            )
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(
+                                Color.white.opacity(0.60)
+                            )
+                            .frame(
+                                maxWidth: .infinity,
+                                alignment: .leading
+                            )
+                            .padding(.top, 8)
+                            .padding(.leading, 38)
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        Color.black.opacity(0.10),
+                        in: RoundedRectangle(
+                            cornerRadius: 17,
+                            style: .continuous
+                        )
+                    )
+                    .padding(.top, 16)
+                }
+
+                HStack(spacing: 9) {
+                    Button {
+                        openTodayPrimaryWorkout(
+                            primary,
+                            planID: plan.id,
+                            isHealthCompleted:
+                                isHealthCompleted
+                        )
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(
+                                systemName:
+                                    isCompleted
+                                        ? "checkmark.circle.fill"
+                                        : "play.fill"
+                            )
+                            .font(.system(size: 13, weight: .bold))
+
+                            Text(
+                                isCompleted
+                                    ? ATHLTHLocalization.choose(
+                                        english: "View workout",
+                                        norwegian: "Se økten"
+                                    )
+                                    : todayPrimaryActionTitle(primary)
+                            )
+                            .font(.subheadline.weight(.bold))
+                        }
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(
+                            Color.white.opacity(0.96),
+                            in: RoundedRectangle(
+                                cornerRadius: 15,
+                                style: .continuous
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedPlanWorkout =
+                            PlannedWorkoutSelection(
+                                planID: plan.id,
+                                workout: primary,
+                                isHealthCompleted:
+                                    isHealthCompleted
+                            )
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 48, height: 48)
+                            .background(
+                                Color.white.opacity(0.12),
+                                in: RoundedRectangle(
+                                    cornerRadius: 15,
+                                    style: .continuous
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Workout details",
+                            norwegian: "Øktdetaljer"
+                        )
+                    )
+                }
+                .padding(.top, 17)
+
+                if sessions.count > 1 {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "MORE TODAY",
+                                norwegian: "FLERE I DAG"
+                            )
+                        )
+                        .font(.system(size: 8.5, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(
+                            Color.white.opacity(0.52)
+                        )
+
+                        ForEach(
+                            sessions.filter {
+                                $0.id != primary.id
+                            }
+                        ) { workout in
+                            Button {
+                                selectedPlanWorkout =
+                                    PlannedWorkoutSelection(
+                                        planID: plan.id,
+                                        workout: workout,
+                                        isHealthCompleted:
+                                            healthCompletedIDs
+                                                .contains(workout.id)
+                                    )
+                            } label: {
+                                HStack(spacing: 9) {
+                                    Image(
+                                        systemName:
+                                            workout.kind.systemImage
+                                    )
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .frame(width: 26, height: 26)
+                                    .background(
+                                        Color.white.opacity(0.10),
+                                        in: Circle()
+                                    )
+
+                                    Text(workout.title)
+                                        .font(.caption.weight(.semibold))
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    Text(
+                                        todayPlanStatus(
+                                            workout,
+                                            isCompleted:
+                                                completedIDs
+                                                    .contains(workout.id)
+                                        )
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(
+                                        Color.white.opacity(0.60)
+                                    )
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2.bold())
+                                }
+                                .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.top, 16)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Color.white.opacity(0.72),
+                LinearGradient(
+                    colors: [
+                        Color(
+                            red: 0.15,
+                            green: 0.18,
+                            blue: 0.24
+                        ),
+                        Color(
+                            red: 0.08,
+                            green: 0.10,
+                            blue: 0.14
+                        )
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
                 in: RoundedRectangle(
-                    cornerRadius: 17,
+                    cornerRadius: 28,
                     style: .continuous
                 )
             )
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: 17,
+                    cornerRadius: 28,
                     style: .continuous
                 )
                 .stroke(
-                    Color.white.opacity(0.82),
+                    Color.white.opacity(0.08),
                     lineWidth: 0.8
                 )
             }
             .shadow(
                 color:
-                    Color.black.opacity(0.035),
-                radius: 9,
-                y: 4
+                    ATHLTHTheme.accentDeep.opacity(0.14),
+                radius: 20,
+                y: 10
             )
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-
-        unfinishedWorkoutRecoveryCards
-
-        if let plan = session.activePlan {
-            todaysPlanCard(plan)
         } else {
-            noActivePlanCard
+            todayRecoveryDayCard(plan)
         }
+    }
 
-        VStack(
-            alignment: .leading,
-            spacing: 13
-        ) {
-            HStack(
-                alignment: .firstTextBaseline
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
+    private func todayHeroMetric(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .semibold))
+
+                Text(title.uppercased())
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.7)
+            }
+            .foregroundStyle(
+                Color.white.opacity(0.50)
+            )
+
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var todayHeroDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.10))
+            .frame(width: 1, height: 36)
+            .padding(.horizontal, 9)
+    }
+
+    private func todayExercisePreviewRow(
+        _ exercise: PlannedExercise,
+        index: Int
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text("\(index)")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 24, height: 24)
+                .background(
+                    ATHLTHTheme.champagne,
+                    in: Circle()
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(exercise.embeddedExercise.displayName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Text(
+                    [
+                        exercise.compactTargetSummary,
+                        exercise.compactLoadSummary,
+                        exercise.restSeconds.map {
+                            ATHLTHLocalization.choose(
+                                english: "\($0)s rest",
+                                norwegian: "\($0)s hvile"
+                            )
+                        }
+                    ]
+                    .compactMap { $0 }
+                    .joined(separator: " · ")
+                )
+                .font(.caption2)
+                .foregroundStyle(
+                    Color.white.opacity(0.60)
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 7)
+    }
+
+    private func todayRecoveryDayCard(
+        _ plan: TrainingPlan
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 13) {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                        .frame(width: 50, height: 50)
+                        .background(
+                            ATHLTHTheme.recoveryBlueSoft,
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "RECOVERY DAY",
+                                norwegian: "HVILEDAG"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Nothing planned today",
+                                norwegian: "Ingen økt planlagt i dag"
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 24,
+                                weight: .bold,
+                                design: .serif
+                            )
+                        )
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Text(plan.title)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Spacer()
+                }
+
+                if let next =
+                    trainUpcomingWorkouts(
+                        in: plan,
+                        limit: 1
+                    )
+                    .first {
+                    Button {
+                        selectedPlanWorkout =
+                            PlannedWorkoutSelection(
+                                planID: next.planID,
+                                workout: next.workout,
+                                isHealthCompleted: false
+                            )
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(
+                                systemName:
+                                    next.workout.kind.systemImage
+                            )
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(
+                                trainPlanKindTint(
+                                    next.workout.kind
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                            .background(
+                                trainPlanKindTint(
+                                    next.workout.kind
+                                )
+                                .opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 11,
+                                    style: .continuous
+                                )
+                            )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Next workout",
+                                        norwegian: "Neste økt"
+                                    )
+                                )
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                Text(next.workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                            }
+
+                            Spacer()
+
+                            Text(
+                                trainUpcomingDateText(next.date)
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(12)
+                        .background(
+                            Color.white.opacity(0.55),
+                            in: RoundedRectangle(
+                                cornerRadius: 16,
+                                style: .continuous
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var todayQuickTrainSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "QUICK START",
-                            norwegian: "HURTIGSTART"
+                            english: "QUICK TRAIN",
+                            norwegian: "QUICK TRAIN"
                         )
                     )
                     .font(.caption2.weight(.bold))
                     .tracking(1.8)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
+                    .foregroundStyle(ATHLTHTheme.mutedText)
 
                     Text(
                         ATHLTHLocalization.choose(
-                            english: "Move now",
-                            norwegian: "Kom i gang"
+                            english: "Train without a plan",
+                            norwegian: "Start uten plan"
                         )
                     )
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
+                    .foregroundStyle(ATHLTHTheme.primaryText)
                 }
 
                 Spacer()
 
                 Text(quickStartDeviceTitle)
-                    .font(
-                        .system(
-                            size: 10.5,
-                            weight: .medium
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .multilineTextAlignment(
-                        .trailing
-                    )
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .multilineTextAlignment(.trailing)
                     .lineLimit(2)
             }
 
-            HStack(spacing: 8) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
                 quickStartTile(
                     title:
                         ATHLTHLocalization.choose(
@@ -5719,16 +6321,32 @@ struct ATHLTHTrainView: View {
                         ),
                     subtitle:
                         ATHLTHLocalization.choose(
-                            english: "Free run",
-                            norwegian: "Fri løping"
+                            english: "Free, route or workout",
+                            norwegian: "Fri, rute eller økt"
                         ),
                     icon: "figure.run",
                     enabled:
-                        quickStartAvailable(
-                            .running
-                        )
+                        quickStartAvailable(.running)
                 ) {
                     handleQuickStart(.running)
+                }
+
+                quickStartTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Strength",
+                            norwegian: "Styrke"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Gym or home",
+                            norwegian: "Gym eller hjemme"
+                        ),
+                    icon: "dumbbell.fill",
+                    enabled:
+                        quickStartAvailable(.strength)
+                ) {
+                    handleQuickStart(.strength)
                 }
 
                 quickStartTile(
@@ -5744,9 +6362,7 @@ struct ATHLTHTrainView: View {
                         ),
                     icon: "figure.walk",
                     enabled:
-                        quickStartAvailable(
-                            .walking
-                        )
+                        quickStartAvailable(.walking)
                 ) {
                     handleQuickStart(.walking)
                 }
@@ -5754,28 +6370,8 @@ struct ATHLTHTrainView: View {
                 quickStartTile(
                     title:
                         ATHLTHLocalization.choose(
-                            english: "Strength",
-                            norwegian: "Styrke"
-                        ),
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english: "Gym / Home",
-                            norwegian: "Gym / hjemme"
-                        ),
-                    icon: "dumbbell.fill",
-                    enabled:
-                        quickStartAvailable(
-                            .strength
-                        )
-                ) {
-                    handleQuickStart(.strength)
-                }
-
-                quickStartTile(
-                    title:
-                        ATHLTHLocalization.choose(
                             english: "Custom",
-                            norwegian: "Egen"
+                            norwegian: "Egen økt"
                         ),
                     subtitle:
                         quickStartCustomSubtitle,
@@ -5787,12 +6383,12 @@ struct ATHLTHTrainView: View {
                 }
             }
         }
-        .padding(15)
+        .padding(16)
         .background(
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.84),
-                    ATHLTHTheme.accentSoft.opacity(0.20)
+                    Color.white.opacity(0.88),
+                    ATHLTHTheme.cardWarm.opacity(0.40)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -5808,199 +6404,768 @@ struct ATHLTHTrainView: View {
                 style: .continuous
             )
             .stroke(
-                Color.white.opacity(0.88),
+                Color.white.opacity(0.90),
                 lineWidth: 0.8
             )
         }
         .shadow(
-            color:
-                Color.black.opacity(0.025),
+            color: ATHLTHTheme.accentDeep.opacity(0.055),
             radius: 12,
-            y: 5
+            y: 6
         )
+    }
 
-        if let plan = session.activePlan {
-            trainWeekSnapshotCard(plan)
-        }
+    private func todayWeekProgressCard(
+        _ plan: TrainingPlan
+    ) -> some View {
+        let weekIndex = trainCurrentWeekIndex(in: plan)
+        let week =
+            plan.weeks.indices.contains(weekIndex)
+                ? plan.weeks[weekIndex]
+                : plan.weeks.first
+        let stats =
+            trainWeekCompletionStats(
+                in: plan,
+                weekIndex: weekIndex
+            )
 
-        Button {
-            showingGhostHub = true
-        } label: {
-            HStack(alignment: .center, spacing: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("GHOST TRAINING")
-                        .font(.caption.weight(.bold))
-                        .tracking(3.0)
-                        .foregroundStyle(
-                            Color.white.opacity(0.72)
-                        )
-
-                    Text("Compete with yourself.")
-                        .font(
-                            .system(
-                                size: 27,
-                                weight: .bold
+        return ATHLTHCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "THIS WEEK",
+                                norwegian: "DENNE UKEN"
                             )
                         )
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.6)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
 
-                    Text(
-                        "Replay a previous run, chase a target time, race a route or challenge a friend."
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        Color.white.opacity(0.74)
-                    )
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                }
-
-                Spacer(minLength: 6)
-
-                ZStack {
-                    Circle()
-                        .fill(
-                            Color.white.opacity(0.13)
-                        )
-                        .frame(width: 82, height: 82)
-
-                    Circle()
-                        .fill(
-                            Color.white.opacity(0.96)
-                        )
-                        .frame(width: 50, height: 50)
-
-                    Image(systemName: "figure.run")
-                        .font(
-                            .system(
-                                size: 25,
-                                weight: .semibold
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Week progress",
+                                norwegian: "Ukens fremdrift"
                             )
                         )
-                        .foregroundStyle(
-                            Color(
-                                red: 0.25,
-                                green: 0.28,
-                                blue: 0.34
-                            )
-                        )
-                }
-                .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 22)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 168,
-                alignment: .leading
-            )
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(
-                            red: 0.06,
-                            green: 0.07,
-                            blue: 0.10
-                        ),
-                        Color(
-                            red: 0.15,
-                            green: 0.18,
-                            blue: 0.24
-                        )
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.06),
-                    lineWidth: 0.8
-                )
-            }
-            .contentShape(
-                RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            "Ghost Training. Compete with yourself."
-        )
-        .accessibilityHint(
-            "Open Ghost Training to replay a previous run, chase a target time, race a route or challenge a friend."
-        )
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }
 
-        if !session.savedWorkoutTemplates.isEmpty {
-            ATHLTHCard {
-                ATHLTHSectionHeader(
-                    title: "Saved Workouts",
-                    actionTitle: "From you & friends"
-                )
+                    Spacer()
 
-                VStack(spacing: 13) {
-                    ForEach(session.savedWorkoutTemplates.prefix(4)) { workout in
-                        HStack(spacing: 12) {
-                            Image(systemName: workout.kind.systemImage)
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 11)
+                    Button {
+                        selectedSection = 1
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "View plan",
+                                    norwegian: "Se plan"
                                 )
+                            )
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .buttonStyle(.plain)
+                }
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workout.title)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(todaySessionSummary(workout))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .stroke(
+                                ATHLTHTheme.accent.opacity(0.10),
+                                lineWidth: 7
+                            )
 
-                            Spacer()
+                        Circle()
+                            .trim(
+                                from: 0,
+                                to:
+                                    stats.total > 0
+                                        ? CGFloat(stats.completed) /
+                                            CGFloat(stats.total)
+                                        : 0
+                            )
+                            .stroke(
+                                ATHLTHTheme.accentDeep,
+                                style: StrokeStyle(
+                                    lineWidth: 7,
+                                    lineCap: .round
+                                )
+                            )
+                            .rotationEffect(.degrees(-90))
 
-                            if workout.isStructuredWorkout {
-                                Button("Start") {
-                                    selectedStructuredWorkout =
-                                        workout
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                                .tint(ATHLTHTheme.accentDeep)
-                            } else if workout.kind == .strength {
-                                Button("Start") {
-                                    selectedStrengthSession = workout
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            } else {
-                                Text("Saved")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
+                        VStack(spacing: 0) {
+                            Text(
+                                "\(stats.completed)/\(stats.total)"
+                            )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight: .bold,
+                                    design: .rounded
+                                )
+                            )
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "done",
+                                    norwegian: "ferdig"
+                                )
+                            )
+                            .font(.system(size: 8.5, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                     }
+                    .frame(width: 72, height: 72)
+
+                    if let week {
+                        trainPlanWeekStrip(week)
+                    }
                 }
-                .padding(.top, 10)
+
+                HStack(spacing: 8) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "\(stats.total - stats.completed) remaining",
+                            norwegian:
+                                "\(stats.total - stats.completed) gjenstår"
+                        ),
+                        systemImage: "calendar"
+                    )
+
+                    Spacer()
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Week \(min(weekIndex + 1, max(plan.weeks.count, 1))) of \(max(plan.weeks.count, 1))",
+                            norwegian:
+                                "Uke \(min(weekIndex + 1, max(plan.weeks.count, 1))) av \(max(plan.weeks.count, 1))"
+                        )
+                    )
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    private func todayNextUpSection(
+        _ upcoming: [ATHLTHTrainUpcomingWorkout]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "NEXT UP",
+                            norwegian: "NESTE"
+                        )
+                    )
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.6)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Coming workouts",
+                            norwegian: "Kommende økter"
+                        )
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                }
+
+                Spacer()
+
+                Button {
+                    selectedSection = 1
+                } label: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "See all",
+                            norwegian: "Se alle"
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 8) {
+                ForEach(upcoming) { item in
+                    Button {
+                        selectedPlanWorkout =
+                            PlannedWorkoutSelection(
+                                planID: item.planID,
+                                workout: item.workout,
+                                isHealthCompleted: false
+                            )
+                    } label: {
+                        HStack(spacing: 12) {
+                            VStack(spacing: 1) {
+                                Text(
+                                    item.date.formatted(
+                                        .dateTime.day()
+                                    )
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                )
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                                Text(
+                                    item.date.formatted(
+                                        .dateTime.weekday(
+                                            .abbreviated
+                                        )
+                                    )
+                                    .uppercased()
+                                )
+                                .font(.system(size: 8, weight: .bold))
+                                .tracking(0.5)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .frame(width: 38)
+
+                            Image(
+                                systemName:
+                                    item.workout.kind.systemImage
+                            )
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(
+                                trainPlanKindTint(
+                                    item.workout.kind
+                                )
+                            )
+                            .frame(width: 38, height: 38)
+                            .background(
+                                trainPlanKindTint(
+                                    item.workout.kind
+                                )
+                                .opacity(0.10),
+                                in: RoundedRectangle(
+                                    cornerRadius: 12,
+                                    style: .continuous
+                                )
+                            )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                    .lineLimit(1)
+
+                                Text(todaySessionSummary(item.workout))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 4)
+
+                            if let start =
+                                item.workout.scheduledStart {
+                                Text(
+                                    start.formatted(
+                                        date: .omitted,
+                                        time: .shortened
+                                    )
+                                )
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 62)
+                        .background(
+                            Color.white.opacity(0.70),
+                            in: RoundedRectangle(
+                                cornerRadius: 17,
+                                style: .continuous
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: 17,
+                                style: .continuous
+                            )
+                            .stroke(
+                                Color.white.opacity(0.85),
+                                lineWidth: 0.8
+                            )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            ATHLTHTheme.card.opacity(0.72),
+            in: RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+    }
+
+    private var todayTrainingTools: some View {
+        HStack(spacing: 10) {
+            Button {
+                showingGhostHub = true
+            } label: {
+                todayToolTile(
+                    title: "Ghost",
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Race yourself",
+                            norwegian: "Konkurrer mot deg selv"
+                        ),
+                    icon: "figure.run.circle.fill"
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingLibrary = true
+            } label: {
+                todayToolTile(
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Library",
+                            norwegian: "Bibliotek"
+                        ),
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english: "Plans & workouts",
+                            norwegian: "Planer og økter"
+                        ),
+                    icon: "square.grid.2x2.fill"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func todayToolTile(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 38, height: 38)
+                .background(
+                    ATHLTHTheme.accentSoft,
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 2)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 72)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.84),
+                    ATHLTHTheme.cardWarm.opacity(0.40)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.88),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func todayWorkoutFocusSummary(
+        _ workout: PlannedSession
+    ) -> String {
+        if !workout.exercises.isEmpty {
+            return ATHLTHLocalization.choose(
+                english:
+                    "\(workout.exercises.count) exercises",
+                norwegian:
+                    "\(workout.exercises.count) øvelser"
+            )
+        }
+
+        if let distance =
+            workout.targetDistanceKilometers {
+            return String(
+                format: "%.1f km",
+                distance
+            )
+        }
+
+        if let running =
+            workout.resolvedRunningWorkouts.first {
+            return running.type.title
+        }
+
+        switch workout.kind {
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Recovery",
+                norwegian: "Restitusjon"
+            )
+        case .mobility:
+            return ATHLTHLocalization.choose(
+                english: "Mobility",
+                norwegian: "Mobilitet"
+            )
+        default:
+            return workout.kind.title
+        }
+    }
+
+    private func todayPrimaryActionTitle(
+        _ workout: PlannedSession
+    ) -> String {
+        switch workout.kind {
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Start workout",
+                norwegian: "Start økt"
+            )
+        case .running:
+            return workout.resolvedRunningWorkouts.first != nil
+                ? ATHLTHLocalization.choose(
+                    english: "Start workout",
+                    norwegian: "Start økt"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "View workout",
+                    norwegian: "Se økten"
+                )
+        default:
+            return workout.isStructuredWorkout
+                ? ATHLTHLocalization.choose(
+                    english: "Start workout",
+                    norwegian: "Start økt"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "View workout",
+                    norwegian: "Se økten"
+                )
+        }
+    }
+
+    private func openTodayPrimaryWorkout(
+        _ workout: PlannedSession,
+        planID: UUID,
+        isHealthCompleted: Bool
+    ) {
+        if isHealthCompleted ||
+            session.isPlanSessionManuallyCompleted(
+                planID: planID,
+                sessionID: workout.id
+            ) {
+            selectedPlanWorkout =
+                PlannedWorkoutSelection(
+                    planID: planID,
+                    workout: workout,
+                    isHealthCompleted:
+                        isHealthCompleted
+                )
+            return
+        }
+
+        if workout.kind == .strength {
+            selectedStrengthSession = workout
+            return
+        }
+
+        if workout.isStructuredWorkout {
+            selectedStructuredWorkout = workout
+            return
+        }
+
+        if workout.kind == .running,
+           let running =
+                workout.resolvedRunningWorkouts.first {
+            pendingRunningTemplate = running
+            return
+        }
+
+        selectedPlanWorkout =
+            PlannedWorkoutSelection(
+                planID: planID,
+                workout: workout,
+                isHealthCompleted:
+                    isHealthCompleted
+            )
+    }
+
+    private func trainTodayPlanPositionText(
+        _ plan: TrainingPlan
+    ) -> String {
+        let weekIndex = trainCurrentWeekIndex(in: plan)
+        let weekday =
+            Calendar.current.component(
+                .weekday,
+                from: Date()
+            )
+        let dayIndex =
+            ((weekday + 5) % 7) + 1
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Week \(weekIndex + 1) · Day \(dayIndex)",
+            norwegian:
+                "Uke \(weekIndex + 1) · Dag \(dayIndex)"
+        )
+    }
+
+    private func trainWeekCompletionStats(
+        in plan: TrainingPlan,
+        weekIndex: Int
+    ) -> (completed: Int, total: Int) {
+        guard
+            plan.weeks.indices.contains(weekIndex)
+        else {
+            return (0, 0)
+        }
+
+        let week = plan.weeks[weekIndex]
+        let sessions =
+            week.days.flatMap(\.sessions)
+        let total = sessions.count
+
+        guard total > 0 else {
+            return (0, 0)
+        }
+
+        var completedIDs =
+            Set(
+                sessions
+                    .filter {
+                        session
+                            .isPlanSessionManuallyCompleted(
+                                planID: plan.id,
+                                sessionID: $0.id
+                            )
+                    }
+                    .map(\.id)
+            )
+
+        guard let startDate = plan.startDate else {
+            return (completedIDs.count, total)
+        }
+
+        let calendar = Calendar.current
+        let planStart =
+            calendar.startOfDay(for: startDate)
+
+        for day in week.days {
+            guard
+                let date =
+                    calendar.date(
+                        byAdding: .day,
+                        value:
+                            weekIndex * 7 +
+                            max(day.dayIndex - 1, 0),
+                        to: planStart
+                    )
+            else {
+                continue
+            }
+
+            var available =
+                health.workouts
+                    .filter {
+                        calendar.isDate(
+                            $0.startDate,
+                            inSameDayAs: date
+                        )
+                    }
+                    .sorted {
+                        $0.startDate < $1.startDate
+                    }
+
+            for workout in day.sessions
+            where !completedIDs.contains(
+                workout.id
+            ) {
+                guard
+                    let matchIndex =
+                        available.firstIndex(
+                            where: {
+                                healthWorkout(
+                                    $0,
+                                    matches: workout
+                                )
+                            }
+                        )
+                else {
+                    continue
+                }
+
+                completedIDs.insert(workout.id)
+                available.remove(at: matchIndex)
             }
         }
 
+        return (
+            min(completedIDs.count, total),
+            total
+        )
+    }
 
+    private func trainUpcomingWorkouts(
+        in plan: TrainingPlan,
+        limit: Int
+    ) -> [ATHLTHTrainUpcomingWorkout] {
+        guard limit > 0 else {
+            return []
+        }
+
+        let calendar = Calendar.current
+        let today =
+            calendar.startOfDay(for: Date())
+        let planStart =
+            calendar.startOfDay(
+                for:
+                    plan.startDate ??
+                    today
+            )
+
+        var result:
+            [ATHLTHTrainUpcomingWorkout] = []
+
+        for (weekIndex, week)
+        in plan.weeks.enumerated() {
+            for day in week.days {
+                guard
+                    let baseDate =
+                        calendar.date(
+                            byAdding: .day,
+                            value:
+                                weekIndex * 7 +
+                                max(day.dayIndex - 1, 0),
+                            to: planStart
+                        )
+                else {
+                    continue
+                }
+
+                guard baseDate > today else {
+                    continue
+                }
+
+                for workout in day.sessions {
+                    var date = baseDate
+
+                    if let scheduled =
+                        workout.scheduledStart {
+                        let parts =
+                            calendar.dateComponents(
+                                [.hour, .minute],
+                                from: scheduled
+                            )
+
+                        date =
+                            calendar.date(
+                                bySettingHour:
+                                    parts.hour ?? 0,
+                                minute:
+                                    parts.minute ?? 0,
+                                second: 0,
+                                of: baseDate
+                            ) ?? baseDate
+                    }
+
+                    result.append(
+                        ATHLTHTrainUpcomingWorkout(
+                            planID: plan.id,
+                            date: date,
+                            workout: workout
+                        )
+                    )
+                }
+            }
+        }
+
+        return Array(
+            result
+                .sorted {
+                    if $0.date == $1.date {
+                        return
+                            $0.workout.title <
+                            $1.workout.title
+                    }
+
+                    return $0.date < $1.date
+                }
+                .prefix(limit)
+        )
+    }
+
+    private func trainUpcomingDateText(
+        _ date: Date
+    ) -> String {
+        let calendar = Calendar.current
+
+        if calendar.isDateInTomorrow(date) {
+            return ATHLTHLocalization.choose(
+                english: "Tomorrow",
+                norwegian: "I morgen"
+            )
+        }
+
+        return date.formatted(
+            .dateTime.weekday(.abbreviated)
+        )
     }
 
     @ViewBuilder
@@ -6811,11 +7976,11 @@ struct ATHLTHTrainView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(
                         .system(
-                            size: 17,
+                            size: 19,
                             weight: .semibold
                         )
                     )
@@ -6823,51 +7988,60 @@ struct ATHLTHTrainView: View {
                         ATHLTHTheme.accentDeep
                     )
                     .frame(
-                        width: 34,
-                        height: 34
+                        width: 44,
+                        height: 44
                     )
                     .background(
-                        ATHLTHTheme.accentSoft
-                            .opacity(0.88),
-                        in: Circle()
-                    )
-
-                Text(title)
-                    .font(
-                        .system(
-                            size: 11.5,
-                            weight: .semibold
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.champagneSoft,
+                                ATHLTHTheme.accentSoft
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(
+                            cornerRadius: 14,
+                            style: .continuous
                         )
                     )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
 
-                Text(subtitle)
-                    .font(
-                        .system(
-                            size: 9.2,
-                            weight: .medium
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
                         )
-                    )
+                        .lineLimit(1)
+
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 2)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(
-                        ATHLTHTheme.mutedText
+                        ATHLTHTheme.accentDeep.opacity(0.70)
                     )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
             }
+            .padding(12)
             .frame(
                 maxWidth: .infinity,
-                minHeight: 92
+                minHeight: 78,
+                alignment: .leading
             )
-            .padding(.horizontal, 3)
             .background(
                 Color.white.opacity(
                     enabled
-                        ? 0.68
-                        : 0.40
+                        ? 0.76
+                        : 0.42
                 ),
                 in: RoundedRectangle(
                     cornerRadius: 18,
@@ -6881,9 +8055,7 @@ struct ATHLTHTrainView: View {
                 )
                 .stroke(
                     enabled
-                        ? ATHLTHTheme.accent.opacity(
-                            0.08
-                        )
+                        ? Color.white.opacity(0.90)
                         : ATHLTHTheme.border,
                     lineWidth: 0.8
                 )
