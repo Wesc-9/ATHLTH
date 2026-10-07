@@ -259,19 +259,8 @@ final class MessagingStore: ObservableObject {
 
     private func syncApplicationIconBadge()
         async {
-        guard let count =
-                try? await service
-                    .unreadInboxEventCount()
-        else {
-            return
-        }
-
-        try? await
-            UNUserNotificationCenter
-                .current()
-                .setBadgeCount(
-                    count
-                )
+        // The root tab owns the app-icon badge so Messages cannot overwrite
+        // notification/import counts (or revive stale hidden inbox rows).
     }
 
     func openConversation(with userID: UUID) async throws -> UUID {
