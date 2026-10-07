@@ -10211,6 +10211,21 @@ struct CommunityGroupDetailView: View {
                 Spacer()
             }
 
+            if !groupPostMentionSuggestions.isEmpty {
+                ATHLTHMentionSuggestionList(
+                    suggestions:
+                        groupPostMentionSuggestions
+                ) { suggestion in
+                    updateDraft =
+                        ATHLTHMentionSupport
+                            .inserting(
+                                suggestion,
+                                into:
+                                    updateDraft
+                            )
+                }
+            }
+
             HStack(alignment: .bottom, spacing: 10) {
                 TextField(
                     "Share a Club post…",
@@ -10271,6 +10286,33 @@ struct CommunityGroupDetailView: View {
             }
             .padding(.top, 12)
         }
+    }
+
+    private var groupPostMentionSuggestions:
+        [ATHLTHMentionSuggestion] {
+        let candidates =
+            groups.mentionCandidates(
+                in: group.id
+            )
+            .filter {
+                $0.userID !=
+                    session.profile.userID
+            }
+
+        let role =
+            groups.role(
+                in: currentGroup
+            )
+
+        return ATHLTHMentionSupport
+            .suggestions(
+                in: updateDraft,
+                candidates: candidates,
+                includeEveryone:
+                    role == "owner" ||
+                    role == "admin" ||
+                    role == "contributor"
+            )
     }
 
     private var nextGroupEvent: CommunityGroupEventRecord? {
