@@ -100,6 +100,61 @@ targets:
           APS_ENVIRONMENT: development
         Release:
           APS_ENVIRONMENT: production
+    preBuildScripts:
+      - name: Restore strength completion hero
+        basedOnDependencyAnalysis: false
+        showEnvVars: false
+        script: |
+          set -euo pipefail
+          python3 - "$SRCROOT" <<'PY'
+          import base64
+          import hashlib
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          parts = sorted(
+              (root / "scripts/assets").glob(
+                  "StrengthPostWorkoutHero.part*"
+              )
+          )
+          if not parts:
+              raise SystemExit(
+                  "StrengthPostWorkoutHero payload parts are missing"
+              )
+
+          payload = "".join(
+              part.read_text(encoding="utf-8").strip()
+              for part in parts
+          )
+          image = base64.b64decode(
+              payload,
+              validate=True
+          )
+
+          expected_sha256 = (
+              "50f8bccba3c16541250a23f8720a8b0c"
+              "80bfd222cb472620db8130c2b1dc52b0"
+          )
+          actual_sha256 = hashlib.sha256(image).hexdigest()
+          if actual_sha256 != expected_sha256:
+              raise SystemExit(
+                  "StrengthPostWorkoutHero checksum mismatch: "
+                  + actual_sha256
+              )
+
+          target = (
+              root
+              / "ATHLTH/Assets.xcassets/"
+                "StrengthPostWorkoutHero.imageset/"
+                "StrengthPostWorkoutHero.jpg"
+          )
+          target.write_bytes(image)
+          print(
+              "Restored StrengthPostWorkoutHero.jpg "
+              f"({len(image)} bytes)"
+          )
+          PY
     scheme:
       testTargets:
         - ATHLTHTests
