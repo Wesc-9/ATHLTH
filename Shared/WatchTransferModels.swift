@@ -359,6 +359,8 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var announceStrengthRestCountdown: Bool? = nil
     var announceStrengthRestComplete: Bool? = nil
     var announceStrengthNextExercise: Bool? = nil
+    var announceStrengthNextSetDetails: Bool? = nil
+    var announceStrengthExerciseProgress: Bool? = nil
     var strengthStatusIntervalSeconds: TimeInterval? = nil
     var strengthRestCountdownSeconds: Int? = nil
     var strengthHapticsEnabled: Bool? = nil
@@ -428,6 +430,14 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
 
     var shouldAnnounceStrengthNextExercise: Bool {
         announceStrengthNextExercise ?? false
+    }
+
+    var shouldAnnounceStrengthNextSetDetails: Bool {
+        announceStrengthNextSetDetails ?? true
+    }
+
+    var shouldAnnounceStrengthExerciseProgress: Bool {
+        announceStrengthExerciseProgress ?? false
     }
 
     var resolvedStrengthRestCountdownSeconds: Int {
