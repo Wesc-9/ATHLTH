@@ -1435,7 +1435,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .secondaryTextColorHex
             )
 
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             OfficialWeeklyChallengeArtwork(
                 challenge: challenge,
                 preserveOriginalColors:
@@ -1443,16 +1443,39 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     .preserveOriginalImageColors
             )
 
-            // Premium vignette keeps the artwork visible while giving text
-            // a reliable visual anchor regardless of the selected image.
+            // Premium floating-text treatment. Instead of putting the whole
+            // copy inside a glass rectangle, contrast is created inside the
+            // artwork itself with soft local gradients.
+            HStack(spacing: 0) {
+                LinearGradient(
+                    colors: [
+                        Color.black
+                            .opacity(0.48),
+                        Color.black
+                            .opacity(0.24),
+                        Color.black
+                            .opacity(0.04),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(maxWidth: 430)
+
+                Spacer(minLength: 0)
+            }
+            .allowsHitTesting(false)
+
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.04),
-                    Color.black.opacity(0.10),
-                    Color.black.opacity(0.54)
+                    Color.clear,
+                    Color.black
+                        .opacity(0.04),
+                    Color.black
+                        .opacity(0.31)
                 ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
+                startPoint: .top,
+                endPoint: .bottom
             )
             .allowsHitTesting(false)
 
@@ -1461,118 +1484,158 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     appearance
                         .resolvedImageOverlayOpacity
                 )
+                .allowsHitTesting(false)
             }
 
             VStack(
                 alignment: .leading,
-                spacing: 9
+                spacing: 0
             ) {
                 HStack(
                     alignment: .center,
-                    spacing: 8
+                    spacing: 9
                 ) {
                     if appearance.showBadge {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "WEEKLY CHALLENGE",
-                                norwegian:
-                                    "UKENS CHALLENGE"
-                            ),
-                            systemImage:
-                                "trophy.fill"
-                        )
-                        .font(
-                            .system(
-                                size: 9,
-                                weight: .heavy,
-                                design: .rounded
+                        HStack(spacing: 9) {
+                            Image(
+                                systemName:
+                                    "trophy.fill"
                             )
-                        )
-                        .tracking(0.9)
-                        .foregroundStyle(
-                            Color(
-                                red: 0.31,
-                                green: 0.23,
-                                blue: 0.07
+                            .font(
+                                .system(
+                                    size: 11,
+                                    weight: .bold
+                                )
                             )
-                        )
+                            .foregroundStyle(
+                                premiumGold
+                            )
+
+                            Rectangle()
+                                .fill(
+                                    premiumGold
+                                        .opacity(0.64)
+                                )
+                                .frame(
+                                    width: 1,
+                                    height: 16
+                                )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "WEEKLY CHALLENGE",
+                                    norwegian:
+                                        "UKENS CHALLENGE"
+                                )
+                            )
+                            .font(
+                                .system(
+                                    size: 10,
+                                    weight: .heavy,
+                                    design: .rounded
+                                )
+                            )
+                            .tracking(1.15)
+                            .foregroundStyle(
+                                Color.white
+                                    .opacity(0.96)
+                            )
+                        }
                         .padding(
                             .horizontal,
-                            11
+                            13
                         )
-                        .frame(height: 27)
+                        .frame(height: 34)
                         .background(
-                            LinearGradient(
-                                colors: [
-                                    Color.white
-                                        .opacity(0.96),
-                                    ATHLTHTheme
-                                        .champagneSoft
-                                        .opacity(0.98)
-                                ],
-                                startPoint:
-                                    .topLeading,
-                                endPoint:
-                                    .bottomTrailing
-                            ),
+                            .ultraThinMaterial,
                             in: Capsule()
                         )
                         .overlay {
                             Capsule()
                                 .stroke(
-                                    premiumGold
-                                        .opacity(0.52),
-                                    lineWidth: 0.8
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white
+                                                .opacity(0.70),
+                                            premiumGold
+                                                .opacity(0.62),
+                                            Color.white
+                                                .opacity(0.18)
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
+                                    ),
+                                    lineWidth: 0.9
                                 )
                         }
                         .shadow(
                             color:
+                                premiumGold
+                                    .opacity(0.17),
+                            radius: 7,
+                            y: 2
+                        )
+                        .shadow(
+                            color:
                                 Color.black
                                     .opacity(0.18),
-                            radius: 5,
-                            y: 2
+                            radius: 8,
+                            y: 3
                         )
                     }
 
                     Spacer(minLength: 8)
 
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
                         Image(
                             systemName:
                                 challenge
                                     .kind
                                     .icon
                         )
+
                         Text(targetText)
                     }
                     .font(
                         .system(
-                            size: 10,
+                            size: 11,
                             weight: .bold,
                             design: .rounded
                         )
                     )
-                    .foregroundStyle(.white)
+                    .foregroundStyle(
+                        .white
+                    )
                     .padding(
                         .horizontal,
-                        9
+                        12
                     )
-                    .frame(height: 27)
+                    .frame(height: 34)
                     .background(
-                        Color.black
-                            .opacity(0.30),
+                        .ultraThinMaterial,
                         in: Capsule()
                     )
                     .overlay {
                         Capsule()
                             .stroke(
                                 Color.white
-                                    .opacity(0.26),
-                                lineWidth: 0.7
+                                    .opacity(0.36),
+                                lineWidth: 0.8
                             )
                     }
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(0.18),
+                        radius: 7,
+                        y: 3
+                    )
                 }
+
+                Spacer(minLength: 15)
 
                 VStack(
                     alignment: .leading,
@@ -1581,7 +1644,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     Text(challenge.title)
                         .font(
                             .system(
-                                size: 21,
+                                size: 24,
                                 weight: .bold,
                                 design: .rounded
                             )
@@ -1591,7 +1654,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                         .lineLimit(2)
                         .minimumScaleFactor(
-                            0.86
+                            0.80
                         )
                         .lineSpacing(1)
                         .shadow(
@@ -1603,16 +1666,16 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                                         ? max(
                                             appearance
                                                 .resolvedShadowOpacity,
-                                            0.42
+                                            0.46
                                         )
-                                        : 0
+                                        : 0.24
                                 ),
                             radius:
                                 appearance
                                     .showTextShadow
-                                    ? 3
-                                    : 0,
-                            y: 1
+                                    ? 4
+                                    : 2,
+                            y: 1.5
                         )
 
                     if appearance.showSubtitle {
@@ -1621,7 +1684,7 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         )
                         .font(
                             .system(
-                                size: 12,
+                                size: 13,
                                 weight: .medium
                             )
                         )
@@ -1631,92 +1694,28 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         .lineLimit(2)
                         .lineSpacing(1.5)
                         .truncationMode(.tail)
+                        .shadow(
+                            color:
+                                Color.black
+                                    .opacity(0.34),
+                            radius: 3,
+                            y: 1
+                        )
                     }
                 }
-                .padding(
-                    .horizontal,
-                    appearance
-                        .showTextBackdrop
-                        ? 11
-                        : 0
-                )
-                .padding(
-                    .vertical,
-                    appearance
-                        .showTextBackdrop
-                        ? 9
-                        : 0
-                )
                 .frame(
-                    maxWidth: 306,
+                    maxWidth: 345,
                     alignment: .leading
                 )
-                .background(
-                    appearance
-                        .readableTextBackdropColor,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                )
-                .overlay {
-                    if appearance
-                        .showTextBackdrop {
-                        RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                        .stroke(
-                            Color.white
-                                .opacity(0.18),
-                            lineWidth: 0.7
-                        )
-                    }
-                }
-                .shadow(
-                    color:
-                        Color.black
-                            .opacity(0.12),
-                    radius: 8,
-                    y: 4
-                )
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 14)
 
-                HStack(spacing: 9) {
+                HStack(
+                    alignment: .center,
+                    spacing: 10
+                ) {
                     if appearance.showMetadata {
-                        HStack(spacing: -7) {
-                            ForEach(
-                                participantProfiles
-                                    .prefix(4)
-                            ) { profile in
-                                CommunityReferenceAvatar(
-                                    url:
-                                        profile.avatarURL
-                                            .flatMap(
-                                                URL.init(string:)
-                                            ),
-                                    fallback:
-                                        profile
-                                            .resolvedName,
-                                    size: 27
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            premiumGold
-                                                .opacity(
-                                                    0.78
-                                                ),
-                                            lineWidth:
-                                                1.4
-                                        )
-                                }
-                            }
-                        }
-
-                        HStack(spacing: 9) {
+                        HStack(spacing: 10) {
                             Label(
                                 ATHLTHLocalization
                                     .format(
@@ -1738,11 +1737,11 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                             Rectangle()
                                 .fill(
                                     Color.white
-                                        .opacity(0.28)
+                                        .opacity(0.34)
                                 )
                                 .frame(
                                     width: 1,
-                                    height: 11
+                                    height: 15
                                 )
 
                             Label(
@@ -1760,17 +1759,20 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         }
                         .font(
                             .system(
-                                size: 9.5,
+                                size: 10.5,
                                 weight: .bold,
                                 design: .rounded
                             )
                         )
-                        .foregroundStyle(.white)
+                        .foregroundStyle(
+                            Color.white
+                                .opacity(0.96)
+                        )
                         .padding(
                             .horizontal,
-                            10
+                            13
                         )
-                        .frame(height: 29)
+                        .frame(height: 36)
                         .background(
                             .ultraThinMaterial,
                             in: Capsule()
@@ -1778,14 +1780,33 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                         .overlay {
                             Capsule()
                                 .stroke(
-                                    Color.white
-                                        .opacity(0.30),
-                                    lineWidth: 0.7
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white
+                                                .opacity(0.52),
+                                            premiumGold
+                                                .opacity(0.28),
+                                            Color.white
+                                                .opacity(0.20)
+                                        ],
+                                        startPoint:
+                                            .topLeading,
+                                        endPoint:
+                                            .bottomTrailing
+                                    ),
+                                    lineWidth: 0.8
                                 )
                         }
+                        .shadow(
+                            color:
+                                Color.black
+                                    .opacity(0.17),
+                            radius: 7,
+                            y: 3
+                        )
                     }
 
-                    Spacer(minLength: 6)
+                    Spacer(minLength: 8)
 
                     Image(
                         systemName:
@@ -1793,76 +1814,85 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
                     )
                     .font(
                         .system(
-                            size: 15,
+                            size: 18,
                             weight: .bold
                         )
                     )
                     .foregroundStyle(
                         Color(
-                            red: 0.27,
-                            green: 0.20,
-                            blue: 0.07
+                            red: 0.34,
+                            green: 0.25,
+                            blue: 0.08
                         )
                     )
                     .frame(
-                        width: 35,
-                        height: 35
+                        width: 43,
+                        height: 43
                     )
                     .background(
-                        LinearGradient(
-                            colors: [
-                                Color.white,
-                                ATHLTHTheme
-                                    .champagneSoft
-                            ],
-                            startPoint:
-                                .topLeading,
-                            endPoint:
-                                .bottomTrailing
-                        ),
+                        .ultraThinMaterial,
                         in: Circle()
                     )
                     .overlay {
                         Circle()
                             .stroke(
-                                premiumGold
-                                    .opacity(0.55),
-                                lineWidth: 0.8
+                                LinearGradient(
+                                    colors: [
+                                        Color.white
+                                            .opacity(0.90),
+                                        premiumGold
+                                            .opacity(0.82),
+                                        Color.white
+                                            .opacity(0.32)
+                                    ],
+                                    startPoint:
+                                        .topLeading,
+                                    endPoint:
+                                        .bottomTrailing
+                                ),
+                                lineWidth: 1.15
                             )
                     }
                     .shadow(
                         color:
-                            Color.black
-                                .opacity(0.15),
-                        radius: 5,
+                            premiumGold
+                                .opacity(0.20),
+                        radius: 8,
                         y: 2
+                    )
+                    .shadow(
+                        color:
+                            Color.black
+                                .opacity(0.18),
+                        radius: 7,
+                        y: 3
                     )
                 }
             }
-            .padding(12)
+            .padding(14)
         }
-        .frame(height: 166)
+        .frame(height: 184)
         .frame(maxWidth: .infinity)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: 26,
+                cornerRadius: 27,
                 style: .continuous
             )
         )
         .overlay {
             RoundedRectangle(
-                cornerRadius: 26,
+                cornerRadius: 27,
                 style: .continuous
             )
             .stroke(
                 LinearGradient(
                     colors: [
                         Color.white
-                            .opacity(0.72),
+                            .opacity(0.76),
                         premiumGold
-                            .opacity(0.48),
+                            .opacity(0.52),
                         Color.white
-                            .opacity(0.22)
+                            .opacity(0.20)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -1872,16 +1902,19 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
         }
         .shadow(
             color:
-                Color.black.opacity(0.10),
-            radius: 16,
-            y: 7
+                Color.black
+                    .opacity(0.12),
+            radius: 17,
+            y: 8
         )
         .shadow(
             color:
-                premiumGold.opacity(0.07),
-            radius: 22,
-            y: 9
+                premiumGold
+                    .opacity(0.08),
+            radius: 24,
+            y: 10
         )
+
     }
 }
 
