@@ -43,6 +43,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var creationError: String?
+    @State private var showingAIBuilder = false
+    @State private var dismissAfterAI = false
     @State private var didApplySuggestedStartDate = false
 
     init(
@@ -305,6 +307,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(creationError ?? "")
+        }
+        .sheet(
+            isPresented: $showingAIBuilder,
+            onDismiss: {
+                if dismissAfterAI {
+                    dismiss()
+                }
+            }
+        ) {
+            AIProgramBuilderView(
+                mode: .generate,
+                seed: aiBuilderSeed,
+                onProgramCreated: {
+                    dismissAfterAI = true
+                }
+            )
         }
     }
 
@@ -2439,7 +2457,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         value:
                             ATHLTHLocalization.choose(
                                 english:
-                                    "\(selectedDays.count) sessions · \(selectedDays.sorted().map(shortDayName).joined(separator: ", "))",
+                                    "\(selectedDays.count) sessions · \(selectedDays.sorted().map { shortDayName($0) }.joined(separator: ", "))",
                                 norwegian:
                                     "\(selectedDays.count) økter · \(selectedDays.sorted().map(shortDayName).joined(separator: ", "))"
                             )
@@ -2572,6 +2590,36 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
 
                 Button {
+                    showingAIBuilder = true
+                } label: {
+                    creationChoiceCard(
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Get an AI proposal",
+                                norwegian:
+                                    "Få forslag fra AI"
+                            ),
+                        subtitle:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH Coach starts with your focus, goal, training days, limitations and available time.",
+                                norwegian:
+                                    "ATHLTH Coach starter med fokus, mål, treningsdager, hensyn og tiden du har tilgjengelig."
+                            ),
+                        icon: "sparkles",
+                        prominent: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    !canCreatePlan
+                )
+                .opacity(
+                    canCreatePlan ? 1 : 0.42
+                )
+
+                Button {
                     createPlan(
                         seedSuggestedWeek: true
                     )
@@ -2580,19 +2628,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         title:
                             ATHLTHLocalization.choose(
                                 english:
-                                    "Build my starting week",
+                                    "Use a simple starting structure",
                                 norwegian:
-                                    "Bygg startuken for meg"
+                                    "Bruk enkel startstruktur"
                             ),
                         subtitle:
                             ATHLTHLocalization.choose(
                                 english:
-                                    "ATHLTH uses your focus, goal and chosen days to create an editable starting structure.",
+                                    "Create the chosen training days immediately, without AI, and edit every workout yourself.",
                                 norwegian:
-                                    "ATHLTH bruker fokus, mål og valgte dager til å lage en redigerbar startstruktur."
+                                    "Opprett de valgte treningsdagene med en gang, uten AI, og rediger øktene selv."
                             ),
-                        icon: "sparkles",
-                        prominent: true
+                        icon:
+                            "calendar.day.timeline.left",
+                        prominent: false
                     )
                 }
                 .buttonStyle(.plain)
@@ -2635,20 +2684,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .opacity(
                     canCreatePlan ? 1 : 0.42
                 )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "AI-specific plan generation can be added on top of this profile later without changing the plan data.",
-                        norwegian:
-                            "AI-generering kan kobles på denne profilen senere uten at planens data må bygges om."
-                    )
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .padding(.horizontal, 3)
             }
         }
     }
@@ -3497,6 +3532,146 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 style: .continuous
             )
         )
+    }
+
+    private var aiBuilderSeed:
+        AIProgramBuilderSeed {
+        let cleanLimitations =
+            injuryFree
+                ? ""
+                : injuriesOrLimitations
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+        let detail =
+            goalDetail
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+
+        var focusNotes: [String] = [
+            ATHLTHLocalization.choose(
+                english:
+                    "Primary goal: \(goal.title).",
+                norwegian:
+                    "Hovedmål: \(goal.title)."
+            )
+        ]
+
+        if !detail.isEmpty {
+            focusNotes.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Concrete target: \(detail).",
+                    norwegian:
+                        "Konkret mål: \(detail)."
+                )
+            )
+        }
+
+        if !selectedMuscles.isEmpty {
+            focusNotes.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Prioritise these muscle groups: \(selectedMuscleTitles).",
+                    norwegian:
+                        "Prioriter disse muskelgruppene: \(selectedMuscleTitles)."
+                )
+            )
+        }
+
+        if mode == .advanced,
+           let secondaryFocus {
+            focusNotes.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Focus split: \(focusWeight)% \(focus.title), \(100 - focusWeight)% \(secondaryFocus.title).",
+                    norwegian:
+                        "Fokusfordeling: \(focusWeight)% \(focus.title), \(100 - focusWeight)% \(secondaryFocus.title)."
+                )
+            )
+        }
+
+        if hasCompetitionDate &&
+            mode == .advanced {
+            focusNotes.append(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Target date: \(competitionDate.formatted(date: .abbreviated, time: .omitted)).",
+                    norwegian:
+                        "Måldato: \(competitionDate.formatted(date: .abbreviated, time: .omitted))."
+                )
+            )
+        }
+
+        let sessionMinutes: Int
+        if mode == .advanced {
+            sessionMinutes =
+                max(
+                    weeklyTimeBudgetMinutes /
+                    max(selectedDays.count, 1),
+                    20
+                )
+        } else {
+            sessionMinutes = 60
+        }
+
+        let seededGymAccess: String?
+        if mode == .advanced {
+            switch equipment {
+            case .gym, .both:
+                seededGymAccess = "Yes"
+            case .home:
+                seededGymAccess = "No"
+            }
+        } else {
+            seededGymAccess = nil
+        }
+
+        return AIProgramBuilderSeed(
+            preferredTitle:
+                title.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            startDate: startDate,
+            weekCount: weekCount,
+            sessionsPerWeek:
+                selectedDays.count,
+            sessionDurationMinutes:
+                min(sessionMinutes, 180),
+            availableDays:
+                selectedDays,
+            trainingFocus:
+                aiTrainingFocus,
+            gymAccess:
+                seededGymAccess,
+            limitations:
+                cleanLimitations,
+            coachFocusNotes:
+                focusNotes.joined(
+                    separator: " "
+                ),
+            selectedGoalIDs:
+                selectedGoalIDs
+        )
+    }
+
+    private var aiTrainingFocus:
+        TrainingFocus {
+        switch focus {
+        case .generalFitness:
+            return .generalFitness
+        case .strength,
+             .hypertrophy:
+            return .strength
+        case .running,
+             .endurance:
+            return .running
+        case .hybrid:
+            return .hybrid
+        case .mobilityRehab:
+            return .recovery
+        }
     }
 
     private func createPlan(
