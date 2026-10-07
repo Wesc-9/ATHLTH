@@ -9411,6 +9411,33 @@ struct CommunityGroupDetailView: View {
                         }
                     }
 
+                    let mentionSuggestions =
+                        announcementMentionSuggestions(
+                            for: update.id
+                        )
+
+                    if !mentionSuggestions.isEmpty {
+                        ATHLTHMentionSuggestionList(
+                            suggestions:
+                                mentionSuggestions
+                        ) { suggestion in
+                            let currentDraft =
+                                announcementCommentDrafts[
+                                    update.id
+                                ] ?? ""
+
+                            announcementCommentDrafts[
+                                update.id
+                            ] =
+                                ATHLTHMentionSupport
+                                    .inserting(
+                                        suggestion,
+                                        into:
+                                            currentDraft
+                                    )
+                        }
+                    }
+
                     HStack(
                         alignment: .bottom,
                         spacing: 8
@@ -9686,6 +9713,39 @@ struct CommunityGroupDetailView: View {
                 }
             }
         }
+    }
+
+    private func announcementMentionSuggestions(
+        for announcementID: UUID
+    ) -> [ATHLTHMentionSuggestion] {
+        let draft =
+            announcementCommentDrafts[
+                announcementID
+            ] ?? ""
+
+        let candidates =
+            groups.mentionCandidates(
+                in: group.id
+            )
+            .filter {
+                $0.userID !=
+                    session.profile.userID
+            }
+
+        let role =
+            groups.role(
+                in: currentGroup
+            )
+
+        return ATHLTHMentionSupport
+            .suggestions(
+                in: draft,
+                candidates: candidates,
+                includeEveryone:
+                    role == "owner" ||
+                    role == "admin" ||
+                    role == "contributor"
+            )
     }
 
     private func postAnnouncementComment(
