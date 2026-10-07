@@ -2114,6 +2114,239 @@ struct CommunityEventDetailView: View {
         }
     }
 
+    private func loadEventStartWeather()
+        async {
+        guard
+            let item =
+                community.item(
+                    id: eventID
+                ),
+            let coordinate =
+                eventWeatherCoordinate(
+                    item
+                )
+        else {
+            return
+        }
+
+        await eventWeather.load(
+            latitude:
+                coordinate.latitude,
+            longitude:
+                coordinate.longitude,
+            startsAt:
+                item.event.startsAt
+        )
+    }
+
+    private func eventWeatherCoordinate(
+        _ item: CommunityEventItem
+    ) -> CLLocationCoordinate2D? {
+        if let latitude =
+                item.event.latitude,
+           let longitude =
+                item.event.longitude {
+            return CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            )
+        }
+
+        if let first =
+                eventRoute(item)?
+                    .coordinates
+                    .first {
+            return first.coordinate
+        }
+
+        return nil
+    }
+
+    @ViewBuilder
+    private func eventStartWeatherCard(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if eventWeatherCoordinate(item) != nil {
+            ATHLTHCard {
+                HStack(
+                    alignment: .top,
+                    spacing: 12
+                ) {
+                    Image(
+                        systemName:
+                            eventWeather
+                                .snapshot?
+                                .symbolName ??
+                            "cloud.sun.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 22,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(
+                        width: 44,
+                        height: 44
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .vitalitySoft,
+                        in: Circle()
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Weather at start",
+                                norwegian:
+                                    "Vær ved start"
+                            )
+                        )
+                        .font(
+                            .headline
+                        )
+
+                        Text(
+                            item.event.startsAt
+                                .formatted(
+                                    date:
+                                        .abbreviated,
+                                    time:
+                                        .shortened
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+
+                        if let snapshot =
+                                eventWeather
+                                    .snapshot {
+                            HStack(
+                                spacing: 12
+                            ) {
+                                Text(
+                                    String(
+                                        format:
+                                            "%.0f°",
+                                        snapshot
+                                            .temperatureCelsius
+                                    )
+                                )
+                                .font(
+                                    .title3
+                                        .weight(
+                                            .bold
+                                        )
+                                )
+
+                                if let rain =
+                                        snapshot
+                                            .precipitationProbabilityPercent {
+                                    Label(
+                                        "\(rain)%",
+                                        systemImage:
+                                            "drop.fill"
+                                    )
+                                }
+
+                                if let wind =
+                                        snapshot
+                                            .windSpeedKilometersPerHour {
+                                    Label(
+                                        String(
+                                            format:
+                                                "%.0f km/t",
+                                            wind
+                                        ),
+                                        systemImage:
+                                            "wind"
+                                    )
+                                }
+                            }
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+                            .padding(.top, 4)
+
+                            if let feels =
+                                    snapshot
+                                        .apparentTemperatureCelsius {
+                                Text(
+                                    ATHLTHLocalization.format(
+                                        english:
+                                            "Feels like %.0f°. Forecast for the event start, not current weather.",
+                                        norwegian:
+                                            "Føles som %.0f°. Prognose for arrangementsstart, ikke været akkurat nå.",
+                                        feels
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .padding(.top, 2)
+                            } else {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Forecast for the event start, not current weather.",
+                                        norwegian:
+                                            "Prognose for arrangementsstart, ikke været akkurat nå."
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .padding(.top, 2)
+                            }
+                        } else if eventWeather
+                                    .isLoading {
+                            ProgressView()
+                                .padding(.top, 5)
+                        } else {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "The start forecast will appear when it is available.",
+                                    norwegian:
+                                        "Værmelding for starttidspunktet vises når prognosen er tilgjengelig."
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .padding(.top, 4)
+                        }
+                    }
+
+                    Spacer(
+                        minLength: 0
+                    )
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func routeSpotlight(
         _ item: CommunityEventItem
