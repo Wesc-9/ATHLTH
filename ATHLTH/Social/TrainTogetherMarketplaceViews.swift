@@ -2598,7 +2598,8 @@ struct TrainTogetherPostCreateView:
                 $editingExercise
         ) { exercise in
             PlannedExerciseEditorView(
-                exercise: exercise
+                exercise: exercise,
+                advancedMode: true
             ) { updated in
                 updateExercise(
                     updated
