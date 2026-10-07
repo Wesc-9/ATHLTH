@@ -3,6 +3,18 @@ import Supabase
 import UIKit
 import UserNotifications
 
+struct ATHLTHPushNavigationTarget:
+    Identifiable,
+    Equatable
+{
+    let communityEventID: UUID
+    let backendEventID: UUID?
+
+    var id: UUID {
+        communityEventID
+    }
+}
+
 extension Notification.Name {
     static let athlthRemoteNotificationReceived =
         Notification.Name("athlth.remoteNotificationReceived")
@@ -19,6 +31,8 @@ final class APNsPushManager: ObservableObject {
     @Published private(set) var hasDeviceToken = false
     @Published private(set) var isSystemRegistered = false
     @Published private(set) var lastBackendSyncAt: Date?
+    @Published private(set) var pendingNavigationTarget:
+        ATHLTHPushNavigationTarget?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -45,6 +59,56 @@ final class APNsPushManager: ObservableObject {
         Self.apnsEnvironment == "production"
             ? "Production"
             : "Sandbox"
+    }
+
+    func captureTappedNotification(
+        _ userInfo:
+            [AnyHashable: Any]
+    ) {
+        guard
+            let entityType =
+                userInfo[
+                    "athlth_entity_type"
+                ] as? String,
+            entityType
+                .lowercased() ==
+                "community_event",
+            let rawEntityID =
+                userInfo[
+                    "athlth_entity_id"
+                ] as? String,
+            let eventID =
+                UUID(
+                    uuidString:
+                        rawEntityID
+                )
+        else {
+            return
+        }
+
+        let backendEventID =
+            (
+                userInfo[
+                    "athlth_event_id"
+                ] as? String
+            )
+            .flatMap(
+                UUID.init(
+                    uuidString:
+                )
+            )
+
+        pendingNavigationTarget =
+            ATHLTHPushNavigationTarget(
+                communityEventID:
+                    eventID,
+                backendEventID:
+                    backendEventID
+            )
+    }
+
+    func clearPendingNavigationTarget() {
+        pendingNavigationTarget = nil
     }
 
     func receive(deviceToken: Data) {
@@ -532,6 +596,13 @@ final class ATHLTHAppDelegate: NSObject,
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
+
+        await MainActor.run {
+            APNsPushManager.shared
+                .captureTappedNotification(
+                    userInfo
+                )
+        }
 
         NotificationCenter.default.post(
             name: .athlthRemoteNotificationReceived,
