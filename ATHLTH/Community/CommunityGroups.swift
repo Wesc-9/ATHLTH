@@ -13711,6 +13711,532 @@ struct CommunityGroupCreateView: View {
 
 }
 
+
+private struct CommunityGroupUpcomingOverviewView:
+    View
+{
+    @Environment(\.dismiss)
+    private var dismiss
+    @EnvironmentObject
+    private var groups:
+        CommunityGroupStore
+
+    let group: CommunityGroupRecord
+
+    private var currentGroup:
+        CommunityGroupRecord {
+        groups.group(for: group.id) ??
+        group
+    }
+
+    private var clubTheme:
+        CommunityClubTheme {
+        currentGroup.clubTheme
+    }
+
+    private var upcomingEvents:
+        [CommunityGroupEventRecord] {
+        let now = Date()
+
+        return groups.events(in: group.id)
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.nextOccurrenceStart(
+                    relativeTo: now
+                ) != nil
+            }
+            .sorted {
+                ($0.nextOccurrenceStart(
+                    relativeTo: now
+                ) ?? .distantFuture) <
+                ($1.nextOccurrenceStart(
+                    relativeTo: now
+                ) ?? .distantFuture)
+            }
+    }
+
+    private var upcomingChallenges:
+        [CommunityGroupChallengeRecord] {
+        let now = Date()
+
+        return groups.challenges(in: group.id)
+            .filter {
+                $0.status != "draft" &&
+                $0.status != "cancelled" &&
+                $0.endsAt >= now
+            }
+            .sorted { lhs, rhs in
+                let lhsActive =
+                    lhs.startsAt <= now &&
+                    lhs.endsAt >= now
+                let rhsActive =
+                    rhs.startsAt <= now &&
+                    rhs.endsAt >= now
+
+                if lhsActive != rhsActive {
+                    return lhsActive
+                }
+
+                return lhs.startsAt <
+                    rhs.startsAt
+            }
+    }
+
+    var body: some View {
+        ZStack {
+            ATHLTHPremiumCanvas(
+                accent:
+                    clubTheme.emerald
+                        .opacity(0.14)
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    if upcomingEvents.isEmpty &&
+                        upcomingChallenges.isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Nothing coming up yet",
+                                    norwegian:
+                                        "Ingenting kommende ennå"
+                                ),
+                            systemImage:
+                                "calendar.badge.plus",
+                            description:
+                                Text(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Events and Club challenges will appear here.",
+                                            norwegian:
+                                                "Events og Club-challenges vises her."
+                                        )
+                                )
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .padding(
+                            .top,
+                            70
+                        )
+                    } else {
+                        if !upcomingEvents
+                            .isEmpty {
+                            upcomingSectionHeader(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Events",
+                                            norwegian:
+                                                "Events"
+                                        ),
+                                icon:
+                                    "calendar"
+                            )
+
+                            VStack(
+                                spacing: 9
+                            ) {
+                                ForEach(
+                                    upcomingEvents
+                                ) {
+                                    event in
+
+                                    NavigationLink {
+                                        CommunityGroupEventDetailView(
+                                            group:
+                                                currentGroup,
+                                            event:
+                                                event
+                                        )
+                                    } label: {
+                                        eventRow(
+                                            event
+                                        )
+                                    }
+                                    .buttonStyle(
+                                        .plain
+                                    )
+                                }
+                            }
+                        }
+
+                        if !upcomingChallenges
+                            .isEmpty {
+                            upcomingSectionHeader(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Challenges",
+                                            norwegian:
+                                                "Challenges"
+                                        ),
+                                icon:
+                                    "trophy.fill"
+                            )
+                            .padding(
+                                .top,
+                                upcomingEvents
+                                    .isEmpty
+                                    ? 0
+                                    : 6
+                            )
+
+                            VStack(
+                                spacing: 9
+                            ) {
+                                ForEach(
+                                    upcomingChallenges
+                                ) {
+                                    challenge in
+
+                                    NavigationLink {
+                                        CommunityGroupChallengeDetailView(
+                                            group:
+                                                currentGroup,
+                                            challenge:
+                                                challenge
+                                        )
+                                    } label: {
+                                        challengeRow(
+                                            challenge
+                                        )
+                                    }
+                                    .buttonStyle(
+                                        .plain
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(
+                    .horizontal,
+                    16
+                )
+                .padding(.top, 14)
+                .padding(
+                    .bottom,
+                    32
+                )
+                .frame(
+                    maxWidth: 760
+                )
+                .frame(
+                    maxWidth:
+                        .infinity
+                )
+            }
+        }
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Coming up",
+                norwegian: "Kommende"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .toolbar {
+            ToolbarItem(
+                placement:
+                    .cancellationAction
+            ) {
+                Button(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Close",
+                            norwegian:
+                                "Lukk"
+                        )
+                ) {
+                    dismiss()
+                }
+            }
+        }
+        .task {
+            await groups.loadGroupContent(
+                group.id
+            )
+        }
+    }
+
+    private func upcomingSectionHeader(
+        title: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 13,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubTheme.forest
+            )
+            .frame(
+                width: 32,
+                height: 32
+            )
+            .background(
+                clubTheme.mint,
+                in: Circle()
+            )
+
+            Text(title)
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            Spacer()
+        }
+    }
+
+    private func eventRow(
+        _ event:
+            CommunityGroupEventRecord
+    ) -> some View {
+        let start =
+            event.nextOccurrenceStart() ??
+            event.startsAt
+
+        return HStack(spacing: 11) {
+            ATHLTHArtworkImage(
+                reference:
+                    event.imageURL,
+                fallbackAssetName:
+                    "CommunityHero"
+            )
+            .athlthBoundedFill()
+            .frame(
+                width: 86,
+                height: 66
+            )
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 14,
+                    style: .continuous
+                )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(event.title)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Label(
+                    start.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    ),
+                    systemImage:
+                        "calendar"
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+
+                if !event.meetingName
+                    .isEmpty {
+                    Label(
+                        event.meetingName,
+                        systemImage:
+                            "location.fill"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                clubTheme.forest
+            )
+        }
+        .padding(9)
+        .background(
+            Color.white.opacity(0.94),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                clubTheme.sage
+                    .opacity(0.42),
+                lineWidth: 0.8
+            )
+        }
+    }
+
+    private func challengeRow(
+        _ challenge:
+            CommunityGroupChallengeRecord
+    ) -> some View {
+        let now = Date()
+        let active =
+            challenge.startsAt <= now &&
+            challenge.endsAt >= now
+
+        return HStack(spacing: 11) {
+            Image(
+                systemName:
+                    "trophy.fill"
+            )
+            .font(.title3)
+            .foregroundStyle(
+                .white
+            )
+            .frame(
+                width: 52,
+                height: 52
+            )
+            .background(
+                clubTheme.gradient,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 4
+            ) {
+                Text(challenge.title)
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                    .lineLimit(1)
+
+                Text(
+                    active
+                        ? ATHLTHLocalization
+                            .format(
+                                english:
+                                    "Active · ends %@",
+                                norwegian:
+                                    "Aktiv · slutter %@",
+                                challenge.endsAt
+                                    .formatted(
+                                        date:
+                                            .abbreviated,
+                                        time:
+                                            .omitted
+                                    )
+                            )
+                        : ATHLTHLocalization
+                            .format(
+                                english:
+                                    "Starts %@",
+                                norwegian:
+                                    "Starter %@",
+                                challenge.startsAt
+                                    .formatted(
+                                        date:
+                                            .abbreviated,
+                                        time:
+                                            .shortened
+                                    )
+                            )
+                )
+                .font(.caption)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .mutedText
+                )
+                .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(
+                systemName:
+                    "chevron.right"
+            )
+            .font(.caption.bold())
+            .foregroundStyle(
+                clubTheme.forest
+            )
+        }
+        .padding(10)
+        .background(
+            Color.white.opacity(0.94),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 18,
+                style: .continuous
+            )
+            .stroke(
+                clubTheme.sage
+                    .opacity(0.42),
+                lineWidth: 0.8
+            )
+        }
+    }
+}
+
 struct CommunityGroupSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var groups: CommunityGroupStore
