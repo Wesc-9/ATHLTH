@@ -594,7 +594,11 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
 
             switch title {
             case "Event cancelled":
-                return "Event avlyst"
+                return entityType?
+                    .lowercased() ==
+                    "community_event"
+                    ? "Arrangement avlyst"
+                    : "Event avlyst"
             case "Event updated":
                 return "Event oppdatert"
             case "You have a spot":
@@ -781,6 +785,20 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
             return message
 
         case "group_event":
+            if entityType?
+                .lowercased() ==
+                "community_event",
+               title ==
+                "Event cancelled" {
+                return replacingSuffix(
+                    in: message,
+                    english:
+                        " has been cancelled.",
+                    norwegian:
+                        " er avlyst."
+                )
+            }
+
             let important =
                 replacingSuffix(
                     in: message,
