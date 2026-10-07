@@ -350,6 +350,8 @@ struct AppRootView: View {
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
     @EnvironmentObject private var trophies: TrophyStore
     @EnvironmentObject private var deviceRelay: WorkoutDeviceRelayStore
+    @ObservedObject private var pushManager =
+        APNsPushManager.shared
 
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
@@ -376,6 +378,22 @@ struct AppRootView: View {
 
     private let minimumLifecycleRefreshInterval:
         TimeInterval = 90
+
+    private var pushNavigationTargetBinding:
+        Binding<ATHLTHPushNavigationTarget?> {
+        Binding(
+            get: {
+                pushManager
+                    .pendingNavigationTarget
+            },
+            set: { value in
+                if value == nil {
+                    pushManager
+                        .clearPendingNavigationTarget()
+                }
+            }
+        )
+    }
 
     private func handleWatchSpotifyCommand(
         _ command: WatchSpotifyCommand
@@ -1703,6 +1721,31 @@ struct AppRootView: View {
                     }
                 } catch {
                     authCallbackError = error.localizedDescription
+                }
+            }
+        }
+        .sheet(
+            item:
+                pushNavigationTargetBinding
+        ) { target in
+            NavigationStack {
+                CommunityEventDetailView(
+                    eventID:
+                        target
+                            .communityEventID
+                )
+            }
+            .task {
+                await communityEvents
+                    .refresh(force: true)
+
+                if let backendEventID =
+                        target
+                            .backendEventID {
+                    await social
+                        .markBackendInboxRead(
+                            backendEventID
+                        )
                 }
             }
         }
