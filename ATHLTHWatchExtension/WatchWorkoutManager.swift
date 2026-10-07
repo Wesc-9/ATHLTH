@@ -84,6 +84,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     @Published private(set) var state: WatchWorkoutState = .idle
     @Published private(set) var kind: WatchWorkoutKind = .running
+    @Published private(set) var companionWorkoutActivity:
+        WatchWorkoutActivityState?
+    private var lastReportedWorkoutActivity:
+        WatchWorkoutActivityState?
     @Published private(set) var elapsedTime: TimeInterval = 0
     @Published private(set) var heartRate: Double = 0
     @Published private(set) var activeCalories: Double = 0
@@ -1848,6 +1852,193 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         state == .running || state == .paused
     }
 
+    func configureCompanionWorkoutActivity(
+        _ activity: WatchWorkoutActivityState
+    ) {
+        guard activity.updatedAt >=
+                companionWorkoutActivity?
+                    .updatedAt ??
+                .distantPast
+        else {
+            return
+        }
+
+        companionWorkoutActivity =
+            activity
+    }
+
+    private func localWorkoutStartAllowed()
+        async -> Bool {
+        if companionWorkoutActivity?
+            .isActive == true {
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "A workout is already running on iPhone. Finish it before starting another workout.",
+                    norwegian:
+                        "En økt kjører allerede på iPhone. Avslutt den før du starter en ny økt."
+                )
+            return false
+        }
+
+        guard WCSession.isSupported() else {
+            return true
+        }
+
+        let session =
+            WCSession.default
+
+        guard
+            session.activationState ==
+                .activated,
+            session.isReachable
+        else {
+            // Preserve standalone/offline Watch workouts. When the iPhone is
+            // disconnected, use the last durable activity state we have.
+            return companionWorkoutActivity?
+                .isActive != true
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind
+                    .workoutStartGuard
+                    .rawValue,
+            WatchTransferMetadataKey.sentAt:
+                Date()
+                    .timeIntervalSince1970
+        ]
+
+        let allowed: Bool? =
+            await withCheckedContinuation {
+                continuation in
+
+                session.sendMessage(
+                    payload,
+                    replyHandler: {
+                        reply in
+                        continuation.resume(
+                            returning:
+                                reply[
+                                    WatchTransferMetadataKey
+                                        .workoutAllowed
+                                ] as? Bool
+                        )
+                    },
+                    errorHandler: {
+                        _ in
+                        continuation.resume(
+                            returning: nil
+                        )
+                    }
+                )
+            }
+
+        guard allowed != false else {
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "A workout is already running on iPhone. Finish it before starting another workout.",
+                    norwegian:
+                        "En økt kjører allerede på iPhone. Avslutt den før du starter en ny økt."
+                )
+            return false
+        }
+
+        return true
+    }
+
+    func syncWorkoutActivityStateToPhone() {
+        reportWorkoutActivityStateToPhone(
+            state,
+            force: true
+        )
+    }
+
+    private func reportWorkoutActivityStateToPhone(
+        _ workoutState: WatchWorkoutState,
+        force: Bool = false
+    ) {
+        let active: Bool
+        switch workoutState {
+        case .preparing,
+             .running,
+             .paused,
+             .ending:
+            active = true
+        case .idle,
+             .completed,
+             .failed:
+            active = false
+        }
+
+        let activity =
+            WatchWorkoutActivityState(
+                isActive: active,
+                title:
+                    active
+                        ? kind.title
+                        : nil,
+                updatedAt: Date()
+            )
+
+        if !force,
+           let previous =
+                lastReportedWorkoutActivity,
+           previous.isActive ==
+                activity.isActive,
+           previous.title ==
+                activity.title {
+            return
+        }
+
+        lastReportedWorkoutActivity =
+            activity
+
+        guard
+            WCSession.isSupported(),
+            let data =
+                try? JSONEncoder().encode(
+                    activity
+                )
+        else {
+            return
+        }
+
+        let session =
+            WCSession.default
+
+        guard session.activationState ==
+                .activated
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind
+                    .workoutActivityState
+                    .rawValue,
+            WatchTransferMetadataKey.payload:
+                data,
+            WatchTransferMetadataKey.sentAt:
+                activity.updatedAt
+                    .timeIntervalSince1970
+        ]
+
+        session.transferUserInfo(
+            payload
+        )
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        }
+    }
+
     func recoverActiveWorkout() async {
         guard workoutSession == nil,
               !recoveryInProgress
@@ -1986,6 +2177,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         route: WatchRouteTransfer? = nil,
         indoor: Bool? = nil
     ) async {
+        guard await localWorkoutStartAllowed()
+        else {
+            return
+        }
+
         workoutInitiatedLocallyOnWatch = true
 
         if kind == .strength {
@@ -2160,6 +2356,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         kind: WatchWorkoutKind,
         route: WatchRouteTransfer? = nil
     ) async {
+        guard await localWorkoutStartAllowed()
+        else {
+            return
+        }
+
         workoutInitiatedLocallyOnWatch = true
         prepareForLocalWorkoutStart()
 
@@ -5656,6 +5857,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         publish {
             self.state = newState
         }
+        reportWorkoutActivityStateToPhone(
+            newState
+        )
     }
 
     private func publish(
