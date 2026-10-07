@@ -2252,6 +2252,10 @@ final class AppSessionStore: ObservableObject {
                     }
 
                     let kind =
+                        builderProfile
+                            .preferredWorkoutKindsByDay?[
+                                dayIndex
+                            ] ??
                         pattern[
                             slot %
                             max(
