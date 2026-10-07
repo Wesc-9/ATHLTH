@@ -772,12 +772,12 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
                     english:
                         "Resistance " +
                         values
-                            .map(String.init)
+                            .map { String($0) }
                             .joined(separator: " / "),
                     norwegian:
                         "Motstand " +
                         values
-                            .map(String.init)
+                            .map { String($0) }
                             .joined(separator: " / ")
                 )
             }
