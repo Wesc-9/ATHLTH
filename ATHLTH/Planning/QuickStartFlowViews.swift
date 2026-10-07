@@ -3573,7 +3573,8 @@ struct StrengthQuickBuilderView: View {
         }
         .sheet(item: $exerciseBeingEdited) { exercise in
             PlannedExerciseEditorView(
-                exercise: exercise
+                exercise: exercise,
+                advancedMode: false
             ) { updated in
                 if let index = exercises.firstIndex(
                     where: { $0.id == updated.id }
