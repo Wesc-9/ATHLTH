@@ -163,6 +163,8 @@ final class IPhoneWorkoutStore:
 {
     @Published private(set) var active: PhoneWorkout?
     @Published private(set) var history: [PhoneWorkout] = []
+    @Published private(set) var treadmillInclineOverrides:
+        [UUID: Double] = [:]
     @Published var showingWorkout = false
     @Published private(set) var liveViewIsVisible = false
     @Published private(set) var isUserMinimized = false
@@ -297,6 +299,14 @@ final class IPhoneWorkoutStore:
             active = workout
         }
         history = userID.flatMap { AccountLocalStorage.read([PhoneWorkout].self, name: "phoneHistory", userID: $0) } ?? []
+        treadmillInclineOverrides =
+            userID.flatMap {
+                AccountLocalStorage.read(
+                    [UUID: Double].self,
+                    name: "treadmillInclineOverrides",
+                    userID: $0
+                )
+            } ?? [:]
         if let active,
            active.end != nil ||
             history.contains(
@@ -671,6 +681,93 @@ final class IPhoneWorkoutStore:
             force: true
         )
         syncLiveActivity()
+    }
+
+    func treadmillInclinePercent(
+        for workoutID: UUID
+    ) -> Double? {
+        if let local =
+                history.first(
+                    where: {
+                        $0.id == workoutID ||
+                        $0.healthID == workoutID
+                    }
+                ),
+           local.runEnvironment == .treadmill {
+            return local.treadmillInclinePercent ??
+                treadmillInclineOverrides[
+                    workoutID
+                ]
+        }
+
+        return treadmillInclineOverrides[
+            workoutID
+        ]
+    }
+
+    func setCompletedTreadmillInclinePercent(
+        _ percent: Double,
+        workoutID: UUID
+    ) {
+        let value =
+            min(
+                max(
+                    (percent * 2).rounded() / 2,
+                    0
+                ),
+                20
+            )
+
+        treadmillInclineOverrides[
+            workoutID
+        ] = value
+
+        if let index =
+                history.firstIndex(
+                    where: {
+                        $0.id == workoutID ||
+                        $0.healthID == workoutID
+                    }
+                ) {
+            history[index]
+                .runEnvironment =
+                .treadmill
+            history[index]
+                .treadmillInclinePercent =
+                value
+
+            treadmillInclineOverrides[
+                history[index].id
+            ] = value
+
+            if let healthID =
+                    history[index]
+                        .healthID {
+                treadmillInclineOverrides[
+                    healthID
+                ] = value
+            }
+
+            if lastCompletedWorkout?
+                .id ==
+                history[index].id {
+                lastCompletedWorkout =
+                    history[index]
+            }
+
+            persistHistory()
+        }
+
+        persistTreadmillInclineOverrides()
+
+        message =
+            ATHLTHLocalization.format(
+                english:
+                    "Treadmill incline updated to %.1f%%.",
+                norwegian:
+                    "Stigning på tredemølle oppdatert til %.1f%%.",
+                value
+            )
     }
 
     func liveViewDidAppear() {
@@ -3843,6 +3940,21 @@ final class IPhoneWorkoutStore:
         }
 
         persistHistory()
+    }
+
+    private func persistTreadmillInclineOverrides() {
+        guard let accountID else {
+            return
+        }
+
+        AccountLocalStorage.write(
+            treadmillInclineOverrides,
+            name: "treadmillInclineOverrides",
+            userID: accountID
+        )
+        ATHLTHTrainingDataChangeSignal.post(
+            userID: accountID
+        )
     }
 
     private func persistHistory() {
