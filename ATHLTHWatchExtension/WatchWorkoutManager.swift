@@ -369,6 +369,44 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    func setTreadmillInclinePercent(
+        _ percent: Double
+    ) {
+        guard treadmillInclinePercent != nil else {
+            return
+        }
+
+        let value =
+            min(
+                max(
+                    (percent * 2).rounded() / 2,
+                    0
+                ),
+                20
+            )
+
+        publish {
+            self.treadmillInclinePercent =
+                value
+
+            if var workout =
+                    self.structuredRunningWorkout {
+                workout.treadmillInclinePercent =
+                    value
+                self.structuredRunningWorkout =
+                    workout
+            }
+        }
+
+        persistWorkoutRecoveryState()
+
+        Task { @MainActor [weak self] in
+            await self?.sendLiveSnapshot(
+                force: true
+            )
+        }
+    }
+
     func configureGhostRace(
         _ ghost: WatchGhostRaceTransfer?
     ) {
@@ -6459,6 +6497,14 @@ extension WatchWorkoutManager:
                     self.pause()
                 case .resume:
                     self.resume()
+                case .setTreadmillIncline:
+                    if let value =
+                            command
+                                .treadmillInclinePercent {
+                        self.setTreadmillInclinePercent(
+                            value
+                        )
+                    }
                 }
             }
         }
