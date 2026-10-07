@@ -5814,6 +5814,13 @@ struct CommunityEventDetailView: View {
             CommunityEventLifecycleStatus(
                 rawValue: item.event.status
             ) ?? .upcoming
+        let expectedArrivals =
+            item.participantRows
+                .filter {
+                    $0.attendanceStatus ==
+                        .going
+                }
+                .count
 
         ATHLTHCard {
             HStack {
@@ -5855,8 +5862,11 @@ struct CommunityEventDetailView: View {
                 )
             }
 
-            if Date() >=
-                    item.event.startsAt ||
+            if (
+                    Date() >=
+                        item.event.startsAt &&
+                    expectedArrivals > 0
+                ) ||
                 item.checkedInCount > 0 {
                 HStack(spacing: 10) {
                     Label(
@@ -5866,7 +5876,7 @@ struct CommunityEventDetailView: View {
                             norwegian:
                                 "%d av %d ankommet",
                             item.checkedInCount,
-                            item.participantCount
+                            expectedArrivals
                         ),
                         systemImage:
                             "person.crop.circle.badge.checkmark"
@@ -5890,7 +5900,7 @@ struct CommunityEventDetailView: View {
                         total:
                             Double(
                                 max(
-                                    item.participantCount,
+                                    expectedArrivals,
                                     1
                                 )
                             )
