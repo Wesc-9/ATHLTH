@@ -1,4 +1,5 @@
 import Foundation
+import Charts
 @preconcurrency import CoreLocation
 @preconcurrency import MapKit
 import Supabase
@@ -2081,8 +2082,18 @@ private struct CommunityEventListRow: View {
 struct CommunityEventDetailView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var calendarSync:
+        AppleCalendarSyncStore
 
     let eventID: UUID
+
+    private struct ElevationPoint:
+        Identifiable
+    {
+        let id: Int
+        let distanceKilometers: Double
+        let elevationMeters: Double
+    }
 
     private enum DetailTab: String, CaseIterable, Identifiable {
         case overview
@@ -2154,6 +2165,10 @@ struct CommunityEventDetailView: View {
         false
     @State private var showingCompetitionResultEntry =
         false
+    @State private var meetingDistanceMeters:
+        CLLocationDistance?
+    @State private var calendarSaved = false
+    @State private var calendarMessage: String?
 
     var body: some View {
         ScrollView {
@@ -2204,6 +2219,33 @@ struct CommunityEventDetailView: View {
             .hidden,
             for: .navigationBar
         )
+        .alert(
+            ATHLTHLocalization.choose(
+                english:
+                    "Calendar",
+                norwegian:
+                    "Kalender"
+            ),
+            isPresented:
+                Binding(
+                    get: {
+                        calendarMessage != nil
+                    },
+                    set: { presented in
+                        if !presented {
+                            calendarMessage = nil
+                        }
+                    }
+                )
+        ) {
+            Button("OK", role: .cancel) {
+                calendarMessage = nil
+            }
+        } message: {
+            Text(
+                calendarMessage ?? ""
+            )
+        }
         .sheet(
             isPresented: $showingEditEvent
         ) {
@@ -2298,6 +2340,13 @@ struct CommunityEventDetailView: View {
                     .updatedAt
         ) {
             await loadEventStartWeather()
+        }
+        .task(
+            id:
+                checkInLocation
+                    .authorizationStatus
+        ) {
+            await loadMeetingDistanceIfAuthorized()
         }
     }
 
@@ -2530,6 +2579,77 @@ struct CommunityEventDetailView: View {
                 coordinate.longitude,
             startsAt:
                 item.event.startsAt
+        )
+    }
+
+    private func loadMeetingDistanceIfAuthorized()
+        async {
+        guard
+            let item =
+                community.item(
+                    id: eventID
+                ),
+            let meeting =
+                meetingLocation(
+                    item
+                )
+        else {
+            meetingDistanceMeters =
+                nil
+            return
+        }
+
+        switch checkInLocation
+            .authorizationStatus {
+        case .authorizedAlways,
+             .authorizedWhenInUse:
+            guard
+                let current =
+                    await checkInLocation
+                        .requestCurrentLocation()
+            else {
+                return
+            }
+
+            meetingDistanceMeters =
+                current.distance(
+                    from: meeting
+                )
+
+        case .notDetermined,
+             .denied,
+             .restricted:
+            // Do not prompt for location just to show distance.
+            meetingDistanceMeters =
+                nil
+
+        @unknown default:
+            meetingDistanceMeters =
+                nil
+        }
+    }
+
+    private func formattedMeetingDistance(
+        _ meters: CLLocationDistance
+    ) -> String {
+        if meters < 1_000 {
+            return ATHLTHLocalization.format(
+                english:
+                    "%d m away",
+                norwegian:
+                    "%d m fra deg",
+                Int(
+                    meters.rounded()
+                )
+            )
+        }
+
+        return ATHLTHLocalization.format(
+            english:
+                "%.1f km away",
+            norwegian:
+                "%.1f km fra deg",
+            meters / 1_000
         )
     }
 
@@ -3528,6 +3648,10 @@ struct CommunityEventDetailView: View {
                     mapHeight: 360
                 )
 
+                routeElevationProfileCard(
+                    route
+                )
+
                 routeMetricsCard(route)
 
                 eventDetails(
@@ -3906,6 +4030,8 @@ struct CommunityEventDetailView: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
 
+            eventQuickActions(item)
+
             actionButton(item)
         }
         .padding(18)
@@ -3932,6 +4058,147 @@ struct CommunityEventDetailView: View {
                 Color.black.opacity(0.045),
             radius: 12,
             y: 5
+        )
+    }
+
+    private func eventQuickActions(
+        _ item: CommunityEventItem
+    ) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                Task {
+                    let saved =
+                        await calendarSync
+                            .addCommunityEvent(
+                                item,
+                                currentUserID:
+                                    session.profile
+                                        .userID
+                            )
+
+                    calendarSaved = saved
+
+                    if !saved {
+                        calendarMessage =
+                            calendarSync
+                                .errorMessage ??
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH could not add this event to Calendar.",
+                                norwegian:
+                                    "ATHLTH klarte ikke å legge arrangementet til i Kalender."
+                            )
+                    }
+                }
+            } label: {
+                Label(
+                    calendarSaved
+                        ? ATHLTHLocalization.choose(
+                            english:
+                                "Added",
+                            norwegian:
+                                "Lagt til"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english:
+                                "Calendar",
+                            norwegian:
+                                "Kalender"
+                        ),
+                    systemImage:
+                        calendarSaved
+                            ? "calendar.badge.checkmark"
+                            : "calendar.badge.plus"
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(
+                ATHLTHTheme.vitality
+            )
+
+            ShareLink(
+                item:
+                    eventShareText(
+                        item
+                    )
+            ) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Share",
+                        norwegian: "Del"
+                    ),
+                    systemImage:
+                        "square.and.arrow.up"
+                )
+                .font(
+                    .caption
+                        .weight(.semibold)
+                )
+                .frame(
+                    maxWidth: .infinity
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(
+                ATHLTHTheme.vitality
+            )
+        }
+    }
+
+    private func eventShareText(
+        _ item: CommunityEventItem
+    ) -> String {
+        var lines = [
+            item.event.title,
+            item.event.startsAt
+                .formatted(
+                    date: .abbreviated,
+                    time: .shortened
+                )
+        ]
+
+        if let meeting =
+                item.event
+                    .meetingName
+                    .nilIfBlank {
+            lines.append(
+                ATHLTHLocalization.format(
+                    english:
+                        "Meeting point: %@",
+                    norwegian:
+                        "Møtested: %@",
+                    meeting
+                )
+            )
+        }
+
+        if let route =
+                item.event
+                    .routeTitle?
+                    .nilIfBlank {
+            lines.append(
+                ATHLTHLocalization.format(
+                    english:
+                        "Route: %@",
+                    norwegian:
+                        "Rute: %@",
+                    route
+                )
+            )
+        }
+
+        lines.append("ATHLTH")
+        return lines.joined(
+            separator: "\n"
         )
     }
 
@@ -4194,6 +4461,26 @@ struct CommunityEventDetailView: View {
                     longitude:
                         item.event.longitude
                 )
+
+                if selectedTab ==
+                        .overview,
+                   let distance =
+                        meetingDistanceMeters {
+                    eventDetailRow(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Distance from you",
+                            norwegian:
+                                "Avstand fra deg"
+                        ),
+                        value:
+                            formattedMeetingDistance(
+                                distance
+                            ),
+                        icon:
+                            "location.fill"
+                    )
+                }
             } else {
                 eventDetailRow(
                     ATHLTHLocalization.choose(
@@ -5192,6 +5479,9 @@ struct CommunityEventDetailView: View {
 
         let distance =
             current.distance(from: meeting)
+        meetingDistanceMeters =
+            distance
+
         let accuracyAllowance =
             min(
                 max(
@@ -5563,6 +5853,54 @@ struct CommunityEventDetailView: View {
                         lifecycle
                     )
                 )
+            }
+
+            if Date() >=
+                    item.event.startsAt ||
+                item.checkedInCount > 0 {
+                HStack(spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.format(
+                            english:
+                                "%d of %d arrived",
+                            norwegian:
+                                "%d av %d ankommet",
+                            item.checkedInCount,
+                            item.participantCount
+                        ),
+                        systemImage:
+                            "person.crop.circle.badge.checkmark"
+                    )
+                    .font(
+                        .caption
+                            .weight(.semibold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+
+                    Spacer()
+
+                    ProgressView(
+                        value:
+                            Double(
+                                item.checkedInCount
+                            ),
+                        total:
+                            Double(
+                                max(
+                                    item.participantCount,
+                                    1
+                                )
+                            )
+                    )
+                    .tint(
+                        ATHLTHTheme.vitality
+                    )
+                    .frame(width: 76)
+                }
+                .padding(.top, 8)
             }
 
             switch lifecycle {
@@ -6016,6 +6354,257 @@ struct CommunityEventDetailView: View {
                         .continuous
                 )
         )
+    }
+
+    @ViewBuilder
+    private func routeElevationProfileCard(
+        _ route: TrainingRoute
+    ) -> some View {
+        let points =
+            eventElevationProfile(
+                route
+            )
+
+        if points.count >= 3,
+           let minimum =
+                points
+                    .map(\.elevationMeters)
+                    .min(),
+           let maximum =
+                points
+                    .map(\.elevationMeters)
+                    .max() {
+            let padding =
+                max(
+                    (maximum - minimum) *
+                        0.16,
+                    8
+                )
+
+            ATHLTHCard {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Elevation profile",
+                                norwegian:
+                                    "Høydeprofil"
+                            )
+                        )
+                        .font(.headline)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Terrain along the saved route",
+                                norwegian:
+                                    "Terreng gjennom den lagrede ruten"
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "mountain.2.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                Chart(points) { point in
+                    AreaMark(
+                        x:
+                            .value(
+                                "km",
+                                point
+                                    .distanceKilometers
+                            ),
+                        y:
+                            .value(
+                                "m",
+                                point
+                                    .elevationMeters
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.12)
+                    )
+
+                    LineMark(
+                        x:
+                            .value(
+                                "km",
+                                point
+                                    .distanceKilometers
+                            ),
+                        y:
+                            .value(
+                                "m",
+                                point
+                                    .elevationMeters
+                            )
+                    )
+                    .lineStyle(
+                        StrokeStyle(
+                            lineWidth: 2.5,
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+                .chartYScale(
+                    domain:
+                        (minimum - padding)...
+                        (maximum + padding)
+                )
+                .frame(height: 170)
+                .padding(.top, 8)
+
+                HStack {
+                    Label(
+                        ATHLTHLocalization.format(
+                            english:
+                                "Low %.0f m",
+                            norwegian:
+                                "Lavest %.0f m",
+                            minimum
+                        ),
+                        systemImage:
+                            "arrow.down.right"
+                    )
+
+                    Spacer()
+
+                    Label(
+                        ATHLTHLocalization.format(
+                            english:
+                                "High %.0f m",
+                            norwegian:
+                                "Høyest %.0f m",
+                            maximum
+                        ),
+                        systemImage:
+                            "arrow.up.right"
+                    )
+                }
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+            }
+        }
+    }
+
+    private func eventElevationProfile(
+        _ route: TrainingRoute
+    ) -> [ElevationPoint] {
+        guard route.coordinates.count >=
+                3
+        else {
+            return []
+        }
+
+        var distanceKilometers = 0.0
+        var points:
+            [ElevationPoint] = []
+
+        for index in
+            route.coordinates.indices {
+            let coordinate =
+                route.coordinates[index]
+
+            if index > 0 {
+                let previous =
+                    route.coordinates[
+                        index - 1
+                    ]
+                distanceKilometers +=
+                    CLLocation(
+                        latitude:
+                            previous.latitude,
+                        longitude:
+                            previous.longitude
+                    )
+                    .distance(
+                        from:
+                            CLLocation(
+                                latitude:
+                                    coordinate
+                                        .latitude,
+                                longitude:
+                                    coordinate
+                                        .longitude
+                            )
+                    ) /
+                    1_000
+            }
+
+            if let altitude =
+                    coordinate.altitude,
+               altitude.isFinite {
+                points.append(
+                    ElevationPoint(
+                        id: index,
+                        distanceKilometers:
+                            distanceKilometers,
+                        elevationMeters:
+                            altitude
+                    )
+                )
+            }
+        }
+
+        guard points.count >= 3
+        else {
+            return []
+        }
+
+        // Keep the chart lightweight even for long imported GPX tracks.
+        guard points.count > 140
+        else {
+            return points
+        }
+
+        let lastIndex =
+            points.count - 1
+        let step =
+            Double(lastIndex) /
+            139.0
+
+        return (0..<140).map {
+            sampleIndex in
+
+            points[
+                min(
+                    Int(
+                        (
+                            Double(
+                                sampleIndex
+                            ) *
+                            step
+                        )
+                        .rounded()
+                    ),
+                    lastIndex
+                )
+            ]
+        }
     }
 
     private func routeMetricsCard(
