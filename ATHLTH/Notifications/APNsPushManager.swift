@@ -92,11 +92,11 @@ final class APNsPushManager: ObservableObject {
                     "athlth_event_id"
                 ] as? String
             )
-            .flatMap(
-                UUID.init(
-                    uuidString:
+            .flatMap {
+                UUID(
+                    uuidString: $0
                 )
-            )
+            }
 
         pendingNavigationTarget =
             ATHLTHPushNavigationTarget(
