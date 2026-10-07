@@ -128,13 +128,7 @@ struct ActiveStrengthWorkoutView: View {
                     placement:
                         .topBarTrailing
                 ) {
-                    // Adding exercises while the timer is running is reserved
-                    // for explicit freestyle / no-plan workouts. Planned
-                    // sessions stay distraction-free once training starts.
-                    if strength
-                        .activeWorkout?
-                        .allowsLiveExerciseBuilding ==
-                        true {
+                    if strength.activeWorkout != nil {
                         Button {
                             showingExerciseLibrary =
                                 true
@@ -172,7 +166,11 @@ struct ActiveStrengthWorkoutView: View {
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
                     ExerciseLibraryView(
-                        selectionTitle: "Add to Active Workout"
+                        selectionTitle:
+                            ATHLTHLocalization.choose(
+                                english: "Add to active workout",
+                                norwegian: "Legg til i økten"
+                            )
                     ) { entry in
                         pendingExercise = entry
                         showingExerciseLibrary = false
@@ -194,6 +192,7 @@ struct ActiveStrengthWorkoutView: View {
                         warmUpSets: $8
                     )
                     pendingExercise = nil
+                    showingWorkoutReview = false
                     loadDefaultsFromCurrentSet()
                 }
             }
@@ -1158,6 +1157,31 @@ struct ActiveStrengthWorkoutView: View {
 
                 WorkoutPlaceCheckInSection(
                     workoutID: workout.id
+                )
+
+                Button {
+                    showingExerciseLibrary =
+                        true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Add another exercise",
+                            norwegian:
+                                "Legg til en øvelse"
+                        ),
+                        systemImage:
+                            "plus.rectangle.on.rectangle"
+                    )
+                    .font(.headline)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 50
+                    )
+                }
+                .buttonStyle(.bordered)
+                .tint(
+                    ATHLTHTheme.vitality
                 )
 
                 Button {
@@ -5058,6 +5082,36 @@ struct ActiveStrengthWorkoutView: View {
                             .tint(
                                 ATHLTHTheme
                                     .accentDeep
+                            )
+
+                            Button {
+                                showingExerciseLibrary =
+                                    true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Add another exercise",
+                                        norwegian:
+                                            "Legg til en øvelse"
+                                    ),
+                                    systemImage:
+                                        "plus.rectangle.on.rectangle"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    minHeight: 44
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(
+                                ATHLTHTheme
+                                    .vitality
                             )
 
                             Button {
