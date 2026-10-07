@@ -1071,8 +1071,14 @@ final class StrengthWorkoutStore: ObservableObject {
             )
         draftRestSeconds =
             max(set.restSeconds ?? 90, 0)
-        draftRPE = set.rpe ?? 8
-        draftRIR = set.rir ?? 2
+        draftRPE =
+            set.rpe ??
+            set.plannedRPE ??
+            8
+        draftRIR =
+            set.rir ??
+            set.plannedRIR ??
+            2
         draftWarmUp = set.isWarmUp ?? false
     }
 
@@ -1681,37 +1687,56 @@ final class StrengthWorkoutStore: ObservableObject {
     ) {
         recoveredCheckpointSavedAt = nil
         let exerciseLogs = session.exercises.map { planned in
-            let setCount = max(planned.sets, 1)
+            let setTargets =
+                planned.resolvedSetTargets
 
             return StrengthExerciseLog(
                 id: UUID(),
                 plannedExerciseID: planned.id,
                 exercise: planned.embeddedExercise,
-                sets: (1...setCount).map { setNumber in
-                    StrengthSetLog(
-                        id: UUID(),
-                        setNumber: setNumber,
-                        plannedReps:
-                            planned.resolvedTargetReps,
-                        plannedWeightKilograms:
-                            planned.resolvedLoadKind == .weightKilograms
-                                ? planned.targetWeightKilograms
-                                : nil,
-                        completedReps: nil,
-                        completedWeightKilograms: nil,
-                        rpe: nil,
-                        completedAt: nil,
-                        restSeconds: planned.restSeconds,
-                        targetKind:
-                            planned.resolvedTargetKind,
-                        plannedDurationSeconds:
-                            planned.resolvedTargetDurationSeconds,
-                        loadKind:
-                            planned.resolvedLoadKind,
-                        plannedResistanceLevel:
-                            planned.resolvedTargetResistanceLevel
+                sets:
+                    Array(
+                        setTargets.enumerated()
                     )
-                },
+                    .map { index, target in
+                        StrengthSetLog(
+                            id: UUID(),
+                            setNumber: index + 1,
+                            plannedReps:
+                                planned.resolvedTargetKind == .reps
+                                    ? target.reps
+                                    : nil,
+                            plannedWeightKilograms:
+                                planned.resolvedLoadKind == .weightKilograms
+                                    ? target.weightKilograms
+                                    : nil,
+                            completedReps: nil,
+                            completedWeightKilograms: nil,
+                            rpe: nil,
+                            completedAt: nil,
+                            restSeconds:
+                                target.restSeconds,
+                            plannedRPE:
+                                target.targetRPE,
+                            plannedRIR:
+                                target.targetRIR,
+                            rir: nil,
+                            isWarmUp:
+                                target.isWarmUp,
+                            targetKind:
+                                planned.resolvedTargetKind,
+                            plannedDurationSeconds:
+                                planned.resolvedTargetKind == .time
+                                    ? target.durationSeconds
+                                    : nil,
+                            loadKind:
+                                planned.resolvedLoadKind,
+                            plannedResistanceLevel:
+                                planned.resolvedLoadKind == .resistanceLevel
+                                    ? target.resistanceLevel
+                                    : nil
+                        )
+                    },
                 completedAt: nil
             )
         }
