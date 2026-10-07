@@ -2513,8 +2513,10 @@ struct CommunityEventDetailView: View {
 
                 eventRouteOverview(
                     route,
-                    mapHeight: 320
+                    mapHeight: 360
                 )
+
+                routeMetricsCard(route)
 
                 eventDetails(
                     item,
@@ -2636,7 +2638,7 @@ struct CommunityEventDetailView: View {
 
                         Image(
                             systemName:
-                                "chevron.right"
+                                "arrow.up.right"
                         )
                     }
                     .font(
@@ -4518,10 +4520,8 @@ struct CommunityEventDetailView: View {
                 }
             }
 
-            NavigationLink {
-                RouteDetailView(
-                    route: route
-                )
+            Button {
+                openRouteInMaps(route)
             } label: {
                 VStack(
                     alignment: .leading,
@@ -4620,9 +4620,9 @@ struct CommunityEventDetailView: View {
                             Text(
                                 ATHLTHLocalization.choose(
                                     english:
-                                        "Tap to view the full route",
+                                        "Open start and finish in Apple Maps",
                                     norwegian:
-                                        "Trykk for å se hele ruten"
+                                        "Åpne start og mål i Apple Maps"
                                 )
                             )
                             .font(.caption2)
