@@ -1656,6 +1656,20 @@ struct FriendProfileView: View {
                 )
                 .clipped()
 
+                Color.black
+                    .opacity(
+                        min(
+                            max(
+                                profile.card
+                                    .headerDimStrength ??
+                                0,
+                                0
+                            ),
+                            0.45
+                        )
+                    )
+                    .allowsHitTesting(false)
+
                 LinearGradient(
                     stops: [
                         .init(
