@@ -17,6 +17,7 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
     let avatarURL: String?
     var headerArtworkName: String? = nil
     var headerImageURL: String? = nil
+    var headerDimStrength: Double? = nil
     let profileVisibility: String?
     let createdAt: Date?
     let updatedAt: Date?
@@ -29,6 +30,7 @@ struct SocialProfileCard: Identifiable, Codable, Hashable {
         case avatarURL = "avatar_url"
         case headerArtworkName = "header_artwork_name"
         case headerImageURL = "header_image_url"
+        case headerDimStrength = "header_dim_strength"
         case profileVisibility = "profile_visibility"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
