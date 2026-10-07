@@ -780,14 +780,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             previous.exerciseIndex,
            audioCoachConfiguration
             .shouldAnnounceStrengthNextExercise,
-           let exerciseName =
-            current.exerciseName {
+           current.exerciseName != nil {
+            let phrase =
+                strengthNextExerciseCoachPhrase(
+                    current
+                )
+
             speak(
                 coachPhrase(
                     english:
-                        "Next exercise. \(exerciseName).",
+                        phrase.english,
                     norwegian:
-                        "Neste øvelse. \(exerciseName)."
+                        phrase.norwegian
                 )
             )
         }
@@ -800,6 +804,237 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         scheduleStrengthStatusCoach()
+    }
+
+    private func strengthNextExerciseCoachPhrase(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        let name =
+            snapshot.exerciseName ??
+            snapshot.title
+
+        var english = [
+            "Next exercise. \(name)."
+        ]
+        var norwegian = [
+            "Neste øvelse. \(name)."
+        ]
+
+        if audioCoachConfiguration
+            .shouldAnnounceStrengthExerciseProgress,
+           snapshot.exerciseCount > 0 {
+            english.append(
+                "Exercise \(snapshot.exerciseIndex + 1) of \(snapshot.exerciseCount)."
+            )
+            norwegian.append(
+                "Øvelse \(snapshot.exerciseIndex + 1) av \(snapshot.exerciseCount)."
+            )
+        }
+
+        if snapshot.setCount > 0 {
+            english.append(
+                "\(snapshot.setCount) sets."
+            )
+            norwegian.append(
+                "\(snapshot.setCount) sett."
+            )
+        }
+
+        let target =
+            strengthSnapshotTargetPhrase(
+                snapshot
+            )
+
+        if !target.english.isEmpty {
+            english.append(
+                "First target. \(target.english)"
+            )
+            norwegian.append(
+                "Første mål. \(target.norwegian)"
+            )
+        }
+
+        if snapshot.draftRestSeconds > 0 {
+            english.append(
+                "\(snapshot.draftRestSeconds) seconds rest."
+            )
+            norwegian.append(
+                "\(snapshot.draftRestSeconds) sekunder hvile."
+            )
+        }
+
+        return (
+            english.joined(
+                separator: " "
+            ),
+            norwegian.joined(
+                separator: " "
+            )
+        )
+    }
+
+    private func strengthNextSetCoachPhrase(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) -> (
+        english: String,
+        norwegian: String
+    )? {
+        guard
+            audioCoachConfiguration
+                .shouldAnnounceStrengthNextSetDetails,
+            !snapshot
+                .currentExerciseComplete,
+            snapshot.setCount > 0
+        else {
+            return nil
+        }
+
+        let number =
+            snapshot.setNumber ??
+            min(
+                snapshot.setIndex + 1,
+                snapshot.setCount
+            )
+        let target =
+            strengthSnapshotTargetPhrase(
+                snapshot
+            )
+
+        var english =
+            "Next set. Set \(number) of \(snapshot.setCount)."
+        var norwegian =
+            "Neste sett. Sett \(number) av \(snapshot.setCount)."
+
+        if !target.english.isEmpty {
+            english +=
+                " \(target.english)"
+            norwegian +=
+                " \(target.norwegian)"
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
+    private func strengthSnapshotTargetPhrase(
+        _ snapshot:
+            WatchStrengthSessionSnapshot
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        var english = ""
+        var norwegian = ""
+
+        if snapshot.targetKindRaw ==
+            "time",
+           let seconds =
+                snapshot
+                    .draftDurationSeconds,
+           seconds > 0 {
+            let duration =
+                strengthCoachDurationPhrase(
+                    seconds
+                )
+            english =
+                duration.english
+            norwegian =
+                duration.norwegian
+        } else if snapshot.draftReps > 0 {
+            english =
+                "\(snapshot.draftReps) reps"
+            norwegian =
+                "\(snapshot.draftReps) repetisjoner"
+        }
+
+        if snapshot.loadKindRaw ==
+            "resistanceLevel",
+           let level =
+                snapshot
+                    .draftResistanceLevel,
+           level > 0 {
+            english +=
+                english.isEmpty
+                    ? "Resistance level \(level)"
+                    : " at resistance level \(level)"
+            norwegian +=
+                norwegian.isEmpty
+                    ? "Motstand \(level)"
+                    : " på motstand \(level)"
+        } else if snapshot
+            .draftWeightKilograms > 0 {
+            let weight =
+                snapshot
+                    .draftWeightKilograms
+            let formatted =
+                weight.rounded() ==
+                    weight
+                    ? String(Int(weight))
+                    : String(
+                        format: "%.1f",
+                        weight
+                    )
+
+            english +=
+                english.isEmpty
+                    ? "\(formatted) kilograms"
+                    : " at \(formatted) kilograms"
+            norwegian +=
+                norwegian.isEmpty
+                    ? "\(formatted) kilo"
+                    : " på \(formatted) kilo"
+        }
+
+        if !english.isEmpty {
+            english += "."
+            norwegian += "."
+        }
+
+        return (
+            english,
+            norwegian
+        )
+    }
+
+    private func strengthCoachDurationPhrase(
+        _ seconds: Int
+    ) -> (
+        english: String,
+        norwegian: String
+    ) {
+        let bounded =
+            max(seconds, 0)
+        let minutes =
+            bounded / 60
+        let remainder =
+            bounded % 60
+
+        if minutes > 0,
+           remainder > 0 {
+            return (
+                "\(minutes) minutes and \(remainder) seconds",
+                "\(minutes) minutter og \(remainder) sekunder"
+            )
+        }
+
+        if minutes > 0 {
+            return (
+                "\(minutes) minutes",
+                "\(minutes) minutter"
+            )
+        }
+
+        return (
+            "\(remainder) seconds",
+            "\(remainder) sekunder"
+        )
     }
 
     private func scheduleStrengthRestCoach(
@@ -917,14 +1152,56 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         .play(.success)
                 }
 
+                var englishParts:
+                    [String] = []
+                var norwegianParts:
+                    [String] = []
+
                 if self.audioCoachConfiguration
                     .shouldAnnounceStrengthRestComplete {
+                    englishParts.append(
+                        snapshot
+                            .currentExerciseComplete
+                            ? "Rest complete. Ready for the next exercise."
+                            : "Rest complete."
+                    )
+                    norwegianParts.append(
+                        snapshot
+                            .currentExerciseComplete
+                            ? "Hvilen er ferdig. Klar for neste øvelse."
+                            : "Hvilen er ferdig."
+                    )
+                }
+
+                if let currentSnapshot =
+                        self.strengthSession,
+                   let nextSet =
+                        self.strengthNextSetCoachPhrase(
+                            currentSnapshot
+                        ) {
+                    englishParts.append(
+                        nextSet.english
+                    )
+                    norwegianParts.append(
+                        nextSet.norwegian
+                    )
+                }
+
+                if !englishParts.isEmpty {
                     self.speak(
                         self.coachPhrase(
                             english:
-                                "Rest complete. Ready for the next set.",
+                                englishParts
+                                    .joined(
+                                        separator:
+                                            " "
+                                    ),
                             norwegian:
-                                "Hvilen er ferdig. Klar for neste sett."
+                                norwegianParts
+                                    .joined(
+                                        separator:
+                                            " "
+                                    )
                         )
                     )
                 }
@@ -971,12 +1248,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         snapshot.exerciseName ??
                         snapshot.title
 
+                    var english =
+                        "\(snapshot.completedSets) of \(snapshot.totalSets) sets complete. Current exercise: \(exercise)."
+                    var norwegian =
+                        "\(snapshot.completedSets) av \(snapshot.totalSets) sett fullført. Nåværende øvelse: \(exercise)."
+
+                    if self.audioCoachConfiguration
+                        .shouldAnnounceStrengthExerciseProgress,
+                       snapshot.exerciseCount >
+                        0 {
+                        english +=
+                            " Exercise \(snapshot.exerciseIndex + 1) of \(snapshot.exerciseCount)."
+                        norwegian +=
+                            " Øvelse \(snapshot.exerciseIndex + 1) av \(snapshot.exerciseCount)."
+                    }
+
                     self.speak(
                         self.coachPhrase(
-                            english:
-                                "\(snapshot.completedSets) sets complete. Current exercise: \(exercise).",
+                            english: english,
                             norwegian:
-                                "\(snapshot.completedSets) sett fullført. Nåværende øvelse: \(exercise)."
+                                norwegian
                         )
                     )
                 }
