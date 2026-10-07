@@ -98,6 +98,11 @@ struct ATHLTHNotificationCenterView: View {
                         )
                     ) {
                         notifications.markAllRead()
+
+                        Task {
+                            await social
+                                .markNotificationCenterInboxRead()
+                        }
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
