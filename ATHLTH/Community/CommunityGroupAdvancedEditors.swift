@@ -106,7 +106,7 @@ struct CommunityGroupEventAdvancedEditor: View {
             .foregroundStyle(.secondary)
         }
 
-        Section("Timing & place") {
+        Section("Timing") {
             Toggle(
                 "Set end time",
                 isOn: endTimeEnabled
@@ -129,54 +129,16 @@ struct CommunityGroupEventAdvancedEditor: View {
                 )
             }
 
-            NavigationLink {
-                CommunityGroupMeetingPointPicker(
-                    latitude:
-                        $options.meetingLatitude,
-                    longitude:
-                        $options.meetingLongitude,
-                    routeStart: routeStart
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Meeting point is set from the main event form.",
+                    norwegian:
+                        "Møtested velges fra hovedskjermen for arrangementet."
                 )
-            } label: {
-                HStack {
-                    Label(
-                        "Meeting point on map",
-                        systemImage:
-                            "mappin.and.ellipse"
-                    )
-
-                    Spacer()
-
-                    Text(
-                        options.meetingLatitude == nil
-                            ? "Set"
-                            : "Selected"
-                    )
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            if routeStart != nil {
-                Button {
-                    useRouteStart()
-                } label: {
-                    Label(
-                        "Use route start",
-                        systemImage:
-                            "point.topleft.down.to.point.bottomright.curvepath"
-                    )
-                }
-            }
-
-            if options.meetingLatitude != nil {
-                Button(
-                    "Remove map point",
-                    role: .destructive
-                ) {
-                    options.meetingLatitude = nil
-                    options.meetingLongitude = nil
-                }
-            }
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
 
         Section("Repeat & publishing") {
@@ -341,16 +303,6 @@ struct CommunityGroupEventAdvancedEditor: View {
         )
     }
 
-    private func useRouteStart() {
-        guard let routeStart else {
-            return
-        }
-
-        options.meetingLatitude =
-            routeStart.latitude
-        options.meetingLongitude =
-            routeStart.longitude
-    }
 }
 
 struct CommunityGroupChallengeAdvancedEditor:
