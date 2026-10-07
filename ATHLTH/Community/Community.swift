@@ -1796,8 +1796,11 @@ final class CommunityEventStore: ObservableObject {
         }
     }
 
-    func cancel(_ item: CommunityEventItem) async {
-        _ = await setLifecycle(
+    @discardableResult
+    func cancel(
+        _ item: CommunityEventItem
+    ) async -> Bool {
+        await setLifecycle(
             item,
             status: .cancelled
         )
@@ -2154,6 +2157,10 @@ struct CommunityEventDetailView: View {
     @State private var showingEditEvent = false
     @State private var showingCancelConfirmation =
         false
+    @State private var isCancellingEvent =
+        false
+    @State private var eventActionMessage:
+        String?
     @StateObject private var checkInLocation =
         ChallengeLocationStore()
     @StateObject private var eventWeather =
@@ -2305,9 +2312,34 @@ struct CommunityEventDetailView: View {
                     role: .destructive
                 ) {
                     Task {
-                        await community.cancel(
-                            item
-                        )
+                        guard !isCancellingEvent
+                        else {
+                            return
+                        }
+
+                        isCancellingEvent =
+                            true
+                        eventActionMessage =
+                            nil
+
+                        let cancelled =
+                            await community
+                                .cancel(item)
+
+                        isCancellingEvent =
+                            false
+
+                        if !cancelled {
+                            eventActionMessage =
+                                community
+                                    .errorMessage ??
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "ATHLTH could not cancel the event. Try again.",
+                                    norwegian:
+                                        "ATHLTH klarte ikke å avlyse arrangementet. Prøv igjen."
+                                )
+                        }
                     }
                 }
             }
@@ -6087,38 +6119,76 @@ struct CommunityEventDetailView: View {
     private func cancelEventButton(
         _ item: CommunityEventItem
     ) -> some View {
-        Button(role: .destructive) {
-            showingCancelConfirmation =
-                true
-        } label: {
-            Label(
+        VStack(spacing: 8) {
+            Button(role: .destructive) {
+                showingCancelConfirmation =
+                    true
+            } label: {
+                HStack(spacing: 8) {
+                    if isCancellingEvent {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(
+                            systemName:
+                                "xmark.circle"
+                        )
+                    }
+
+                    Text(
+                        isCancellingEvent
+                            ? ATHLTHLocalization.choose(
+                                english:
+                                    "Cancelling…",
+                                norwegian:
+                                    "Avlyser…"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english:
+                                    "Cancel Event",
+                                norwegian:
+                                    "Avlys arrangement"
+                            )
+                    )
+                }
+                .font(
+                    .subheadline.weight(
+                        .semibold
+                    )
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: 46
+                )
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
+            .disabled(isCancellingEvent)
+            .accessibilityHint(
                 ATHLTHLocalization.choose(
-                    english: "Cancel Event",
+                    english:
+                        "Moves this event to cancelled.",
                     norwegian:
-                        "Avlys arrangement"
-                ),
-                systemImage: "xmark.circle"
+                        "Flytter arrangementet til avlyst."
+                )
             )
-            .font(
-                .subheadline.weight(.semibold)
-            )
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 46
-            )
+
+            if let eventActionMessage {
+                Label(
+                    eventActionMessage,
+                    systemImage:
+                        "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.red)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+            }
         }
-        .buttonStyle(.bordered)
-        .tint(.red)
         .padding(.top, 2)
         .padding(.bottom, 8)
-        .accessibilityHint(
-            ATHLTHLocalization.choose(
-                english:
-                    "Moves this event to cancelled.",
-                norwegian:
-                    "Flytter arrangementet til avlyst."
-            )
-        )
     }
 
     private func eventRoute(
