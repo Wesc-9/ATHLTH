@@ -572,6 +572,8 @@ private struct CommunityEventWrite: Encodable {
     let longitude: Double?
     let maxParticipants: Int?
     let paceLabel: String?
+    let competitionEnabled: Bool
+    let competitionMetric: String?
     let routeID: UUID?
     let routeTitle: String?
     let routeCoordinates: [RouteCoordinate]?
@@ -598,6 +600,10 @@ private struct CommunityEventWrite: Encodable {
         case longitude
         case maxParticipants = "max_participants"
         case paceLabel = "pace_label"
+        case competitionEnabled =
+            "competition_enabled"
+        case competitionMetric =
+            "competition_metric"
         case routeID = "route_id"
         case routeTitle = "route_title"
         case routeCoordinates = "route_coordinates"
@@ -628,6 +634,8 @@ private struct CommunityEventUpdate: Encodable {
     let longitude: Double?
     let maxParticipants: Int?
     let paceLabel: String?
+    let competitionEnabled: Bool
+    let competitionMetric: String?
     let routeID: UUID?
     let routeTitle: String?
     let routeCoordinates: [RouteCoordinate]?
@@ -651,6 +659,10 @@ private struct CommunityEventUpdate: Encodable {
         case longitude
         case maxParticipants = "max_participants"
         case paceLabel = "pace_label"
+        case competitionEnabled =
+            "competition_enabled"
+        case competitionMetric =
+            "competition_metric"
         case routeID = "route_id"
         case routeTitle = "route_title"
         case routeCoordinates = "route_coordinates"
@@ -695,6 +707,14 @@ private struct CommunityEventUpdate: Encodable {
             forKey: .maxParticipants
         )
         try container.encode(paceLabel, forKey: .paceLabel)
+        try container.encode(
+            competitionEnabled,
+            forKey: .competitionEnabled
+        )
+        try container.encode(
+            competitionMetric,
+            forKey: .competitionMetric
+        )
         try container.encode(routeID, forKey: .routeID)
         try container.encode(routeTitle, forKey: .routeTitle)
         try container.encode(
@@ -764,6 +784,17 @@ private struct CommunityEventCheckInUpdate:
             "attendance_status"
         case checkInMethod =
             "check_in_method"
+    }
+}
+
+private struct CommunityEventCompetitionResultUpdate:
+    Encodable
+{
+    let competitionResultValue: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case competitionResultValue =
+            "competition_result_value"
     }
 }
 
@@ -1015,6 +1046,14 @@ final class SupabaseCommunityService {
                     longitude: resolvedCoordinate?.longitude,
                     maxParticipants: draft.maxParticipants,
                     paceLabel: draft.paceLabel.nilIfBlank,
+                    competitionEnabled:
+                        draft.competitionEnabled,
+                    competitionMetric:
+                        draft.competitionEnabled
+                            ? draft
+                                .competitionMetric
+                                .rawValue
+                            : nil,
                     routeID: draft.routeID,
                     routeTitle: draft.routeTitle,
                     routeCoordinates:
@@ -1110,6 +1149,14 @@ final class SupabaseCommunityService {
                     paceLabel:
                         draft.paceLabel
                             .nilIfBlank,
+                    competitionEnabled:
+                        draft.competitionEnabled,
+                    competitionMetric:
+                        draft.competitionEnabled
+                            ? draft
+                                .competitionMetric
+                                .rawValue
+                            : nil,
                     routeID: draft.routeID,
                     routeTitle:
                         draft.routeTitle,
