@@ -1430,9 +1430,11 @@ struct FriendProfileView: View {
         ATHLTHPinnedHeroLayout(
             accent: ATHLTHTheme.premiumGold.opacity(0.34),
             immersiveTransition: true,
-            // Keep the sheet below the four hero stats so their full
-            // rounded cards remain visible with a small breathing gap.
-            sheetOverlapOverride: 10
+            // Match the owner's profile transition: keep the sheet below
+            // the hero and use the same short, restrained fade instead of
+            // the stronger white glow previously shown on other profiles.
+            sheetOverlapOverride: 0,
+            transitionFadeHeightOverride: 22
         ) {
             if let profile {
                 remoteProfileHero(profile)
@@ -1509,9 +1511,8 @@ struct FriendProfileView: View {
                 }
             }
             .padding(.horizontal, 14)
-            // The lower sheet now starts beneath the stats. Reduce its
-            // internal top inset by the same amount so the action row
-            // stays compact instead of leaving a tall white header area.
+            // Keep the action row comfortably below the same short hero
+            // fade used by the owner's profile.
             .padding(.top, 22)
             .padding(.bottom, 120)
             .frame(maxWidth: 900)
