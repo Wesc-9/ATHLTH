@@ -1523,12 +1523,7 @@ private struct StrengthAudioCoachSettingsView: View {
                     )
                 }
 
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Announcements",
-                        norwegian: "Meldinger"
-                    )
-                ) {
+                Section {
                     Toggle(
                         ATHLTHLocalization.choose(
                             english: "Set completed",
@@ -1624,6 +1619,13 @@ private struct StrengthAudioCoachSettingsView: View {
                         isOn:
                             $configuration
                                 .announceWorkoutStatus
+                    )
+                } header: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Announcements",
+                            norwegian: "Meldinger"
+                        )
                     )
                 } footer: {
                     Text(
