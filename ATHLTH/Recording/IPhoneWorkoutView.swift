@@ -886,6 +886,8 @@ struct IPhoneWorkoutView: View {
     @State private var followMe = true
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
+    @State private var treadmillInclineEditingWorkoutID:
+        UUID?
     @State private var routeCamera:
         MapCameraPosition = .automatic
 
@@ -1425,6 +1427,61 @@ struct IPhoneWorkoutView: View {
                                     )
                                 )
 
+                                if workout.runEnvironment ==
+                                    .treadmill {
+                                    HStack(spacing: 8) {
+                                        Label(
+                                            ATHLTHLocalization.format(
+                                                english:
+                                                    "%.1f%% incline",
+                                                norwegian:
+                                                    "%.1f%% stigning",
+                                                workout
+                                                    .treadmillInclinePercent ??
+                                                0
+                                            ),
+                                            systemImage:
+                                                "arrow.up.right"
+                                        )
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+
+                                        Spacer()
+
+                                        Button(
+                                            ATHLTHLocalization.choose(
+                                                english: "Adjust",
+                                                norwegian: "Juster"
+                                            )
+                                        ) {
+                                            treadmillInclineEditingWorkoutID =
+                                                workout.id
+                                            treadmillInclineDraft =
+                                                recorder
+                                                    .treadmillInclinePercent(
+                                                        for:
+                                                            workout.id
+                                                    ) ??
+                                                workout
+                                                    .treadmillInclinePercent ??
+                                                0
+                                            showingTreadmillInclineEditor =
+                                                true
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .font(
+                                            .caption
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                    }
+                                }
+
                                 if workout.healthID == nil {
                                     Button(
                                         "Copy to Apple Health"
@@ -1481,10 +1538,23 @@ struct IPhoneWorkoutView: View {
                     initialValue:
                         treadmillInclineDraft
                 ) { value in
-                    recorder
-                        .setTreadmillInclinePercent(
-                            value
-                        )
+                    if let workoutID =
+                            treadmillInclineEditingWorkoutID {
+                        recorder
+                            .setCompletedTreadmillInclinePercent(
+                                value,
+                                workoutID:
+                                    workoutID
+                            )
+                        treadmillInclineEditingWorkoutID =
+                            nil
+                    } else {
+                        recorder
+                            .setTreadmillInclinePercent(
+                                value
+                            )
+                    }
+
                     treadmillInclineDraft =
                         value
                 }
@@ -1761,6 +1831,8 @@ struct IPhoneWorkoutView: View {
                         return
                     }
 
+                    treadmillInclineEditingWorkoutID =
+                        nil
                     treadmillInclineDraft =
                         workout
                             .treadmillInclinePercent ??
@@ -2943,7 +3015,7 @@ struct IPhoneWorkoutView: View {
 }
 
 
-private struct TreadmillInclineEditorView: View {
+struct TreadmillInclineEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     let onSave: (Double) -> Void
@@ -3012,9 +3084,9 @@ private struct TreadmillInclineEditorView: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "You can change incline while the workout is running. The current value is stored with the workout.",
+                                "You can change incline while the workout is running or correct it after the workout. The value is stored with the workout.",
                             norwegian:
-                                "Du kan endre stigning mens økten pågår. Gjeldende verdi lagres med økten."
+                                "Du kan endre stigning mens økten pågår eller korrigere den etter økten. Verdien lagres med økten."
                         )
                     )
                     .font(.caption)
