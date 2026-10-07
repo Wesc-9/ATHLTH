@@ -131,6 +131,12 @@ final class ATHLTHNotificationStore: ObservableObject {
                 changed = true
             }
 
+            if items[index].readAt == nil,
+               let readAt = draft.readAt {
+                items[index].readAt = readAt
+                changed = true
+            }
+
             if changed {
                 persist()
             }
@@ -143,6 +149,7 @@ final class ATHLTHNotificationStore: ObservableObject {
             title: draft.title,
             message: draft.message,
             createdAt: draft.createdAt,
+            readAt: draft.readAt,
             goalID: draft.goalID,
             workoutID: draft.workoutID,
             challengeID: draft.challengeID,
