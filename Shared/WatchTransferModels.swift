@@ -842,6 +842,8 @@ struct WatchStrengthSetPlan: Codable, Hashable {
     var weightKilograms: Double? = nil
     var resistanceLevel: Int? = nil
     var restSeconds: Int? = nil
+    var targetRPE: Double? = nil
+    var targetRIR: Double? = nil
     var isWarmUp: Bool? = nil
 }
 
