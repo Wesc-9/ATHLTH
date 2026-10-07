@@ -1567,12 +1567,54 @@ private struct StrengthAudioCoachSettingsView: View {
                     )
                     Toggle(
                         ATHLTHLocalization.choose(
-                            english: "Next exercise",
-                            norwegian: "Neste øvelse"
+                            english:
+                                "Next exercise + target",
+                            norwegian:
+                                "Neste øvelse + mål"
                         ),
                         isOn:
                             $configuration
                                 .announceNextExercise
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Next set + target",
+                            norwegian:
+                                "Neste sett + mål"
+                        ),
+                        isOn:
+                            Binding(
+                                get: {
+                                    configuration
+                                        .shouldAnnounceNextSetDetails
+                                },
+                                set: {
+                                    configuration
+                                        .announceNextSetDetails =
+                                        $0
+                                }
+                            )
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Exercise progress",
+                            norwegian:
+                                "Øktfremdrift"
+                        ),
+                        isOn:
+                            Binding(
+                                get: {
+                                    configuration
+                                        .shouldAnnounceExerciseProgress
+                                },
+                                set: {
+                                    configuration
+                                        .announceExerciseProgress =
+                                        $0
+                                }
+                            )
                     )
                     Toggle(
                         ATHLTHLocalization.choose(
@@ -1582,6 +1624,15 @@ private struct StrengthAudioCoachSettingsView: View {
                         isOn:
                             $configuration
                                 .announceWorkoutStatus
+                    )
+                } footer: {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Next exercise includes its name and first target. Next set can announce reps, load, time or machine level when available. Exercise progress adds where you are in the workout.",
+                            norwegian:
+                                "Neste øvelse sier navn og første mål. Neste sett kan si reps, vekt, tid eller maskinnivå når det finnes. Øktfremdrift legger til hvor langt du har kommet i økta."
+                        )
                     )
                 }
 
