@@ -13174,233 +13174,78 @@ struct CommunityGroupSettingsView: View {
                     "photo.on.rectangle.angled"
             )
 
-            ZStack(
-                alignment:
-                    .bottomLeading
-            ) {
-                groupHeaderImagePreview
-                    .frame(height: 112)
+            groupHeaderImagePreview
+                .frame(height: 112)
 
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        clubForest
-                            .opacity(0.28)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style:
-                            .continuous
-                    )
-                )
-
-                groupImagePreview
-                    .frame(
-                        width: 72,
-                        height: 72
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
-                    )
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 18,
-                            style:
-                                .continuous
-                        )
-                        .stroke(
-                            Color.white,
-                            lineWidth: 2
-                        )
-                    }
-                    .shadow(
-                        color:
-                            Color.black
-                                .opacity(
-                                    0.10
-                                ),
-                        radius: 8,
-                        y: 4
-                    )
-                    .padding(
-                        .leading,
-                        12
-                    )
-                    .offset(y: 24)
-
-                HStack(spacing: 8) {
-                PhotosPicker(
-                    selection:
-                        $selectedPhoto,
-                    matching: .images
-                ) {
-                    compactActionChip(
-                        title:
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Club image",
-                                    norwegian:
-                                        "Club-bilde"
-                                ),
-                        icon: "photo"
-                    )
-                }
-
+            HStack(spacing: 8) {
                 PhotosPicker(
                     selection:
                         $selectedHeaderPhoto,
                     matching: .images
                 ) {
-                    compactActionChip(
-                        title:
-                            ATHLTHLocalization
-                                .choose(
-                                    english:
-                                        "Header",
-                                    norwegian:
-                                        "Header"
-                                ),
-                        icon:
-                            "photo.on.rectangle.angled"
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                selectedHeaderImageData == nil
+                                    ? "Upload your own image"
+                                    : "Change uploaded image",
+                            norwegian:
+                                selectedHeaderImageData == nil
+                                    ? "Last opp eget bilde"
+                                    : "Bytt eget bilde"
+                        ),
+                        systemImage:
+                            "square.and.arrow.up"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 42
+                    )
+                    .background(
+                        clubMint,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
                     )
                 }
-
-                if selectedImageData != nil ||
-                    selectedHeaderImageData != nil {
-                    Menu {
-                        if let selectedImageData,
-                           let image =
-                            UIImage(
-                                data:
-                                    selectedImageData
-                            ) {
-                            Button {
-                                cropRequest =
-                                    CommunityImageCropRequest(
-                                        image: image,
-                                        target:
-                                            .clubImage
-                                    )
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization
-                                        .choose(
-                                            english:
-                                                "Crop Club image",
-                                            norwegian:
-                                                "Juster Club-bilde"
-                                        ),
-                                    systemImage:
-                                        "crop"
-                                )
-                            }
-                        }
-
-                        if let selectedHeaderImageData,
-                           let image =
-                            UIImage(
-                                data:
-                                    selectedHeaderImageData
-                            ) {
-                            Button {
-                                cropRequest =
-                                    CommunityImageCropRequest(
-                                        image: image,
-                                        target:
-                                            .wideCover
-                                    )
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization
-                                        .choose(
-                                            english:
-                                                "Crop header",
-                                            norwegian:
-                                                "Juster header"
-                                        ),
-                                    systemImage:
-                                        "crop"
-                                )
-                            }
-                        }
-                    } label: {
-                        compactActionChip(
-                            title:
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Crop",
-                                        norwegian:
-                                            "Utsnitt"
-                                    ),
-                            icon: "crop"
-                        )
-                    }
-                }
-
-                Spacer()
+                .buttonStyle(.plain)
 
                 Menu {
-                    if selectedImageData != nil {
-                        Button(
-                            role: .destructive
+                    if let selectedHeaderImageData,
+                       let image =
+                        UIImage(
+                            data:
+                                selectedHeaderImageData
                         ) {
-                            selectedImageData =
-                                nil
-                            selectedPhoto = nil
+                        Button {
+                            cropRequest =
+                                CommunityImageCropRequest(
+                                    image: image,
+                                    target:
+                                        .wideCover
+                                )
                         } label: {
                             Label(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Remove Club image",
-                                        norwegian:
-                                            "Fjern Club-bilde"
-                                    ),
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Adjust header",
+                                    norwegian:
+                                        "Juster header"
+                                ),
                                 systemImage:
-                                    "trash"
-                            )
-                        }
-                    } else if currentGroup
-                        .imageURL != nil {
-                        Button(
-                            role: .destructive
-                        ) {
-                            Task {
-                                saving = true
-                                let removed =
-                                    await groups
-                                        .removeGroupImage(
-                                            currentGroup
-                                        )
-                                saving = false
-
-                                if !removed {
-                                    saveError =
-                                        groups
-                                            .errorMessage
-                                }
-                            }
-                        } label: {
-                            Label(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Remove Club image",
-                                        norwegian:
-                                            "Fjern Club-bilde"
-                                    ),
-                                systemImage:
-                                    "trash"
+                                    "crop"
                             )
                         }
                     }
@@ -13428,13 +13273,12 @@ struct CommunityGroupSettingsView: View {
                                 )
                         } label: {
                             Label(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Reset header changes",
-                                        norwegian:
-                                            "Tilbakestill header"
-                                    ),
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Reset header changes",
+                                    norwegian:
+                                        "Tilbakestill header"
+                                ),
                                 systemImage:
                                     "arrow.counterclockwise"
                             )
@@ -13465,13 +13309,12 @@ struct CommunityGroupSettingsView: View {
                             }
                         } label: {
                             Label(
-                                ATHLTHLocalization
-                                    .choose(
-                                        english:
-                                            "Remove header",
-                                        norwegian:
-                                            "Fjern header"
-                                    ),
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Remove header",
+                                    norwegian:
+                                        "Fjern header"
+                                ),
                                 systemImage:
                                     "trash"
                             )
@@ -13493,46 +13336,35 @@ struct CommunityGroupSettingsView: View {
                         clubForest
                     )
                     .frame(
-                        width: 34,
-                        height: 34
+                        width: 42,
+                        height: 42
                     )
                     .background(
-                        Color.white
-                            .opacity(0.92),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                clubSage
-                                    .opacity(
-                                        0.52
-                                    ),
-                                lineWidth:
-                                    0.8
+                        clubMint,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
                             )
-                    }
+                    )
                 }
                 .disabled(saving)
             }
-            }
 
-            HStack {
-                Text(
-                    "ATHLTH images"
-                )
-                .font(
-                    .caption
-                        .weight(
-                            .semibold
-                        )
-                )
-                .foregroundStyle(
-                    clubForest
-                )
-
-                Spacer()
-            }
+            Text(
+                "ATHLTH images"
+            )
+            .font(
+                .caption
+                    .weight(
+                        .semibold
+                    )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .padding(.top, 2)
 
             ATHLTHStandardArtworkPicker(
                 selection:
@@ -13594,16 +13426,105 @@ struct CommunityGroupSettingsView: View {
             alignment: .leading,
             spacing: 0
         ) {
-            sectionTitle(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Club details",
-                    norwegian:
-                        "Club-detaljer"
-                ),
-                systemImage:
-                    "pencil.line"
-            )
+            HStack(
+                alignment: .center,
+                spacing: 12
+            ) {
+                sectionTitle(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Club details",
+                        norwegian:
+                            "Club-detaljer"
+                    ),
+                    systemImage:
+                        "pencil.line"
+                )
+
+                Spacer()
+
+                PhotosPicker(
+                    selection:
+                        $selectedPhoto,
+                    matching: .images
+                ) {
+                    ZStack(
+                        alignment:
+                            .bottomTrailing
+                    ) {
+                        groupImagePreview
+                            .frame(
+                                width: 58,
+                                height: 58
+                            )
+                            .clipShape(
+                                Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color.white,
+                                        lineWidth: 2
+                                    )
+                            }
+                            .shadow(
+                                color:
+                                    Color.black
+                                        .opacity(
+                                            0.10
+                                        ),
+                                radius: 7,
+                                y: 3
+                            )
+
+                        Image(
+                            systemName:
+                                "camera.fill"
+                        )
+                        .font(
+                            .system(
+                                size: 10,
+                                weight:
+                                    .bold
+                            )
+                        )
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            width: 22,
+                            height: 22
+                        )
+                        .background(
+                            clubEmerald,
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                        .offset(
+                            x: 2,
+                            y: 2
+                        )
+                    }
+                    .contentShape(
+                        Circle()
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Change Club image",
+                        norwegian:
+                            "Endre Club-bilde"
+                    )
+                )
+            }
             .padding(
                 .bottom,
                 8
