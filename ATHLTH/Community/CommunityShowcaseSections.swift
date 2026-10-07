@@ -639,13 +639,49 @@ struct CommunityFriendsVsFriendsDetailView: View {
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme.accent
-                        .opacity(0.12)
-            )
-        )
+        .background {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.13)
+                )
+
+                Circle()
+                    .fill(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.055)
+                    )
+                    .frame(
+                        width: 310,
+                        height: 310
+                    )
+                    .blur(radius: 42)
+                    .offset(
+                        x: 170,
+                        y: -250
+                    )
+
+                Circle()
+                    .fill(
+                        ATHLTHTheme
+                            .accentSoft
+                            .opacity(0.34)
+                    )
+                    .frame(
+                        width: 260,
+                        height: 260
+                    )
+                    .blur(radius: 52)
+                    .offset(
+                        x: -150,
+                        y: 360
+                    )
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle("Head-to-head")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -700,46 +736,23 @@ struct CommunityFriendsVsFriendsDetailView: View {
             )
             await loadSelectedFriend()
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Choose a direct duel",
-                norwegian: "Velg direkte duell"
-            ),
+        .sheet(
             isPresented:
-                $showingDirectDuelPicker,
-            titleVisibility: .visible
+                $showingDirectDuelPicker
         ) {
-            ForEach(
-                CommunityDirectDuelMetric
-                    .allCases
-            ) { metric in
-                Button(
-                    metric.title
-                ) {
-                    Task {
-                        await createDirectDuel(
-                            metric
-                        )
-                    }
-                }
-            }
-
-            Button(
-                ATHLTHLocalization.choose(
-                    english: "Cancel",
-                    norwegian: "Avbryt"
-                ),
-                role: .cancel
-            ) {}
-        } message: {
-            Text(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Your friend receives a request. Activity points remain the default until the duel is accepted.",
-                    norwegian:
-                        "Vennen din får en forespørsel. Aktivitetspoeng er standard helt til duellen er godtatt."
+            directDuelPickerSheet
+                .presentationDetents([
+                    .height(430)
+                ])
+                .presentationDragIndicator(
+                    .visible
                 )
-            )
+                .presentationCornerRadius(
+                    30
+                )
+                .presentationBackground(
+                    .ultraThinMaterial
+                )
         }
         .alert(
             ATHLTHLocalization.choose(
@@ -778,6 +791,314 @@ struct CommunityFriendsVsFriendsDetailView: View {
                 )
             }
         }
+    }
+
+    private var directDuelPickerSheet:
+        some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        ATHLTHTheme
+                            .canvasTop,
+                        ATHLTHTheme
+                            .canvasBottom
+                    ],
+                    startPoint:
+                        .topLeading,
+                    endPoint:
+                        .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                Circle()
+                    .fill(
+                        ATHLTHTheme
+                            .vitality
+                            .opacity(0.11)
+                    )
+                    .frame(
+                        width: 230,
+                        height: 230
+                    )
+                    .blur(radius: 38)
+                    .offset(
+                        x: 135,
+                        y: -145
+                    )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 14
+                ) {
+                    HStack(
+                        alignment: .top,
+                        spacing: 12
+                    ) {
+                        Image(
+                            systemName:
+                                "bolt.horizontal.circle.fill"
+                        )
+                        .font(.title2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                        .frame(
+                            width: 46,
+                            height: 46
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft,
+                            in: Circle()
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 4
+                        ) {
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Choose direct duel",
+                                        norwegian:
+                                            "Velg direkte duell"
+                                    )
+                            )
+                            .font(
+                                .title3
+                                    .weight(.bold)
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                            Text(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Seven days. One category. The request starts when your friend accepts.",
+                                        norwegian:
+                                            "Syv dager. Én gren. Duellen starter når vennen din godtar."
+                                    )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                        }
+
+                        Spacer()
+                    }
+
+                    VStack(spacing: 9) {
+                        ForEach(
+                            CommunityDirectDuelMetric
+                                .allCases
+                        ) { metric in
+                            directDuelOption(
+                                metric
+                            )
+                        }
+                    }
+
+                    Text(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Activity points remain the default score until the request is accepted.",
+                                norwegian:
+                                    "Aktivitetspoeng er fortsatt standardscoren frem til forespørselen er godtatt."
+                            )
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                    .padding(
+                        .horizontal,
+                        2
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    18
+                )
+                .padding(.top, 10)
+                .padding(
+                    .bottom,
+                    18
+                )
+            }
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .topBarTrailing
+                ) {
+                    Button {
+                        showingDirectDuelPicker =
+                            false
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .frame(
+                            width: 32,
+                            height: 32
+                        )
+                        .background(
+                            Color.white
+                                .opacity(0.74),
+                            in: Circle()
+                        )
+                    }
+                }
+            }
+            .toolbarBackground(
+                .hidden,
+                for: .navigationBar
+            )
+        }
+    }
+
+    private func directDuelOption(
+        _ metric:
+            CommunityDirectDuelMetric
+    ) -> some View {
+        Button {
+            showingDirectDuelPicker =
+                false
+
+            Task {
+                await createDirectDuel(
+                    metric
+                )
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(
+                    systemName:
+                        metric.systemImage
+                )
+                .font(
+                    .system(
+                        size: 17,
+                        weight: .semibold
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+                .frame(
+                    width: 42,
+                    height: 42
+                )
+                .background(
+                    ATHLTHTheme
+                        .vitalitySoft,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 13,
+                            style: .continuous
+                        )
+                )
+
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(metric.title)
+                        .font(
+                            .subheadline
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Text(metric.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(
+                            0.82
+                        )
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        "chevron.right"
+                )
+                .font(.caption.bold())
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .vitality
+                )
+            }
+            .padding(
+                .horizontal,
+                13
+            )
+            .frame(height: 62)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color.white
+                            .opacity(0.95),
+                        ATHLTHTheme
+                            .vitalitySoft
+                            .opacity(0.62)
+                    ],
+                    startPoint:
+                        .leading,
+                    endPoint:
+                        .trailing
+                ),
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 18,
+                        style: .continuous
+                    )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.12),
+                    lineWidth: 0.8
+                )
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            creatingDirectDuel
+        )
     }
 
     private var friendPicker: some View {
