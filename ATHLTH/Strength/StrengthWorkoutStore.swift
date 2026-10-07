@@ -1720,6 +1720,12 @@ final class StrengthWorkoutStore: ObservableObject {
                                 target.targetRPE,
                             plannedRIR:
                                 target.targetRIR,
+                            plannedSetType:
+                                target.setType,
+                            plannedTempo:
+                                target.tempo,
+                            plannedNote:
+                                target.notes,
                             rir: nil,
                             isWarmUp:
                                 target.isWarmUp,
