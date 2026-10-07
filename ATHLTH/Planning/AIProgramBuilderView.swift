@@ -14,6 +14,20 @@ private enum AIProgramTimelineMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct AIProgramBuilderSeed: Hashable {
+    var preferredTitle: String
+    var startDate: Date
+    var weekCount: Int
+    var sessionsPerWeek: Int
+    var sessionDurationMinutes: Int
+    var availableDays: Set<Int>
+    var trainingFocus: TrainingFocus
+    var gymAccess: String?
+    var limitations: String
+    var coachFocusNotes: String
+    var selectedGoalIDs: Set<UUID>
+}
+
 private struct CoachIntakePreferences: Codable, Equatable {
     var experience: String
     var trainingFocus: TrainingFocus
@@ -37,6 +51,18 @@ struct AIProgramBuilderView: View {
     @EnvironmentObject private var health: HealthKitManager
 
     let mode: AIProgramGenerationMode
+    let seed: AIProgramBuilderSeed?
+    let onProgramCreated: (() -> Void)?
+
+    init(
+        mode: AIProgramGenerationMode,
+        seed: AIProgramBuilderSeed? = nil,
+        onProgramCreated: (() -> Void)? = nil
+    ) {
+        self.mode = mode
+        self.seed = seed
+        self.onProgramCreated = onProgramCreated
+    }
 
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var timelineMode: AIProgramTimelineMode = .weeks
@@ -1042,10 +1068,21 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func applyPreview(_ draft: AIProgramDraft) {
-        let generated = draft.makeTrainingPlan(
+        var generated = draft.makeTrainingPlan(
             ownerID: session.profile.userID,
             startDate: startDate
         )
+
+        if mode == .generate,
+           let preferredTitle =
+                seed?
+                    .preferredTitle
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ),
+           !preferredTitle.isEmpty {
+            generated.title = preferredTitle
+        }
 
         switch mode {
         case .generate:
@@ -1086,6 +1123,7 @@ struct AIProgramBuilderView: View {
             }
         }
 
+        onProgramCreated?()
         dismiss()
     }
 
@@ -1137,6 +1175,71 @@ struct AIProgramBuilderView: View {
             if !linked.isEmpty {
                 selectedGoalIDs = Set(linked.map(\.id))
             }
+        }
+
+        if mode == .generate,
+           let seed {
+            startDate =
+                Calendar.current
+                    .startOfDay(
+                        for: seed.startDate
+                    )
+            weekCount =
+                min(
+                    max(seed.weekCount, 1),
+                    52
+                )
+            endDate =
+                Calendar.current.date(
+                    byAdding: .day,
+                    value:
+                        max(
+                            weekCount * 7 - 1,
+                            0
+                        ),
+                    to: startDate
+                ) ?? startDate
+            availableDays =
+                seed.availableDays.isEmpty
+                    ? Set(1...7)
+                    : seed.availableDays
+            sessionsPerWeek =
+                min(
+                    max(
+                        seed.sessionsPerWeek,
+                        1
+                    ),
+                    max(
+                        availableDays.count,
+                        1
+                    )
+                )
+            sessionDurationMinutes =
+                min(
+                    max(
+                        seed.sessionDurationMinutes,
+                        20
+                    ),
+                    180
+                )
+            trainingFocus =
+                seed.trainingFocus
+            limitations =
+                seed.limitations
+            coachFocusNotes =
+                seed.coachFocusNotes
+            selectedGoalIDs =
+                seed.selectedGoalIDs
+
+            if let seededGymAccess =
+                    seed.gymAccess,
+               !seededGymAccess.isEmpty {
+                gymAccess =
+                    seededGymAccess
+            }
+
+            showingQuestions =
+                !questionsAnswered
         }
 
         if selectedGoalIDs.isEmpty,
