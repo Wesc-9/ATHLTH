@@ -434,6 +434,13 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
+        guard !watchConnection
+            .hasActiveWatchWorkout
+        else {
+            throw AppleWatchWorkoutLaunchError
+                .workoutAlreadyActive
+        }
+
         let selectedRoute: TrainingRoute? = {
             if let route = configuration.route {
                 return route
@@ -741,6 +748,13 @@ enum WorkoutLaunchCoordinator {
             return
         }
 
+        guard !watchConnection
+            .hasActiveWatchWorkout
+        else {
+            throw AppleWatchWorkoutLaunchError
+                .workoutAlreadyActive
+        }
+
         if configuration.captureDevice == .iPhone {
             workoutMirroring?
                 .clearIPhoneAudioCoach()
@@ -873,6 +887,13 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
+        guard !watchConnection
+            .hasActiveWatchWorkout
+        else {
+            throw AppleWatchWorkoutLaunchError
+                .workoutAlreadyActive
+        }
+
         var inviteAdvancedConfiguration =
             advancedConfiguration
         inviteAdvancedConfiguration.spotifyPlaylist = nil
