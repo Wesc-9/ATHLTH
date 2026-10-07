@@ -8431,6 +8431,130 @@ struct PlannedExerciseEditorView: View {
                     ATHLTHTheme.card
                 )
 
+                if advancedMode &&
+                    targetKind == .reps &&
+                    loadKind == .weightKilograms &&
+                    useLoadTarget {
+                    Section(
+                        ATHLTHLocalization.choose(
+                            english: "Warm-up",
+                            norwegian: "Oppvarming"
+                        )
+                    ) {
+                        HStack(spacing: 11) {
+                            Image(
+                                systemName:
+                                    "flame.fill"
+                            )
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.premiumGold
+                            )
+                            .frame(width: 36, height: 36)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(
+                                    cornerRadius: 11,
+                                    style: .continuous
+                                )
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 2
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Warm-up generator",
+                                        norwegian:
+                                            "Oppvarmingsgenerator"
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Build 3 progressive warm-up sets toward your first work set.",
+                                        norwegian:
+                                            "Lag 3 progressive oppvarmingssett frem mot første arbeidssett."
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+
+                            Spacer()
+                        }
+
+                        HStack(spacing: 8) {
+                            Button {
+                                generateWarmUpSets()
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Generate",
+                                        norwegian:
+                                            "Lag oppvarming"
+                                    ),
+                                    systemImage:
+                                        "wand.and.stars"
+                                )
+                                .font(.caption.weight(.bold))
+                                .frame(
+                                    maxWidth: .infinity,
+                                    minHeight: 40
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.white)
+                            .background(
+                                ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(
+                                    cornerRadius: 12,
+                                    style: .continuous
+                                )
+                            )
+
+                            if warmUpSetCount > 0 {
+                                Button {
+                                    removeWarmUpSets()
+                                } label: {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english: "Remove",
+                                            norwegian: "Fjern"
+                                        )
+                                    )
+                                    .font(.caption.weight(.bold))
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: 40
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                                .background(
+                                    ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 12,
+                                        style: .continuous
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    .listRowBackground(
+                        ATHLTHTheme.card
+                    )
+                }
+
                 if useIndividualSetTargets {
                     Section(
                         ATHLTHLocalization.choose(
@@ -10085,6 +10209,142 @@ struct PlannedExerciseEditorView: View {
                 )
             }
         }
+    }
+
+    private var warmUpSetCount: Int {
+        individualSetTargets
+            .filter {
+                $0.isWarmUp == true ||
+                $0.setType == .warmUp
+            }
+            .count
+    }
+
+    private func generateWarmUpSets() {
+        let currentTargets =
+            useIndividualSetTargets
+                ? normalizedIndividualTargets()
+                : Array(
+                    repeating:
+                        sharedSetTarget(),
+                    count:
+                        max(sets, 1)
+                )
+
+        let workTargets =
+            currentTargets.filter {
+                $0.isWarmUp != true &&
+                $0.setType != .warmUp
+            }
+        let firstWork =
+            workTargets.first ??
+            sharedSetTarget()
+        let targetWeight =
+            max(
+                firstWork.weightKilograms ??
+                weight,
+                0
+            )
+
+        guard targetWeight > 0 else {
+            return
+        }
+
+        let percentages: [Double] = [
+            0.40,
+            0.60,
+            0.80
+        ]
+        let warmUpReps = [
+            8,
+            5,
+            3
+        ]
+        let warmUpRest = [
+            45,
+            60,
+            90
+        ]
+
+        let warmUps =
+            percentages.enumerated().map {
+                index,
+                percentage in
+
+                let rawWeight =
+                    targetWeight *
+                    percentage
+                let roundedWeight =
+                    max(
+                        (
+                            rawWeight / 2.5
+                        )
+                        .rounded() *
+                        2.5,
+                        0
+                    )
+
+                return PlannedExerciseSetTarget(
+                    reps:
+                        warmUpReps[index],
+                    durationSeconds: nil,
+                    weightKilograms:
+                        roundedWeight,
+                    resistanceLevel: nil,
+                    restSeconds:
+                        warmUpRest[index],
+                    targetRPE: nil,
+                    targetRIR: nil,
+                    isWarmUp: true,
+                    setType: .warmUp,
+                    tempo:
+                        firstWork.tempo,
+                    notes:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Progressive warm-up",
+                            norwegian:
+                                "Progressiv oppvarming"
+                        )
+                )
+            }
+
+        individualSetTargets =
+            warmUps +
+            workTargets.map {
+                target in
+                var updated = target
+                if updated.setType == nil {
+                    updated.setType = .work
+                }
+                updated.isWarmUp = false
+                return updated
+            }
+        sets =
+            individualSetTargets.count
+        useIndividualSetTargets = true
+    }
+
+    private func removeWarmUpSets() {
+        let workTargets =
+            individualSetTargets.filter {
+                $0.isWarmUp != true &&
+                $0.setType != .warmUp
+            }
+
+        guard !workTargets.isEmpty else {
+            seedIndividualTargetsFromShared()
+            sets =
+                individualSetTargets.count
+            useIndividualSetTargets = true
+            return
+        }
+
+        individualSetTargets =
+            workTargets
+        sets =
+            workTargets.count
+        useIndividualSetTargets = true
     }
 
     private func syncSetTargetCount() {
