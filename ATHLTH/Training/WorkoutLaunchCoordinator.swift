@@ -537,6 +537,11 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .autoPauseEnabled
             )
+            watchConnection
+                .updateLocalWorkoutActivity(
+                    isActive: true,
+                    title: configuration.title
+                )
             startQuickSpotifyIfNeeded(
                 playlist:
                     configuration.spotifyPlaylist,
@@ -775,6 +780,15 @@ enum WorkoutLaunchCoordinator {
                 autoPauseEnabled:
                     configuration.autoPauseEnabled
             )
+            watchConnection
+                .updateLocalWorkoutActivity(
+                    isActive: true,
+                    title:
+                        ATHLTHLocalization.choose(
+                            english: "Walk",
+                            norwegian: "Gåtur"
+                        )
+                )
             startQuickSpotifyIfNeeded(
                 playlist:
                     configuration.spotifyPlaylist,
@@ -1030,6 +1044,14 @@ enum WorkoutLaunchCoordinator {
                     ? advancedConfiguration
                     : nil
         )
+
+        if captureDevice == .iPhone {
+            watchConnection
+                .updateLocalWorkoutActivity(
+                    isActive: true,
+                    title: workout.title
+                )
+        }
 
         if captureDevice == .appleWatch {
             // The iPhone strength log is authoritative for exercise/set state.
