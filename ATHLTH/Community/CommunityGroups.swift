@@ -7105,18 +7105,25 @@ struct CommunityGroupDetailView: View {
                 referenceClubComposer
             }
 
+            referenceClubPostsSection
+
             if let challenge =
                 featuredClubChallenge ??
                 nextGroupChallenge {
                 referenceClubChallengeCard(
                     challenge
                 )
-            } else {
-                referenceEmptyChallengeCard
             }
 
             referenceComingUpSection
-            referenceClubPostsSection
+
+            if featuredClubChallenge == nil,
+               nextGroupChallenge == nil,
+               nextGroupEvent == nil,
+               referenceSecondaryChallenge == nil {
+                referenceEmptyChallengeCard
+            }
+
             clubLeaderboardCard
         }
     }
