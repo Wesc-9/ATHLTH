@@ -34,6 +34,12 @@ struct WatchRunWorkoutExperienceView: View {
                     planPage
                         .tag(1)
 
+                    if workoutManager
+                        .treadmillInclinePercent != nil {
+                        treadmillInclinePage
+                            .tag(6)
+                    }
+
                     routePage
                         .tag(2)
 
@@ -1874,6 +1880,88 @@ struct WatchRunWorkoutExperienceView: View {
     // MARK: - Page 2: workout / interval plan
 
     @ViewBuilder
+    private var treadmillInclinePage: some View {
+        VStack(spacing: 10) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Incline",
+                    norwegian: "Stigning"
+                )
+            )
+            .font(.headline)
+
+            Text(
+                String(
+                    format: "%.1f%%",
+                    workoutManager
+                        .treadmillInclinePercent ??
+                    0
+                )
+            )
+            .font(
+                .system(
+                    size: 42,
+                    weight: .bold,
+                    design: .rounded
+                )
+            )
+            .monospacedDigit()
+
+            HStack(spacing: 12) {
+                Button {
+                    workoutManager
+                        .setTreadmillInclinePercent(
+                            (
+                                workoutManager
+                                    .treadmillInclinePercent ??
+                                0
+                            ) - 0.5
+                        )
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.title3.bold())
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 44
+                        )
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    workoutManager
+                        .setTreadmillInclinePercent(
+                            (
+                                workoutManager
+                                    .treadmillInclinePercent ??
+                                0
+                            ) + 0.5
+                        )
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title3.bold())
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: 44
+                        )
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Adjust in 0.5% steps while you run.",
+                    norwegian: "Juster i trinn på 0,5 % mens du løper."
+                )
+            )
+            .font(.caption2)
+            .foregroundStyle(
+                WatchTheme.textSecondary
+            )
+            .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 10)
+    }
+
     private var planPage: some View {
         if let workout =
                 workoutManager
