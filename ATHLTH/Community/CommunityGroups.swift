@@ -16658,15 +16658,15 @@ struct CommunityGroupEventCreateView: View {
     @State private var creationError: String?
 
     private var clubForest: Color {
-        Color(red: 0.025, green: 0.30, blue: 0.21)
+        group.clubTheme.forest
     }
 
     private var clubEmerald: Color {
-        Color(red: 0.055, green: 0.49, blue: 0.32)
+        group.clubTheme.emerald
     }
 
     private var clubMint: Color {
-        Color(red: 0.90, green: 0.96, blue: 0.92)
+        group.clubTheme.mint
     }
 
     var body: some View {
