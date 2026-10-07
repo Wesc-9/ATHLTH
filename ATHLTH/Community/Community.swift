@@ -443,6 +443,11 @@ struct CommunityEventItem: Identifiable, Hashable {
             $0.checkedInAt != nil
         }.count
     }
+
+    var isCompetition: Bool {
+        event.competitionEnabled == true &&
+        event.competitionMetric != nil
+    }
 }
 
 struct CommunityEventDraft:
@@ -1363,6 +1368,41 @@ final class SupabaseCommunityService {
             .execute()
     }
 
+    func submitCompetitionResult(
+        eventID: UUID,
+        value: Double
+    ) async throws {
+        guard let currentUserID else {
+            throw CommunityEventError
+                .notAuthenticated
+        }
+
+        guard value > 0 else {
+            throw CommunityEventError
+                .invalidCompetitionResult
+        }
+
+        try await client
+            .from(
+                "community_event_participants"
+            )
+            .update(
+                CommunityEventCompetitionResultUpdate(
+                    competitionResultValue:
+                        value
+                )
+            )
+            .eq(
+                "event_id",
+                value: eventID
+            )
+            .eq(
+                "user_id",
+                value: currentUserID
+            )
+            .execute()
+    }
+
     func leave(eventID: UUID) async throws {
         guard let currentUserID else {
             throw CommunityEventError.notAuthenticated
@@ -1404,6 +1444,7 @@ enum CommunityEventError: LocalizedError {
     case notAuthenticated
     case invalidEvent
     case eventFull
+    case invalidCompetitionResult
 
     var errorDescription: String? {
         switch self {
@@ -1413,6 +1454,13 @@ enum CommunityEventError: LocalizedError {
             return "Add an event name and choose a future start time."
         case .eventFull:
             return "This event is full."
+        case .invalidCompetitionResult:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Enter a valid competition result.",
+                norwegian:
+                    "Legg inn et gyldig konkurranseresultat."
+            )
         }
     }
 }
@@ -1678,6 +1726,39 @@ final class CommunityEventStore: ObservableObject {
                 eventID: item.id,
                 method: method
             )
+            await refresh(force: true)
+            return true
+        } catch {
+            errorMessage =
+                error.localizedDescription
+            return false
+        }
+    }
+
+    func submitCompetitionResult(
+        _ item: CommunityEventItem,
+        value: Double
+    ) async -> Bool {
+        guard item.isCompetition,
+              item.event.startsAt <= Date(),
+              isCheckedIn(item)
+        else {
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Check in and wait until the event has started before submitting a result.",
+                    norwegian:
+                        "Sjekk inn og vent til arrangementet har startet før du registrerer resultat."
+                )
+            return false
+        }
+
+        do {
+            try await service
+                .submitCompetitionResult(
+                    eventID: item.id,
+                    value: value
+                )
             await refresh(force: true)
             return true
         } catch {
