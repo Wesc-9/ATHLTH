@@ -90,7 +90,9 @@ struct ATHLTHCommunityV4View: View {
 
     private var joinedUpcomingEvents:
         [CommunityEventItem] {
-        community.upcomingEvents.filter { item in
+        func belongsToCurrentUser(
+            _ item: CommunityEventItem
+        ) -> Bool {
             item.event.creatorID ==
                 session.profile.userID ||
             item.participantRows.contains {
@@ -102,6 +104,33 @@ struct ATHLTHCommunityV4View: View {
                 )
             }
         }
+
+        let live =
+            community.upcomingEvents
+                .filter {
+                    $0.event.status ==
+                        "live" &&
+                    belongsToCurrentUser($0)
+                }
+
+        let recentlyCompleted =
+            community
+                .recentlyCompletedEvents
+                .filter(
+                    belongsToCurrentUser
+                )
+
+        let upcoming =
+            community.upcomingEvents
+                .filter {
+                    $0.event.status !=
+                        "live" &&
+                    belongsToCurrentUser($0)
+                }
+
+        return live +
+            recentlyCompleted +
+            upcoming
     }
 
     private var joinedUpcomingChallenges:
@@ -4706,6 +4735,17 @@ private struct CommunityReferenceClubCard: View {
 private struct CommunityReferenceUpcomingEventCard: View {
     let item: CommunityEventItem
 
+    private var isCompleted: Bool {
+        item.event.status ==
+            "completed"
+    }
+
+    private var statusTint: Color {
+        isCompleted
+            ? .indigo
+            : ATHLTHTheme.accentDeep
+    }
+
     var body: some View {
         HStack(spacing: 9) {
             VStack(spacing: 0) {
@@ -4797,7 +4837,9 @@ private struct CommunityReferenceUpcomingEventCard: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.primaryText
+                        isCompleted
+                            ? ATHLTHTheme.mutedText
+                            : ATHLTHTheme.primaryText
                     )
                     .lineLimit(2)
                     .minimumScaleFactor(0.88)
@@ -4805,6 +4847,29 @@ private struct CommunityReferenceUpcomingEventCard: View {
                         horizontal: false,
                         vertical: true
                     )
+
+                if isCompleted {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Finished · shown for 24h",
+                            norwegian:
+                                "Ferdig · vises i 24 t"
+                        ),
+                        systemImage:
+                            "checkmark.circle.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        .indigo
+                    )
+                    .lineLimit(1)
+                }
 
                 Label(
                     eventLocationText,
@@ -4866,7 +4931,7 @@ private struct CommunityReferenceUpcomingEventCard: View {
                 )
             )
             .foregroundStyle(
-                ATHLTHTheme.accentDeep
+                statusTint
             )
             .frame(
                 width: 20,
@@ -4875,7 +4940,13 @@ private struct CommunityReferenceUpcomingEventCard: View {
         }
         .padding(9)
         .background(
-            Color.white.opacity(0.90),
+            (
+                isCompleted
+                    ? Color.indigo
+                        .opacity(0.075)
+                    : Color.white
+                        .opacity(0.90)
+            ),
             in:
                 RoundedRectangle(
                     cornerRadius: 18,
