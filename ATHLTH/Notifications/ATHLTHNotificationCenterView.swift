@@ -1668,6 +1668,16 @@ struct ATHLTHNotificationCenterView: View {
             )
         }
 
+        if communityEventNotificationID(
+            item
+        ) != nil {
+            return ATHLTHLocalization.choose(
+                english: "Open event",
+                norwegian:
+                    "Åpne arrangement"
+            )
+        }
+
         if notificationGroupID(item) != nil {
             return ATHLTHLocalization.choose(
                 english: "Open Club",
@@ -1756,6 +1766,12 @@ struct ATHLTHNotificationCenterView: View {
             return true
         }
 
+        if communityEventNotificationID(
+            item
+        ) != nil {
+            return true
+        }
+
         if notificationGroupID(item) != nil {
             return true
         }
@@ -1807,6 +1823,13 @@ struct ATHLTHNotificationCenterView: View {
             )
         } else if item.kind == .achievement {
             TrophyCollectionView()
+        } else if let eventID =
+                    communityEventNotificationID(
+                        item
+                    ) {
+            CommunityEventDetailView(
+                eventID: eventID
+            )
         } else if let groupID =
                     notificationGroupID(item) {
             CommunityGroupNotificationDestination(
@@ -1860,6 +1883,19 @@ struct ATHLTHNotificationCenterView: View {
         default:
             return .overview
         }
+    }
+
+    private func communityEventNotificationID(
+        _ item: ATHLTHNotificationItem
+    ) -> UUID? {
+        guard item.socialEntityType?
+                .lowercased() ==
+                "community_event"
+        else {
+            return nil
+        }
+
+        return item.socialEntityID
     }
 
     private func notificationGroupID(
