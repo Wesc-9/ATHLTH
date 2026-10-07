@@ -684,17 +684,6 @@ struct ATHLTHHomeView: View {
                     homeGoalAndCalendarRow
 
                     HomePersonalRecentActivitySection()
-
-                    HomeWeeklySummaryCard(
-                        runningDistanceKilometers:
-                            homeWeeklyRunningDistanceKilometers,
-                        durationMinutes:
-                            homeWeeklyDurationMinutes,
-                        strengthSessions:
-                            homeWeeklyStrengthSessions,
-                        sessionCount:
-                            homeWeeklySessionCount
-                    )
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
