@@ -17027,6 +17027,7 @@ private struct CommunityContentCoverPicker: View {
         ATHLTHStandardArtwork?
 
     let placeholderIcon: String
+    var showsPreview: Bool = true
 
     @State private var imageError: String?
     @State private var cropRequest:
@@ -17042,66 +17043,70 @@ private struct CommunityContentCoverPicker: View {
             alignment: .leading,
             spacing: 12
         ) {
-            Group {
-                if let imageData,
-                   let image = UIImage(data: imageData) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else if let selectedArtwork,
-                          let image =
-                            selectedArtwork
-                                .resolvedUIImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .scaleEffect(
-                            1.16,
-                            anchor: .trailing
+            if showsPreview {
+                Group {
+                    if let imageData,
+                       let image = UIImage(data: imageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else if let selectedArtwork,
+                              let image =
+                                selectedArtwork
+                                    .resolvedUIImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .scaleEffect(
+                                1.16,
+                                anchor: .trailing
+                            )
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.accentDeep.opacity(0.18),
+                                ATHLTHTheme.cardWarm,
+                                ATHLTHTheme.canvasTop
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                } else {
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme.accentDeep.opacity(0.18),
-                            ATHLTHTheme.cardWarm,
-                            ATHLTHTheme.canvasTop
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        Image(systemName: placeholderIcon)
-                            .font(
-                                .system(
-                                    size: 34,
-                                    weight: .semibold
+                        .overlay {
+                            Image(systemName: placeholderIcon)
+                                .font(
+                                    .system(
+                                        size: 34,
+                                        weight: .semibold
+                                    )
                                 )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                                    .opacity(0.70)
-                            )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                        .opacity(0.70)
+                                )
+                        }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 150)
-            .clipped()
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
+                .frame(maxWidth: .infinity)
+                .frame(height: 150)
+                .clipped()
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
+                    )
                 )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-                .stroke(
-                    ATHLTHTheme.border,
-                    lineWidth: 1
-                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 20,
+                        style: .continuous
+                    )
+                    .stroke(
+                        ATHLTHTheme.border,
+                        lineWidth: 1
+                    )
+                }
+    
+    
             }
 
             Text("ATHLTH images")
@@ -18780,7 +18785,8 @@ struct CommunityGroupEventCreateView: View {
                 selectedArtwork:
                     $selectedArtwork,
                 placeholderIcon:
-                    "calendar.badge.plus"
+                    "calendar.badge.plus",
+                showsPreview: false
             )
         }
     }
