@@ -5709,14 +5709,43 @@ struct SessionEditorView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .swipeActions {
+                    .swipeActions(
+                        edge: .trailing,
+                        allowsFullSwipe: false
+                    ) {
                         Button(role: .destructive) {
                             plannedExercises.removeAll {
                                 $0.id == planned.id
                             }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Delete",
+                                    norwegian: "Slett"
+                                ),
+                                systemImage: "trash"
+                            )
                         }
+                    }
+                    .swipeActions(
+                        edge: .leading,
+                        allowsFullSwipe: false
+                    ) {
+                        Button {
+                            duplicatePlannedExercise(
+                                at: index
+                            )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Duplicate",
+                                    norwegian: "Dupliser"
+                                ),
+                                systemImage:
+                                    "plus.square.on.square"
+                            )
+                        }
+                        .tint(ATHLTHTheme.accentDeep)
                     }
 
                     if index > 0 {
@@ -6347,6 +6376,79 @@ struct SessionEditorView: View {
         )
 
         plannedExercises.append(planned)
+    }
+
+    private func duplicatePlannedExercise(
+        at index: Int
+    ) {
+        guard
+            plannedExercises.indices
+                .contains(index)
+        else {
+            return
+        }
+
+        let source =
+            plannedExercises[index]
+        let duplicate =
+            PlannedExercise(
+                id: UUID(),
+                exerciseID:
+                    source.exerciseID,
+                embeddedExercise:
+                    source.embeddedExercise,
+                sets: source.sets,
+                reps: source.reps,
+                targetWeightKilograms:
+                    source.targetWeightKilograms,
+                targetRPE:
+                    source.targetRPE,
+                restSeconds:
+                    source.restSeconds,
+                notes: source.notes,
+                targetRIR:
+                    source.targetRIR,
+                supersetGroupID: nil,
+                progression:
+                    source.progression,
+                targetKind:
+                    source.targetKind,
+                targetDurationSeconds:
+                    source.targetDurationSeconds,
+                loadKind:
+                    source.loadKind,
+                targetResistanceLevel:
+                    source.targetResistanceLevel,
+                setTargets:
+                    source.setTargets?.map {
+                        PlannedExerciseSetTarget(
+                            reps: $0.reps,
+                            durationSeconds:
+                                $0.durationSeconds,
+                            weightKilograms:
+                                $0.weightKilograms,
+                            resistanceLevel:
+                                $0.resistanceLevel,
+                            restSeconds:
+                                $0.restSeconds,
+                            targetRPE:
+                                $0.targetRPE,
+                            targetRIR:
+                                $0.targetRIR,
+                            isWarmUp:
+                                $0.isWarmUp
+                        )
+                    }
+            )
+
+        plannedExercises.insert(
+            duplicate,
+            at:
+                min(
+                    index + 1,
+                    plannedExercises.count
+                )
+        )
     }
 
     private func toggleSuperset(at index: Int) {
@@ -7137,16 +7239,40 @@ struct SessionEditorView: View {
             parts.append(load)
         }
 
-        if let rpe = planned.targetRPE {
-            parts.append(String(format: "RPE %.1f", rpe))
-        }
+        if planned.hasIndividualSetTargets {
+            parts.append(
+                ATHLTHLocalization.choose(
+                    english: "Per-set targets",
+                    norwegian: "Individuelle sett"
+                )
+            )
+        } else {
+            if let rpe = planned.targetRPE {
+                parts.append(
+                    String(
+                        format: "RPE %.1f",
+                        rpe
+                    )
+                )
+            }
 
-        if let rir = planned.targetRIR {
-            parts.append(String(format: "RIR %.1f", rir))
-        }
+            if let rir = planned.targetRIR {
+                parts.append(
+                    String(
+                        format: "RIR %.1f",
+                        rir
+                    )
+                )
+            }
 
-        if let rest = planned.restSeconds {
-            parts.append("\(rest)s rest")
+            if let rest = planned.restSeconds {
+                parts.append(
+                    ATHLTHLocalization.choose(
+                        english: "\(rest)s rest",
+                        norwegian: "\(rest)s hvile"
+                    )
+                )
+            }
         }
 
         if let progression = planned.progression,
