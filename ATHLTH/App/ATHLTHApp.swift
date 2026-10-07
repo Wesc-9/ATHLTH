@@ -620,6 +620,57 @@ struct AppRootView: View {
         }
     }
 
+    private var localWorkoutActivitySignature:
+        String {
+        if let workout =
+                strengthWorkout.activeWorkout {
+            return "strength-" +
+                workout.id.uuidString
+        }
+
+        if let workout =
+                phoneWorkout.active {
+            return "phone-" +
+                workout.id.uuidString
+        }
+
+        return "idle"
+    }
+
+    private func syncLocalWorkoutActivityToWatch() {
+        guard ATHLTHDeviceRole
+            .supportsDirectAppleWatch
+        else {
+            return
+        }
+
+        if let workout =
+                strengthWorkout.activeWorkout {
+            watchConnection
+                .updateLocalWorkoutActivity(
+                    isActive: true,
+                    title: workout.title
+                )
+            return
+        }
+
+        if let workout =
+                phoneWorkout.active {
+            watchConnection
+                .updateLocalWorkoutActivity(
+                    isActive: true,
+                    title: workout.title
+                )
+            return
+        }
+
+        watchConnection
+            .updateLocalWorkoutActivity(
+                isActive: false,
+                title: nil
+            )
+    }
+
     private func startDeviceRelayIfNeeded() {
         guard
             appSession.signedIn,
@@ -661,6 +712,7 @@ struct AppRootView: View {
         if ATHLTHDeviceRole.supportsDirectAppleWatch {
             watchConnection.connect()
             syncSpotifyPlaybackToWatch()
+            syncLocalWorkoutActivityToWatch()
         }
 
         startDeviceRelayIfNeeded()
@@ -845,6 +897,11 @@ struct AppRootView: View {
                 .environmentObject(
                     appSession
                 )
+        }
+        .onChange(
+            of: localWorkoutActivitySignature
+        ) { _, _ in
+            syncLocalWorkoutActivityToWatch()
         }
         .onChange(of: watchConnection.lastSpotifyCommand) { _, command in
             guard let command else { return }
