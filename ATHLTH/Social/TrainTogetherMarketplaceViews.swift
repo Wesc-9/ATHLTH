@@ -1,3 +1,4 @@
+import CoreLocation
 import MapKit
 import SwiftUI
 
@@ -3112,25 +3113,6 @@ struct TrainTogetherPostCreateView:
                 }
                 .padding(.vertical, 13)
 
-                if participationMode ==
-                    .physical {
-                    createDivider
-
-                    createTextFieldRow(
-                        icon:
-                            "location.circle.fill",
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "City / area",
-                                norwegian:
-                                    "By / område"
-                            ),
-                        text:
-                            $broadArea
-                    )
-                }
-
                 createDivider
 
                 VStack(
@@ -3995,15 +3977,12 @@ struct TrainTogetherPostCreateView:
         meetingLongitude =
             place.longitude
 
-        if broadArea
-            .trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
-            .isEmpty,
-           !place.broadArea.isEmpty {
+        if !place.broadArea.isEmpty {
             broadArea =
                 place.broadArea
+        } else {
+            broadArea =
+                place.name
         }
     }
 
@@ -4012,6 +3991,7 @@ struct TrainTogetherPostCreateView:
         meetingAddress = ""
         meetingLatitude = nil
         meetingLongitude = nil
+        broadArea = ""
     }
 
     private func publish() {
@@ -4266,99 +4246,233 @@ private struct TrainTogetherMapPlacePickerView:
         [TrainTogetherMapPlace] = []
     @State private var isSearching =
         false
+    @State private var isResolvingMapTap =
+        false
     @State private var searchError:
         String?
+    @State private var selectedPlace:
+        TrainTogetherMapPlace?
+    @State private var cameraPosition:
+        MapCameraPosition = .automatic
 
     var body: some View {
-        List {
+        VStack(spacing: 0) {
+            mapSection
+
             if query
                 .trimmingCharacters(
                     in:
                         .whitespacesAndNewlines
                 )
-                .count < 2 {
-                Section {
-                    ContentUnavailableView {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Search Apple Maps",
-                                norwegian:
-                                    "Søk i Apple Maps"
-                            ),
-                            systemImage:
-                                "map.fill"
-                        )
-                    } description: {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Search for a street address, gym, park or other meeting point.",
-                                norwegian:
-                                    "Søk etter gateadresse, treningssenter, park eller et annet møtepunkt."
-                            )
-                        )
-                    }
-                }
-                .listRowBackground(
-                    Color.clear
+                .count >= 2 {
+                searchResultsSection
+            } else {
+                pickerHint
+            }
+        }
+        .background(
+            ATHLTHPremiumCanvas(
+                accent:
+                    ATHLTHTheme
+                        .vitality
+                        .opacity(0.14)
+            )
+        )
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english:
+                    "Meeting point",
+                norwegian:
+                    "Møtepunkt"
+            )
+        )
+        .navigationBarTitleDisplayMode(
+            .inline
+        )
+        .searchable(
+            text: $query,
+            placement:
+                .navigationBarDrawer(
+                    displayMode:
+                        .always
+                ),
+            prompt:
+                ATHLTHLocalization.choose(
+                    english:
+                        "Address or place",
+                    norwegian:
+                        "Adresse eller sted"
                 )
-            } else if isSearching &&
-                        results.isEmpty {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .padding(
-                        .vertical,
-                        24
+        )
+        .task(id: query) {
+            await searchMaps()
+        }
+        .safeAreaInset(edge: .bottom) {
+            confirmBar
+        }
+    }
+
+    private var mapSection:
+        some View {
+        MapReader { proxy in
+            Map(
+                position:
+                    $cameraPosition,
+                interactionModes: [
+                    .pan,
+                    .zoom,
+                    .rotate,
+                    .pitch
+                ]
+            ) {
+                if let selectedPlace {
+                    Marker(
+                        selectedPlace.name,
+                        coordinate:
+                            CLLocationCoordinate2D(
+                                latitude:
+                                    selectedPlace
+                                        .latitude,
+                                longitude:
+                                    selectedPlace
+                                        .longitude
+                            )
+                    )
+                    .tint(
+                        ATHLTHTheme
+                            .accentDeep
                     )
                 }
-                .listRowBackground(
-                    Color.clear
+            }
+            .mapStyle(
+                .standard(
+                    elevation: .realistic
                 )
-            } else if let searchError,
-                      results.isEmpty {
-                Section {
-                    ContentUnavailableView(
+            )
+            .frame(minHeight: 300)
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            "hand.tap.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .accentDeep
+                    )
+
+                    Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Could not search Maps",
+                                "Tap anywhere on the map, or search above",
                             norwegian:
-                                "Kunne ikke søke i Maps"
-                        ),
-                        systemImage:
-                            "exclamationmark.triangle",
-                        description:
-                            Text(searchError)
+                                "Trykk hvor som helst i kartet, eller søk over"
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
                     )
                 }
-                .listRowBackground(
-                    Color.clear
+                .padding(.horizontal, 11)
+                .frame(height: 36)
+                .background(
+                    .ultraThinMaterial,
+                    in: Capsule()
                 )
-            } else {
-                Section(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Places",
-                        norwegian:
-                            "Steder"
-                    )
-                ) {
+                .padding(12)
+            }
+            .overlay {
+                if isResolvingMapTap {
+                    ProgressView()
+                        .padding(14)
+                        .background(
+                            .ultraThinMaterial,
+                            in: Circle()
+                        )
+                }
+            }
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        guard let coordinate =
+                            proxy.convert(
+                                value.location,
+                                from: .local
+                            )
+                        else {
+                            return
+                        }
+
+                        Task {
+                            await chooseCoordinate(
+                                coordinate
+                            )
+                        }
+                    }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultsSection:
+        some View {
+        if isSearching &&
+            results.isEmpty {
+            HStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+            .frame(height: 100)
+        } else if let searchError,
+                  results.isEmpty {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could not search Maps",
+                    norwegian:
+                        "Kunne ikke søke i Maps"
+                ),
+                systemImage:
+                    "exclamationmark.triangle",
+                description:
+                    Text(searchError)
+            )
+            .frame(maxHeight: 180)
+        } else if results.isEmpty {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english:
+                        "No places found",
+                    norwegian:
+                        "Ingen steder funnet"
+                ),
+                systemImage:
+                    "magnifyingglass"
+            )
+            .frame(maxHeight: 160)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 8) {
                     ForEach(results) {
                         place in
                         Button {
-                            onSelect(place)
-                            dismiss()
+                            chooseSearchResult(
+                                place
+                            )
                         } label: {
                             HStack(
                                 spacing: 12
                             ) {
                                 Image(
                                     systemName:
-                                        "mappin.and.ellipse"
+                                        selectedPlace?.id ==
+                                        place.id
+                                            ? "mappin.circle.fill"
+                                            : "mappin.and.ellipse"
                                 )
                                 .font(
                                     .system(
@@ -4405,6 +4519,7 @@ private struct TrainTogetherMapPlacePickerView:
                                         ATHLTHTheme
                                             .primaryText
                                     )
+                                    .lineLimit(1)
 
                                     Text(
                                         place.address
@@ -4418,58 +4533,275 @@ private struct TrainTogetherMapPlacePickerView:
                                 }
 
                                 Spacer()
+
+                                Image(
+                                    systemName:
+                                        "chevron.right"
+                                )
+                                .font(.caption2.bold())
+                                .foregroundStyle(
+                                    .tertiary
+                                )
                             }
-                            .padding(
-                                .vertical,
-                                3
+                            .padding(12)
+                            .background(
+                                Color.white.opacity(
+                                    0.72
+                                ),
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            16,
+                                        style:
+                                            .continuous
+                                    )
                             )
                         }
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             }
+            .frame(maxHeight: 250)
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(
-            .hidden
-        )
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.14)
+    }
+
+    private var pickerHint:
+        some View {
+        VStack(spacing: 7) {
+            Image(
+                systemName:
+                    "magnifyingglass.circle.fill"
             )
-        )
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english:
-                    "Meeting point",
-                norwegian:
-                    "Møtepunkt"
+            .font(.system(size: 24))
+            .foregroundStyle(
+                ATHLTHTheme.accentDeep
             )
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
-        .searchable(
-            text: $query,
-            placement:
-                .navigationBarDrawer(
-                    displayMode:
-                        .always
-                ),
-            prompt:
+
+            Text(
                 ATHLTHLocalization.choose(
                     english:
-                        "Address or place",
+                        "Search for an address, gym or place",
                     norwegian:
-                        "Adresse eller sted"
+                        "Søk etter adresse, treningssenter eller sted"
                 )
-        )
-        .task(id: query) {
-            await searchMaps()
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(
+                ATHLTHTheme.primaryText
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "You can also zoom in and tap the exact point where you want to meet.",
+                    norwegian:
+                        "Du kan også zoome inn og trykke på det nøyaktige punktet der dere skal møtes."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+            .multilineTextAlignment(.center)
         }
+        .padding(.horizontal, 22)
+        .frame(maxWidth: .infinity)
+        .frame(height: 118)
+    }
+
+    private var confirmBar:
+        some View {
+        VStack(spacing: 8) {
+            if let selectedPlace {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName:
+                            "mappin.circle.fill"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 1
+                    ) {
+                        Text(
+                            selectedPlace.name
+                        )
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(
+                            ATHLTHTheme.primaryText
+                        )
+                        .lineLimit(1)
+
+                        Text(
+                            selectedPlace.address
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(1)
+                    }
+
+                    Spacer()
+                }
+            }
+
+            Button {
+                guard let selectedPlace
+                else {
+                    return
+                }
+
+                onSelect(selectedPlace)
+                dismiss()
+            } label: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Use this meeting point",
+                        norwegian:
+                            "Bruk dette møtepunktet"
+                    )
+                )
+                .font(
+                    .subheadline
+                        .weight(.bold)
+                )
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(
+                    ATHLTHTheme
+                        .accentDeep,
+                    in:
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style:
+                                .continuous
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedPlace == nil)
+            .opacity(
+                selectedPlace == nil
+                    ? 0.40
+                    : 1
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 9)
+        .padding(.bottom, 6)
+        .background(
+            .ultraThinMaterial
+        )
+    }
+
+    private func chooseSearchResult(
+        _ place:
+            TrainTogetherMapPlace
+    ) {
+        selectedPlace = place
+        cameraPosition =
+            .region(
+                MKCoordinateRegion(
+                    center:
+                        CLLocationCoordinate2D(
+                            latitude:
+                                place.latitude,
+                            longitude:
+                                place.longitude
+                        ),
+                    span:
+                        MKCoordinateSpan(
+                            latitudeDelta:
+                                0.008,
+                            longitudeDelta:
+                                0.008
+                        )
+                )
+            )
+    }
+
+    @MainActor
+    private func chooseCoordinate(
+        _ coordinate:
+            CLLocationCoordinate2D
+    ) async {
+        isResolvingMapTap = true
+        searchError = nil
+
+        let location =
+            CLLocation(
+                latitude:
+                    coordinate.latitude,
+                longitude:
+                    coordinate.longitude
+            )
+
+        do {
+            let placemarks =
+                try await CLGeocoder()
+                    .reverseGeocodeLocation(
+                        location
+                    )
+            let placemark =
+                placemarks.first
+            let place =
+                mapPlace(
+                    coordinate:
+                        coordinate,
+                    placemark:
+                        placemark
+                )
+
+            selectedPlace = place
+            cameraPosition =
+                .region(
+                    MKCoordinateRegion(
+                        center: coordinate,
+                        span:
+                            MKCoordinateSpan(
+                                latitudeDelta:
+                                    0.006,
+                                longitudeDelta:
+                                    0.006
+                            )
+                    )
+                )
+        } catch {
+            selectedPlace =
+                TrainTogetherMapPlace(
+                    id:
+                        "\(coordinate.latitude)|\(coordinate.longitude)",
+                    name:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Selected meeting point",
+                            norwegian:
+                                "Valgt møtepunkt"
+                        ),
+                    address:
+                        String(
+                            format:
+                                "%.5f, %.5f",
+                            coordinate.latitude,
+                            coordinate.longitude
+                        ),
+                    broadArea: "",
+                    latitude:
+                        coordinate.latitude,
+                    longitude:
+                        coordinate.longitude
+                )
+        }
+
+        isResolvingMapTap = false
     }
 
     @MainActor
@@ -4552,11 +4884,30 @@ private struct TrainTogetherMapPlacePickerView:
     ) -> TrainTogetherMapPlace {
         let placemark =
             item.placemark
+
+        return mapPlace(
+            coordinate:
+                placemark.coordinate,
+            placemark:
+                placemark,
+            fallbackName:
+                item.name
+        )
+    }
+
+    private func mapPlace(
+        coordinate:
+            CLLocationCoordinate2D,
+        placemark:
+            CLPlacemark?,
+        fallbackName:
+            String? = nil
+    ) -> TrainTogetherMapPlace {
         let street =
             [
-                placemark
+                placemark?
                     .subThoroughfare,
-                placemark
+                placemark?
                     .thoroughfare
             ]
             .compactMap { $0 }
@@ -4566,8 +4917,8 @@ private struct TrainTogetherMapPlacePickerView:
             .joined(separator: " ")
         let city =
             [
-                placemark.postalCode,
-                placemark.locality
+                placemark?.postalCode,
+                placemark?.locality
             ]
             .compactMap { $0 }
             .filter {
@@ -4578,49 +4929,57 @@ private struct TrainTogetherMapPlacePickerView:
             [
                 street,
                 city,
-                placemark
+                placemark?
                     .administrativeArea,
-                placemark.country
+                placemark?.country
             ]
             .compactMap { $0 }
             .filter {
                 !$0.isEmpty
             }
             .joined(separator: ", ")
+        let fallbackAddress =
+            String(
+                format:
+                    "%.5f, %.5f",
+                coordinate.latitude,
+                coordinate.longitude
+            )
         let resolvedAddress =
             address.isEmpty
-                ? (
-                    placemark.title ??
-                    item.name ??
-                    ""
-                )
+                ? fallbackAddress
                 : address
         let name =
-            item.name ??
-            placemark.name ??
-            resolvedAddress
+            fallbackName ??
+            placemark?.name ??
+            (
+                street.isEmpty
+                    ? ATHLTHLocalization.choose(
+                        english:
+                            "Selected meeting point",
+                        norwegian:
+                            "Valgt møtepunkt"
+                    )
+                    : street
+            )
         let broadArea =
-            placemark.locality ??
-            placemark.subAdministrativeArea ??
-            placemark.administrativeArea ??
+            placemark?.locality ??
+            placemark?.subAdministrativeArea ??
+            placemark?.administrativeArea ??
             ""
 
         return TrainTogetherMapPlace(
             id:
-                "\(placemark.coordinate.latitude)|\(placemark.coordinate.longitude)|\(name)",
+                "\(coordinate.latitude)|\(coordinate.longitude)|\(name)",
             name: name,
             address:
                 resolvedAddress,
             broadArea:
                 broadArea,
             latitude:
-                placemark
-                    .coordinate
-                    .latitude,
+                coordinate.latitude,
             longitude:
-                placemark
-                    .coordinate
-                    .longitude
+                coordinate.longitude
         )
     }
 }
