@@ -1050,6 +1050,34 @@ struct PlannedWorkoutDetailView: View {
                     norwegian: "Oppvarming"
                 )
             )
+        } else if let setType =
+                    target.setType,
+                  setType != .work {
+            parts.append(
+                setType.title
+            )
+        }
+
+        if let tempo =
+                target.tempo?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+           !tempo.isEmpty {
+            parts.append(
+                "Tempo \(tempo)"
+            )
+        }
+
+        if let note =
+                target.notes?
+                    .trimmingCharacters(
+                        in:
+                            .whitespacesAndNewlines
+                    ),
+           !note.isEmpty {
+            parts.append(note)
         }
 
         return parts.joined(separator: " · ")
