@@ -141,6 +141,9 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
     let longitude: Double?
     let maxParticipants: Int?
     let paceLabel: String?
+    let competitionEnabled: Bool?
+    let competitionMetric:
+        CommunityEventCompetitionMetric?
     let routeID: UUID?
     let routeTitle: String?
     let routeCoordinates: [RouteCoordinate]?
@@ -169,6 +172,10 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
         case longitude
         case maxParticipants = "max_participants"
         case paceLabel = "pace_label"
+        case competitionEnabled =
+            "competition_enabled"
+        case competitionMetric =
+            "competition_metric"
         case routeID = "route_id"
         case routeTitle = "route_title"
         case routeCoordinates = "route_coordinates"
@@ -190,6 +197,148 @@ struct CommunityEventRecord: Identifiable, Codable, Hashable {
 enum CommunityEventAttendance: String, Codable, Hashable {
     case going
     case maybe
+}
+
+enum CommunityEventCompetitionMetric:
+    String,
+    Codable,
+    Hashable,
+    CaseIterable,
+    Identifiable
+{
+    case fastestTime = "fastest_time"
+    case highestWeight = "highest_weight"
+    case mostReps = "most_reps"
+    case points
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fastestTime:
+            return ATHLTHLocalization.choose(
+                english: "Fastest time",
+                norwegian: "Raskest tid"
+            )
+        case .highestWeight:
+            return ATHLTHLocalization.choose(
+                english: "Heaviest lift",
+                norwegian: "Tyngste løft"
+            )
+        case .mostReps:
+            return ATHLTHLocalization.choose(
+                english: "Most reps",
+                norwegian: "Flest repetisjoner"
+            )
+        case .points:
+            return ATHLTHLocalization.choose(
+                english: "Points",
+                norwegian: "Poeng"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .fastestTime:
+            return "stopwatch.fill"
+        case .highestWeight:
+            return "dumbbell.fill"
+        case .mostReps:
+            return "repeat"
+        case .points:
+            return "star.fill"
+        }
+    }
+
+    var prefersLowerResult: Bool {
+        self == .fastestTime
+    }
+
+    static func defaultMetric(
+        for activity:
+            CommunityEventActivity
+    ) -> CommunityEventCompetitionMetric {
+        switch activity {
+        case .running,
+             .walking,
+             .cycling,
+             .hike:
+            return .fastestTime
+        case .strength:
+            return .highestWeight
+        case .groupWorkout,
+             .other:
+            return .points
+        }
+    }
+
+    static func options(
+        for activity:
+            CommunityEventActivity
+    ) -> [CommunityEventCompetitionMetric] {
+        switch activity {
+        case .running,
+             .walking,
+             .cycling,
+             .hike:
+            return [.fastestTime]
+        case .strength:
+            return [.highestWeight, .mostReps]
+        case .groupWorkout,
+             .other:
+            return [.points]
+        }
+    }
+
+    func formattedResult(
+        _ value: Double
+    ) -> String {
+        switch self {
+        case .fastestTime:
+            let totalSeconds =
+                max(Int(value.rounded()), 0)
+            let hours = totalSeconds / 3_600
+            let minutes =
+                (totalSeconds % 3_600) / 60
+            let seconds =
+                totalSeconds % 60
+
+            if hours > 0 {
+                return String(
+                    format:
+                        "%d:%02d:%02d",
+                    hours,
+                    minutes,
+                    seconds
+                )
+            }
+
+            return String(
+                format:
+                    "%d:%02d",
+                minutes,
+                seconds
+            )
+        case .highestWeight:
+            return String(
+                format: "%.1f kg",
+                value
+            )
+        case .mostReps:
+            return ATHLTHLocalization.format(
+                english: "%.0f reps",
+                norwegian: "%.0f reps",
+                value
+            )
+        case .points:
+            return ATHLTHLocalization.format(
+                english: "%.0f pts",
+                norwegian: "%.0f poeng",
+                value
+            )
+        }
+    }
 }
 
 enum CommunityEventLifecycleStatus:
@@ -258,6 +407,8 @@ struct CommunityEventParticipantRecord: Codable, Hashable {
     let checkedInAt: Date?
     let checkInMethod:
         CommunityEventCheckInMethod?
+    let competitionResultValue: Double?
+    let competitionResultSubmittedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case eventID = "event_id"
@@ -266,6 +417,10 @@ struct CommunityEventParticipantRecord: Codable, Hashable {
         case attendanceStatus = "attendance_status"
         case checkedInAt = "checked_in_at"
         case checkInMethod = "check_in_method"
+        case competitionResultValue =
+            "competition_result_value"
+        case competitionResultSubmittedAt =
+            "competition_result_submitted_at"
     }
 }
 
@@ -305,6 +460,10 @@ struct CommunityEventDraft:
     var longitude: Double? = nil
     var maxParticipants: Int? = nil
     var paceLabel = ""
+    var competitionEnabled = false
+    var competitionMetric:
+        CommunityEventCompetitionMetric =
+            .fastestTime
     var routeID: UUID? = nil
     var routeTitle: String? = nil
     var routeCoordinates: [RouteCoordinate]? = nil
