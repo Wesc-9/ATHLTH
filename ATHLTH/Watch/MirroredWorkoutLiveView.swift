@@ -6,6 +6,8 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showingTreadmillInclineEditor = false
+    @State private var treadmillInclineDraft = 0.0
 
     var body: some View {
         NavigationStack {
@@ -261,6 +263,22 @@ struct MirroredWorkoutLiveView: View {
                         compact: true
                     )
                 }
+            }
+        }
+        .sheet(
+            isPresented:
+                $showingTreadmillInclineEditor
+        ) {
+            TreadmillInclineEditorView(
+                initialValue:
+                    treadmillInclineDraft
+            ) { value in
+                _ = mirroring
+                    .sendTreadmillInclinePercent(
+                        value
+                    )
+                treadmillInclineDraft =
+                    value
             }
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
@@ -816,20 +834,36 @@ struct MirroredWorkoutLiveView: View {
                 if let incline =
                         snapshot
                             .treadmillInclinePercent {
-                    runningMetric(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "INCLINE",
-                                norwegian:
-                                    "STIGNING"
-                            ),
-                        value:
-                            String(
-                                format: "%.1f",
-                                incline
-                            ),
-                        unit: "%"
+                    Button {
+                        treadmillInclineDraft =
+                            incline
+                        showingTreadmillInclineEditor =
+                            true
+                    } label: {
+                        runningMetric(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "INCLINE",
+                                    norwegian:
+                                        "STIGNING"
+                                ),
+                            value:
+                                String(
+                                    format: "%.1f",
+                                    incline
+                                ),
+                            unit: "%"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Adjust treadmill incline",
+                            norwegian:
+                                "Juster stigning på tredemøllen"
+                        )
                     )
                 }
             }
