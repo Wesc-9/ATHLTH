@@ -13733,6 +13733,7 @@ struct CommunityGroupSettingsView: View {
     @State private var selectedHeaderArtwork:
         ATHLTHStandardArtwork?
     @State private var selectedFeaturedChallengeID: UUID?
+    @State private var selectedThemeKey: String
     @State private var saving = false
     @State private var deleting = false
     @State private var showingDeleteConfirmation = false
@@ -13759,42 +13760,37 @@ struct CommunityGroupSettingsView: View {
         _selectedFeaturedChallengeID = State(
             initialValue: group.featuredChallengeID
         )
+        _selectedThemeKey = State(
+            initialValue:
+                group.clubTheme.rawValue
+        )
     }
 
     private var currentGroup: CommunityGroupRecord {
         groups.group(for: group.id) ?? group
     }
 
+    private var selectedClubTheme:
+        CommunityClubTheme {
+        CommunityClubTheme(
+            rawValue: selectedThemeKey
+        ) ?? .emerald
+    }
+
     private var clubForest: Color {
-        Color(
-            red: 0.025,
-            green: 0.30,
-            blue: 0.21
-        )
+        selectedClubTheme.forest
     }
 
     private var clubEmerald: Color {
-        Color(
-            red: 0.055,
-            green: 0.49,
-            blue: 0.32
-        )
+        selectedClubTheme.emerald
     }
 
     private var clubMint: Color {
-        Color(
-            red: 0.90,
-            green: 0.96,
-            blue: 0.92
-        )
+        selectedClubTheme.mint
     }
 
     private var clubSage: Color {
-        Color(
-            red: 0.77,
-            green: 0.88,
-            blue: 0.81
-        )
+        selectedClubTheme.sage
     }
 
     var body: some View {
@@ -13814,6 +13810,7 @@ struct CommunityGroupSettingsView: View {
                         spacing: 14
                     ) {
                         compactMediaCard
+                        clubThemeCard
                         clubIdentityCard
                         clubSetupCard
                         permissionsCard
@@ -14442,6 +14439,158 @@ struct CommunityGroupSettingsView: View {
             radius: 12,
             y: 5
         )
+    }
+
+    private var clubThemeCard:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 11
+        ) {
+            sectionTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Club colors",
+                    norwegian:
+                        "Club-farger"
+                ),
+                systemImage:
+                    "paintpalette.fill"
+            )
+
+            Text(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Choose the color identity used across the Club.",
+                    norwegian:
+                        "Velg fargeprofilen som brukes gjennom hele Club-en."
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(
+                ATHLTHTheme.mutedText
+            )
+
+            ScrollView(
+                .horizontal,
+                showsIndicators: false
+            ) {
+                HStack(spacing: 10) {
+                    ForEach(
+                        CommunityClubTheme
+                            .allCases
+                    ) { theme in
+                        Button {
+                            withAnimation(
+                                .easeOut(
+                                    duration: 0.14
+                                )
+                            ) {
+                                selectedThemeKey =
+                                    theme.rawValue
+                            }
+                        } label: {
+                            VStack(spacing: 7) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            theme.gradient
+                                        )
+                                        .frame(
+                                            width: 46,
+                                            height: 46
+                                        )
+
+                                    if selectedThemeKey ==
+                                        theme.rawValue {
+                                        Image(
+                                            systemName:
+                                                "checkmark"
+                                        )
+                                        .font(
+                                            .caption
+                                                .bold()
+                                        )
+                                        .foregroundStyle(
+                                            .white
+                                        )
+                                        .frame(
+                                            width: 23,
+                                            height: 23
+                                        )
+                                        .background(
+                                            Color.black
+                                                .opacity(
+                                                    0.26
+                                                ),
+                                            in: Circle()
+                                        )
+                                    }
+                                }
+
+                                Text(theme.title)
+                                    .font(
+                                        .caption2
+                                            .weight(
+                                                selectedThemeKey ==
+                                                    theme.rawValue
+                                                    ? .bold
+                                                    : .medium
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 68)
+                            .padding(
+                                .vertical,
+                                7
+                            )
+                            .background(
+                                selectedThemeKey ==
+                                    theme.rawValue
+                                    ? theme.mint
+                                        .opacity(
+                                            0.82
+                                        )
+                                    : Color.clear,
+                                in:
+                                    RoundedRectangle(
+                                        cornerRadius:
+                                            15,
+                                        style:
+                                            .continuous
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(14)
+        .background(
+            Color.white.opacity(0.95),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 22,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+            .stroke(
+                clubSage.opacity(0.42),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private var clubIdentityCard:
@@ -15237,7 +15386,9 @@ struct CommunityGroupSettingsView: View {
             visibility: visibility,
             joinMode: joinMode,
             membersCanCreateContent:
-                membersCanCreateContent
+                membersCanCreateContent,
+            themeKey:
+                selectedThemeKey
         )
 
         if saved,
