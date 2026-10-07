@@ -11280,15 +11280,38 @@ struct ATHLTHProfileView: View {
                         .headerImageURL != nil,
                 selectedPhoto:
                     $selectedHeaderPhoto,
+                dimStrength:
+                    Binding(
+                        get: {
+                            session.profile
+                                .headerDimStrength
+                        },
+                        set: { value in
+                            session.profile
+                                .headerDimStrength =
+                                min(
+                                    max(value, 0),
+                                    0.45
+                                )
+                        }
+                    ),
                 isUpdating:
-                    updatingProfileHeader
-            ) { artwork in
-                Task {
-                    await setProfileHeaderArtwork(
-                        artwork
-                    )
+                    updatingProfileHeader,
+                onSelectArtwork: { artwork in
+                    Task {
+                        await setProfileHeaderArtwork(
+                            artwork
+                        )
+                    }
+                },
+                onDimStrengthCommit: { value in
+                    Task {
+                        await setProfileHeaderDimStrength(
+                            value
+                        )
+                    }
                 }
-            }
+            )
         }
         .onChange(
             of: selectedHeaderPhoto
@@ -11400,6 +11423,19 @@ struct ATHLTHProfileView: View {
                     )
                     .clipped()
                     .accessibilityHidden(true)
+
+                Color.black
+                    .opacity(
+                        min(
+                            max(
+                                session.profile
+                                    .headerDimStrength,
+                                0
+                            ),
+                            0.45
+                        )
+                    )
+                    .allowsHitTesting(false)
 
                 LinearGradient(
                     stops: [
@@ -13459,6 +13495,39 @@ struct ATHLTHProfileView: View {
     }
 
     @MainActor
+    private func setProfileHeaderDimStrength(
+        _ value: Double
+    ) async {
+        guard !updatingProfileHeader
+        else {
+            return
+        }
+
+        updatingProfileHeader = true
+        profilePhotoError = nil
+
+        defer {
+            updatingProfileHeader = false
+        }
+
+        do {
+            let bootstrap =
+                try await accountService
+                    .updateProfileHeaderDimStrength(
+                        value
+                    )
+
+            session.applyBackendBootstrap(
+                bootstrap
+            )
+            await social.refresh()
+        } catch {
+            profilePhotoError =
+                error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func setProfileHeaderArtwork(
         _ artwork: String
     ) async {
@@ -13855,9 +13924,12 @@ private struct ATHLTHProfileHeaderPickerView:
     let hasCustomImage: Bool
     @Binding var selectedPhoto:
         PhotosPickerItem?
+    @Binding var dimStrength: Double
     let isUpdating: Bool
     let onSelectArtwork:
         (String) -> Void
+    let onDimStrengthCommit:
+        (Double) -> Void
 
     private let artworkOptions = [
         "ProfileHero",
@@ -13989,6 +14061,108 @@ private struct ATHLTHProfileHeaderPickerView:
                     }
                     .buttonStyle(.plain)
                     .disabled(isUpdating)
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 9
+                    ) {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Dim header",
+                                        norwegian:
+                                            "Demp header"
+                                    ),
+                                systemImage:
+                                    "circle.lefthalf.filled"
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .primaryText
+                            )
+
+                            Spacer()
+
+                            Text(
+                                "\(Int((dimStrength * 100).rounded()))%"
+                            )
+                            .font(
+                                .caption
+                                    .weight(
+                                        .semibold
+                                    )
+                                    .monospacedDigit()
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .mutedText
+                            )
+                        }
+
+                        Slider(
+                            value:
+                                Binding(
+                                    get: {
+                                        dimStrength
+                                    },
+                                    set: { value in
+                                        dimStrength =
+                                            min(
+                                                max(
+                                                    value,
+                                                    0
+                                                ),
+                                                0.45
+                                            )
+                                    }
+                                ),
+                            in: 0...0.45,
+                            step: 0.05,
+                            onEditingChanged: {
+                                editing in
+
+                                if !editing {
+                                    onDimStrengthCommit(
+                                        dimStrength
+                                    )
+                                }
+                            }
+                        )
+                        .tint(
+                            ATHLTHTheme
+                                .accentDeep
+                        )
+                        .disabled(isUpdating)
+                        .accessibilityLabel(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Dim profile header",
+                                    norwegian:
+                                        "Demp profilheader"
+                                )
+                        )
+                    }
+                    .padding(14)
+                    .background(
+                        Color.white.opacity(
+                            0.90
+                        ),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 20,
+                                style:
+                                    .continuous
+                            )
+                    )
 
                     VStack(
                         alignment: .leading,
