@@ -33,6 +33,7 @@ enum AppleWatchConnectionState: Equatable {
 enum AppleWatchWorkoutLaunchError: LocalizedError {
     case watchUnavailable
     case launchAlreadyInProgress
+    case workoutAlreadyActive
     case watchLockedOrPasscodeRequired
 
     var errorDescription: String? {
@@ -53,6 +54,14 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
                     "ATHLTH starter allerede en økt på Apple Watch."
             )
 
+        case .workoutAlreadyActive:
+            return ATHLTHLocalization.choose(
+                english:
+                    "Another ATHLTH workout is already active. Finish it before starting a new workout.",
+                norwegian:
+                    "En annen ATHLTH-økt er allerede aktiv. Avslutt den før du starter en ny økt."
+            )
+
         case .watchLockedOrPasscodeRequired:
             return ATHLTHLocalization.choose(
                 english:
@@ -64,15 +73,47 @@ enum AppleWatchWorkoutLaunchError: LocalizedError {
     }
 }
 
+private final class IPhoneWorkoutActivityLock:
+    @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = false
+    private var title: String?
+
+    func update(
+        active: Bool,
+        title: String?
+    ) {
+        lock.lock()
+        self.active = active
+        self.title = title
+        lock.unlock()
+    }
+
+    func snapshot() -> (
+        active: Bool,
+        title: String?
+    ) {
+        lock.lock()
+        let result = (
+            active: active,
+            title: title
+        )
+        lock.unlock()
+        return result
+    }
+}
+
 private struct IncomingWatchPayload: Sendable {
     let kind: String?
     let probeID: String?
     let data: Data?
+    let sentAt: TimeInterval?
 
     init(_ payload: [String: Any]) {
         kind = payload[WatchTransferMetadataKey.kind] as? String
         probeID = payload[WatchTransferMetadataKey.probeID] as? String
         data = payload[WatchTransferMetadataKey.payload] as? Data
+        sentAt = payload[WatchTransferMetadataKey.sentAt] as? TimeInterval
     }
 }
 
@@ -88,6 +129,13 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var lastSpotifyCommand: WatchSpotifyCommand?
     @Published private(set) var workoutLaunchInProgress = false
     @Published private(set) var workoutLaunchError: String?
+    @Published private(set) var watchWorkoutActivityState:
+        WatchWorkoutActivityState?
+
+    private let localWorkoutActivityLock =
+        IPhoneWorkoutActivityLock()
+    private var lastWatchWorkoutActivitySentAt:
+        TimeInterval = 0
 
     // Diagnostics are intentionally separate from isReady. Apple's
     // isReachable only means the counterpart app is currently active;
@@ -217,6 +265,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         state.isReady
     }
 
+    var hasActiveWatchWorkout: Bool {
+        watchWorkoutActivityState?
+            .isActive == true
+    }
+
     var statusText: String {
         switch state {
         case .checking:
@@ -315,6 +368,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .launchAlreadyInProgress
         }
 
+        guard !hasActiveWatchWorkout else {
+            throw AppleWatchWorkoutLaunchError
+                .workoutAlreadyActive
+        }
+
         workoutLaunchInProgress = true
         workoutLaunchError = nil
         defer { workoutLaunchInProgress = false }
@@ -399,6 +457,61 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         return error
+    }
+
+    func updateLocalWorkoutActivity(
+        isActive: Bool,
+        title: String?
+    ) {
+        localWorkoutActivityLock.update(
+            active: isActive,
+            title: title
+        )
+
+        guard
+            let session,
+            session.activationState == .activated
+        else {
+            return
+        }
+
+        let state =
+            WatchWorkoutActivityState(
+                isActive: isActive,
+                title: title,
+                updatedAt: Date()
+            )
+
+        guard let data =
+                try? JSONEncoder()
+                    .encode(state)
+        else {
+            return
+        }
+
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind:
+                WatchTransferKind
+                    .workoutActivityState
+                    .rawValue,
+            WatchTransferMetadataKey.payload:
+                data,
+            WatchTransferMetadataKey.sentAt:
+                state.updatedAt
+                    .timeIntervalSince1970
+        ]
+
+        // Keep a durable copy so a Watch that is temporarily offline learns
+        // about the current iPhone workout before its next local launch.
+        session.transferUserInfo(payload)
+
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: nil
+            )
+        }
     }
 
     func sendWorkoutRouteSelection(
@@ -1144,6 +1257,41 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             pendingWorkoutResults.first
     }
 
+    private func receiveWatchWorkoutActivity(
+        from payload: IncomingWatchPayload
+    ) -> Bool {
+        guard
+            payload.kind ==
+                WatchTransferKind
+                    .workoutActivityState
+                    .rawValue,
+            let data = payload.data,
+            let state =
+                try? JSONDecoder().decode(
+                    WatchWorkoutActivityState.self,
+                    from: data
+                )
+        else {
+            return false
+        }
+
+        let sentAt =
+            payload.sentAt ??
+            state.updatedAt.timeIntervalSince1970
+
+        guard sentAt >=
+                lastWatchWorkoutActivitySentAt
+        else {
+            return true
+        }
+
+        lastWatchWorkoutActivitySentAt =
+            sentAt
+        watchWorkoutActivityState =
+            state
+        return true
+    }
+
     private func receive(_ payload: IncomingWatchPayload) {
         if payload.kind ==
             WatchTransferKind.todayWorkoutRequest.rawValue {
@@ -1156,6 +1304,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
         if payload.kind == WatchTransferKind.connectivityAck.rawValue {
             handleConnectivityAck(payload)
+            return
+        }
+
+        if receiveWatchWorkoutActivity(
+            from: payload
+        ) {
             return
         }
 
@@ -1218,6 +1372,50 @@ extension AppleWatchConnectionStore: WCSessionDelegate {
         Task { @MainActor [weak self] in
             self?.receive(incoming)
         }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didReceiveMessage
+            message: [String: Any],
+        replyHandler:
+            @escaping ([String: Any]) -> Void
+    ) {
+        if message[
+            WatchTransferMetadataKey.kind
+        ] as? String ==
+            WatchTransferKind
+                .workoutStartGuard
+                .rawValue {
+            let local =
+                localWorkoutActivityLock
+                    .snapshot()
+
+            replyHandler([
+                WatchTransferMetadataKey.kind:
+                    WatchTransferKind
+                        .workoutStartGuard
+                        .rawValue,
+                WatchTransferMetadataKey
+                    .workoutAllowed:
+                    !local.active,
+                WatchTransferMetadataKey
+                    .workoutActive:
+                    local.active,
+                WatchTransferMetadataKey.title:
+                    local.title ?? ""
+            ])
+            return
+        }
+
+        let incoming =
+            IncomingWatchPayload(message)
+
+        Task { @MainActor [weak self] in
+            self?.receive(incoming)
+        }
+
+        replyHandler([:])
     }
 
     nonisolated func session(
