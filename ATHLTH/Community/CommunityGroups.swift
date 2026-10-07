@@ -10401,9 +10401,153 @@ struct CommunityGroupDetailView: View {
                 .background(.ultraThinMaterial)
             }
 
-            HStack(alignment: .bottom, spacing: 10) {
+            if let pendingChatImageData,
+               let preview =
+                    UIImage(
+                        data:
+                            pendingChatImageData
+                    ) {
+                HStack(spacing: 11) {
+                    Image(uiImage: preview)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: 72,
+                            height: 72
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style: .continuous
+                            )
+                        )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Photo attached",
+                                    norwegian:
+                                        "Bilde lagt ved"
+                                )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(.semibold)
+                        )
+
+                        Text(
+                            ATHLTHLocalization
+                                .choose(
+                                    english:
+                                        "Add a message or send the photo as it is.",
+                                    norwegian:
+                                        "Skriv en melding eller send bildet som det er."
+                                )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        pendingChatImageData =
+                            nil
+                    } label: {
+                        Image(
+                            systemName:
+                                "xmark"
+                        )
+                        .font(.caption.bold())
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .frame(
+                            width: 32,
+                            height: 32
+                        )
+                        .background(
+                            Color.white
+                                .opacity(0.90),
+                            in: Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        sendingGroupMessage
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    14
+                )
+                .padding(.top, 9)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+                .background(
+                    .ultraThinMaterial
+                )
+            }
+
+            HStack(alignment: .bottom, spacing: 9) {
+                PhotosPicker(
+                    selection:
+                        $selectedChatPhoto,
+                    matching: .images
+                ) {
+                    Image(
+                        systemName:
+                            "photo.on.rectangle"
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        width: 44,
+                        height: 44
+                    )
+                    .background(
+                        clubMint,
+                        in: Circle()
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    sendingGroupMessage
+                )
+                .accessibilityLabel(
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Attach photo",
+                            norwegian:
+                                "Legg ved bilde"
+                        )
+                )
+
                 TextField(
-                    "Message Club",
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "Message Club",
+                            norwegian:
+                                "Melding til Club"
+                        ),
                     text: $messageDraft,
                     axis: .vertical
                 )
@@ -10435,41 +10579,63 @@ struct CommunityGroupDetailView: View {
                     )
                 }
                 .frame(maxWidth: .infinity)
+                .disabled(
+                    sendingGroupMessage
+                )
 
                 Button {
                     Task {
                         await sendGroupMessage()
                     }
                 } label: {
-                    Image(systemName: "arrow.up")
-                        .font(
-                            .system(
-                                size: 16,
-                                weight: .bold
+                    Group {
+                        if sendingGroupMessage {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(
+                                systemName:
+                                    "arrow.up"
                             )
-                        )
-                        .foregroundStyle(.white)
-                        .frame(width: 46, height: 46)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    clubForest,
-                                    clubEmerald
-                                ],
-                                startPoint:
-                                    .topLeading,
-                                endPoint:
-                                    .bottomTrailing
-                            ),
-                            in: Circle()
-                        )
+                            .font(
+                                .system(
+                                    size: 16,
+                                    weight: .bold
+                                )
+                            )
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(
+                        width: 46,
+                        height: 46
+                    )
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                clubForest,
+                                clubEmerald
+                            ],
+                            startPoint:
+                                .topLeading,
+                            endPoint:
+                                .bottomTrailing
+                        ),
+                        in: Circle()
+                    )
                 }
                 .disabled(
-                    messageDraft
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        )
-                        .isEmpty
+                    sendingGroupMessage ||
+                    (
+                        messageDraft
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty &&
+                        pendingChatImageData ==
+                            nil
+                    )
                 )
             }
             .padding(.horizontal, 14)
@@ -10501,16 +10667,26 @@ struct CommunityGroupDetailView: View {
     }
 
     private func sendGroupMessage() async {
+        guard !sendingGroupMessage else {
+            return
+        }
+
         let body = messageDraft
             .trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
+        let imageData =
+            pendingChatImageData
 
-        guard !body.isEmpty else {
+        guard !body.isEmpty ||
+                imageData != nil
+        else {
             return
         }
 
         messageDraft = ""
+        pendingChatImageData = nil
+        sendingGroupMessage = true
 
         let sent = await groups.sendMessage(
             groupID: group.id,
@@ -10518,11 +10694,24 @@ struct CommunityGroupDetailView: View {
                 session.profile.username.isEmpty
                     ? session.profile.displayName
                     : "@\(session.profile.username)",
-            body: body
+            body: body,
+            imageJPEGData: imageData
         )
+
+        sendingGroupMessage = false
 
         if !sent {
             messageDraft = body
+            pendingChatImageData =
+                imageData
+            chatImageError =
+                groups.errorMessage ??
+                ATHLTHLocalization.choose(
+                    english:
+                        "ATHLTH could not send the message.",
+                    norwegian:
+                        "ATHLTH klarte ikke å sende meldingen."
+                )
         }
     }
 
@@ -11455,58 +11644,125 @@ struct CommunityGroupDetailView: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-                Text(message.body)
-                    .font(.subheadline)
-                    .foregroundStyle(
+                VStack(
+                    alignment:
                         mine
-                            ? Color.white
-                            : ATHLTHTheme.primaryText
-                    )
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background {
-                        if mine {
-                            RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        clubForest,
-                                        clubEmerald
-                                    ],
-                                    startPoint:
-                                        .topLeading,
-                                    endPoint:
-                                        .bottomTrailing
-                                )
-                            )
-                        } else {
-                            RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                            .fill(
-                                ATHLTHTheme.card
-                            )
+                            ? .trailing
+                            : .leading,
+                    spacing: 7
+                ) {
+                    if let rawImageURL =
+                            message.imageURL,
+                       let imageURL =
+                            URL(
+                                string:
+                                    rawImageURL
+                            ) {
+                        ATHLTHStorageImage(
+                            url: imageURL
+                        ) { phase in
+                            switch phase {
+                            case .success(
+                                let image
+                            ):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            default:
+                                Rectangle()
+                                    .fill(
+                                        ATHLTHTheme
+                                            .cardWarm
+                                    )
+                                    .overlay {
+                                        ProgressView()
+                                    }
+                            }
                         }
+                        .frame(
+                            width: 220,
+                            height: 160
+                        )
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 12,
+                                style: .continuous
+                            )
+                        )
                     }
-                    .overlay {
+
+                    if !message.body
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty {
+                        Text(message.body)
+                            .font(
+                                .subheadline
+                            )
+                            .foregroundStyle(
+                                mine
+                                    ? Color.white
+                                    : ATHLTHTheme
+                                        .primaryText
+                            )
+                            .fixedSize(
+                                horizontal:
+                                    false,
+                                vertical:
+                                    true
+                            )
+                    }
+                }
+                .padding(
+                    message.imageURL == nil
+                        ? 10
+                        : 6
+                )
+                .background {
+                    if mine {
                         RoundedRectangle(
                             cornerRadius: 15,
                             style: .continuous
                         )
-                        .stroke(
-                            mine
-                                ? clubEmerald
-                                    .opacity(0.22)
-                                : ATHLTHTheme
-                                    .border
-                                    .opacity(0.60),
-                            lineWidth: 0.7
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    clubForest,
+                                    clubEmerald
+                                ],
+                                startPoint:
+                                    .topLeading,
+                                endPoint:
+                                    .bottomTrailing
+                            )
+                        )
+                    } else {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .fill(
+                            ATHLTHTheme.card
                         )
                     }
+                }
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: 15,
+                        style: .continuous
+                    )
+                    .stroke(
+                        mine
+                            ? clubEmerald
+                                .opacity(0.22)
+                            : ATHLTHTheme
+                                .border
+                                .opacity(0.60),
+                        lineWidth: 0.7
+                    )
+                }
 
                 Text(
                     message.createdAt.formatted(
