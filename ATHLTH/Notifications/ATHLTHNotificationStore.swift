@@ -108,7 +108,32 @@ final class ATHLTHNotificationStore: ObservableObject {
     }
 
     func add(_ draft: ATHLTHNotificationDraft, deliverSystemAlert: Bool = true) {
-        guard !items.contains(where: { $0.eventKey == draft.eventKey }) else {
+        if let index = items.firstIndex(
+            where: { $0.eventKey == draft.eventKey }
+        ) {
+            var changed = false
+
+            if items[index].groupID == nil,
+               let groupID = draft.groupID {
+                items[index].groupID = groupID
+                changed = true
+            }
+
+            if items[index].socialEntityType == nil,
+               let value = draft.socialEntityType {
+                items[index].socialEntityType = value
+                changed = true
+            }
+
+            if items[index].socialEntityID == nil,
+               let value = draft.socialEntityID {
+                items[index].socialEntityID = value
+                changed = true
+            }
+
+            if changed {
+                persist()
+            }
             return
         }
 
@@ -124,7 +149,8 @@ final class ATHLTHNotificationStore: ObservableObject {
             backendEventID: draft.backendEventID,
             socialEventKind: draft.socialEventKind,
             socialEntityType: draft.socialEntityType,
-            socialEntityID: draft.socialEntityID
+            socialEntityID: draft.socialEntityID,
+            groupID: draft.groupID
         )
 
         items.insert(item, at: 0)
@@ -648,6 +674,10 @@ final class ATHLTHNotificationStore: ObservableObject {
 
         if let backendEventID = item.backendEventID {
             userInfo["athlthBackendEventID"] = backendEventID.uuidString
+        }
+
+        if let groupID = item.groupID {
+            userInfo["athlthGroupID"] = groupID.uuidString
         }
 
         if let socialEventKind = item.socialEventKind {
