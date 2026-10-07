@@ -923,6 +923,11 @@ struct TrainingPlanBuilderProfile: Codable, Hashable {
     var priorityMuscles: [String] = []
     var equipmentContext: String? = nil
     var weeklyTimeBudgetMinutes: Int? = nil
+
+    // Optional for backwards compatibility with plans created before the
+    // per-day workout-type picker was introduced. Missing values keep using
+    // the focus-based suggested pattern.
+    var preferredWorkoutKindsByDay: [Int: WorkoutKind]? = nil
 }
 
 struct TrainingPlan: Identifiable, Codable, Hashable {
