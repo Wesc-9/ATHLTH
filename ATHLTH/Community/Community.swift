@@ -1762,6 +1762,54 @@ struct CommunityEventDetailView: View {
 
     let eventID: UUID
 
+    private enum DetailTab: String, CaseIterable, Identifiable {
+        case overview
+        case route
+        case chat
+        case participants
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .overview:
+                return ATHLTHLocalization.choose(
+                    english: "Overview",
+                    norwegian: "Oversikt"
+                )
+            case .route:
+                return ATHLTHLocalization.choose(
+                    english: "Route",
+                    norwegian: "Rute"
+                )
+            case .chat:
+                return ATHLTHLocalization.choose(
+                    english: "Chat",
+                    norwegian: "Chat"
+                )
+            case .participants:
+                return ATHLTHLocalization.choose(
+                    english: "People",
+                    norwegian: "Deltakere"
+                )
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .overview:
+                return "rectangle.grid.1x2"
+            case .route:
+                return "map.fill"
+            case .chat:
+                return "bubble.left.and.bubble.right.fill"
+            case .participants:
+                return "person.2.fill"
+            }
+        }
+    }
+
+    @State private var selectedTab: DetailTab = .overview
     @State private var showingEditEvent = false
     @State private var showingCancelConfirmation =
         false
@@ -1776,30 +1824,24 @@ struct CommunityEventDetailView: View {
     var body: some View {
         ScrollView {
             if let item = community.item(id: eventID) {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(
+                    alignment: .leading,
+                    spacing: 16,
+                    pinnedViews: [.sectionHeaders]
+                ) {
                     eventHero(item)
-                    CommunityEventSocialSection(
-                        item: item
-                    )
-                    eventDetails(item)
-                    checkInCard(item)
-                    participants(item)
 
-                    if item.event.creatorID ==
-                        session.profile.userID {
-                        adminLifecycleCard(item)
-                    }
-
-                    if item.event.creatorID ==
-                        session.profile.userID &&
-                        item.event.status !=
-                        "cancelled" &&
-                        item.event.status !=
-                        "completed" {
-                        cancelEventButton(item)
+                    Section {
+                        detailTabContent(item)
+                            .padding(.top, 2)
+                    } header: {
+                        eventTabBar(item)
+                            .padding(.vertical, 4)
                     }
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 30)
             } else {
                 ContentUnavailableView(
                     "Event unavailable",
@@ -1884,6 +1926,635 @@ struct CommunityEventDetailView: View {
         }
         .task(id: eventID) {
             await attemptAutomaticCheckIn()
+        }
+    }
+
+    private func availableTabs(
+        for item: CommunityEventItem
+    ) -> [DetailTab] {
+        var tabs: [DetailTab] = [
+            .overview,
+            .chat,
+            .participants
+        ]
+
+        if eventRoute(item) != nil ||
+            item.event.routeTitle?.nilIfBlank != nil {
+            tabs.insert(
+                .route,
+                at: 1
+            )
+        }
+
+        return tabs
+    }
+
+    private func eventTabBar(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let tabs = availableTabs(
+            for: item
+        )
+
+        return HStack(spacing: 4) {
+            ForEach(tabs) { tab in
+                Button {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(
+                            systemName:
+                                tab.systemImage
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+
+                        Text(tab.title)
+                            .font(
+                                .caption2
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(
+                                0.78
+                            )
+                    }
+                    .foregroundStyle(
+                        selectedTab == tab
+                            ? ATHLTHTheme
+                                .vitality
+                            : ATHLTHTheme
+                                .mutedText
+                    )
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 46
+                    )
+                    .background(
+                        selectedTab == tab
+                            ? ATHLTHTheme
+                                .vitalitySoft
+                            : Color.clear,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 14,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .contentShape(
+                        Rectangle()
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    tab.title
+                )
+            }
+        }
+        .padding(5)
+        .background(
+            Color.white.opacity(0.97),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 19,
+                    style: .continuous
+                )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
+            .stroke(
+                Color.black.opacity(0.055),
+                lineWidth: 0.7
+            )
+        }
+        .shadow(
+            color:
+                Color.black.opacity(0.055),
+            radius: 9,
+            y: 4
+        )
+    }
+
+    @ViewBuilder
+    private func detailTabContent(
+        _ item: CommunityEventItem
+    ) -> some View {
+        switch selectedTab {
+        case .overview:
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                routeSpotlight(item)
+                eventDetails(
+                    item,
+                    includeRoute: false
+                )
+                participantsPreview(item)
+                checkInCard(item)
+
+                if item.event.creatorID ==
+                    session.profile.userID {
+                    adminLifecycleCard(item)
+                }
+
+                if item.event.creatorID ==
+                    session.profile.userID &&
+                    item.event.status !=
+                    "cancelled" &&
+                    item.event.status !=
+                    "completed" {
+                    cancelEventButton(item)
+                }
+            }
+
+        case .route:
+            routeTabContent(item)
+
+        case .chat:
+            CommunityEventSocialSection(
+                item: item
+            )
+
+        case .participants:
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                checkInCard(item)
+                participants(item)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func routeSpotlight(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if let route = eventRoute(item) {
+            ATHLTHCard {
+                HStack(
+                    alignment: .firstTextBaseline
+                ) {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "The route",
+                                norwegian: "Ruten"
+                            )
+                        )
+                        .font(.headline)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Route overview for this event",
+                                norwegian:
+                                    "Løypen for arrangementet"
+                            )
+                        )
+                        .font(.caption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(
+                            .easeInOut(
+                                duration: 0.18
+                            )
+                        ) {
+                            selectedTab = .route
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "View route",
+                                    norwegian:
+                                        "Se rute"
+                                )
+                            )
+
+                            Image(
+                                systemName:
+                                    "chevron.right"
+                            )
+                        }
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                eventRouteOverview(
+                    route,
+                    mapHeight: 218
+                )
+                .padding(.top, 8)
+            }
+        } else if let routeTitle =
+                    item.event
+                        .routeTitle?
+                        .nilIfBlank {
+            ATHLTHCard {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "The route",
+                        norwegian: "Ruten"
+                    )
+                )
+                .font(.headline)
+
+                eventDetailRow(
+                    ATHLTHLocalization.choose(
+                        english: "Route",
+                        norwegian: "Rute"
+                    ),
+                    value: routeTitle,
+                    icon:
+                        "point.topleft.down.to.point.bottomright.curvepath"
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func routeTabContent(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if let route = eventRoute(item) {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ATHLTHCard {
+                    HStack {
+                        VStack(
+                            alignment: .leading,
+                            spacing: 3
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Event route",
+                                    norwegian:
+                                        "Arrangementsrute"
+                                )
+                            )
+                            .font(.headline)
+
+                            Text(route.title)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                        }
+
+                        Spacer()
+
+                        if route
+                            .distanceKilometers >
+                            0 {
+                            Text(
+                                String(
+                                    format:
+                                        "%.1f km",
+                                    route
+                                        .distanceKilometers
+                                )
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .bold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                        }
+                    }
+                }
+
+                eventRouteOverview(
+                    route,
+                    mapHeight: 320
+                )
+
+                eventDetails(
+                    item,
+                    includeRoute: false
+                )
+            }
+        } else if let routeTitle =
+                    item.event
+                        .routeTitle?
+                        .nilIfBlank {
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ATHLTHCard {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Event route",
+                            norwegian:
+                                "Arrangementsrute"
+                        )
+                    )
+                    .font(.headline)
+
+                    eventDetailRow(
+                        ATHLTHLocalization.choose(
+                            english: "Route",
+                            norwegian: "Rute"
+                        ),
+                        value: routeTitle,
+                        icon:
+                            "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+                }
+
+                eventDetails(
+                    item,
+                    includeRoute: false
+                )
+            }
+        } else {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english: "No route added",
+                    norwegian: "Ingen rute lagt til"
+                ),
+                systemImage: "map"
+            )
+            .padding(.vertical, 36)
+        }
+    }
+
+    private func participantsPreview(
+        _ item: CommunityEventItem
+    ) -> some View {
+        let profiles =
+            ([item.creator]
+                .compactMap { $0 }) +
+            participantProfiles(
+                item,
+                status: .going
+            )
+        let visibleProfiles =
+            Array(
+                profiles.prefix(4)
+            )
+
+        return ATHLTHCard {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 3
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "People",
+                            norwegian: "Deltakere"
+                        )
+                    )
+                    .font(.headline)
+
+                    Text(
+                        ATHLTHLocalization.format(
+                            english: "%d going",
+                            norwegian: "%d deltar",
+                            item.participantCount
+                        )
+                    )
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(
+                        .easeInOut(
+                            duration: 0.18
+                        )
+                    ) {
+                        selectedTab =
+                            .participants
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "See all",
+                                norwegian: "Se alle"
+                            )
+                        )
+
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                    }
+                    .font(
+                        .caption
+                            .weight(
+                                .semibold
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(
+                    ATHLTHTheme.vitality
+                )
+            }
+
+            if visibleProfiles.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "No participants yet",
+                        norwegian:
+                            "Ingen deltakere ennå"
+                    ),
+                    systemImage:
+                        "person.2"
+                )
+                .font(.subheadline)
+                .foregroundStyle(
+                    .secondary
+                )
+                .padding(.top, 8)
+            } else {
+                HStack(spacing: -9) {
+                    ForEach(
+                        visibleProfiles
+                    ) { profile in
+                        CommunityAvatar(
+                            profile: profile,
+                            size: 40
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                    }
+
+                    if item.participantCount >
+                        visibleProfiles.count {
+                        Text(
+                            "+\(item.participantCount - visibleProfiles.count)"
+                        )
+                        .font(
+                            .caption2
+                                .weight(
+                                    .bold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                        .frame(
+                            width: 40,
+                            height: 40
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft,
+                            in: Circle()
+                        )
+                        .overlay {
+                            Circle()
+                                .stroke(
+                                    Color.white,
+                                    lineWidth: 2
+                                )
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 8)
+
+                ForEach(
+                    Array(
+                        visibleProfiles
+                            .prefix(3)
+                    )
+                ) { profile in
+                    HStack(spacing: 10) {
+                        CommunityAvatar(
+                            profile: profile,
+                            size: 34
+                        )
+
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                profile
+                                    .resolvedName
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+
+                            if profile.userID ==
+                                item.event
+                                    .creatorID {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Host",
+                                        norwegian:
+                                            "Arrangør"
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
+
+                        Spacer()
+
+                        if checkedInRows(
+                            item
+                        )
+                        .contains(
+                            where: {
+                                $0.userID ==
+                                    profile.userID
+                            }
+                        ) {
+                            Image(
+                                systemName:
+                                    "checkmark.circle.fill"
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Checked in",
+                                    norwegian:
+                                        "Sjekket inn"
+                                )
+                            )
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            }
         }
     }
 
@@ -2207,7 +2878,10 @@ struct CommunityEventDetailView: View {
         }
     }
 
-    private func eventDetails(_ item: CommunityEventItem) -> some View {
+    private func eventDetails(
+        _ item: CommunityEventItem,
+        includeRoute: Bool = true
+    ) -> some View {
         ATHLTHCard {
             Text("Details")
                 .font(.headline)
@@ -2256,25 +2930,27 @@ struct CommunityEventDetailView: View {
                 )
             }
 
-            if let route =
-                    eventRoute(item) {
-                eventRouteOverview(
-                    route
-                )
-                .padding(.top, 10)
-            } else if let routeTitle =
-                        item.event
-                            .routeTitle?
-                            .nilIfBlank {
-                eventDetailRow(
-                    ATHLTHLocalization.choose(
-                        english: "Route",
-                        norwegian: "Rute"
-                    ),
-                    value: routeTitle,
-                    icon:
-                        "point.topleft.down.to.point.bottomright.curvepath"
-                )
+            if includeRoute {
+                if let route =
+                        eventRoute(item) {
+                    eventRouteOverview(
+                        route
+                    )
+                    .padding(.top, 10)
+                } else if let routeTitle =
+                            item.event
+                                .routeTitle?
+                                .nilIfBlank {
+                    eventDetailRow(
+                        ATHLTHLocalization.choose(
+                            english: "Route",
+                            norwegian: "Rute"
+                        ),
+                        value: routeTitle,
+                        icon:
+                            "point.topleft.down.to.point.bottomright.curvepath"
+                    )
+                }
             }
 
             eventDetailRow(
@@ -3448,8 +4124,8 @@ struct CommunityEventDetailView: View {
     }
 
     private func eventRouteOverview(
-        _ route:
-            TrainingRoute
+        _ route: TrainingRoute,
+        mapHeight: CGFloat = 176
     ) -> some View {
         VStack(
             alignment: .leading,
@@ -3566,7 +4242,7 @@ struct CommunityEventDetailView: View {
                         }
                     }
                     .allowsHitTesting(false)
-                    .frame(height: 176)
+                    .frame(height: mapHeight)
                     .clipShape(
                         RoundedRectangle(
                             cornerRadius: 18,
