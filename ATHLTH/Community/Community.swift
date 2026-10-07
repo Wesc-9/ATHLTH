@@ -2742,6 +2742,624 @@ struct CommunityEventDetailView: View {
     }
 
     @ViewBuilder
+    private func competitionOverviewCard(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if item.isCompetition,
+           let metric =
+                item.event
+                    .competitionMetric {
+            ATHLTHCard {
+                HStack(
+                    alignment: .top,
+                    spacing: 12
+                ) {
+                    Image(
+                        systemName:
+                            "trophy.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 19,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
+                    .frame(
+                        width: 42,
+                        height: 42
+                    )
+                    .background(
+                        ATHLTHTheme
+                            .premiumGold
+                            .opacity(0.12),
+                        in: Circle()
+                    )
+
+                    VStack(
+                        alignment: .leading,
+                        spacing: 4
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Competition event",
+                                norwegian:
+                                    "Konkurranse"
+                            )
+                        )
+                        .font(.headline)
+
+                        Label(
+                            metric.title,
+                            systemImage:
+                                metric.systemImage
+                        )
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Results belong to this event only. Participants must check in before submitting a result.",
+                                norwegian:
+                                    "Resultatene gjelder kun dette arrangementet. Deltakere må sjekke inn før de kan registrere resultat."
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer(
+                        minLength: 0
+                    )
+
+                    Button {
+                        selectedTab =
+                            .results
+                    } label: {
+                        Image(
+                            systemName:
+                                "chevron.right"
+                        )
+                        .font(
+                            .caption.bold()
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                        .frame(
+                            width: 32,
+                            height: 32
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .vitalitySoft,
+                            in: Circle()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func competitionResultsContent(
+        _ item: CommunityEventItem
+    ) -> some View {
+        if let metric =
+                item.event
+                    .competitionMetric,
+           item.isCompetition {
+            let leaderboard =
+                competitionLeaderboard(
+                    item,
+                    metric: metric
+                )
+
+            VStack(
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ATHLTHCard {
+                    HStack(
+                        alignment: .top,
+                        spacing: 12
+                    ) {
+                        Image(
+                            systemName:
+                                metric.systemImage
+                        )
+                        .font(
+                            .title3.weight(
+                                .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .premiumGold
+                        )
+                        .frame(
+                            width: 42,
+                            height: 42
+                        )
+                        .background(
+                            ATHLTHTheme
+                                .premiumGold
+                                .opacity(
+                                    0.12
+                                ),
+                            in: Circle()
+                        )
+
+                        VStack(
+                            alignment:
+                                .leading,
+                            spacing: 4
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Competition",
+                                    norwegian:
+                                        "Konkurranse"
+                                )
+                            )
+                            .font(.headline)
+
+                            Text(
+                                metric.title
+                            )
+                            .font(
+                                .subheadline
+                                    .weight(
+                                        .semibold
+                                    )
+                            )
+                            .foregroundStyle(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Only checked-in participants can submit results after the event starts.",
+                                    norwegian:
+                                        "Kun innsjekkede deltakere kan registrere resultat etter at arrangementet har startet."
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+
+                        Spacer()
+                    }
+
+                    if community
+                        .isJoined(item) {
+                        Divider()
+                            .padding(
+                                .vertical,
+                                5
+                            )
+
+                        if let current =
+                                currentCompetitionResult(
+                                    item
+                                ),
+                           let value =
+                                current
+                                    .competitionResultValue {
+                            HStack {
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Your result",
+                                            norwegian:
+                                                "Ditt resultat"
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+
+                                    Text(
+                                        metric
+                                            .formattedResult(
+                                                value
+                                            )
+                                    )
+                                    .font(
+                                        .title3
+                                            .weight(
+                                                .bold
+                                            )
+                                    )
+                                }
+
+                                Spacer()
+
+                                Button(
+                                    ATHLTHLocalization.choose(
+                                        english: "Edit",
+                                        norwegian:
+                                            "Endre"
+                                    )
+                                ) {
+                                    showingCompetitionResultEntry =
+                                        true
+                                }
+                                .buttonStyle(
+                                    .bordered
+                                )
+                                .disabled(
+                                    !canSubmitCompetitionResult(
+                                        item
+                                    )
+                                )
+                            }
+                        } else if canSubmitCompetitionResult(
+                                    item
+                                ) {
+                            Button {
+                                showingCompetitionResultEntry =
+                                    true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Register result",
+                                        norwegian:
+                                            "Registrer resultat"
+                                    ),
+                                    systemImage:
+                                        "plus.circle.fill"
+                                )
+                                .font(
+                                    .headline
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity
+                                )
+                            }
+                            .buttonStyle(
+                                .borderedProminent
+                            )
+                            .tint(
+                                ATHLTHTheme
+                                    .vitality
+                            )
+                        } else {
+                            Label(
+                                competitionResultAvailabilityText(
+                                    item
+                                ),
+                                systemImage:
+                                    community
+                                        .isCheckedIn(
+                                            item
+                                        )
+                                        ? "clock"
+                                        : "checkmark.seal"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                        }
+                    }
+                }
+
+                ATHLTHCard {
+                    HStack {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Leaderboard",
+                                norwegian:
+                                    "Resultatliste"
+                            )
+                        )
+                        .font(.headline)
+
+                        Spacer()
+
+                        Text(
+                            "\(leaderboard.count)"
+                        )
+                        .font(
+                            .caption
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .vitality
+                        )
+                    }
+
+                    if leaderboard
+                        .isEmpty {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "No results yet",
+                                norwegian:
+                                    "Ingen resultater ennå"
+                            ),
+                            systemImage:
+                                "trophy"
+                        )
+                        .frame(
+                            minHeight: 150
+                        )
+                    } else {
+                        VStack(spacing: 8) {
+                            ForEach(
+                                Array(
+                                    leaderboard
+                                        .enumerated()
+                                ),
+                                id: \.offset
+                            ) {
+                                index,
+                                row in
+
+                                HStack(
+                                    spacing: 11
+                                ) {
+                                    Text(
+                                        "\(index + 1)"
+                                    )
+                                    .font(
+                                        .headline
+                                            .weight(
+                                                .bold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        index < 3
+                                            ? ATHLTHTheme
+                                                .premiumGold
+                                            : ATHLTHTheme
+                                                .mutedText
+                                    )
+                                    .frame(
+                                        width: 26
+                                    )
+
+                                    if let profile =
+                                            profile(
+                                                for:
+                                                    row.userID,
+                                                in:
+                                                    item
+                                            ) {
+                                        CommunityAvatar(
+                                            profile:
+                                                profile,
+                                            size: 40
+                                        )
+
+                                        VStack(
+                                            alignment:
+                                                .leading,
+                                            spacing: 2
+                                        ) {
+                                            Text(
+                                                profile
+                                                    .resolvedName
+                                            )
+                                            .font(
+                                                .subheadline
+                                                    .weight(
+                                                        .semibold
+                                                    )
+                                            )
+
+                                            if row.checkedInAt !=
+                                                nil {
+                                                Text(
+                                                    ATHLTHLocalization.choose(
+                                                        english:
+                                                            "Checked in",
+                                                        norwegian:
+                                                            "Sjekket inn"
+                                                    )
+                                                )
+                                                .font(
+                                                    .caption2
+                                                )
+                                                .foregroundStyle(
+                                                    ATHLTHTheme
+                                                        .vitality
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english:
+                                                    "Participant",
+                                                norwegian:
+                                                    "Deltaker"
+                                            )
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                    }
+
+                                    Spacer()
+
+                                    if let value =
+                                            row
+                                                .competitionResultValue {
+                                        Text(
+                                            metric
+                                                .formattedResult(
+                                                    value
+                                                )
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .bold
+                                                )
+                                        )
+                                    }
+                                }
+                                .padding(
+                                    .vertical,
+                                    7
+                                )
+
+                                if index <
+                                    leaderboard.count -
+                                    1 {
+                                    Divider()
+                                }
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                }
+            }
+        } else {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Competition unavailable",
+                    norwegian:
+                        "Konkurranse er ikke aktivert"
+                ),
+                systemImage: "trophy"
+            )
+            .padding(.vertical, 36)
+        }
+    }
+
+    private func competitionLeaderboard(
+        _ item: CommunityEventItem,
+        metric:
+            CommunityEventCompetitionMetric
+    ) -> [CommunityEventParticipantRecord] {
+        item.participantRows
+            .filter {
+                $0.attendanceStatus ==
+                    .going &&
+                $0.checkedInAt != nil &&
+                $0.competitionResultValue !=
+                    nil
+            }
+            .sorted {
+                lhs,
+                rhs in
+
+                let lhsValue =
+                    lhs
+                        .competitionResultValue ??
+                    0
+                let rhsValue =
+                    rhs
+                        .competitionResultValue ??
+                    0
+
+                if metric
+                    .prefersLowerResult {
+                    return lhsValue <
+                        rhsValue
+                }
+
+                return lhsValue >
+                    rhsValue
+            }
+    }
+
+    private func currentCompetitionResult(
+        _ item: CommunityEventItem
+    ) -> CommunityEventParticipantRecord? {
+        item.participantRows
+            .first {
+                $0.userID ==
+                    session.profile
+                        .userID
+            }
+    }
+
+    private func canSubmitCompetitionResult(
+        _ item: CommunityEventItem,
+        now: Date = Date()
+    ) -> Bool {
+        item.isCompetition &&
+        community.isJoined(item) &&
+        community.isCheckedIn(item) &&
+        item.event.startsAt <= now &&
+        item.event.status !=
+            "cancelled"
+    }
+
+    private func competitionResultAvailabilityText(
+        _ item: CommunityEventItem,
+        now: Date = Date()
+    ) -> String {
+        if !community
+            .isCheckedIn(item) {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Check in before you can register a result.",
+                norwegian:
+                    "Sjekk inn før du kan registrere resultat."
+            )
+        }
+
+        if now <
+            item.event.startsAt {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Result registration opens when the event starts.",
+                norwegian:
+                    "Resultatregistrering åpner når arrangementet starter."
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Result registration is unavailable.",
+            norwegian:
+                "Resultatregistrering er ikke tilgjengelig."
+        )
+    }
+
+    @ViewBuilder
     private func routeSpotlight(
         _ item: CommunityEventItem
     ) -> some View {
