@@ -18,6 +18,8 @@ struct HomeActivityRunDetailView: View {
     @State private var linkedRouteAttempt: RouteAttemptRecord?
     @State private var linkedRouteAttempts: [RouteAttemptRecord] = []
     @State private var isLoadingRouteResult = false
+    @State private var showingTreadmillInclineEditor = false
+    @State private var treadmillInclineDraft = 0.0
 
     init(
         workout: SocialPublishableWorkout,
@@ -270,6 +272,24 @@ struct HomeActivityRunDetailView: View {
         .task(id: workout.id) {
             await loadDetailAndCoach()
         }
+        .sheet(
+            isPresented:
+                $showingTreadmillInclineEditor
+        ) {
+            TreadmillInclineEditorView(
+                initialValue:
+                    treadmillInclineDraft
+            ) { value in
+                phoneWorkout
+                    .setCompletedTreadmillInclinePercent(
+                        value,
+                        workoutID:
+                            workout.id
+                    )
+                treadmillInclineDraft =
+                    value
+            }
+        }
     }
 
     private var summaryCard: some View {
@@ -403,6 +423,64 @@ struct HomeActivityRunDetailView: View {
                         "Max HR",
                         maxHeartRateText
                     )
+                }
+            }
+
+            if workout.activity == .running &&
+                workout.isIndoor == true {
+                Divider()
+
+                HStack(spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Incline",
+                            norwegian: "Stigning"
+                        ),
+                        systemImage:
+                            "arrow.up.right"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.semibold)
+                    )
+
+                    Spacer()
+
+                    Text(
+                        String(
+                            format: "%.1f%%",
+                            phoneWorkout
+                                .treadmillInclinePercent(
+                                    for:
+                                        workout.id
+                                ) ??
+                            0
+                        )
+                    )
+                    .font(
+                        .subheadline
+                            .weight(.bold)
+                            .monospacedDigit()
+                    )
+
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Adjust",
+                            norwegian: "Juster"
+                        )
+                    ) {
+                        treadmillInclineDraft =
+                            phoneWorkout
+                                .treadmillInclinePercent(
+                                    for:
+                                        workout.id
+                                ) ??
+                            0
+                        showingTreadmillInclineEditor =
+                            true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
         }
