@@ -465,8 +465,24 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchHomeAssistantBridge.shared
                 .apply(configuration)
 
+        case .workoutActivityState:
+            guard let state =
+                    try? JSONDecoder().decode(
+                        WatchWorkoutActivityState.self,
+                        from: data
+                    )
+            else {
+                return
+            }
+
+            WatchWorkoutManager.shared
+                .configureCompanionWorkoutActivity(
+                    state
+                )
+
         case .route,
              .workoutResult,
+             .workoutStartGuard,
              .workoutCommand,
              .workoutRouteSelection,
              .todayWorkoutRequest,
@@ -781,6 +797,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .liveSurfaceContext ||
            transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot ||
+           transferKind == .workoutActivityState ||
            transferKind == .spotifyPlaybackState ||
            transferKind == .homeAssistantConfiguration {
             let sentAt =
@@ -882,6 +899,8 @@ extension WatchRouteStore:
             Task { @MainActor [weak self] in
                 self?.requestTodayWorkoutSnapshot()
                 self?.requestSpotifyPlaybackState()
+                WatchWorkoutManager.shared
+                    .syncWorkoutActivityStateToPhone()
             }
         }
     }
