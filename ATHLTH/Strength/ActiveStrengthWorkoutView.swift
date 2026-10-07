@@ -1585,7 +1585,7 @@ struct ActiveStrengthWorkoutView: View {
     ) -> String {
         switch kind {
         case let .repMax(reps):
-            return "(reps)RM"
+            return "\(reps)RM"
 
         case .heaviestWeight:
             return
@@ -1629,9 +1629,20 @@ struct ActiveStrengthWorkoutView: View {
                 by: 1
             )
         ) { context in
+            let recordedDuration =
+                workout.healthMetrics.duration
+                    .flatMap {
+                        $0 > 0
+                            ? $0
+                            : nil
+                    }
+            let resolvedEndDate =
+                workout.endedAt ??
+                context.date
             let totalDuration =
                 max(
-                    context.date
+                    recordedDuration ??
+                    resolvedEndDate
                         .timeIntervalSince(
                             workout.startedAt
                         ),
