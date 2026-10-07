@@ -4641,7 +4641,7 @@ struct CommunityEventDetailView: View {
     }
 }
 
-private struct CommunityEventMapPlace:
+struct CommunityEventMapPlace:
     Identifiable,
     Hashable
 {
@@ -4652,7 +4652,7 @@ private struct CommunityEventMapPlace:
     let longitude: Double
 }
 
-private struct CommunityEventMapPlacePickerView:
+struct CommunityEventMapPlacePickerView:
     View
 {
     @Environment(\.dismiss)
