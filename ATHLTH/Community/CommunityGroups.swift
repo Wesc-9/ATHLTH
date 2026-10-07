@@ -6498,35 +6498,41 @@ struct CommunityGroupDetailView: View {
     @State private var selectedTab: CommunityGroupsTab = .overview
     @State private var tabIndicator: CommunityGroupsTab = .overview
     @State private var messageDraft = ""
+    @State private var selectedChatPhoto: PhotosPickerItem?
+    @State private var pendingChatImageData: Data?
+    @State private var sendingGroupMessage = false
+    @State private var chatImageError: String?
     @State private var showingCreateEvent = false
     @State private var showingCreateChallenge = false
     @State private var showingGroupSettings = false
     @State private var showingNotificationSettings = false
+    @State private var showingUpcomingOverview = false
     @State private var updateDraft = ""
     @State private var postingUpdate = false
     @State private var showAllClubPosts = false
+    @State private var expandedPostComments: Set<UUID> = []
+    @State private var announcementCommentDrafts: [UUID: String] = [:]
+    @State private var postingAnnouncementCommentID: UUID?
     @FocusState private var updateComposerFocused: Bool
 
-    // Club-only premium green palette. Keeping this local prevents the
-    // Community redesign from changing the visual language elsewhere.
     private var clubForest: Color {
-        Color(red: 0.025, green: 0.30, blue: 0.21)
+        currentGroup.clubTheme.forest
     }
 
     private var clubEmerald: Color {
-        Color(red: 0.055, green: 0.49, blue: 0.32)
+        currentGroup.clubTheme.emerald
     }
 
     private var clubLeaf: Color {
-        Color(red: 0.18, green: 0.62, blue: 0.35)
+        currentGroup.clubTheme.leaf
     }
 
     private var clubMint: Color {
-        Color(red: 0.90, green: 0.96, blue: 0.92)
+        currentGroup.clubTheme.mint
     }
 
     private var clubSage: Color {
-        Color(red: 0.77, green: 0.88, blue: 0.81)
+        currentGroup.clubTheme.sage
     }
 
     private var currentGroup: CommunityGroupRecord {
@@ -6648,6 +6654,75 @@ struct CommunityGroupDetailView: View {
             CommunityGroupNotificationSettingsView(
                 group: currentGroup
             )
+        }
+        .sheet(isPresented: $showingUpcomingOverview) {
+            NavigationStack {
+                CommunityGroupUpcomingOverviewView(
+                    group: currentGroup
+                )
+            }
+            .environmentObject(groups)
+        }
+        .onChange(
+            of: selectedChatPhoto
+        ) { _, item in
+            guard let item else {
+                return
+            }
+
+            Task {
+                do {
+                    guard let data =
+                            try await item
+                                .loadTransferable(
+                                    type: Data.self
+                                ),
+                          let prepared =
+                            await CommunityImageProcessor
+                                .prepareJPEG(
+                                    data,
+                                    maxPixelSize: 2_200,
+                                    quality: 0.88
+                                )
+                    else {
+                        selectedChatPhoto = nil
+                        chatImageError =
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "ATHLTH could not prepare that chat image. Try another photo.",
+                                norwegian:
+                                    "ATHLTH klarte ikke å klargjøre bildet til chatten. Prøv et annet bilde."
+                            )
+                        return
+                    }
+
+                    pendingChatImageData =
+                        prepared
+                    selectedChatPhoto = nil
+                } catch {
+                    selectedChatPhoto = nil
+                    chatImageError =
+                        error.localizedDescription
+                }
+            }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not attach image",
+                norwegian: "Kunne ikke legge ved bilde"
+            ),
+            isPresented: Binding(
+                get: { chatImageError != nil },
+                set: {
+                    if !$0 {
+                        chatImageError = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(chatImageError ?? "")
         }
         .task {
             if groups.groups.isEmpty {
@@ -8448,7 +8523,7 @@ struct CommunityGroupDetailView: View {
                             norwegian: "Se alle"
                         ),
                 action: {
-                    selectTab(.events)
+                    showingUpcomingOverview = true
                 }
             )
 
