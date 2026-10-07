@@ -5708,6 +5708,61 @@ struct SessionEditorView: View {
                                 Text(plannedExerciseSummary(planned))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
+
+                                if planned.hasIndividualSetTargets {
+                                    HStack(spacing: 5) {
+                                        ForEach(
+                                            Array(
+                                                planned
+                                                    .resolvedSetTargets
+                                                    .prefix(3)
+                                                    .enumerated()
+                                            ),
+                                            id: \.element.id
+                                        ) { setIndex, target in
+                                            Text(
+                                                compactPlannedSetLabel(
+                                                    target,
+                                                    exercise: planned,
+                                                    index:
+                                                        setIndex + 1
+                                                )
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 8.5,
+                                                    weight: .bold,
+                                                    design: .rounded
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme.accentDeep
+                                            )
+                                            .padding(.horizontal, 6)
+                                            .frame(height: 20)
+                                            .background(
+                                                ATHLTHTheme.accentSoft,
+                                                in: Capsule()
+                                            )
+                                        }
+
+                                        if planned.sets > 3 {
+                                            Text(
+                                                "+\(planned.sets - 3)"
+                                            )
+                                            .font(
+                                                .system(
+                                                    size: 8.5,
+                                                    weight: .bold
+                                                )
+                                            )
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText
+                                            )
+                                        }
+                                    }
+                                    .padding(.top, 2)
+                                }
                             }
 
                             Spacer()
@@ -7711,6 +7766,83 @@ struct SessionEditorView: View {
         }
 
         dismiss()
+    }
+
+    private func compactPlannedSetLabel(
+        _ target: PlannedExerciseSetTarget,
+        exercise: PlannedExercise,
+        index: Int
+    ) -> String {
+        let targetText: String
+
+        switch exercise.resolvedTargetKind {
+        case .reps:
+            targetText =
+                target.reps.map {
+                    "\($0)"
+                } ?? "—"
+        case .time:
+            let seconds =
+                max(
+                    target.durationSeconds ??
+                    exercise
+                        .resolvedTargetDurationSeconds ??
+                    0,
+                    0
+                )
+            if seconds >= 60 {
+                targetText =
+                    "\(seconds / 60):" +
+                    String(
+                        format:
+                            "%02d",
+                        seconds % 60
+                    )
+            } else {
+                targetText =
+                    "\(seconds)s"
+            }
+        }
+
+        let loadText: String
+        switch exercise.resolvedLoadKind {
+        case .weightKilograms:
+            if let weight =
+                target.weightKilograms {
+                loadText =
+                    String(
+                        format:
+                            "%.0f",
+                        weight
+                    )
+            } else {
+                loadText = ""
+            }
+        case .resistanceLevel:
+            if let level =
+                target.resistanceLevel {
+                loadText =
+                    "L\(level)"
+            } else {
+                loadText = ""
+            }
+        }
+
+        let warmUp =
+            target.isWarmUp == true ||
+            target.setType == .warmUp
+
+        if loadText.isEmpty {
+            return
+                warmUp
+                    ? "O\(index) · \(targetText)"
+                    : "S\(index) · \(targetText)"
+        }
+
+        return
+            warmUp
+                ? "O\(index) · \(targetText)×\(loadText)"
+                : "S\(index) · \(targetText)×\(loadText)"
     }
 
     private func plannedExerciseSummary(
