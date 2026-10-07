@@ -29,6 +29,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var sessionsPerWeek = 3
     @State private var selectedDays: Set<Int> = [1, 3, 5]
+    @State private var workoutKindOverridesByDay:
+        [Int: WorkoutKind] = [:]
 
     @State private var equipment: EquipmentContext = .gym
     @State private var weeklyTimeBudgetMinutes = 240
@@ -2048,8 +2050,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 ) {
                     fieldLabel(
                         ATHLTHLocalization.choose(
-                            english: "Suggested rhythm",
-                            norwegian: "Foreslått rytme"
+                            english: "Week setup",
+                            norwegian: "Ukeoppsett"
                         )
                     )
 
@@ -2058,9 +2060,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "This is only the starting structure. Every workout can be replaced, moved or edited afterwards.",
+                                "Tap a workout type to change it. This is only the starting structure and every session remains editable.",
                             norwegian:
-                                "Dette er bare startstrukturen. Alle økter kan byttes, flyttes eller redigeres etterpå."
+                                "Trykk på økttypen for å endre den. Dette er bare startstrukturen, og alle økter kan redigeres senere."
                         )
                     )
                     .font(.caption)
@@ -2240,24 +2242,57 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var weeklyPreview: some View {
         VStack(spacing: 7) {
+            if !workoutKindOverridesByDay.isEmpty {
+                HStack {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Customised week",
+                            norwegian: "Tilpasset uke"
+                        )
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(
+                            .easeOut(duration: 0.16)
+                        ) {
+                            workoutKindOverridesByDay
+                                .removeAll()
+                        }
+                    } label: {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Use suggestions",
+                                norwegian: "Bruk forslag"
+                            )
+                        )
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 2)
+            }
+
             ForEach(1...7, id: \.self) {
                 dayIndex in
                 let isTraining =
                     selectedDays.contains(
                         dayIndex
                     )
-                let slot =
-                    selectedDays
-                        .sorted()
-                        .firstIndex(
-                            of: dayIndex
-                        )
                 let kind =
-                    slot.map {
-                        suggestedKind(
-                            slot: $0
+                    isTraining
+                        ? resolvedWorkoutKind(
+                            for: dayIndex
                         )
-                    }
+                        : nil
 
                 HStack(spacing: 10) {
                     Text(
@@ -2291,18 +2326,109 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             )
                         )
 
-                        Text(
-                            suggestedWorkoutTitle(
-                                kind: kind,
-                                slot: slot ?? 0
-                            )
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
+                        Menu {
+                            ForEach(
+                                selectableWorkoutKinds,
+                                id: \.self
+                            ) { option in
+                                Button {
+                                    workoutKindOverridesByDay[
+                                        dayIndex
+                                    ] = option
+                                } label: {
+                                    Label(
+                                        option.title,
+                                        systemImage:
+                                            option.systemImage
+                                    )
+                                }
+                            }
 
-                        Spacer()
+                            if workoutKindOverridesByDay[
+                                dayIndex
+                            ] != nil {
+                                Divider()
+
+                                Button {
+                                    workoutKindOverridesByDay[
+                                        dayIndex
+                                    ] = nil
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Use suggested type",
+                                            norwegian:
+                                                "Bruk foreslått type"
+                                        ),
+                                        systemImage:
+                                            "arrow.uturn.backward"
+                                    )
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                VStack(
+                                    alignment: .leading,
+                                    spacing: 2
+                                ) {
+                                    Text(
+                                        suggestedWorkoutTitle(
+                                            kind: kind,
+                                            slot:
+                                                trainingSlot(
+                                                    for: dayIndex
+                                                )
+                                        )
+                                    )
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(
+                                        ATHLTHTheme.primaryText
+                                    )
+                                    .lineLimit(1)
+
+                                    HStack(spacing: 4) {
+                                        Text(kind.title)
+                                            .font(.caption2)
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText
+                                            )
+
+                                        if workoutKindOverridesByDay[
+                                            dayIndex
+                                        ] != nil {
+                                            Text("·")
+                                                .foregroundStyle(
+                                                    ATHLTHTheme.mutedText
+                                                )
+
+                                            Text(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Changed",
+                                                    norwegian: "Endret"
+                                                )
+                                            )
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(
+                                                ATHLTHTheme.premiumGold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(minLength: 4)
+
+                                Image(
+                                    systemName:
+                                        "chevron.up.chevron.down"
+                                )
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                            }
+                            .contentShape(Rectangle())
+                        }
 
                         Text(
                             ATHLTHLocalization.choose(
@@ -2332,22 +2458,41 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             )
                         )
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Rest day",
-                                norwegian: "Hviledag"
+                        VStack(
+                            alignment: .leading,
+                            spacing: 2
+                        ) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Rest day",
+                                    norwegian: "Hviledag"
+                                )
                             )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "No workout planned",
+                                    norwegian:
+                                        "Ingen økt planlagt"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                                    .opacity(0.78)
+                            )
+                        }
 
                         Spacer()
                     }
                 }
                 .padding(.horizontal, 10)
-                .frame(minHeight: 45)
+                .frame(minHeight: 52)
                 .background(
                     Color.white.opacity(0.56),
                     in: RoundedRectangle(
@@ -2357,6 +2502,55 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             }
         }
+    }
+
+    private var selectableWorkoutKinds:
+        [WorkoutKind] {
+        if mode == .basic {
+            return [
+                .strength,
+                .running,
+                .walking,
+                .mobility
+            ]
+        }
+
+        return [
+            .strength,
+            .running,
+            .walking,
+            .mobility,
+            .recovery,
+            .custom
+        ]
+    }
+
+    private func trainingSlot(
+        for dayIndex: Int
+    ) -> Int {
+        selectedDays
+            .sorted()
+            .firstIndex(
+                of: dayIndex
+            ) ?? 0
+    }
+
+    private func resolvedWorkoutKind(
+        for dayIndex: Int
+    ) -> WorkoutKind {
+        if let override =
+            workoutKindOverridesByDay[
+                dayIndex
+            ] {
+            return override
+        }
+
+        return suggestedKind(
+            slot:
+                trainingSlot(
+                    for: dayIndex
+                )
+        )
     }
 
     private var reviewStep: some View {
@@ -2455,12 +2649,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 norwegian: "Uke"
                             ),
                         value:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "\(selectedDays.count) sessions · \(selectedDays.sorted().map { shortDayName($0) }.joined(separator: ", "))",
-                                norwegian:
-                                    "\(selectedDays.count) økter · \(selectedDays.sorted().map(shortDayName).joined(separator: ", "))"
-                            )
+                            trainingWeekSummary
                     )
 
                     reviewDivider
@@ -3439,6 +3628,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
     }
 
+    private var trainingWeekSummary:
+        String {
+        selectedDays
+            .sorted()
+            .map { dayIndex in
+                let kind =
+                    resolvedWorkoutKind(
+                        for: dayIndex
+                    )
+
+                return
+                    "\(fullDayName(dayIndex)): \(kind.title)"
+            }
+            .joined(separator: " · ")
+    }
+
     private func durationText(
         _ minutes: Int
     ) -> String {
@@ -3579,6 +3784,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
         }
+
+        focusNotes.append(
+            ATHLTHLocalization.choose(
+                english:
+                    "Preferred week: \(trainingWeekSummary).",
+                norwegian:
+                    "Ønsket treningsuke: \(trainingWeekSummary)."
+            )
+        )
 
         if mode == .advanced,
            let secondaryFocus {
@@ -3733,7 +3947,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 weeklyTimeBudgetMinutes:
                     mode == .advanced
                         ? weeklyTimeBudgetMinutes
-                        : nil
+                        : nil,
+                preferredWorkoutKindsByDay:
+                    Dictionary(
+                        uniqueKeysWithValues:
+                            selectedDays
+                                .sorted()
+                                .map {
+                                    (
+                                        $0,
+                                        resolvedWorkoutKind(
+                                            for: $0
+                                        )
+                                    )
+                                }
+                    )
             )
 
         let created =
