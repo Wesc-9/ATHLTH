@@ -5,6 +5,7 @@ import PhotosUI
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 enum ATHLTHTrainNavigationRequest: Identifiable {
     case plan
@@ -32,10 +33,65 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
 struct ProductRootTabView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var notifications:
+        ATHLTHNotificationStore
+    @EnvironmentObject private var messaging:
+        MessagingStore
+    @EnvironmentObject private var health:
+        HealthKitManager
+    @Environment(\.scenePhase)
+    private var scenePhase
 
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
+
+    private var visibleAppBadgeCount: Int {
+        let inboxCount =
+            messaging.unreadCount +
+            messaging.messageRequestCount
+
+        let bellCount =
+            notifications
+                .notificationCenterUnreadCount +
+            health.pendingWorkoutImportCount
+
+        // A challenge invite can arrive in SocialStore slightly before the
+        // notification center imports the same backend row. Count only the
+        // uncovered invites so one event never becomes two app-icon badges.
+        let backendChallengeInvites =
+            social.inboxEvents.filter {
+                $0.kind ==
+                    "challenge_invite" &&
+                $0.readAt == nil
+            }
+            .count
+
+        let importedChallengeInvites =
+            notifications
+                .notificationCenterItems
+                .filter {
+                    $0.isUnread &&
+                    $0.socialEventKind?
+                        .lowercased() ==
+                        "challenge_invite"
+                }
+                .count
+
+        let uncoveredChallengeInvites =
+            max(
+                backendChallengeInvites -
+                    importedChallengeInvites,
+                0
+            )
+
+        return max(
+            inboxCount +
+            bellCount +
+            uncoveredChallengeInvites,
+            0
+        )
+    }
 
     init() {
         let prefix =
@@ -127,10 +183,33 @@ struct ProductRootTabView: View {
                 kind.contains("friend") ||
                 kind.contains("challenge") ||
                 kind.contains("reaction") ||
-                kind.contains("workout") {
+                kind.contains("workout") ||
+                kind.contains("event") {
                 selectedTab = 4
             } else {
                 selectedTab = 0
+            }
+        }
+        .task {
+            await syncApplicationIconBadge()
+        }
+        .onChange(
+            of: visibleAppBadgeCount
+        ) { _, _ in
+            Task {
+                await syncApplicationIconBadge()
+            }
+        }
+        .onChange(
+            of: scenePhase
+        ) { _, phase in
+            guard phase == .active
+            else {
+                return
+            }
+
+            Task {
+                await syncApplicationIconBadge()
             }
         }
         .background {
@@ -365,6 +444,21 @@ struct ProductRootTabView: View {
                 )
                 .environmentObject(social)
             }
+        }
+    }
+
+    @MainActor
+    private func syncApplicationIconBadge()
+        async {
+        do {
+            try await UNUserNotificationCenter
+                .current()
+                .setBadgeCount(
+                    visibleAppBadgeCount
+                )
+        } catch {
+            // In-app badges remain the source of truth. iOS can briefly reject
+            // a badge write while notification permissions are changing.
         }
     }
 
