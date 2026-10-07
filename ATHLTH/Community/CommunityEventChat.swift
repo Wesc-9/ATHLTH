@@ -525,13 +525,18 @@ struct CommunityEventChatView: View {
         AppSessionStore
 
     let event: CommunityEventRecord
+    let embedded: Bool
 
     @StateObject private var chat:
         CommunityEventChatStore
     @State private var draft = ""
 
-    init(event: CommunityEventRecord) {
+    init(
+        event: CommunityEventRecord,
+        embedded: Bool = false
+    ) {
         self.event = event
+        self.embedded = embedded
         _chat = StateObject(
             wrappedValue:
                 CommunityEventChatStore(
@@ -551,34 +556,59 @@ struct CommunityEventChatView: View {
     }
 
     var body: some View {
-        ZStack {
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme.vitality
-                        .opacity(0.16)
-            )
-            .ignoresSafeArea()
+        Group {
+            if embedded {
+                chatSurface
+                    .frame(
+                        minHeight: 520,
+                        idealHeight: 600,
+                        maxHeight: 680
+                    )
+                    .background(
+                        Color.white
+                            .opacity(0.94),
+                        in:
+                            RoundedRectangle(
+                                cornerRadius: 22,
+                                style:
+                                    .continuous
+                            )
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 22,
+                            style:
+                                .continuous
+                        )
+                        .stroke(
+                            Color.black
+                                .opacity(0.055),
+                            lineWidth: 0.7
+                        )
+                    }
+            } else {
+                ZStack {
+                    ATHLTHPremiumCanvas(
+                        accent:
+                            ATHLTHTheme.vitality
+                                .opacity(0.16)
+                    )
+                    .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                messageList
-
-                if canSend {
-                    composer
-                } else {
-                    closedComposer
+                    chatSurface
                 }
+                .navigationTitle(
+                    ATHLTHLocalization.choose(
+                        english: "Event chat",
+                        norwegian:
+                            "Arrangementchat"
+                    )
+                )
+                .navigationBarTitleDisplayMode(
+                    .inline
+                )
             }
         }
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english: "Event chat",
-                norwegian:
-                    "Arrangementchat"
-            )
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
         .task {
             await chat.refresh(
                 showLoading: true
@@ -595,6 +625,18 @@ struct CommunityEventChatView: View {
                 }
 
                 await chat.refresh()
+            }
+        }
+    }
+
+    private var chatSurface: some View {
+        VStack(spacing: 0) {
+            messageList
+
+            if canSend {
+                composer
+            } else {
+                closedComposer
             }
         }
     }
