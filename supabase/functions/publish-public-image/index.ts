@@ -263,6 +263,30 @@ Return exactly:
   }
 }
 
+async function authorizeGroupMember(
+  admin: ReturnType<typeof createClient>,
+  userID: string,
+  groupID: string,
+): Promise<boolean> {
+  const { data: group } = await admin
+    .from("community_groups")
+    .select("creator_id")
+    .eq("id", groupID)
+    .maybeSingle();
+
+  if (!group) return false;
+  if (group.creator_id === userID) return true;
+
+  const { data: membership } = await admin
+    .from("community_group_members")
+    .select("user_id")
+    .eq("group_id", groupID)
+    .eq("user_id", userID)
+    .maybeSingle();
+
+  return Boolean(membership);
+}
+
 async function authorizeGroup(
   admin: ReturnType<typeof createClient>,
   userID: string,
@@ -368,6 +392,15 @@ async function destinationFor(
       return {
         bucket: "community-content-images",
         path: `${groupID}/${kind}/${entityID}/cover.jpg`,
+        cacheControl: "3600",
+      };
+    }
+    case "club_chat_message": {
+      if (!groupID || !entityID) return null;
+      if (!(await authorizeGroupMember(admin, userID, groupID))) return null;
+      return {
+        bucket: "community-content-images",
+        path: `${groupID}/chat/${entityID}.jpg`,
         cacheControl: "3600",
       };
     }
