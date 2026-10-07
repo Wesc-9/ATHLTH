@@ -123,6 +123,58 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         return true
     }
 
+    @discardableResult
+    func sendTreadmillInclinePercent(
+        _ percent: Double
+    ) -> Bool {
+        guard let mirroredSession else {
+            publish {
+                self.errorMessage =
+                    ATHLTHLocalization.choose(
+                        english:
+                            "The mirrored Apple Watch workout is reconnecting.",
+                        norwegian:
+                            "Den speilede Apple Watch-økten kobler til på nytt."
+                    )
+            }
+            return false
+        }
+
+        let value =
+            min(
+                max(
+                    (percent * 2).rounded() / 2,
+                    0
+                ),
+                20
+            )
+
+        guard let data = try? JSONEncoder().encode(
+            WatchWorkoutMirrorCommand(
+                command: .setTreadmillIncline,
+                treadmillInclinePercent: value
+            )
+        ) else {
+            return false
+        }
+
+        Task {
+            do {
+                try await mirroredSession
+                    .sendToRemoteWorkoutSession(
+                        data: data
+                    )
+            } catch {
+                publish {
+                    self.errorMessage =
+                        error.localizedDescription
+                }
+            }
+        }
+
+        return true
+    }
+
     func liveViewDidAppear() {
         liveViewIsVisible = true
     }
