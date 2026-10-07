@@ -136,6 +136,10 @@ function preferenceAllows(
 }
 
 function threadID(event: InboxEvent): string {
+  if (event.entity_type === "community_event" && event.entity_id) {
+    return `community_event:${event.entity_id}`;
+  }
+
   if (event.actor_id) {
     return `person:${event.actor_id}`;
   }
@@ -153,7 +157,11 @@ function localizedAlert(
   actorName?: string | null,
   actorUnreadCount = 1,
 ): { title: string; body: string } {
-  if (actorName && actorUnreadCount > 1) {
+  const isCommunityEventCancellation =
+    event.entity_type === "community_event" &&
+    event.title === "Event cancelled";
+
+  if (actorName && actorUnreadCount > 1 && !isCommunityEventCancellation) {
     if (languageCode === "nb") {
       return {
         title: actorName,
@@ -335,7 +343,14 @@ function localizedAlert(
       if (title.startsWith("New event in ")) {
         title = `Nytt event i ${title.slice("New event in ".length)}`;
       } else if (title === "Event cancelled") {
-        title = "Event avlyst";
+        title = "Arrangement avlyst";
+
+        const cancelled = body.match(
+          /^(.+) has been cancelled\.$/,
+        );
+        if (cancelled) {
+          body = `${cancelled[1]} er avlyst.`;
+        }
       } else if (title === "Event updated") {
         title = "Event oppdatert";
       } else if (title === "You have a spot") {
@@ -570,7 +585,14 @@ Deno.serve(async (req: Request) => {
     .eq("user_id", event.recipient_id)
     .maybeSingle<UserPreferences>();
 
-  if (!preferenceAllows(event.kind, preferences ?? null)) {
+  const mandatoryCommunityEventCancellation =
+    event.entity_type === "community_event" &&
+    event.title === "Event cancelled";
+
+  if (
+    !mandatoryCommunityEventCancellation &&
+    !preferenceAllows(event.kind, preferences ?? null)
+  ) {
     await admin
       .from("social_inbox_events")
       .update({ push_notified_at: new Date().toISOString() })
