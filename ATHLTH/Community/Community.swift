@@ -2133,10 +2133,33 @@ struct CommunityEventDetailView: View {
             routeTabContent(item)
 
         case .chat:
-            CommunityEventChatView(
-                event: item.event,
-                embedded: true
-            )
+            if item.event.creatorID ==
+                session.profile.userID ||
+                item.participantRows
+                    .contains(
+                        where: {
+                            $0.userID ==
+                                session.profile
+                                    .userID
+                        }
+                    ) {
+                CommunityEventChatView(
+                    event: item.event,
+                    embedded: true
+                )
+            } else {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english:
+                            "Join to use the chat",
+                        norwegian:
+                            "Delta for å bruke chatten"
+                    ),
+                    systemImage:
+                        "bubble.left.and.bubble.right"
+                )
+                .padding(.vertical, 42)
+            }
 
         case .participants:
             VStack(
