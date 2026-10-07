@@ -4877,7 +4877,9 @@ struct SessionEditorView: View {
             }
             .sheet(item: $exerciseBeingEdited) { exercise in
                 PlannedExerciseEditorView(
-                    exercise: exercise
+                    exercise: exercise,
+                    advancedMode:
+                        editorMode == .advanced
                 ) { updated in
                     if let index = plannedExercises.firstIndex(
                         where: { $0.id == updated.id }
@@ -8092,6 +8094,7 @@ struct PlannedExerciseEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     let original: PlannedExercise
+    let advancedMode: Bool
     let onSave: (PlannedExercise) -> Void
 
     @State private var sets: Int
@@ -8125,9 +8128,11 @@ struct PlannedExerciseEditorView: View {
 
     init(
         exercise: PlannedExercise,
+        advancedMode: Bool,
         onSave: @escaping (PlannedExercise) -> Void
     ) {
         original = exercise
+        self.advancedMode = advancedMode
         self.onSave = onSave
 
         _sets = State(
@@ -8517,79 +8522,82 @@ struct PlannedExerciseEditorView: View {
                     )
                 }
 
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Effort",
-                        norwegian: "Anstrengelse"
-                    )
-                ) {
-                    Toggle(
+                if advancedMode {
+                    Section(
                         ATHLTHLocalization.choose(
-                            english: "Use RPE",
-                            norwegian: "Bruk RPE"
-                        ),
-                        isOn: $useRPE
-                    )
-
-                    if useRPE &&
-                        !useIndividualSetTargets {
-                        HStack {
-                            Slider(
-                                value: $rpe,
-                                in: 1...10,
-                                step: 0.5
-                            )
-                            Text(
-                                "\(rpe, specifier: "%.1f")"
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Use RIR",
-                            norwegian: "Bruk RIR"
-                        ),
-                        isOn: $useRIR
-                    )
-
-                    if useRIR &&
-                        !useIndividualSetTargets {
-                        HStack {
-                            Slider(
-                                value: $rir,
-                                in: 0...5,
-                                step: 0.5
-                            )
-                            Text(
-                                "\(rir, specifier: "%.1f")"
-                            )
-                            .monospacedDigit()
-                        }
-                    }
-
-                    if useIndividualSetTargets &&
-                        (useRPE || useRIR) {
-                        Text(
+                            english: "Effort",
+                            norwegian: "Anstrengelse"
+                        )
+                    ) {
+                        Toggle(
                             ATHLTHLocalization.choose(
-                                english:
-                                    "Effort is adjusted inside each set above.",
-                                norwegian:
-                                    "Innsats justeres på hvert enkelt sett over."
-                            )
+                                english: "Use RPE",
+                                norwegian: "Bruk RPE"
+                            ),
+                            isOn: $useRPE
                         )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                    }
-                }
-                .listRowBackground(
-                    ATHLTHTheme.card
-                )
 
-                if targetKind == .reps &&
+                        if useRPE &&
+                            !useIndividualSetTargets {
+                            HStack {
+                                Slider(
+                                    value: $rpe,
+                                    in: 1...10,
+                                    step: 0.5
+                                )
+                                Text(
+                                    "\(rpe, specifier: "%.1f")"
+                                )
+                                .monospacedDigit()
+                            }
+                        }
+
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Use RIR",
+                                norwegian: "Bruk RIR"
+                            ),
+                            isOn: $useRIR
+                        )
+
+                        if useRIR &&
+                            !useIndividualSetTargets {
+                            HStack {
+                                Slider(
+                                    value: $rir,
+                                    in: 0...5,
+                                    step: 0.5
+                                )
+                                Text(
+                                    "\(rir, specifier: "%.1f")"
+                                )
+                                .monospacedDigit()
+                            }
+                        }
+
+                        if useIndividualSetTargets &&
+                            (useRPE || useRIR) {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Effort is adjusted inside each set above.",
+                                    norwegian:
+                                        "Innsats justeres på hvert enkelt sett over."
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                ATHLTHTheme.mutedText
+                            )
+                        }
+                    }
+                    .listRowBackground(
+                        ATHLTHTheme.card
+                    )
+                }
+
+                if advancedMode &&
+                    targetKind == .reps &&
                     loadKind == .weightKilograms {
                     Section(
                         ATHLTHLocalization.choose(
@@ -9040,38 +9048,40 @@ struct PlannedExerciseEditorView: View {
 
                 Spacer()
 
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Warm-up",
-                        norwegian: "Oppvarming"
-                    ),
-                    isOn:
-                        Binding(
-                            get: {
-                                binding.wrappedValue
-                                    .isWarmUp ??
-                                false
-                            },
-                            set: { value in
-                                var target =
+                if advancedMode {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Warm-up",
+                            norwegian: "Oppvarming"
+                        ),
+                        isOn:
+                            Binding(
+                                get: {
                                     binding.wrappedValue
-                                target.isWarmUp =
-                                    value
-                                binding.wrappedValue =
-                                    target
-                            }
-                        )
-                )
-                .font(.caption2)
-                .labelsHidden()
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Warm-up set",
-                        norwegian:
-                            "Oppvarmingssett"
+                                        .isWarmUp ??
+                                    false
+                                },
+                                set: { value in
+                                    var target =
+                                        binding.wrappedValue
+                                    target.isWarmUp =
+                                        value
+                                    binding.wrappedValue =
+                                        target
+                                }
+                            )
                     )
-                )
+                    .font(.caption2)
+                    .labelsHidden()
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Warm-up set",
+                            norwegian:
+                                "Oppvarmingssett"
+                        )
+                    )
+                }
             }
 
             LazyVGrid(
