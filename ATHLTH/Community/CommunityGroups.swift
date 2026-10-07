@@ -17228,8 +17228,10 @@ private struct CommunityContentCoverPicker: View {
     }
 }
 struct CommunityGroupEventCreateView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var groups:
+    @Environment(\.dismiss)
+    private var dismiss
+    @EnvironmentObject
+    private var groups:
         CommunityGroupStore
 
     let group: CommunityGroupRecord
@@ -17251,286 +17253,35 @@ struct CommunityGroupEventCreateView: View {
         ATHLTHStandardArtwork?
     @State private var saving = false
     @State private var creationError: String?
+    @State private var showingMeetingSearch = false
+    @State private var showingActivitySetup = false
+    @State private var showingClubOptions = false
+
+    private var currentGroup:
+        CommunityGroupRecord {
+        groups.group(for: group.id) ??
+        group
+    }
+
+    private var clubTheme:
+        CommunityClubTheme {
+        currentGroup.clubTheme
+    }
 
     private var clubForest: Color {
-        group.clubTheme.forest
+        clubTheme.forest
     }
 
     private var clubEmerald: Color {
-        group.clubTheme.emerald
+        clubTheme.emerald
+    }
+
+    private var clubLeaf: Color {
+        clubTheme.leaf
     }
 
     private var clubMint: Color {
-        group.clubTheme.mint
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    eventCreationHero
-                        .listRowInsets(
-                            EdgeInsets()
-                        )
-                        .listRowBackground(
-                            Color.clear
-                        )
-                }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Cover image",
-                        norwegian: "Toppbilde"
-                    )
-                ) {
-                    CommunityContentCoverPicker(
-                        selectedPhoto: $selectedPhoto,
-                        imageData: $imageData,
-                        selectedArtwork:
-                            $selectedArtwork,
-                        placeholderIcon:
-                            "calendar.badge.plus"
-                    )
-                }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Event",
-                        norwegian: "Arrangement"
-                    )
-                ) {
-                    TextField(
-                        "Title",
-                        text: $title
-                    )
-
-                    TextField(
-                        "Description",
-                        text: $summary,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
-
-                    DatePicker(
-                        "Starts",
-                        selection: $startsAt,
-                        displayedComponents: [
-                            .date,
-                            .hourAndMinute
-                        ]
-                    )
-                }
-
-                CommunityGroupActivityEditor(
-                    draft: $activityDraft
-                )
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Meet",
-                        norwegian: "Oppmøte"
-                    )
-                ) {
-                    TextField(
-                        "Meeting point (optional)",
-                        text: $meetingName
-                    )
-                }
-
-                CommunityGroupEventAdvancedEditor(
-                    group: group,
-                    eventStartsAt: startsAt,
-                    options: $advancedOptions,
-                    cohostIDs: $cohostIDs,
-                    routeStart:
-                        activityDraft
-                            .configuration
-                            .route?
-                            .coordinates
-                            .first
-                )
-
-                Section {
-                    Label(
-                        ATHLTHLocalization.format(
-                            english: "Only members of %@ can see this event.",
-                            norwegian: "Bare medlemmer av %@ kan se dette arrangementet.",
-                            group.name
-                        ),
-                        systemImage: "lock.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-            .scrollContentBackground(
-                .hidden
-            )
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        clubEmerald.opacity(
-                            0.14
-                        )
-                )
-                .ignoresSafeArea()
-            )
-            .tint(clubForest)
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english: "Create Event",
-                    norwegian: "Opprett arrangement"
-                )
-            )
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Cancel",
-                            norwegian: "Avbryt"
-                        )
-                    ) {
-                        dismiss()
-                    }
-                    .foregroundStyle(
-                        clubForest
-                    )
-                }
-
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button(
-                        saving
-                            ? ATHLTHLocalization.choose(
-                                english: "Creating…",
-                                norwegian: "Oppretter…"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Create",
-                                norwegian: "Opprett"
-                            )
-                    ) {
-                        createEvent()
-                    }
-                    .disabled(!canCreate)
-                }
-            }
-            .alert(
-                "Could Not Create Event",
-                isPresented: Binding(
-                    get: {
-                        creationError != nil
-                    },
-                    set: {
-                        if !$0 {
-                            creationError = nil
-                        }
-                    }
-                )
-            ) {
-                Button(
-                    "OK",
-                    role: .cancel
-                ) {}
-            } message: {
-                Text(creationError ?? "")
-            }
-        }
-    }
-
-    private var eventCreationHero:
-        some View {
-        ZStack(alignment: .bottomLeading) {
-            Image("CommunityHero")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 136)
-                .frame(
-                    maxWidth: .infinity
-                )
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    clubForest.opacity(0.84)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(
-                alignment: .leading,
-                spacing: 4
-            ) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "EVENT",
-                        norwegian: "ARRANGEMENT"
-                    ),
-                    systemImage:
-                        "calendar.badge.plus"
-                )
-                .font(
-                    .caption2.bold()
-                )
-                .tracking(1.0)
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Bring the Club together",
-                        norwegian:
-                            "Samle fellesskapet"
-                    )
-                )
-                .font(.title3.bold())
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Plan a session, place and route in one flow.",
-                        norwegian:
-                            "Planlegg økt, sted og rute i én flyt."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .white.opacity(0.88)
-                )
-            }
-            .foregroundStyle(.white)
-            .padding(15)
-        }
-        .frame(height: 136)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.22),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                clubForest.opacity(
-                    0.12
-                ),
-            radius: 13,
-            y: 6
-        )
+        clubTheme.mint
     }
 
     private var canCreate: Bool {
@@ -17539,42 +17290,1926 @@ struct CommunityGroupEventCreateView: View {
                 in: .whitespacesAndNewlines
             )
             .isEmpty &&
-        activityDraft.validationMessage == nil &&
+        startsAt >
+            Date().addingTimeInterval(-30) &&
+        activityDraft.validationMessage ==
+            nil &&
         !saving
     }
 
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                ATHLTHPremiumCanvas(
+                    accent:
+                        clubEmerald
+                            .opacity(0.16)
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        eventHero
+                        eventCoverPicker
+
+                        if let creationError {
+                            Text(creationError)
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .red
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    alignment:
+                                        .leading
+                                )
+                                .padding(
+                                    .horizontal,
+                                    4
+                                )
+                        }
+
+                        clubEventSection(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Event",
+                                        norwegian:
+                                            "Arrangement"
+                                    ),
+                            icon:
+                                "calendar.badge.plus"
+                        ) {
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Event name",
+                                            norwegian:
+                                                "Navn på arrangement"
+                                        ),
+                                placeholder:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Add a name",
+                                            norwegian:
+                                                "Gi arrangementet et navn"
+                                        ),
+                                text: $title,
+                                icon:
+                                    "doc.text"
+                            )
+
+                            eventDivider
+
+                            Menu {
+                                activityButton(
+                                    type: "running",
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Running",
+                                                norwegian:
+                                                    "Løping"
+                                            ),
+                                    icon:
+                                        "figure.run"
+                                )
+                                activityButton(
+                                    type: "walking",
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Walking",
+                                                norwegian:
+                                                    "Gåing"
+                                            ),
+                                    icon:
+                                        "figure.walk"
+                                )
+                                activityButton(
+                                    type: "cycling",
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Cycling",
+                                                norwegian:
+                                                    "Sykling"
+                                            ),
+                                    icon:
+                                        "figure.outdoor.cycle"
+                                )
+                                activityButton(
+                                    type: "strength",
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Strength",
+                                                norwegian:
+                                                    "Styrke"
+                                            ),
+                                    icon:
+                                        "dumbbell.fill"
+                                )
+                            } label: {
+                                eventSelectionRow(
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Activity",
+                                                norwegian:
+                                                    "Aktivitet"
+                                            ),
+                                    value:
+                                        activityTitle,
+                                    icon:
+                                        activityIcon
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            eventDivider
+
+                            eventTextField(
+                                title:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Description",
+                                            norwegian:
+                                                "Beskrivelse"
+                                        ),
+                                placeholder:
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Optional",
+                                            norwegian:
+                                                "Valgfritt"
+                                        ),
+                                text: $summary,
+                                icon:
+                                    "text.alignleft",
+                                axis: .vertical
+                            )
+
+                            eventDivider
+
+                            HStack(spacing: 10) {
+                                compactDateControl(
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Date",
+                                                norwegian:
+                                                    "Dato"
+                                            ),
+                                    icon:
+                                        "calendar",
+                                    components:
+                                        [.date]
+                                )
+
+                                compactDateControl(
+                                    title:
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Time",
+                                                norwegian:
+                                                    "Tid"
+                                            ),
+                                    icon:
+                                        "clock",
+                                    components: [
+                                        .hourAndMinute
+                                    ]
+                                )
+                            }
+
+                            eventDivider
+
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "person.3.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    clubMint,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Who can see it",
+                                                norwegian:
+                                                    "Hvem kan se det"
+                                            )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization
+                                            .format(
+                                                english:
+                                                    "%@ members",
+                                                norwegian:
+                                                    "Medlemmer i %@",
+                                                currentGroup
+                                                    .name
+                                            )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+                                }
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        "lock.fill"
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                            }
+                        }
+
+                        clubEventSection(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Activity",
+                                        norwegian:
+                                            "Aktivitet"
+                                    ),
+                            icon:
+                                activityIcon
+                        ) {
+                            HStack(
+                                alignment: .top,
+                                spacing: 12
+                            ) {
+                                Image(
+                                    systemName:
+                                        "figure.run.circle"
+                                )
+                                .font(
+                                    .system(
+                                        size: 18,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                                .frame(
+                                    width: 40,
+                                    height: 40
+                                )
+                                .background(
+                                    clubMint,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 4
+                                ) {
+                                    Text(
+                                        activityDraft
+                                            .configuration
+                                            .compactSummary
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+                                    .foregroundStyle(
+                                        ATHLTHTheme
+                                            .primaryText
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Choose distance, route, running workout or strength exercises.",
+                                                norwegian:
+                                                    "Velg distanse, rute, løpeøkt eller styrkeøvelser."
+                                            )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                    .fixedSize(
+                                        horizontal:
+                                            false,
+                                        vertical:
+                                            true
+                                    )
+                                }
+
+                                Spacer()
+                            }
+
+                            Button {
+                                showingActivitySetup =
+                                    true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Set up activity",
+                                            norwegian:
+                                                "Sett opp aktivitet"
+                                        ),
+                                    systemImage:
+                                        "slider.horizontal.3"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+                                .foregroundStyle(
+                                    .white
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity
+                                )
+                                .frame(height: 46)
+                                .background(
+                                    clubTheme
+                                        .gradient,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                15,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            if let validation =
+                                activityDraft
+                                    .validationMessage {
+                                Text(validation)
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .red
+                                    )
+                            }
+                        }
+
+                        clubEventSection(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Meet",
+                                        norwegian:
+                                            "Oppmøte"
+                                    ),
+                            icon:
+                                "mappin.and.ellipse"
+                        ) {
+                            Button {
+                                showingMeetingSearch =
+                                    true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            "mappin.and.ellipse"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 17,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        clubForest
+                                    )
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        clubMint,
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    12,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(
+                                            ATHLTHLocalization
+                                                .choose(
+                                                    english:
+                                                        "Meeting point",
+                                                    norwegian:
+                                                        "Møtested"
+                                                )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+
+                                        Text(
+                                            meetingName
+                                                .trimmingCharacters(
+                                                    in:
+                                                        .whitespacesAndNewlines
+                                                )
+                                                .isEmpty
+                                                ? ATHLTHLocalization
+                                                    .choose(
+                                                        english:
+                                                            "Choose from Apple Maps",
+                                                        norwegian:
+                                                            "Velg fra Apple Maps"
+                                                    )
+                                                : meetingName
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    meetingName
+                                                        .trimmingCharacters(
+                                                            in:
+                                                                .whitespacesAndNewlines
+                                                        )
+                                                        .isEmpty
+                                                        ? .regular
+                                                        : .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            meetingName
+                                                .trimmingCharacters(
+                                                    in:
+                                                        .whitespacesAndNewlines
+                                                )
+                                                .isEmpty
+                                                ? .secondary
+                                                : ATHLTHTheme
+                                                    .primaryText
+                                        )
+                                        .lineLimit(2)
+                                    }
+
+                                    Spacer()
+
+                                    if advancedOptions
+                                        .meetingLatitude !=
+                                        nil &&
+                                        advancedOptions
+                                            .meetingLongitude !=
+                                            nil {
+                                        Image(
+                                            systemName:
+                                                "checkmark.circle.fill"
+                                        )
+                                        .foregroundStyle(
+                                            clubEmerald
+                                        )
+                                    }
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            if !meetingName
+                                .trimmingCharacters(
+                                    in:
+                                        .whitespacesAndNewlines
+                                )
+                                .isEmpty ||
+                                advancedOptions
+                                    .meetingLatitude !=
+                                    nil {
+                                Button(
+                                    role: .destructive
+                                ) {
+                                    meetingName = ""
+                                    advancedOptions
+                                        .meetingLatitude =
+                                        nil
+                                    advancedOptions
+                                        .meetingLongitude =
+                                        nil
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Clear meeting point",
+                                                norwegian:
+                                                    "Fjern møtested"
+                                            ),
+                                        systemImage:
+                                            "xmark.circle"
+                                    )
+                                    .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        clubEventSection(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Participants",
+                                        norwegian:
+                                            "Deltakere"
+                                    ),
+                            icon:
+                                "person.2.fill"
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "person.badge.plus"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    clubForest
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    clubMint,
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                Text(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Limit participants",
+                                            norwegian:
+                                                "Begrens deltakere"
+                                        )
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(
+                                            .semibold
+                                        )
+                                )
+
+                                Spacer()
+
+                                Toggle(
+                                    "",
+                                    isOn:
+                                        capacityEnabled
+                                )
+                                .labelsHidden()
+                                .tint(
+                                    clubEmerald
+                                )
+                            }
+
+                            if advancedOptions
+                                .capacity != nil {
+                                eventDivider
+
+                                HStack(spacing: 14) {
+                                    Text(
+                                        ATHLTHLocalization
+                                            .choose(
+                                                english:
+                                                    "Maximum participants",
+                                                norwegian:
+                                                    "Maks antall deltakere"
+                                            )
+                                    )
+                                    .font(
+                                        .subheadline
+                                    )
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+
+                                    Spacer()
+
+                                    capacityButton(
+                                        icon: "minus",
+                                        delta: -1
+                                    )
+
+                                    Text(
+                                        "\(advancedOptions.capacity ?? 20)"
+                                    )
+                                    .font(
+                                        .headline
+                                            .monospacedDigit()
+                                    )
+                                    .frame(
+                                        minWidth: 34
+                                    )
+
+                                    capacityButton(
+                                        icon: "plus",
+                                        delta: 1
+                                    )
+                                }
+
+                                Text(
+                                    ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "When the event is full, new Going responses move to the waitlist automatically.",
+                                            norwegian:
+                                                "Når arrangementet er fullt, flyttes nye påmeldinger automatisk til venteliste."
+                                        )
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                            }
+                        }
+
+                        clubEventSection(
+                            title:
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Club options",
+                                        norwegian:
+                                            "Club-valg"
+                                    ),
+                            icon:
+                                "person.3.sequence.fill"
+                        ) {
+                            Button {
+                                showingClubOptions =
+                                    true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(
+                                        systemName:
+                                            "gearshape.2.fill"
+                                    )
+                                    .font(
+                                        .system(
+                                            size: 17,
+                                            weight:
+                                                .semibold
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        clubForest
+                                    )
+                                    .frame(
+                                        width: 38,
+                                        height: 38
+                                    )
+                                    .background(
+                                        clubMint,
+                                        in:
+                                            RoundedRectangle(
+                                                cornerRadius:
+                                                    12,
+                                                style:
+                                                    .continuous
+                                            )
+                                    )
+
+                                    VStack(
+                                        alignment:
+                                            .leading,
+                                        spacing: 3
+                                    ) {
+                                        Text(
+                                            ATHLTHLocalization
+                                                .choose(
+                                                    english:
+                                                        "Advanced Club settings",
+                                                    norwegian:
+                                                        "Avanserte Club-innstillinger"
+                                                )
+                                        )
+                                        .font(
+                                            .subheadline
+                                                .weight(
+                                                    .semibold
+                                                )
+                                        )
+                                        .foregroundStyle(
+                                            ATHLTHTheme
+                                                .primaryText
+                                        )
+
+                                        Text(
+                                            clubOptionsSummary
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(
+                                            .secondary
+                                        )
+                                        .lineLimit(2)
+                                    }
+
+                                    Spacer()
+
+                                    Image(
+                                        systemName:
+                                            "chevron.right"
+                                    )
+                                    .font(.caption.bold())
+                                    .foregroundStyle(
+                                        clubForest
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            Label(
+                                ATHLTHLocalization
+                                    .format(
+                                        english:
+                                            "Only members of %@ can see this event.",
+                                        norwegian:
+                                            "Bare medlemmer av %@ kan se dette arrangementet.",
+                                        currentGroup
+                                            .name
+                                    ),
+                                systemImage:
+                                    "lock.fill"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                            .fixedSize(
+                                horizontal: false,
+                                vertical: true
+                            )
+                        }
+                    }
+                    .padding(
+                        .horizontal,
+                        16
+                    )
+                    .padding(.top, 10)
+                    .padding(
+                        .bottom,
+                        28
+                    )
+                }
+                .scrollDismissesKeyboard(
+                    .interactively
+                )
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Create Event",
+                    norwegian:
+                        "Opprett arrangement"
+                )
+            )
+            .navigationBarTitleDisplayMode(
+                .inline
+            )
+            .toolbarBackground(
+                .hidden,
+                for: .navigationBar
+            )
+            .toolbar {
+                ToolbarItem(
+                    placement:
+                        .cancellationAction
+                ) {
+                    Button(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Cancel",
+                                norwegian:
+                                    "Avbryt"
+                            )
+                    ) {
+                        dismiss()
+                    }
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .primaryText
+                    )
+                }
+
+                ToolbarItem(
+                    placement:
+                        .confirmationAction
+                ) {
+                    Button {
+                        createEvent()
+                    } label: {
+                        Text(
+                            saving
+                                ? ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Creating…",
+                                        norwegian:
+                                            "Oppretter…"
+                                    )
+                                : ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Create",
+                                        norwegian:
+                                            "Opprett"
+                                    )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .disabled(
+                        !canCreate
+                    )
+                }
+            }
+            .safeAreaInset(
+                edge: .bottom
+            ) {
+                VStack(spacing: 0) {
+                    Divider()
+                        .opacity(0.35)
+
+                    Button {
+                        createEvent()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if saving {
+                                ProgressView()
+                                    .tint(
+                                        .white
+                                    )
+                            }
+
+                            Text(
+                                saving
+                                    ? ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Creating…",
+                                            norwegian:
+                                                "Oppretter…"
+                                        )
+                                    : ATHLTHLocalization
+                                        .choose(
+                                            english:
+                                                "Create event",
+                                            norwegian:
+                                                "Opprett arrangement"
+                                        )
+                            )
+                            .font(.headline)
+                        }
+                        .foregroundStyle(
+                            .white
+                        )
+                        .frame(
+                            maxWidth:
+                                .infinity
+                        )
+                        .frame(height: 54)
+                        .background(
+                            clubTheme
+                                .gradient,
+                            in:
+                                Capsule(
+                                    style:
+                                        .continuous
+                                )
+                        )
+                        .opacity(
+                            canCreate
+                                ? 1
+                                : 0.34
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(
+                        !canCreate
+                    )
+                    .padding(
+                        .horizontal,
+                        16
+                    )
+                    .padding(
+                        .vertical,
+                        10
+                    )
+                }
+                .background(
+                    .ultraThinMaterial
+                )
+            }
+            .sheet(
+                isPresented:
+                    $showingMeetingSearch
+            ) {
+                NavigationStack {
+                    CommunityEventMapPlacePickerView {
+                        place in
+
+                        meetingName =
+                            place.displayName
+                        advancedOptions
+                            .meetingLatitude =
+                            place.latitude
+                        advancedOptions
+                            .meetingLongitude =
+                            place.longitude
+                        showingMeetingSearch =
+                            false
+                    }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingActivitySetup
+            ) {
+                NavigationStack {
+                    Form {
+                        CommunityGroupActivityEditor(
+                            draft:
+                                $activityDraft
+                        )
+                    }
+                    .navigationTitle(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Activity setup",
+                                norwegian:
+                                    "Oppsett av aktivitet"
+                            )
+                    )
+                    .navigationBarTitleDisplayMode(
+                        .inline
+                    )
+                    .toolbar {
+                        ToolbarItem(
+                            placement:
+                                .confirmationAction
+                        ) {
+                            Button(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Done",
+                                        norwegian:
+                                            "Ferdig"
+                                    )
+                            ) {
+                                showingActivitySetup =
+                                    false
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingClubOptions
+            ) {
+                NavigationStack {
+                    Form {
+                        CommunityGroupEventAdvancedEditor(
+                            group:
+                                currentGroup,
+                            eventStartsAt:
+                                startsAt,
+                            options:
+                                $advancedOptions,
+                            cohostIDs:
+                                $cohostIDs,
+                            routeStart:
+                                activityDraft
+                                    .configuration
+                                    .route?
+                                    .coordinates
+                                    .first
+                        )
+                    }
+                    .navigationTitle(
+                        ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "Club options",
+                                norwegian:
+                                    "Club-valg"
+                            )
+                    )
+                    .navigationBarTitleDisplayMode(
+                        .inline
+                    )
+                    .toolbar {
+                        ToolbarItem(
+                            placement:
+                                .confirmationAction
+                        ) {
+                            Button(
+                                ATHLTHLocalization
+                                    .choose(
+                                        english:
+                                            "Done",
+                                        norwegian:
+                                            "Ferdig"
+                                    )
+                            ) {
+                                showingClubOptions =
+                                    false
+                            }
+                        }
+                    }
+                }
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english:
+                        "Could Not Create Event",
+                    norwegian:
+                        "Kunne ikke opprette arrangement"
+                ),
+                isPresented:
+                    Binding(
+                        get: {
+                            creationError !=
+                                nil
+                        },
+                        set: {
+                            if !$0 {
+                                creationError =
+                                    nil
+                            }
+                        }
+                    )
+            ) {
+                Button(
+                    "OK",
+                    role: .cancel
+                ) {}
+            } message: {
+                Text(
+                    creationError ?? ""
+                )
+            }
+            .sensoryFeedback(
+                .selection,
+                trigger:
+                    activityDraft
+                        .activityType
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func activityButton(
+        type: String,
+        title: String,
+        icon: String
+    ) -> some View {
+        Button {
+            guard activityDraft
+                .activityType !=
+                    type
+            else {
+                return
+            }
+
+            activityDraft
+                .activityType = type
+            activityDraft
+                .normalizeForActivityChange()
+        } label: {
+            Label(
+                title,
+                systemImage: icon
+            )
+        }
+    }
+
+    private var activityTitle:
+        String {
+        switch activityDraft
+            .activityType {
+        case "running":
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Running",
+                    norwegian:
+                        "Løping"
+                )
+        case "walking":
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Walking",
+                    norwegian:
+                        "Gåing"
+                )
+        case "cycling":
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Cycling",
+                    norwegian:
+                        "Sykling"
+                )
+        case "strength":
+            return ATHLTHLocalization
+                .choose(
+                    english:
+                        "Strength",
+                    norwegian:
+                        "Styrke"
+                )
+        default:
+            return activityDraft
+                .activityType
+                .capitalized
+        }
+    }
+
+    private var activityIcon:
+        String {
+        switch activityDraft
+            .activityType {
+        case "running":
+            return "figure.run"
+        case "walking":
+            return "figure.walk"
+        case "cycling":
+            return "figure.outdoor.cycle"
+        case "strength":
+            return "dumbbell.fill"
+        default:
+            return "figure.mixed.cardio"
+        }
+    }
+
+    private var eventHero:
+        some View {
+        ZStack(
+            alignment:
+                .bottomLeading
+        ) {
+            Group {
+                if let imageData,
+                   let image =
+                    UIImage(
+                        data:
+                            imageData
+                    ) {
+                    Image(
+                        uiImage: image
+                    )
+                    .resizable()
+                    .scaledToFill()
+                } else if let selectedArtwork,
+                          let image =
+                            selectedArtwork
+                                .resolvedUIImage {
+                    Image(
+                        uiImage: image
+                    )
+                    .resizable()
+                    .scaledToFill()
+                } else {
+                    Image(
+                        "CommunityHero"
+                    )
+                    .resizable()
+                    .scaledToFill()
+                }
+            }
+            .athlthBoundedFill()
+            .frame(height: 150)
+            .frame(
+                maxWidth: .infinity
+            )
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color.black
+                        .opacity(0.10),
+                    clubForest
+                        .opacity(0.76)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 7
+            ) {
+                HStack(spacing: 7) {
+                    Label(
+                        currentGroup.name,
+                        systemImage:
+                            "person.3.fill"
+                    )
+                    .font(
+                        .caption2
+                            .weight(
+                                .bold
+                            )
+                    )
+                    .lineLimit(1)
+
+                    Text("•")
+
+                    Label(
+                        activityTitle,
+                        systemImage:
+                            activityIcon
+                    )
+                    .font(
+                        .caption2
+                            .weight(
+                                .bold
+                            )
+                    )
+                }
+                .foregroundStyle(
+                    .white
+                )
+                .padding(
+                    .horizontal,
+                    10
+                )
+                .padding(
+                    .vertical,
+                    6
+                )
+                .background(
+                    .ultraThinMaterial,
+                    in: Capsule()
+                )
+
+                Text(
+                    title
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        )
+                        .isEmpty
+                        ? ATHLTHLocalization
+                            .choose(
+                                english:
+                                    "New Club event",
+                                norwegian:
+                                    "Nytt Club-arrangement"
+                            )
+                        : title
+                )
+                .font(
+                    .title3
+                        .weight(.bold)
+                )
+                .foregroundStyle(
+                    .white
+                )
+                .lineLimit(2)
+            }
+            .padding(14)
+        }
+        .frame(height: 150)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 24,
+                style: .continuous
+            )
+            .stroke(
+                Color.white
+                    .opacity(0.34),
+                lineWidth: 0.8
+            )
+        }
+        .shadow(
+            color:
+                clubForest
+                    .opacity(0.10),
+            radius: 13,
+            y: 6
+        )
+    }
+
+    private var eventCoverPicker:
+        some View {
+        clubEventSection(
+            title:
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Cover",
+                        norwegian:
+                            "Bilde"
+                    ),
+            icon: "photo"
+        ) {
+            CommunityContentCoverPicker(
+                selectedPhoto:
+                    $selectedPhoto,
+                imageData:
+                    $imageData,
+                selectedArtwork:
+                    $selectedArtwork,
+                placeholderIcon:
+                    "calendar.badge.plus"
+            )
+        }
+    }
+
+    private func clubEventSection<
+        Content: View
+    >(
+        title: String,
+        icon: String,
+        @ViewBuilder content:
+            () -> Content
+    ) -> some View {
+        ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack(spacing: 10) {
+                    Image(
+                        systemName: icon
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        clubForest
+                    )
+                    .frame(
+                        width: 36,
+                        height: 36
+                    )
+                    .background(
+                        clubMint,
+                        in:
+                            RoundedRectangle(
+                                cornerRadius:
+                                    11,
+                                style:
+                                    .continuous
+                            )
+                    )
+
+                    Text(title)
+                        .font(
+                            .headline
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+
+                    Spacer()
+                }
+
+                content()
+            }
+        }
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+            .stroke(
+                clubEmerald
+                    .opacity(0.06),
+                lineWidth: 0.7
+            )
+        }
+    }
+
+    private var eventDivider:
+        some View {
+        Divider()
+            .opacity(0.42)
+            .padding(
+                .leading,
+                50
+            )
+    }
+
+    private func eventTextField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        icon: String,
+        axis: Axis = .horizontal
+    ) -> some View {
+        HStack(
+            alignment:
+                axis == .vertical
+                    ? .top
+                    : .center,
+            spacing: 12
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight: .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                clubMint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style:
+                            .continuous
+                    )
+            )
+
+            VStack(
+                alignment: .leading,
+                spacing: 3
+            ) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(
+                        .secondary
+                    )
+
+                TextField(
+                    placeholder,
+                    text: text,
+                    axis: axis
+                )
+                .font(.body)
+                .lineLimit(
+                    axis == .vertical
+                        ? 2...4
+                        : 1...1
+                )
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func eventSelectionRow(
+        title: String,
+        value: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .system(
+                    size: 17,
+                    weight:
+                        .semibold
+                )
+            )
+            .foregroundStyle(
+                clubForest
+            )
+            .frame(
+                width: 38,
+                height: 38
+            )
+            .background(
+                clubMint,
+                in:
+                    RoundedRectangle(
+                        cornerRadius: 12,
+                        style:
+                            .continuous
+                    )
+            )
+
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+
+            Spacer()
+
+            HStack(spacing: 7) {
+                Text(value)
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .lineLimit(1)
+
+                Image(
+                    systemName:
+                        "chevron.up.chevron.down"
+                )
+                .font(
+                    .caption2
+                        .bold()
+                )
+            }
+            .foregroundStyle(
+                clubForest
+            )
+            .padding(
+                .horizontal,
+                12
+            )
+            .frame(height: 38)
+            .background(
+                clubMint,
+                in: Capsule()
+            )
+        }
+    }
+
+    private func compactDateControl(
+        title: String,
+        icon: String,
+        components:
+            DatePickerComponents
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 5
+        ) {
+            Label(
+                title,
+                systemImage: icon
+            )
+            .font(.caption)
+            .foregroundStyle(
+                .secondary
+            )
+
+            DatePicker(
+                "",
+                selection:
+                    $startsAt,
+                in: Date()...,
+                displayedComponents:
+                    components
+            )
+            .labelsHidden()
+            .datePickerStyle(
+                .compact
+            )
+            .frame(
+                maxWidth:
+                    .infinity,
+                alignment:
+                    .leading
+            )
+        }
+        .padding(12)
+        .frame(
+            maxWidth: .infinity
+        )
+        .background(
+            clubMint
+                .opacity(0.42),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+    private var capacityEnabled:
+        Binding<Bool> {
+        Binding(
+            get: {
+                advancedOptions
+                    .capacity != nil
+            },
+            set: {
+                advancedOptions
+                    .capacity =
+                    $0
+                    ? (
+                        advancedOptions
+                            .capacity ??
+                        20
+                      )
+                    : nil
+            }
+        )
+    }
+
+    private func capacityButton(
+        icon: String,
+        delta: Int
+    ) -> some View {
+        Button {
+            let current =
+                advancedOptions
+                    .capacity ??
+                20
+            advancedOptions.capacity =
+                min(
+                    max(
+                        current + delta,
+                        2
+                    ),
+                    500
+                )
+        } label: {
+            Image(
+                systemName: icon
+            )
+            .frame(
+                width: 34,
+                height: 34
+            )
+            .background(
+                clubMint,
+                in: Circle()
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var clubOptionsSummary:
+        String {
+        var parts: [String] = []
+
+        if advancedOptions
+            .repeatWeekly {
+            parts.append(
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Repeats weekly",
+                        norwegian:
+                            "Gjentas ukentlig"
+                    )
+            )
+        }
+
+        if advancedOptions
+            .rsvpDeadline != nil {
+            parts.append(
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "RSVP deadline",
+                        norwegian:
+                            "Påmeldingsfrist"
+                    )
+            )
+        }
+
+        if !cohostIDs.isEmpty {
+            parts.append(
+                ATHLTHLocalization
+                    .format(
+                        english:
+                            "%d co-hosts",
+                        norwegian:
+                            "%d medarrangører",
+                        cohostIDs.count
+                    )
+            )
+        }
+
+        if advancedOptions
+            .organizerKind ==
+            .group {
+            parts.append(
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Hosted by Club",
+                        norwegian:
+                            "Arrangert av Club"
+                    )
+            )
+        }
+
+        return parts.isEmpty
+            ? ATHLTHLocalization
+                .choose(
+                    english:
+                        "Co-hosts, repetition, RSVP deadline and more",
+                    norwegian:
+                        "Medarrangører, gjentakelse, påmeldingsfrist og mer"
+                )
+            : parts.joined(
+                separator: " · "
+            )
+    }
+
     private func createEvent() {
+        guard !saving else {
+            return
+        }
+
         if let validation =
-            activityDraft.validationMessage {
-            creationError = validation
+            activityDraft
+                .validationMessage {
+            creationError =
+                validation
+            return
+        }
+
+        guard startsAt >
+                Date()
+                    .addingTimeInterval(
+                        -30
+                    )
+        else {
+            creationError =
+                ATHLTHLocalization
+                    .choose(
+                        english:
+                            "Choose a future start time.",
+                        norwegian:
+                            "Velg et starttidspunkt frem i tid."
+                    )
             return
         }
 
         let configuration =
-            activityDraft.configuration
+            activityDraft
+                .configuration
 
         Task {
             saving = true
+            creationError = nil
 
-            let ok = await groups.createEvent(
-                groupID: group.id,
-                title: title,
-                summary: summary,
-                activityType:
-                    configuration.activityType,
-                startsAt: startsAt,
-                meetingName: meetingName,
-                imageData: imageData,
-                imageReference:
-                    selectedArtwork?
-                        .reference,
-                activityConfiguration:
-                    configuration,
-                advancedOptions:
-                    advancedOptions,
-                cohostIDs:
-                    Array(cohostIDs)
-            )
+            let ok =
+                await groups
+                    .createEvent(
+                        groupID:
+                            currentGroup.id,
+                        title: title,
+                        summary:
+                            summary,
+                        activityType:
+                            configuration
+                                .activityType,
+                        startsAt:
+                            startsAt,
+                        meetingName:
+                            meetingName,
+                        imageData:
+                            imageData,
+                        imageReference:
+                            selectedArtwork?
+                                .reference,
+                        activityConfiguration:
+                            configuration,
+                        advancedOptions:
+                            advancedOptions,
+                        cohostIDs:
+                            Array(
+                                cohostIDs
+                            )
+                    )
 
             saving = false
 
@@ -17582,8 +19217,14 @@ struct CommunityGroupEventCreateView: View {
                 dismiss()
             } else {
                 creationError =
-                    groups.errorMessage
-                    ?? "ATHLTH could not create the event."
+                    groups.errorMessage ??
+                    ATHLTHLocalization
+                        .choose(
+                            english:
+                                "ATHLTH could not create the event.",
+                            norwegian:
+                                "ATHLTH klarte ikke å opprette arrangementet."
+                        )
             }
         }
     }
