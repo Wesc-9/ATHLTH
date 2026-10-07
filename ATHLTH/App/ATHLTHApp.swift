@@ -623,7 +623,9 @@ struct AppRootView: View {
     private var localWorkoutActivitySignature:
         String {
         if let workout =
-                strengthWorkout.activeWorkout {
+                strengthWorkout.activeWorkout,
+           workout.captureDevice ==
+                .iPhone {
             return "strength-" +
                 workout.id.uuidString
         }
@@ -645,7 +647,9 @@ struct AppRootView: View {
         }
 
         if let workout =
-                strengthWorkout.activeWorkout {
+                strengthWorkout.activeWorkout,
+           workout.captureDevice ==
+                .iPhone {
             watchConnection
                 .updateLocalWorkoutActivity(
                     isActive: true,
