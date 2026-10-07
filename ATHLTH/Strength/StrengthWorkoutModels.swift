@@ -267,6 +267,9 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     // Optional fields keep all existing workout history decodable.
     var plannedRPE: Double? = nil
     var plannedRIR: Double? = nil
+    var plannedSetType: PlannedStrengthSetType? = nil
+    var plannedTempo: String? = nil
+    var plannedNote: String? = nil
 
     // Optional fields preserve decoding of workouts created before this strength upgrade.
     var rir: Double? = nil
