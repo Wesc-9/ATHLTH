@@ -6703,7 +6703,27 @@ struct SessionEditorView: View {
                 loadKind:
                     exercise.loadKind,
                 targetResistanceLevel:
-                    exercise.targetResistanceLevel
+                    exercise.targetResistanceLevel,
+                setTargets:
+                    exercise.setTargets?.map {
+                        PlannedExerciseSetTarget(
+                            reps: $0.reps,
+                            durationSeconds:
+                                $0.durationSeconds,
+                            weightKilograms:
+                                $0.weightKilograms,
+                            resistanceLevel:
+                                $0.resistanceLevel,
+                            restSeconds:
+                                $0.restSeconds,
+                            targetRPE:
+                                $0.targetRPE,
+                            targetRIR:
+                                $0.targetRIR,
+                            isWarmUp:
+                                $0.isWarmUp
+                        )
+                    }
             )
         }
     }
