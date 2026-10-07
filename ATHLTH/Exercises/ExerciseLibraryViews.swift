@@ -548,7 +548,12 @@ struct ExerciseLibraryView: View {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "star.fill")
-                            Text("Favorites")
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Favorites",
+                                    norwegian: "Favoritter"
+                                )
+                            )
                         }
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(
@@ -569,35 +574,64 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
 
                     Menu {
-                        Button("All") { selectedBodyPart = "All" }
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "All",
+                                norwegian: "Alle"
+                            )
+                        ) { selectedBodyPart = "All" }
                         ForEach(library.bodyParts, id: \.self) { part in
-                            Button(part) { selectedBodyPart = part }
+                            Button(
+                                library.localizedBodyPartTitle(
+                                    part
+                                )
+                            ) {
+                                selectedBodyPart = part
+                            }
                         }
                     } label: {
                         filterChip(
                             selectedBodyPart == "All"
-                                ? "Muscle group"
-                                : selectedBodyPart,
+                                ? ATHLTHLocalization.choose(
+                                    english: "Muscle group",
+                                    norwegian: "Muskelgruppe"
+                                )
+                                : library.localizedBodyPartTitle(
+                                    selectedBodyPart
+                                ),
                             active: selectedBodyPart != "All"
                         )
                     }
 
                     Menu {
-                        Button("All") { selectedEquipment = "All" }
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "All",
+                                norwegian: "Alle"
+                            )
+                        ) { selectedEquipment = "All" }
                         ForEach(library.equipmentOptions, id: \.self) { equipment in
                             Button(equipment) { selectedEquipment = equipment }
                         }
                     } label: {
                         filterChip(
                             selectedEquipment == "All"
-                                ? "Equipment"
+                                ? ATHLTHLocalization.choose(
+                                    english: "Equipment",
+                                    norwegian: "Utstyr"
+                                )
                                 : selectedEquipment,
                             active: selectedEquipment != "All"
                         )
                     }
 
                     if selectedBodyPart != "All" || selectedEquipment != "All" {
-                        Button("Clear") {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Clear",
+                                norwegian: "Nullstill"
+                            )
+                        ) {
                             selectedBodyPart = "All"
                             selectedEquipment = "All"
                         }
