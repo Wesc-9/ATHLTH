@@ -4660,6 +4660,572 @@ struct CommunityEventDetailView: View {
         )
     }
 
+    private func routeMetricsCard(
+        _ route: TrainingRoute
+    ) -> some View {
+        let distance =
+            resolvedRouteDistance(
+                route
+            )
+        let ascent =
+            resolvedElevationGain(
+                route
+            )
+        let descent =
+            resolvedElevationLoss(
+                route
+            )
+        let walk =
+            estimatedRouteDuration(
+                distanceKilometers:
+                    distance,
+                ascentMeters:
+                    ascent,
+                speedKilometersPerHour:
+                    5.0,
+                ascentMetersPerHour:
+                    600
+            )
+        let jog =
+            estimatedRouteDuration(
+                distanceKilometers:
+                    distance,
+                ascentMeters:
+                    ascent,
+                speedKilometersPerHour:
+                    8.0,
+                ascentMetersPerHour:
+                    1_000
+            )
+
+        return ATHLTHCard {
+            VStack(
+                alignment: .leading,
+                spacing: 14
+            ) {
+                HStack {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 3
+                    ) {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Route details",
+                                norwegian:
+                                    "Ruteinfo"
+                            )
+                        )
+                        .font(.headline)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Estimated times are guidance, not live navigation.",
+                                norwegian:
+                                    "Estimerte tider er veiledende, ikke live navigasjon."
+                            )
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                    }
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chart.xyaxis.line"
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme.vitality
+                    )
+                }
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .flexible(),
+                            spacing: 10
+                        ),
+                        GridItem(
+                            .flexible(),
+                            spacing: 10
+                        )
+                    ],
+                    spacing: 10
+                ) {
+                    eventRouteMetric(
+                        icon: "point.topleft.down.curvedto.point.bottomright.up",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english: "Distance",
+                                norwegian:
+                                    "Distanse"
+                            ),
+                        value:
+                            String(
+                                format:
+                                    "%.1f km",
+                                distance
+                            )
+                    )
+
+                    eventRouteMetric(
+                        icon: "mountain.2.fill",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Elevation gain",
+                                norwegian:
+                                    "Høydemeter"
+                            ),
+                        value:
+                            ascent > 0
+                                ? "\(Int(ascent.rounded())) m"
+                                : "—"
+                    )
+
+                    eventRouteMetric(
+                        icon: "figure.walk",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Estimated walk",
+                                norwegian:
+                                    "Estimert gange"
+                            ),
+                        value:
+                            compactEventDuration(
+                                walk
+                            )
+                    )
+
+                    eventRouteMetric(
+                        icon: "figure.run",
+                        title:
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Estimated jog",
+                                norwegian:
+                                    "Estimert jogg"
+                            ),
+                        value:
+                            compactEventDuration(
+                                jog
+                            )
+                    )
+
+                    if descent > 0 {
+                        eventRouteMetric(
+                            icon:
+                                "arrow.down.right",
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Elevation loss",
+                                    norwegian:
+                                        "Nedovermeter"
+                                ),
+                            value:
+                                "\(Int(descent.rounded())) m"
+                        )
+                    }
+
+                    if distance > 0,
+                       ascent > 0 {
+                        eventRouteMetric(
+                            icon:
+                                "chart.line.uptrend.xyaxis",
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Climb / km",
+                                    norwegian:
+                                        "Stigning / km"
+                                ),
+                            value:
+                                String(
+                                    format:
+                                        "%.0f m/km",
+                                    ascent /
+                                    distance
+                                )
+                        )
+                    }
+                }
+
+                if let start =
+                        route.startName?
+                            .nilIfBlank {
+                    eventDetailRow(
+                        ATHLTHLocalization.choose(
+                            english: "Start",
+                            norwegian: "Start"
+                        ),
+                        value: start,
+                        icon:
+                            "location.fill"
+                    )
+                }
+
+                if let finish =
+                        route.endName?
+                            .nilIfBlank {
+                    eventDetailRow(
+                        ATHLTHLocalization.choose(
+                            english: "Finish",
+                            norwegian: "Mål"
+                        ),
+                        value: finish,
+                        icon:
+                            "flag.checkered"
+                    )
+                }
+
+                Button {
+                    openRouteInMaps(
+                        route
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Open in Apple Maps",
+                            norwegian:
+                                "Åpne i Apple Maps"
+                        ),
+                        systemImage:
+                            "map.fill"
+                    )
+                    .font(
+                        .subheadline
+                            .weight(
+                                .semibold
+                            )
+                    )
+                    .frame(
+                        maxWidth:
+                            .infinity,
+                        minHeight: 44
+                    )
+                }
+                .buttonStyle(
+                    .borderedProminent
+                )
+                .tint(
+                    ATHLTHTheme.vitality
+                )
+            }
+        }
+    }
+
+    private func eventRouteMetric(
+        icon: String,
+        title: String,
+        value: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 7
+        ) {
+            Image(
+                systemName: icon
+            )
+            .font(
+                .subheadline
+                    .weight(
+                        .semibold
+                    )
+            )
+            .foregroundStyle(
+                ATHLTHTheme.vitality
+            )
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(
+                    .secondary
+                )
+
+            Text(value)
+                .font(
+                    .subheadline
+                        .weight(
+                            .bold
+                        )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme
+                        .primaryText
+                )
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .padding(12)
+        .background(
+            ATHLTHTheme
+                .surfaceSage
+                .opacity(0.72),
+            in:
+                RoundedRectangle(
+                    cornerRadius: 15,
+                    style:
+                        .continuous
+                )
+        )
+    }
+
+    private func resolvedRouteDistance(
+        _ route: TrainingRoute
+    ) -> Double {
+        if route.distanceKilometers >
+            0 {
+            return route
+                .distanceKilometers
+        }
+
+        guard route.coordinates.count >
+                1
+        else {
+            return 0
+        }
+
+        let meters =
+            zip(
+                route.coordinates,
+                route.coordinates
+                    .dropFirst()
+            )
+            .reduce(0.0) {
+                total,
+                pair in
+
+                let lhs =
+                    CLLocation(
+                        latitude:
+                            pair.0
+                                .latitude,
+                        longitude:
+                            pair.0
+                                .longitude
+                    )
+                let rhs =
+                    CLLocation(
+                        latitude:
+                            pair.1
+                                .latitude,
+                        longitude:
+                            pair.1
+                                .longitude
+                    )
+
+                return total +
+                    lhs.distance(
+                        from: rhs
+                    )
+            }
+
+        return meters / 1_000
+    }
+
+    private func resolvedElevationGain(
+        _ route: TrainingRoute
+    ) -> Double {
+        if let stored =
+                route.elevationGainMeters,
+           stored > 0 {
+            return stored
+        }
+
+        guard route.coordinates.count >
+                1
+        else {
+            return 0
+        }
+
+        return zip(
+            route.coordinates,
+            route.coordinates
+                .dropFirst()
+        )
+        .reduce(0.0) {
+            total,
+            pair in
+
+            guard
+                let lhs =
+                    pair.0.altitude,
+                let rhs =
+                    pair.1.altitude
+            else {
+                return total
+            }
+
+            return total +
+                max(
+                    rhs - lhs,
+                    0
+                )
+        }
+    }
+
+    private func resolvedElevationLoss(
+        _ route: TrainingRoute
+    ) -> Double {
+        guard route.coordinates.count >
+                1
+        else {
+            return 0
+        }
+
+        return zip(
+            route.coordinates,
+            route.coordinates
+                .dropFirst()
+        )
+        .reduce(0.0) {
+            total,
+            pair in
+
+            guard
+                let lhs =
+                    pair.0.altitude,
+                let rhs =
+                    pair.1.altitude
+            else {
+                return total
+            }
+
+            return total +
+                max(
+                    lhs - rhs,
+                    0
+                )
+        }
+    }
+
+    private func estimatedRouteDuration(
+        distanceKilometers: Double,
+        ascentMeters: Double,
+        speedKilometersPerHour:
+            Double,
+        ascentMetersPerHour:
+            Double
+    ) -> TimeInterval {
+        guard
+            distanceKilometers > 0,
+            speedKilometersPerHour > 0
+        else {
+            return 0
+        }
+
+        let flatHours =
+            distanceKilometers /
+            speedKilometersPerHour
+        let climbHours =
+            ascentMeters > 0 &&
+            ascentMetersPerHour > 0
+                ? ascentMeters /
+                    ascentMetersPerHour
+                : 0
+
+        return (
+            flatHours +
+            climbHours
+        ) * 3_600
+    }
+
+    private func compactEventDuration(
+        _ seconds: TimeInterval
+    ) -> String {
+        guard seconds > 0 else {
+            return "—"
+        }
+
+        let totalMinutes =
+            max(
+                Int(
+                    (seconds / 60)
+                        .rounded()
+                ),
+                1
+            )
+        let hours =
+            totalMinutes / 60
+        let minutes =
+            totalMinutes % 60
+
+        if hours > 0 {
+            return minutes > 0
+                ? "\(hours)t \(minutes)min"
+                : "\(hours)t"
+        }
+
+        return "\(minutes) min"
+    }
+
+    private func openRouteInMaps(
+        _ route: TrainingRoute
+    ) {
+        guard
+            let first =
+                route.coordinates.first,
+            let last =
+                route.coordinates.last
+        else {
+            return
+        }
+
+        let source =
+            MKMapItem(
+                placemark:
+                    MKPlacemark(
+                        coordinate:
+                            first.coordinate
+                    )
+            )
+        source.name =
+            route.startName ??
+            ATHLTHLocalization.choose(
+                english:
+                    "Route start",
+                norwegian:
+                    "Rutestart"
+            )
+
+        let destination =
+            MKMapItem(
+                placemark:
+                    MKPlacemark(
+                        coordinate:
+                            last.coordinate
+                    )
+            )
+        destination.name =
+            route.endName ??
+            ATHLTHLocalization.choose(
+                english:
+                    "Route finish",
+                norwegian:
+                    "Rutemål"
+            )
+
+        MKMapItem.openMaps(
+            with: [
+                source,
+                destination
+            ],
+            launchOptions: [
+                MKLaunchOptionsDirectionsModeKey:
+                    MKLaunchOptionsDirectionsModeWalking
+            ]
+        )
+    }
+
     private func routeRegion(
         _ route:
             TrainingRoute
