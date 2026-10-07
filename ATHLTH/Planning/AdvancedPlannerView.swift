@@ -4696,6 +4696,16 @@ struct SessionEditorView: View {
                 )
 
 
+                Section {
+                    workoutBuilderOverview
+                }
+                .listRowBackground(
+                    ATHLTHTheme.card
+                )
+                .listRowSeparatorTint(
+                    ATHLTHTheme.border
+                )
+
                 if existingWorkout == nil ||
                     kind == .strength {
                     Section {
@@ -4855,10 +4865,13 @@ struct SessionEditorView: View {
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
                     ExerciseLibraryView(
-                        selectionTitle: "Add to Workout"
+                        selectionTitle:
+                            ATHLTHLocalization.choose(
+                                english: "Add to Workout",
+                                norwegian: "Legg til i økten"
+                            )
                     ) { entry in
                         addExercise(entry.exercise)
-                        showingExerciseLibrary = false
                     }
                 }
             }
@@ -5778,6 +5791,465 @@ struct SessionEditorView: View {
             ATHLTHTheme.border
         )
         .environment(\.editMode, .constant(.active))
+    }
+
+    private var workoutBuilderOverview:
+        some View {
+        VStack(
+            alignment: .leading,
+            spacing: 13
+        ) {
+            HStack {
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "WORKOUT OVERVIEW",
+                            norwegian:
+                                "ØKTOVERSIKT"
+                        )
+                    )
+                    .font(.system(size: 8.5, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+
+                    Text(
+                        title
+                            .trimmingCharacters(
+                                in:
+                                    .whitespacesAndNewlines
+                            )
+                            .isEmpty
+                            ? kind.title
+                            : title
+                    )
+                    .font(.headline)
+                    .foregroundStyle(
+                        ATHLTHTheme.primaryText
+                    )
+                    .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(
+                    systemName:
+                        kind.systemImage
+                )
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.accentDeep
+                )
+                .frame(width: 40, height: 40)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            ATHLTHTheme
+                                .champagneSoft,
+                            ATHLTHTheme
+                                .accentSoft
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    )
+                )
+            }
+
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .flexible(),
+                        spacing: 7
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 7
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 7
+                    ),
+                    GridItem(
+                        .flexible(),
+                        spacing: 7
+                    )
+                ],
+                spacing: 7
+            ) {
+                workoutOverviewMetric(
+                    value:
+                        workoutOverviewDuration,
+                    label:
+                        ATHLTHLocalization.choose(
+                            english: "Time",
+                            norwegian: "Tid"
+                        )
+                )
+
+                workoutOverviewMetric(
+                    value:
+                        workoutOverviewPrimaryCount,
+                    label:
+                        workoutOverviewPrimaryLabel
+                )
+
+                workoutOverviewMetric(
+                    value:
+                        workoutOverviewSecondaryCount,
+                    label:
+                        workoutOverviewSecondaryLabel
+                )
+
+                workoutOverviewMetric(
+                    value:
+                        workoutOverviewLoadValue,
+                    label:
+                        workoutOverviewLoadLabel
+                )
+            }
+
+            if kind == .strength,
+               !workoutOverviewMuscles.isEmpty {
+                HStack(spacing: 7) {
+                    Image(
+                        systemName:
+                            "figure.strengthtraining.traditional"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.accentDeep
+                    )
+
+                    Text(
+                        workoutOverviewMuscles
+                    )
+                    .font(.caption)
+                    .foregroundStyle(
+                        ATHLTHTheme.mutedText
+                    )
+                    .lineLimit(2)
+
+                    Spacer()
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func workoutOverviewMetric(
+        value: String,
+        label: String
+    ) -> some View {
+        VStack(
+            alignment: .leading,
+            spacing: 2
+        ) {
+            Text(value)
+                .font(
+                    .system(
+                        size: 15,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
+                .foregroundStyle(
+                    ATHLTHTheme.primaryText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Text(label)
+                .font(.system(size: 8.5, weight: .semibold))
+                .foregroundStyle(
+                    ATHLTHTheme.mutedText
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(9)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 49,
+            alignment: .leading
+        )
+        .background(
+            ATHLTHTheme.accentSoft
+                .opacity(0.40),
+            in: RoundedRectangle(
+                cornerRadius: 12,
+                style: .continuous
+            )
+        )
+    }
+
+    private var workoutOverviewDuration:
+        String {
+        if kind == .strength,
+           !plannedExercises.isEmpty {
+            let seconds =
+                plannedExercises.reduce(0) {
+                    total,
+                    exercise in
+
+                    let targets =
+                        exercise
+                            .resolvedSetTargets
+                    let work =
+                        targets.reduce(0) {
+                            partial,
+                            target in
+
+                            switch exercise
+                                .resolvedTargetKind {
+                            case .reps:
+                                return partial +
+                                    max(
+                                        target.reps ??
+                                            exercise
+                                                .reps ??
+                                            8,
+                                        1
+                                    ) * 4
+                            case .time:
+                                return partial +
+                                    max(
+                                        target
+                                            .durationSeconds ??
+                                            exercise
+                                                .resolvedTargetDurationSeconds ??
+                                            60,
+                                        15
+                                    )
+                            }
+                        }
+                    let rest =
+                        targets
+                            .dropLast()
+                            .reduce(0) {
+                                $0 +
+                                max(
+                                    $1.restSeconds ??
+                                        exercise
+                                            .restSeconds ??
+                                        90,
+                                    0
+                                )
+                            }
+
+                    return
+                        total +
+                        work +
+                        rest
+                }
+
+            let estimated =
+                max(
+                    Int(
+                        ceil(
+                            Double(seconds) /
+                            60.0
+                        )
+                    ),
+                    1
+                )
+
+            return "~\(estimated)m"
+        }
+
+        return "\(durationMinutes)m"
+    }
+
+    private var workoutOverviewPrimaryCount:
+        String {
+        if kind == .running {
+            return
+                "\(selectedRunningWorkouts.count)"
+        }
+
+        return
+            "\(plannedExercises.count)"
+    }
+
+    private var workoutOverviewPrimaryLabel:
+        String {
+        if kind == .running {
+            return ATHLTHLocalization.choose(
+                english: "Runs",
+                norwegian: "Løp"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Exercises",
+            norwegian: "Øvelser"
+        )
+    }
+
+    private var workoutOverviewSecondaryCount:
+        String {
+        if kind == .strength {
+            return
+                "\(plannedExercises.reduce(0) { $0 + max($1.sets, 1) })"
+        }
+
+        if kind == .running {
+            return
+                "\(selectedRunningWorkouts.reduce(0) { $0 + $1.blocks.count })"
+        }
+
+        return "—"
+    }
+
+    private var workoutOverviewSecondaryLabel:
+        String {
+        if kind == .strength {
+            return ATHLTHLocalization.choose(
+                english: "Sets",
+                norwegian: "Sett"
+            )
+        }
+
+        if kind == .running {
+            return ATHLTHLocalization.choose(
+                english: "Blocks",
+                norwegian: "Deler"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Structure",
+            norwegian: "Struktur"
+        )
+    }
+
+    private var workoutOverviewLoadValue:
+        String {
+        if kind == .strength {
+            let volume =
+                plannedExercises.reduce(0.0) {
+                    total,
+                    exercise in
+
+                    guard
+                        exercise.resolvedTargetKind ==
+                            .reps,
+                        exercise.resolvedLoadKind ==
+                            .weightKilograms
+                    else {
+                        return total
+                    }
+
+                    let exerciseVolume =
+                        exercise
+                            .resolvedSetTargets
+                            .reduce(0.0) {
+                                partial,
+                                target in
+
+                                guard
+                                    let reps =
+                                        target.reps,
+                                    let load =
+                                        target
+                                            .weightKilograms
+                                else {
+                                    return partial
+                                }
+
+                                return
+                                    partial +
+                                    Double(reps) *
+                                    load
+                            }
+
+                    return
+                        total +
+                        exerciseVolume
+                }
+
+            guard volume > 0 else {
+                return "—"
+            }
+
+            if volume >= 1_000 {
+                return String(
+                    format:
+                        "%.1ft",
+                    volume / 1_000
+                )
+            }
+
+            return String(
+                format:
+                    "%.0fkg",
+                volume
+            )
+        }
+
+        if kind == .running ||
+            kind == .walking {
+            return String(
+                format:
+                    "%.1fkm",
+                distanceKilometers
+            )
+        }
+
+        return "—"
+    }
+
+    private var workoutOverviewLoadLabel:
+        String {
+        if kind == .strength {
+            return ATHLTHLocalization.choose(
+                english: "Volume",
+                norwegian: "Volum"
+            )
+        }
+
+        if kind == .running ||
+            kind == .walking {
+            return ATHLTHLocalization.choose(
+                english: "Distance",
+                norwegian: "Distanse"
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english: "Load",
+            norwegian: "Belastning"
+        )
+    }
+
+    private var workoutOverviewMuscles:
+        String {
+        let muscles =
+            plannedExercises
+                .flatMap {
+                    $0.embeddedExercise
+                        .primaryMuscles
+                }
+        var seen =
+            Set<String>()
+        let unique =
+            muscles.filter {
+                seen.insert($0)
+                    .inserted
+            }
+
+        return
+            unique
+                .prefix(4)
+                .joined(separator: " · ")
     }
 
     private var plannedRunGuidanceSection:
