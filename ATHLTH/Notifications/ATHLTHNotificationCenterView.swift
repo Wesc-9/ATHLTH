@@ -44,6 +44,7 @@ struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var communityGroups: CommunityGroupStore
 
     @State private var selectedWorkoutImportIDs: Set<UUID> = []
     @State private var selectedScope: ATHLTHNotificationScope = .all
@@ -1662,6 +1663,13 @@ struct ATHLTHNotificationCenterView: View {
             )
         }
 
+        if notificationGroupID(item) != nil {
+            return ATHLTHLocalization.choose(
+                english: "Open Club",
+                norwegian: "Åpne klubb"
+            )
+        }
+
         switch item.socialEventKind?.lowercased() {
         case "reaction":
             return ATHLTHLocalization.choose(
@@ -1743,6 +1751,10 @@ struct ATHLTHNotificationCenterView: View {
             return true
         }
 
+        if notificationGroupID(item) != nil {
+            return true
+        }
+
         switch item.socialEventKind {
         case "friend_request",
              "friend_accepted",
@@ -1790,6 +1802,11 @@ struct ATHLTHNotificationCenterView: View {
             )
         } else if item.kind == .achievement {
             TrophyCollectionView()
+        } else if let groupID =
+                    notificationGroupID(item) {
+            CommunityGroupNotificationDestination(
+                groupID: groupID
+            )
         } else {
             let eventKind =
                 item.socialEventKind?.lowercased() ?? ""
@@ -1819,6 +1836,38 @@ struct ATHLTHNotificationCenterView: View {
                 )
             }
         }
+    }
+
+    private func notificationGroupID(
+        _ item: ATHLTHNotificationItem
+    ) -> UUID? {
+        if let groupID = item.groupID {
+            return groupID
+        }
+
+        if let backendEventID =
+                item.backendEventID,
+           let event =
+                social.inboxEvents.first(
+                    where: {
+                        $0.id ==
+                            backendEventID
+                    }
+                ),
+           let groupID = event.groupID {
+            return groupID
+        }
+
+        let entityType =
+            item.socialEntityType?
+                .lowercased()
+
+        if entityType == "community_group" ||
+            entityType == "group" {
+            return item.socialEntityID
+        }
+
+        return nil
     }
 
     private func isDeletedGoalNotification(
@@ -1871,6 +1920,73 @@ struct ATHLTHNotificationCenterView: View {
             return .blue
         case .system:
             return .secondary
+        }
+    }
+}
+
+private struct CommunityGroupNotificationDestination: View {
+    @EnvironmentObject private var groups: CommunityGroupStore
+
+    let groupID: UUID
+
+    @State private var finishedLookup = false
+
+    private var resolvedGroup: CommunityGroupRecord? {
+        groups.groups.first {
+            $0.id == groupID
+        } ??
+        groups.searchResults.first {
+            $0.id == groupID
+        }
+    }
+
+    var body: some View {
+        Group {
+            if let group = resolvedGroup {
+                CommunityGroupDetailView(
+                    group: group
+                )
+            } else if finishedLookup {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english: "Club unavailable",
+                        norwegian: "Klubben er ikke tilgjengelig"
+                    ),
+                    systemImage:
+                        "person.3.fill",
+                    description: Text(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "ATHLTH could not load this Club. It may have been deleted or you may no longer have access.",
+                            norwegian:
+                                "ATHLTH kunne ikke laste denne klubben. Den kan være slettet, eller du har ikke lenger tilgang."
+                        )
+                    )
+                )
+            } else {
+                ProgressView(
+                    ATHLTHLocalization.choose(
+                        english: "Opening Club…",
+                        norwegian: "Åpner klubb…"
+                    )
+                )
+            }
+        }
+        .task(id: groupID) {
+            if resolvedGroup == nil {
+                await groups.refresh(
+                    force: true
+                )
+            }
+
+            if resolvedGroup != nil {
+                await groups
+                    .loadGroupContent(
+                        groupID
+                    )
+            }
+
+            finishedLookup = true
         }
     }
 }
