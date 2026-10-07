@@ -3365,6 +3365,79 @@ struct CommunityEventDetailView: View {
     }
 
 
+    private func checkInOpensAt(
+        _ item: CommunityEventItem
+    ) -> Date {
+        item.event.startsAt
+            .addingTimeInterval(
+                -30 * 60
+            )
+    }
+
+    private func canCheckInNow(
+        _ item: CommunityEventItem,
+        now: Date = Date()
+    ) -> Bool {
+        guard
+            item.event.status !=
+                "cancelled",
+            item.event.status !=
+                "completed"
+        else {
+            return false
+        }
+
+        return now >=
+            checkInOpensAt(item)
+    }
+
+    private func checkInAvailabilityText(
+        _ item: CommunityEventItem,
+        now: Date = Date()
+    ) -> String {
+        if item.event.status ==
+            "cancelled" ||
+            item.event.status ==
+            "completed" {
+            return ATHLTHLocalization.choose(
+                english:
+                    "Check-in is closed.",
+                norwegian:
+                    "Innsjekk er stengt."
+            )
+        }
+
+        let opensAt =
+            checkInOpensAt(item)
+
+        if now < opensAt {
+            return ATHLTHLocalization.format(
+                english:
+                    "Opens 30 min before start · %@",
+                norwegian:
+                    "Åpner 30 min før start · %@",
+                opensAt.formatted(
+                    date:
+                        Calendar.current
+                            .isDateInToday(
+                                opensAt
+                            )
+                            ? .omitted
+                            : .abbreviated,
+                    time:
+                        .shortened
+                )
+            )
+        }
+
+        return ATHLTHLocalization.choose(
+            english:
+                "Check-in is open.",
+            norwegian:
+                "Innsjekk er åpen."
+        )
+    }
+
     @ViewBuilder
     private func checkInCard(
         _ item: CommunityEventItem
@@ -3553,7 +3626,10 @@ struct CommunityEventDetailView: View {
                         )
                         .disabled(
                             checkInLocation
-                                .isLocating
+                                .isLocating ||
+                            !canCheckInNow(
+                                item
+                            )
                         )
                         .padding(.top, 8)
 
@@ -3715,6 +3791,17 @@ struct CommunityEventDetailView: View {
         _ item: CommunityEventItem,
         automatic: Bool
     ) async {
+        guard canCheckInNow(item)
+        else {
+            if !automatic {
+                checkInMessage =
+                    checkInAvailabilityText(
+                        item
+                    )
+            }
+            return
+        }
+
         guard let meeting =
                 meetingLocation(item)
         else {
@@ -3801,6 +3888,15 @@ struct CommunityEventDetailView: View {
     private func manualCheckIn(
         _ item: CommunityEventItem
     ) async {
+        guard canCheckInNow(item)
+        else {
+            checkInMessage =
+                checkInAvailabilityText(
+                    item
+                )
+            return
+        }
+
         let saved =
             await community.checkIn(
                 item,
@@ -3839,6 +3935,7 @@ struct CommunityEventDetailView: View {
                 session.profile.userID,
               community.isJoined(item),
               !community.isCheckedIn(item),
+              canCheckInNow(item),
               hasMeetingCoordinate(item),
               item.event.status !=
                 "cancelled",
