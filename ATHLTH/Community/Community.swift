@@ -7897,6 +7897,12 @@ struct CommunityEventCreateView: View {
                                     Button {
                                         draft.activityType =
                                             activity
+                                        draft.competitionMetric =
+                                            CommunityEventCompetitionMetric
+                                                .defaultMetric(
+                                                    for:
+                                                        activity
+                                                )
 
                                         if activity !=
                                             .running &&
@@ -8384,6 +8390,177 @@ struct CommunityEventCreateView: View {
                                     )
                                     .padding(.top, 12)
                                 }
+                            }
+                        }
+
+                        eventSection(
+                            title:
+                                ATHLTHLocalization.choose(
+                                    english:
+                                        "Competition",
+                                    norwegian:
+                                        "Konkurranse"
+                                ),
+                            icon:
+                                "trophy.fill"
+                        ) {
+                            HStack(spacing: 12) {
+                                Image(
+                                    systemName:
+                                        "trophy.fill"
+                                )
+                                .font(
+                                    .system(
+                                        size: 17,
+                                        weight:
+                                            .semibold
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                )
+                                .frame(
+                                    width: 38,
+                                    height: 38
+                                )
+                                .background(
+                                    ATHLTHTheme
+                                        .premiumGold
+                                        .opacity(
+                                            0.12
+                                        ),
+                                    in:
+                                        RoundedRectangle(
+                                            cornerRadius:
+                                                12,
+                                            style:
+                                                .continuous
+                                        )
+                                )
+
+                                VStack(
+                                    alignment:
+                                        .leading,
+                                    spacing: 3
+                                ) {
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "Make this a competition",
+                                            norwegian:
+                                                "Gjør arrangementet til en konkurranse"
+                                        )
+                                    )
+                                    .font(
+                                        .subheadline
+                                            .weight(
+                                                .semibold
+                                            )
+                                    )
+
+                                    Text(
+                                        ATHLTHLocalization.choose(
+                                            english:
+                                                "A one-time ranking tied to this event and check-in.",
+                                            norwegian:
+                                                "En engangsrangering knyttet til arrangementet og innsjekk."
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        .secondary
+                                    )
+                                }
+
+                                Spacer(
+                                    minLength: 8
+                                )
+
+                                Toggle(
+                                    "",
+                                    isOn:
+                                        $draft
+                                            .competitionEnabled
+                                )
+                                .labelsHidden()
+                                .tint(
+                                    ATHLTHTheme
+                                        .accent
+                                )
+                            }
+
+                            if draft
+                                .competitionEnabled {
+                                eventDivider
+
+                                Menu {
+                                    ForEach(
+                                        CommunityEventCompetitionMetric
+                                            .options(
+                                                for:
+                                                    draft
+                                                        .activityType
+                                            )
+                                    ) {
+                                        metric in
+
+                                        Button {
+                                            draft
+                                                .competitionMetric =
+                                                metric
+                                        } label: {
+                                            Label(
+                                                metric
+                                                    .title,
+                                                systemImage:
+                                                    metric
+                                                        .systemImage
+                                            )
+                                        }
+                                    }
+                                } label: {
+                                    eventSelectionRow(
+                                        title:
+                                            ATHLTHLocalization.choose(
+                                                english:
+                                                    "Ranking",
+                                                norwegian:
+                                                    "Rangering"
+                                            ),
+                                        value:
+                                            draft
+                                                .competitionMetric
+                                                .title,
+                                        icon:
+                                            draft
+                                                .competitionMetric
+                                                .systemImage
+                                    )
+                                }
+
+                                eventDivider
+
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "Participants must check in before they can submit a result. Challenges remain separate for competitions over several days or weeks.",
+                                        norwegian:
+                                            "Deltakere må sjekke inn før de kan registrere resultat. Challenges brukes fortsatt for konkurranser over flere dager eller uker."
+                                    ),
+                                    systemImage:
+                                        "checkmark.seal.fill"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(
+                                    .secondary
+                                )
+                                .fixedSize(
+                                    horizontal:
+                                        false,
+                                    vertical:
+                                        true
+                                )
                             }
                         }
 
