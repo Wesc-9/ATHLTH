@@ -1502,6 +1502,29 @@ final class CommunityEventStore: ObservableObject {
             }
     }
 
+    /// Keep a completed event visible in the active Community surface for one
+    /// day after it is closed. updatedAt is written by the lifecycle RPC at
+    /// completion time, so this does not depend on an optional planned end.
+    var recentlyCompletedEvents:
+        [CommunityEventItem] {
+        let cutoff =
+            Date().addingTimeInterval(
+                -24 * 60 * 60
+            )
+
+        return events
+            .filter {
+                $0.event.status ==
+                    "completed" &&
+                $0.event.updatedAt >=
+                    cutoff
+            }
+            .sorted {
+                $0.event.updatedAt >
+                    $1.event.updatedAt
+            }
+    }
+
     func refresh(force: Bool = false) async {
         guard currentUserID != nil else {
             events = []
