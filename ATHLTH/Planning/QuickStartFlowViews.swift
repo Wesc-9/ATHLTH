@@ -1666,9 +1666,9 @@ struct RunQuickStartSheet: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Set the treadmill incline for this workout. You can change it in 0.5% steps before starting.",
+                                "Set the treadmill incline for this workout. You can adjust it in 0.5% steps before or during the run, and correct it after the workout.",
                             norwegian:
-                                "Angi stigningen på tredemøllen for denne økten. Du kan justere i trinn på 0,5 % før start."
+                                "Angi stigningen på tredemøllen for denne økten. Du kan justere i trinn på 0,5 % før eller under økten, og korrigere den etterpå."
                         )
                     )
                     .font(.caption)
