@@ -1,5 +1,4 @@
 import Foundation
-import UserNotifications
 
 @MainActor
 final class SocialStore: ObservableObject {
@@ -2714,20 +2713,10 @@ final class SocialStore: ObservableObject {
     }
 
     private func syncApplicationIconBadge() {
-        let unread =
-            inboxEvents.filter {
-                $0.readAt == nil
-            }
-            .count
-
-        Task {
-            try? await
-                UNUserNotificationCenter
-                    .current()
-                    .setBadgeCount(
-                        unread
-                    )
-        }
+        // ProductRootTabView owns the app-icon badge because only the root
+        // sees every user-visible source (bell, messages and workout imports).
+        // Keeping badge writes centralized prevents a stale backend inbox row
+        // from overwriting the zero badge shown by the in-app surfaces.
     }
 
     private func resolveWorkoutInvite(
