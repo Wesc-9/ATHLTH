@@ -1676,21 +1676,45 @@ struct CommunityFriendsVsFriendsDetailView: View {
         return VStack(spacing: 0) {
                 matchupHeader
 
-                metricRow(
-                    ATHLTHLocalization.choose(
-                        english: "Workouts",
-                        norwegian: "Økter"
-                    ),
-                    icon:
-                        "figure.run.circle.fill",
-                    mine: mine.workouts,
-                    theirs: theirs.workouts,
-                    format: countText,
-                    emphasis:
-                        metricEmphasis(
-                            for: .workouts
-                        )
-                )
+                if directMetric ==
+                    .workoutCount {
+                    metricRow(
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Workouts · duel",
+                            norwegian:
+                                "Treningsøkter · duell"
+                        ),
+                        icon:
+                            "checkmark.circle.fill",
+                        mine:
+                            primaryScoreValues
+                                .mine,
+                        theirs:
+                            primaryScoreValues
+                                .theirs,
+                        format: countText,
+                        emphasis:
+                            .highlighted
+                    )
+                } else {
+                    metricRow(
+                        ATHLTHLocalization.choose(
+                            english: "Workouts",
+                            norwegian: "Økter"
+                        ),
+                        icon:
+                            "figure.run.circle.fill",
+                        mine: mine.workouts,
+                        theirs:
+                            theirs.workouts,
+                        format: countText,
+                        emphasis:
+                            metricEmphasis(
+                                for: .workouts
+                            )
+                    )
+                }
 
                 Divider()
                     .opacity(
@@ -2369,6 +2393,14 @@ struct CommunityFriendsVsFriendsDetailView: View {
             )
         }
 
+        if directMetric(
+            for: duel
+        ) == .workoutCount {
+            return directWorkoutCountValues(
+                for: duel
+            )
+        }
+
         let leaderboard =
             challenges.leaderboard(
                 for: duel.id
@@ -2460,6 +2492,12 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
 
         switch (metric, kind) {
+        case (
+            .workoutCount,
+            .workouts
+        ):
+            return .highlighted
+
         case (
             .runningDistance,
             .running
@@ -2714,6 +2752,42 @@ struct CommunityFriendsVsFriendsDetailView: View {
         await social.refresh(
             challengeStore:
                 challenges
+        )
+    }
+
+    private func directWorkoutCountValues(
+        for duel:
+            ATHLTHChallenge
+    ) -> (
+        mine: Double?,
+        theirs: Double?
+    ) {
+        let start =
+            duel.rules.startsAt
+        let end =
+            duel.rules.endsAt ??
+            Date.distantFuture
+
+        let myCount =
+            health.workouts
+                .filter {
+                    $0.startDate >= start &&
+                    $0.startDate <= end
+                }
+                .count
+
+        let friendCount =
+            friendActivities
+                .filter {
+                    $0.kind == "workout" &&
+                    $0.createdAt >= start &&
+                    $0.createdAt <= end
+                }
+                .count
+
+        return (
+            Double(myCount),
+            Double(friendCount)
         )
     }
 
