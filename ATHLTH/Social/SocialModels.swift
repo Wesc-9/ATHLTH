@@ -491,6 +491,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
     let message: String
     let entityType: String?
     let entityID: UUID?
+    let groupID: UUID?
     let createdAt: Date
     let readAt: Date?
     let pushNotifiedAt: Date?
@@ -504,6 +505,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         case message
         case entityType = "entity_type"
         case entityID = "entity_id"
+        case groupID = "group_id"
         case createdAt = "created_at"
         case readAt = "read_at"
         case pushNotifiedAt = "push_notified_at"
