@@ -2942,7 +2942,8 @@ final class SocialStore: ObservableObject {
                     backendEventID: event.id,
                     socialEventKind: event.kind,
                     socialEntityType: event.entityType,
-                    socialEntityID: event.entityID
+                    socialEntityID: event.entityID,
+                    groupID: event.groupID
                 ),
                 deliverSystemAlert:
                     deliverSystemAlerts &&
