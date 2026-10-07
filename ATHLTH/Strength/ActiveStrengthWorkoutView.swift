@@ -21,6 +21,7 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var watchFinishError: String?
     @State private var showingExerciseLibrary = false
+    @State private var showingAIExercisePlanner = false
     @State private var pendingExercise: ExerciseLibraryEntry?
     @State private var editingSetResult:
         StrengthSetResultEditTarget?
@@ -175,6 +176,24 @@ struct ActiveStrengthWorkoutView: View {
                         pendingExercise = entry
                         showingExerciseLibrary = false
                     }
+                }
+            }
+            .sheet(
+                isPresented:
+                    $showingAIExercisePlanner
+            ) {
+                StrengthAIExercisePlannerView(
+                    existingExercises:
+                        activeExistingPlannedExercises,
+                    recentWorkouts:
+                        strength
+                            .workoutHistory
+                ) {
+                    additions in
+
+                    appendAIExercises(
+                        additions
+                    )
                 }
             }
             .sheet(item: $pendingExercise) { entry in
@@ -5115,6 +5134,36 @@ struct ActiveStrengthWorkoutView: View {
                             )
 
                             Button {
+                                showingAIExercisePlanner =
+                                    true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english:
+                                            "AI add exercises",
+                                        norwegian:
+                                            "AI legg til øvelser"
+                                    ),
+                                    systemImage:
+                                        "sparkles"
+                                )
+                                .font(
+                                    .subheadline
+                                        .weight(.semibold)
+                                )
+                                .frame(
+                                    maxWidth:
+                                        .infinity,
+                                    minHeight: 44
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(
+                                ATHLTHTheme
+                                    .premiumGold
+                            )
+
+                            Button {
                                 showingWorkoutReview =
                                     true
                             } label: {
@@ -5229,6 +5278,160 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    private var activeExistingPlannedExercises:
+        [PlannedExercise] {
+        guard let workout =
+                strength.activeWorkout
+        else {
+            return []
+        }
+
+        let entriesByName =
+            Dictionary(
+                grouping:
+                    exerciseLibrary
+                        .allExercises
+            ) {
+                $0.canonicalName
+                    .folding(
+                        options: [
+                            .caseInsensitive,
+                            .diacriticInsensitive
+                        ],
+                        locale: .current
+                    )
+                    .lowercased()
+            }
+
+        return workout.exercises
+            .map {
+                exerciseLog in
+
+                let key =
+                    exerciseLog
+                        .exercise
+                        .name
+                        .folding(
+                            options: [
+                                .caseInsensitive,
+                                .diacriticInsensitive
+                            ],
+                            locale: .current
+                        )
+                        .lowercased()
+
+                let matchedEntry =
+                    entriesByName[key]?
+                        .first
+
+                let firstSet =
+                    exerciseLog
+                        .sets
+                        .first
+
+                return PlannedExercise(
+                    id: UUID(),
+                    exerciseID:
+                        matchedEntry?.id,
+                    embeddedExercise:
+                        exerciseLog
+                            .exercise,
+                    sets:
+                        max(
+                            exerciseLog
+                                .sets
+                                .count,
+                            1
+                        ),
+                    reps:
+                        firstSet?
+                            .plannedReps,
+                    targetWeightKilograms:
+                        firstSet?
+                            .plannedWeightKilograms,
+                    targetRPE:
+                        firstSet?
+                            .plannedRPE,
+                    restSeconds:
+                        firstSet?
+                            .restSeconds,
+                    notes: nil,
+                    targetRIR:
+                        firstSet?
+                            .plannedRIR,
+                    supersetGroupID:
+                        nil,
+                    progression:
+                        StrengthProgressionRule
+                            .none
+                )
+            }
+    }
+
+    private func appendAIExercises(
+        _ additions:
+            [PlannedExercise]
+    ) {
+        var didAppend = false
+
+        for planned in additions {
+            guard
+                let exerciseID =
+                    planned.exerciseID,
+                let entry =
+                    exerciseLibrary
+                        .allExercises
+                        .first(
+                            where: {
+                                $0.id ==
+                                    exerciseID
+                            }
+                        )
+            else {
+                continue
+            }
+
+            strength.appendExercise(
+                entry.exercise,
+                sets:
+                    max(
+                        planned.sets,
+                        1
+                    ),
+                reps:
+                    planned.reps ??
+                    8,
+                targetKind:
+                    planned
+                        .resolvedTargetKind,
+                targetDurationSeconds:
+                    planned
+                        .resolvedTargetDurationSeconds,
+                loadKind:
+                    planned
+                        .resolvedLoadKind,
+                targetWeightKilograms:
+                    planned
+                        .targetWeightKilograms,
+                targetResistanceLevel:
+                    planned
+                        .resolvedTargetResistanceLevel,
+                restSeconds:
+                    planned
+                        .restSeconds ??
+                    90,
+                warmUpSets: 0
+            )
+
+            didAppend = true
+        }
+
+        if didAppend {
+            showingWorkoutReview = false
+            loadDefaultsFromCurrentSet()
+        }
+    }
+
     @ViewBuilder
     private func workoutHeader(_ workout: StrengthWorkoutLog) -> some View {
         ATHLTHCard {
@@ -5304,16 +5507,47 @@ struct ActiveStrengthWorkoutView: View {
 
                 Spacer()
 
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Add",
-                        norwegian: "Legg til"
+                VStack(spacing: 8) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Add",
+                            norwegian: "Legg til"
+                        )
+                    ) {
+                        showingExerciseLibrary = true
+                    }
+                    .buttonStyle(
+                        .borderedProminent
                     )
-                ) {
-                    showingExerciseLibrary = true
+                    .tint(
+                        ATHLTHTheme.accent
+                    )
+
+                    Button {
+                        showingAIExercisePlanner =
+                            true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "AI pick",
+                                norwegian: "AI velg"
+                            ),
+                            systemImage:
+                                "sparkles"
+                        )
+                        .font(
+                            .caption
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(
+                        ATHLTHTheme
+                            .premiumGold
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accent)
             }
         }
     }
