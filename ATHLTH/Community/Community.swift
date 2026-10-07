@@ -1432,6 +1432,41 @@ final class CommunityEventStore: ObservableObject {
         _ item: CommunityEventItem,
         method: CommunityEventCheckInMethod
     ) async -> Bool {
+        let now = Date()
+        let opensAt =
+            item.event.startsAt
+                .addingTimeInterval(
+                    -30 * 60
+                )
+
+        guard now >= opensAt,
+              item.event.status !=
+                "cancelled",
+              item.event.status !=
+                "completed"
+        else {
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Check-in opens 30 minutes before the event starts.",
+                    norwegian:
+                        "Innsjekk åpner 30 minutter før arrangementet starter."
+                )
+            return false
+        }
+
+        guard isJoined(item)
+        else {
+            errorMessage =
+                ATHLTHLocalization.choose(
+                    english:
+                        "Choose Going before you check in.",
+                    norwegian:
+                        "Velg Deltar før du kan sjekke inn."
+                )
+            return false
+        }
+
         do {
             try await service.checkIn(
                 eventID: item.id,
