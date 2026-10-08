@@ -1061,11 +1061,19 @@ struct TrainingPlanDay: Identifiable, Codable, Hashable {
     var sessions: [PlannedSession]
 }
 
+/// Optional training-load designation. Missing for all historical plans.
+enum TrainingWeekStrengthPhase: String, Codable, Hashable {
+    case build
+    case deload
+}
+
 struct TrainingPlanWeek: Identifiable, Codable, Hashable {
     let id: UUID
     var weekNumber: Int
     var title: String
     var days: [TrainingPlanDay]
+    // Optional to preserve decoding of all pre-periodization plans.
+    var strengthPhase: TrainingWeekStrengthPhase? = nil
 }
 
 enum TrainingPlanBuilderMode: String, Codable, Hashable, CaseIterable, Identifiable {
