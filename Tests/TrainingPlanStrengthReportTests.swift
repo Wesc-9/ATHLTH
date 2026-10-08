@@ -175,6 +175,11 @@ final class TrainingPlanStrengthReportTests: XCTestCase {
         XCTAssertEqual(report.totalRecordedVolumeKilograms, 96)
         XCTAssertEqual(report.muscles.first?.performedVolumeKilograms, 96)
         XCTAssertEqual(report.weeks.first?.loggedStrengthSessions, 1)
+        XCTAssertEqual(report.exerciseSummaries.count, 1)
+        XCTAssertEqual(report.exerciseSummaries.first?.workingSets, 1)
+        XCTAssertEqual(report.exerciseSummaries.first?.loggedSessions, 1)
+        XCTAssertEqual(report.exerciseSummaries.first?.volumeKilograms, 96)
+        XCTAssertEqual(report.exerciseSummaries.first?.peakWeightKilograms, 10)
     }
 
     func testUnlinkedAndUnfinishedWorkoutsAreNotAttributedToPlan() {
