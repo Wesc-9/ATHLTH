@@ -101,6 +101,29 @@ targets:
         Release:
           APS_ENVIRONMENT: production
     preBuildScripts:
+      - name: Restore treadmill activity hero
+        basedOnDependencyAnalysis: false
+        showEnvVars: false
+        script: |
+          set -euo pipefail
+          python3 - "$SRCROOT" <<'PY'
+          import base64
+          import hashlib
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          payload = (root / "scripts/assets/TreadmillRecentCardHero.base64").read_text(encoding="utf-8").strip()
+          photo = base64.b64decode(payload, validate=True)
+          expected = "5d9e85cab397dcc1b544362afb8e7a16ad1e1de21443b16d3864df65df073b76"
+          if hashlib.sha256(photo).hexdigest() != expected:
+              raise SystemExit("TreadmillRecentCardHero asset checksum mismatch")
+
+          output = root / "ATHLTH/Assets.xcassets/TreadmillRecentCardHero.imageset/TreadmillRecentCardHero.jpg"
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_bytes(photo)
+          print("Restored TreadmillRecentCardHero.jpg")
+          PY
       - name: Restore strength completion hero
         basedOnDependencyAnalysis: false
         showEnvVars: false
