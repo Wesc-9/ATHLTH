@@ -728,6 +728,14 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
             return false
         }
 
+        if let existing, existing.isActive {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "The active weekly challenge is locked and cannot be edited.",
+                norwegian: "Den aktive ukens challenge er låst og kan ikke endres."
+            )
+            return false
+        }
+
         let now = Date()
         let challengeID = existing?.id ?? UUID()
         let previousHeroAsset = {
@@ -786,6 +794,14 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
     }
 
     func delete(_ challenge: OfficialWeeklyChallenge) async -> Bool {
+        guard !challenge.isActive else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "The active weekly challenge is locked and cannot be deleted.",
+                norwegian: "Den aktive ukens challenge er låst og kan ikke slettes."
+            )
+            return false
+        }
+
         do {
             try await client
                 .from("official_weekly_challenges")
@@ -871,6 +887,26 @@ final class OfficialWeeklyChallengeStore: ObservableObject {
 
         isGeneratingCover = true
         defer { isGeneratingCover = false }
+
+        guard let challenge = challenges.first(where: { $0.id == challengeID }) else {
+            if reportError {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "Challenge not found.",
+                    norwegian: "Fant ikke challengen."
+                )
+            }
+            return false
+        }
+
+        guard !challenge.isActive else {
+            if reportError {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "The active weekly challenge is locked and its cover cannot be changed.",
+                    norwegian: "Den aktive ukens challenge er låst og bildet kan ikke endres."
+                )
+            }
+            return false
+        }
 
         do {
             let response: OfficialWeeklyChallengeCoverResponse =
@@ -3923,6 +3959,7 @@ struct OfficialWeeklyChallengeAdminListView: View {
         _ challenge: OfficialWeeklyChallenge
     ) -> some View {
         Button {
+            guard !challenge.isActive else { return }
             editorSeed = .existing(challenge)
         } label: {
             HStack(spacing: 12) {
@@ -3986,8 +4023,10 @@ struct OfficialWeeklyChallengeAdminListView: View {
                 Label("AI Cover", systemImage: "photo.badge.plus")
             }
             .tint(.purple)
+                .disabled(challenge.isActive)
 
             Button(role: .destructive) {
+                guard !challenge.isActive else { return }
                 challengeToDelete = challenge
             } label: {
                 Label("Delete", systemImage: "trash")
@@ -4338,7 +4377,12 @@ struct OfficialWeeklyChallengeEditorView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .navigationTitle(
-            seed.existing == nil
+            seed.existing?.isActive == true
+                ? ATHLTHLocalization.choose(
+                    english: "Active Challenge · Locked",
+                    norwegian: "Aktiv challenge · Låst"
+                )
+                : seed.existing == nil
                 ? ATHLTHLocalization.choose(
                     english: "New Weekly Challenge",
                     norwegian: "Ny ukentlig utfordring"
@@ -4418,6 +4462,7 @@ struct OfficialWeeklyChallengeEditorView: View {
     }
 
     private var canSave: Bool {
+        seed.existing?.isActive != true &&
         !saving &&
         !title.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -4958,7 +5003,10 @@ struct OfficialWeeklyChallengeEditorView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .disabled(store.isGeneratingAI)
+                .disabled(
+                    seed.existing?.isActive == true ||
+                    store.isGeneratingAI
+                )
 
                 if let existing = seed.existing {
                     Button {
@@ -4985,8 +5033,21 @@ struct OfficialWeeklyChallengeEditorView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(
+                        seed.existing?.isActive == true ||
                         store.isGeneratingCover
                     )
+                }
+
+                if seed.existing?.isActive == true {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "This challenge is active. Its content, schedule and cover are locked until it ends.",
+                            norwegian: "Denne challengen er aktiv. Innhold, tidsplan og bilde er låst til den er ferdig."
+                        )
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(
@@ -5147,6 +5208,10 @@ struct OfficialWeeklyChallengeEditorView: View {
     }
 
     private func save() {
+        guard seed.existing?.isActive != true else {
+            return
+        }
+
         saving = true
 
         Task {
