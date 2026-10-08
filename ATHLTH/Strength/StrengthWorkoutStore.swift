@@ -987,6 +987,9 @@ final class StrengthWorkoutStore: ObservableObject {
 
     @discardableResult
     func selectExerciseForNow(_ exerciseID: UUID) -> Bool {
+        // Capture the selection ID first, then refresh the workout after
+        // finalizing rest so its recorded actual-rest duration is not lost.
+        finalizeActualRestIfNeeded()
         guard var workout = activeWorkout,
               let target = workout.exercises.firstIndex(where: {
                   $0.id == exerciseID && !$0.isCompleted
@@ -1001,7 +1004,6 @@ final class StrengthWorkoutStore: ObservableObject {
 
         // Changing stations is deliberate; never mark the postponed
         // exercise complete or erase its partially completed sets.
-        finalizeActualRestIfNeeded()
         restStartedAt = nil
         restEndsAt = nil
 
