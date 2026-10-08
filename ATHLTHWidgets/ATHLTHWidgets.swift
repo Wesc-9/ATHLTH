@@ -550,7 +550,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             HStack {
                 Label(
                     context.state.strengthExerciseName != nil
-                        ? context.attributes.workoutTitle
+                        ? (context.state.workoutDisplayTitle ??
+                            context.attributes.workoutTitle)
                         : focusTitle(context),
                     systemImage: focusIcon(context)
                 )
@@ -956,7 +957,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         case .liveShare:
             return "Live Share"
         case .workout:
-            return context.attributes.workoutTitle
+            return context.state.workoutDisplayTitle ??
+                context.attributes.workoutTitle
         }
     }
 
