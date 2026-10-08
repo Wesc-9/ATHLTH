@@ -22,7 +22,8 @@ struct WatchRunWorkoutExperienceView: View {
     var body: some View {
         Group {
             if isLuminanceReduced {
-                alwaysOnPage
+                WatchTrainingAlwaysOnDashboard()
+                    .environmentObject(workoutManager)
             } else {
                 TabView(
                     selection:
@@ -1750,85 +1751,160 @@ struct WatchRunWorkoutExperienceView: View {
     // MARK: - Page 1: live metrics
 
     private var metricsPage: some View {
-        VStack(spacing: 7) {
-            statusHeader(
-                title: workoutManager.kind.title,
-                icon:
-                    workoutManager
-                        .kind.systemImage
-            )
+        GeometryReader { viewport in
+            let compact = viewport.size.height < 205 ||
+                viewport.size.width < 190
 
-            Text(
-                durationText(
-                    workoutManager.elapsedTime
-                )
-            )
-            .font(
-                .system(
-                    size: 30,
-                    weight: .bold,
-                    design: .rounded
-                )
-            )
-            .monospacedDigit()
-            .foregroundStyle(
-                WatchTheme.textPrimary
-            )
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .padding(.horizontal, 2)
+            VStack(alignment: .leading, spacing: compact ? 4 : 7) {
+                HStack(spacing: 5) {
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(WatchTheme.liveLime)
 
-            HStack(spacing: 7) {
-                metricTile(
+                    Text(workoutManager.kind == .walking
+                        ? ATHLTHLocalization.choose(
+                            english: "WALK", norwegian: "GÅTUR"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "RUN", norwegian: "LØPING"
+                        ))
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(.white)
+
+                    Spacer(minLength: 2)
+
+                    Circle()
+                        .fill(workoutManager.state == .paused
+                            ? WatchTheme.warning : WatchTheme.liveLime)
+                        .frame(width: 6, height: 6)
+                    Text(workoutManager.state == .paused ||
+                         workoutManager.automaticPauseActive
+                         ? "PAUSE" : "LIVE")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(
+                            Color.white.opacity(0.82)
+                        )
+                }
+
+                Text(liveWorkoutStepTitle)
+                    .font(.system(
+                        size: compact ? 10 : 11,
+                        weight: .semibold
+                    ))
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                liveHeroMetric(
                     title: "PACE",
-                    value:
-                        paceText(
-                            workoutManager
-                                .currentPaceSecondsPerKilometer
-                        ),
-                    suffix: "/km",
-                    icon: "speedometer"
+                    value: paceText(
+                        workoutManager.currentPaceSecondsPerKilometer
+                    ),
+                    unit: "/km",
+                    tint: WatchTheme.liveLime,
+                    fontSize: compact ? 35 : 42
                 )
 
-                metricTile(
-                    title: "HEART",
-                    value:
-                        heartRateText,
-                    suffix: "bpm",
-                    icon: "heart.fill"
+                liveHeroMetric(
+                    title: ATHLTHLocalization.choose(
+                        english: "DISTANCE", norwegian: "DISTANSE"
+                    ),
+                    value: distanceKilometersText,
+                    unit: "km",
+                    tint: WatchTheme.liveCyan,
+                    fontSize: compact ? 31 : 37
                 )
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 6) {
+                    Label(
+                        durationText(workoutManager.elapsedTime),
+                        systemImage: "clock"
+                    )
+                    .foregroundStyle(Color.white.opacity(0.88))
+                    Spacer(minLength: 4)
+                    Label(heartRateText, systemImage: "heart.fill")
+                        .foregroundStyle(WatchTheme.liveHeart)
+                }
+                .font(.system(
+                    size: compact ? 12 : 13,
+                    weight: .semibold,
+                    design: .rounded
+                ))
+                .monospacedDigit()
+                .lineLimit(1)
             }
-
-            HStack(spacing: 7) {
-                metricTile(
-                    title: "DISTANCE",
-                    value:
-                        distanceKilometersText,
-                    suffix: "km",
-                    icon: "location.fill"
-                )
-
-                metricTile(
-                    title: "CALORIES",
-                    value:
-                        String(
-                            Int(
-                                workoutManager
-                                    .activeCalories
-                                    .rounded()
-                            )
-                        ),
-                    suffix: "kcal",
-                    icon: "flame.fill"
-                )
-            }
-
-            sensorStatus
+            .padding(.horizontal, compact ? 10 : 12)
+            .padding(.vertical, compact ? 6 : 8)
+            .frame(
+                width: viewport.size.width,
+                height: viewport.size.height,
+                alignment: .topLeading
+            )
+            .background(WatchTheme.liveCanvas)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .background(WatchTheme.liveCanvas.ignoresSafeArea())
+    }
+
+    private var liveWorkoutStepTitle: String {
+        if let step = workoutManager.currentStructuredRunningStep {
+            return step.title
+        }
+        if let title = workoutManager.structuredRunningWorkout?.title,
+           !title.isEmpty {
+            return title
+        }
+        return ATHLTHLocalization.choose(
+            english: "Current workout", norwegian: "Pågående økt"
+        )
+    }
+
+    private func liveHeroMetric(
+        title: String,
+        value: String,
+        unit: String,
+        tint: Color,
+        fontSize: CGFloat
+    ) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(tint)
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(value)
+                        .font(.system(
+                            size: fontSize,
+                            weight: .bold,
+                            design: .rounded
+                        ))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+
+                    Text(unit)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(tint)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            tint.opacity(0.11),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .stroke(tint.opacity(0.35), lineWidth: 0.8)
+        }
     }
 
     private var sensorStatus: some View {
