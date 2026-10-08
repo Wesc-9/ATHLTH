@@ -143,6 +143,50 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
     }
 
     @MainActor
+    func testChangingPlannedActivityInvalidatesOldHealthLink() {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = Calendar.current.date(from: DateComponents(
+            year: 2030, month: 1, day: 8
+        ))!
+        guard let plan = store.createTrainingPlan(
+            title: "Edited session", summary: "", weekCount: 1, startDate: start
+        ) else { return XCTFail("Expected plan") }
+
+        var planned = addRun(
+            store: store, planID: plan.id,
+            dayID: plan.weeks[0].days[0].id, time: start
+        )
+        let healthRun = workout(activity: .running, startedAt: start)
+        XCTAssertTrue(store.linkHealthWorkout(
+            healthRun, toPlan: plan.id, sessionID: planned.id
+        ))
+        XCTAssertTrue(store.isPlanSessionCompleted(
+            planID: plan.id,
+            sessionID: planned.id,
+            healthWorkouts: [healthRun],
+            strengthHistory: []
+        ))
+
+        planned.kind = .walking
+        store.updateSession(planned, inPlan: plan.id)
+
+        XCTAssertFalse(store.isPlanSessionCompleted(
+            planID: plan.id,
+            sessionID: planned.id,
+            healthWorkouts: [healthRun],
+            strengthHistory: []
+        ))
+        let progress = store.trainingPlanProgress(
+            store.trainingPlan(withID: plan.id)!,
+            healthWorkouts: [healthRun],
+            strengthHistory: [],
+            referenceDate: start
+        )
+        XCTAssertEqual(progress.completedSessions, 0)
+    }
+
+    @MainActor
     func testLinkedWorkoutRemovedFromHealthIsNotCounted() {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
