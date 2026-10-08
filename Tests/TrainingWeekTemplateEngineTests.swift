@@ -391,6 +391,32 @@ final class TrainingWeekTemplateEngineTests: XCTestCase {
         XCTAssertEqual(deload?.exercises[1].setTargets?.first?.durationSeconds, 45)
     }
 
+    func testFourWeekBlockPreservesExplicitZeroKilograms() {
+        var plan = eightWeekPlan()
+        plan.weeks[0].days[0].sessions[0].exercises[0].targetWeightKilograms = 0
+        plan.weeks[0].days[0].sessions[0].exercises[0].setTargets =
+            plan.weeks[0].days[0].sessions[0].exercises[0].setTargets?.map { original in
+                var target = original
+                target.weightKilograms = 0
+                return target
+            }
+
+        let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            progression: .fourWeekStrengthBlock,
+            now: startDate,
+            calendar: calendar
+        )
+
+        let build = result?.plan.weeks[1].days[0].sessions[0].exercises[0]
+        let deload = result?.plan.weeks[3].days[0].sessions[0].exercises[0]
+        XCTAssertEqual(build?.targetWeightKilograms, 0)
+        XCTAssertEqual(build?.setTargets?.first?.weightKilograms, 0)
+        XCTAssertEqual(deload?.targetWeightKilograms, 0)
+    }
+
     func testStrengthPhaseEncodesAndLegacyWeekDecodesWithoutIt() throws {
         let plan = makePlan()
         var tagged = plan.weeks[0]
