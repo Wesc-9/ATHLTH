@@ -4666,6 +4666,7 @@ private struct HomePersonalWorkoutVisual:
 
     @State private var hasLoadedRoute = false
     @State private var routePreviewImage: UIImage?
+    @State private var treadmillAverageHeartRate: Double?
 
     private var hasLocalRoute:
         Bool {
@@ -4785,13 +4786,21 @@ private struct HomePersonalWorkoutVisual:
         .clipped()
         .task(id: workout.id) {
             await loadRoutePreviewIfNeeded()
+            await loadTreadmillHeartRateIfNeeded()
         }
     }
 
     @ViewBuilder
     private var background:
         some View {
-        if workout.activity ==
+        if workout.activity == .running,
+           workout.isIndoor == true {
+            HomeTreadmillRecentArtwork(
+                workout: workout,
+                averageHeartRate: treadmillAverageHeartRate,
+                height: height
+            )
+        } else if workout.activity ==
             .strength {
             strengthBackground
         } else if isOutdoorActivity,
@@ -4933,8 +4942,27 @@ private struct HomePersonalWorkoutVisual:
         routePreviewImage = rendered
     }
 
+    @MainActor
+    private func loadTreadmillHeartRateIfNeeded() async {
+        guard workout.activity == .running,
+              workout.isIndoor == true else {
+            treadmillAverageHeartRate = nil
+            return
+        }
+        // Optional: show a heart-rate value only when HealthKit has one.
+        // Never substitute the numbers from the design illustration.
+        let detail = await health.workoutDetail(for: workout.id)
+        guard !Task.isCancelled else { return }
+        let value = detail.averageHeartRate
+        treadmillAverageHeartRate =
+            (value?.isFinite == true && (value ?? 0) > 0)
+                ? value
+                : nil
+    }
+
     private var isOutdoorActivity:
         Bool {
+        guard workout.isIndoor != true else { return false }
         switch workout.activity {
         case .running,
              .walking,
@@ -4950,10 +4978,15 @@ private struct HomePersonalWorkoutVisual:
         String {
         switch workout.activity {
         case .running:
-            return ATHLTHLocalization.choose(
-                english: "RUN",
-                norwegian: "LØP"
-            )
+            return workout.isIndoor == true
+                ? ATHLTHLocalization.choose(
+                    english: "TREADMILL",
+                    norwegian: "TREDEMØLLE"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "RUN",
+                    norwegian: "LØP"
+                )
         case .walking:
             return ATHLTHLocalization.choose(
                 english: "WALK",
