@@ -148,6 +148,39 @@ final class StrengthMuscleProfileTests: XCTestCase {
         }
     }
 
+    func testMuscleHighlightKeepsPrimaryAndSecondaryRolesDistinct() {
+        let profile = StrengthMuscleProfile(
+            activations: [
+                StrengthMuscleActivation(region: .chest, score: 4),
+                StrengthMuscleActivation(region: .triceps, score: 2),
+                StrengthMuscleActivation(region: .frontDelts, score: 1)
+            ],
+            primaryRegions: [.chest],
+            secondaryRegions: [.triceps]
+        )
+
+        XCTAssertEqual(profile.highlightRole(for: .chest), .primary)
+        XCTAssertEqual(profile.highlightRole(for: .triceps), .secondary)
+        XCTAssertEqual(profile.highlightRole(for: .frontDelts), .estimated)
+        XCTAssertGreaterThan(
+            profile.intensity(for: .chest),
+            profile.intensity(for: .triceps)
+        )
+    }
+
+    func testMuscleCannotBeBothPrimaryAndSecondary() {
+        let profile = StrengthMuscleProfile(
+            activations: [
+                StrengthMuscleActivation(region: .quads, score: 6)
+            ],
+            primaryRegions: [.quads],
+            secondaryRegions: [.quads]
+        )
+
+        XCTAssertEqual(profile.highlightRole(for: .quads), .primary)
+        XCTAssertFalse(profile.secondaryRegions.contains(.quads))
+    }
+
     func testNorwegianExerciseNameLocalization() {
         XCTAssertEqual(
             ATHLTHExerciseNameLocalization
