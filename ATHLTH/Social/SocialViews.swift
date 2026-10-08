@@ -798,6 +798,7 @@ struct SocialHubView: View {
             Image("CommunityHero")
                 .resizable()
                 .scaledToFill()
+                .athlthBoundedFill()
                 .frame(height: 170)
                 .frame(
                     maxWidth: .infinity
