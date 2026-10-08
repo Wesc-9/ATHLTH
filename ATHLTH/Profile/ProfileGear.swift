@@ -1779,6 +1779,13 @@ struct ProfileGearEditorView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .padding(4)
+                .background(
+                    ATHLTHGearGhostStyle.tint(
+                        for: category
+                    ).opacity(0.09),
+                    in: Capsule()
+                )
 
                 Text(
                     editorMode == .basic
@@ -1788,6 +1795,7 @@ struct ProfileGearEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            .listRowBackground(Color.white.opacity(0.82))
 
             catalogSelectionSection
 
@@ -1822,6 +1830,7 @@ struct ProfileGearEditorView: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            .listRowBackground(Color.white.opacity(0.82))
 
             if editorMode == .advanced {
                 if category == .shoes {
@@ -1842,6 +1851,7 @@ struct ProfileGearEditorView: View {
                     )
                     .lineLimit(2...5)
                 }
+                .listRowBackground(Color.white.opacity(0.82))
             }
 
             if editorMode == .advanced {
@@ -1866,6 +1876,7 @@ struct ProfileGearEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 }
+                .listRowBackground(Color.white.opacity(0.82))
             }
 
             if let displayedError =
@@ -1881,6 +1892,15 @@ struct ProfileGearEditorView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHGearGhostStyle.tint(
+                    for: category
+                ).opacity(0.22)
+            )
+        )
+        .tint(ATHLTHTheme.accentDeep)
         .navigationTitle(
             existing == nil
                 ? "Add \(category.shortTitle)"
@@ -2018,7 +2038,8 @@ struct ProfileGearEditorView: View {
 
     @ViewBuilder
     private var catalogSelectionSection: some View {
-        Section("Gear Catalog") {
+        Section {
+
             if category == .watch,
                watchConnection.paired == true {
                 Button {
@@ -2332,7 +2353,17 @@ struct ProfileGearEditorView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHint(error)
             }
+        } header: {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Gear Catalog",
+                    norwegian: "Utstyrskatalog"
+                ),
+                systemImage: "square.grid.2x2"
+            )
+            .foregroundStyle(ATHLTHTheme.accentDeep)
         }
+        .listRowBackground(Color.white.opacity(0.82))
     }
 
     private func selectCatalogBrand(
@@ -2618,10 +2649,19 @@ struct ProfileGearEditorView: View {
     }
 
     private var defaultPreview: some View {
-        ProfileGearCategoryIcon(
-            category: category,
-            size: 34
-        )
+        Group {
+            if let existing {
+                ProfileGearProductMark(
+                    item: existing,
+                    size: 34
+                )
+            } else {
+                ProfileGearCategoryIcon(
+                    category: category,
+                    size: 34
+                )
+            }
+        }
         .frame(width: 82, height: 82)
         .background(
             Color.primary.opacity(0.04),
