@@ -850,7 +850,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     if let setCount = context.state.strengthSetCount,
                        setCount > 0 {
                         let setNumber = min(
-                            max((context.state.strengthSetIndex ?? 0) + 1, 1),
+                            max(context.state.strengthSetIndex ?? 1, 1),
                             setCount
                         )
                         Label(
