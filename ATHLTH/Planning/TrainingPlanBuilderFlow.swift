@@ -1418,11 +1418,50 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                         muscleGrid
 
+                        if selectedMuscles.count > 1 {
+                            HStack {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Primary muscle",
+                                        norwegian: "Hovedmuskel"
+                                    )
+                                )
+                                .font(.subheadline.weight(.semibold))
+
+                                Spacer()
+
+                                Picker(
+                                    ATHLTHLocalization.choose(
+                                        english: "Primary muscle",
+                                        norwegian: "Hovedmuskel"
+                                    ),
+                                    selection: Binding(
+                                        get: {
+                                            primaryMuscle ??
+                                                selectedMuscles.sorted().first ??
+                                                ""
+                                        },
+                                        set: { primaryMuscle = $0 }
+                                    )
+                                ) {
+                                    ForEach(
+                                        Self.muscleOptions.filter {
+                                            selectedMuscles.contains($0.id)
+                                        }
+                                    ) { muscle in
+                                        Text(muscle.title).tag(muscle.id)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                            }
+                        }
+
                         if !selectedMuscles.isEmpty {
                             Text(
                                 ATHLTHLocalization.choose(
-                                    english: "Tap a star to choose the primary muscle. Suggested strength workouts will include editable exercises for that area.",
-                                    norwegian: "Trykk på stjernen for å velge hovedmuskel. Forslag til styrkeøkter får redigerbare øvelser for området."
+                                    english: "Editable exercise suggestions can be included in the proposed strength days. You choose the final programme.",
+                                    norwegian: "Redigerbare øvelsesforslag kan legges i styrkeøktene. Du bestemmer det endelige programmet."
                                 )
                             )
                             .font(.caption2)
