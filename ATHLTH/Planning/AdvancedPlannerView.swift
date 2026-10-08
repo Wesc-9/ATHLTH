@@ -4115,6 +4115,13 @@ struct PlanMetadataEditorView: View {
         )
     }
 
+    private var wouldDiscardScheduledSessions: Bool {
+        guard weekCount < plan.weeks.count else { return false }
+        return plan.weeks.dropFirst(weekCount).contains { week in
+            week.days.contains { !$0.sessions.isEmpty }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -4140,26 +4147,53 @@ struct PlanMetadataEditorView: View {
                     .textInputAutocapitalization(.never)
                 }
 
-                Section("Timeline") {
+                Section(
+                    ATHLTHLocalization.choose(
+                        english: "Timeline",
+                        norwegian: "Tidsplan"
+                    )
+                ) {
                     Stepper(
-                        "\(weekCount) \(weekCount == 1 ? "week" : "weeks")",
+                        ATHLTHLocalization.format(
+                            english: "%d weeks",
+                            norwegian: "%d uker",
+                            weekCount
+                        ),
                         value: $weekCount,
                         in: 1...52
                     )
 
                     DatePicker(
-                        "Program starts",
+                        ATHLTHLocalization.choose(
+                            english: "Program starts",
+                            norwegian: "Planen starter"
+                        ),
                         selection: $startDate,
                         displayedComponents: .date
                     )
 
                     LabeledContent(
-                        "Program ends",
+                        ATHLTHLocalization.choose(
+                            english: "Program ends",
+                            norwegian: "Planen avsluttes"
+                        ),
                         value: resolvedEndDate.formatted(
                             date: .abbreviated,
                             time: .omitted
                         )
                     )
+
+                    if wouldDiscardScheduledSessions {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "These weeks contain planned workouts. Move or remove them in the planner before shortening this program.",
+                                norwegian: "Ukene du vil fjerne inneholder planlagte økter. Flytt eller fjern dem i planleggeren før du forkorter planen."
+                            ),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
                 }
 
                 if let conflict = conflictingPlan {
@@ -4325,11 +4359,21 @@ struct PlanMetadataEditorView: View {
 
                         guard saved else {
                             if let conflict = conflictingPlan {
-                                saveError =
-                                    "This period overlaps with \(conflict.title). Adjust the dates before saving."
+                                saveError = ATHLTHLocalization.format(
+                                    english: "This period overlaps with %@. Adjust the dates before saving.",
+                                    norwegian: "Perioden overlapper med %@. Endre datoene før du lagrer.",
+                                    conflict.title
+                                )
+                            } else if wouldDiscardScheduledSessions {
+                                saveError = ATHLTHLocalization.choose(
+                                    english: "Some weeks you are removing still have planned workouts. Move or remove them first.",
+                                    norwegian: "Noen av ukene du vil fjerne inneholder planlagte økter. Flytt eller fjern øktene først."
+                                )
                             } else {
-                                saveError =
-                                    "ATHLTH could not save the plan. Check the dates and try again."
+                                saveError = ATHLTHLocalization.choose(
+                                    english: "ATHLTH could not save the plan. Check the dates and try again.",
+                                    norwegian: "ATHLTH kunne ikke lagre planen. Kontroller datoene og prøv igjen."
+                                )
                             }
                             return
                         }
@@ -4389,7 +4433,10 @@ struct PlanMetadataEditorView: View {
             )
         }
         .alert(
-            "Plan Conflict",
+            ATHLTHLocalization.choose(
+                english: "Unable to save plan",
+                norwegian: "Kunne ikke lagre planen"
+            ),
             isPresented: Binding(
                 get: { saveError != nil },
                 set: { shown in
