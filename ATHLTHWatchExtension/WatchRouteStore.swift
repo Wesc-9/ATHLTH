@@ -523,6 +523,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchWorkoutManager.shared.pause()
         case .resume:
             WatchWorkoutManager.shared.resume()
+        case .setTreadmillIncline:
+            // The numeric incline is delivered by the workout mirror and
+            // applied in WatchWorkoutManager. A raw WCSession command has no
+            // value, so it must not overwrite the current incline.
+            break
         }
     }
 
