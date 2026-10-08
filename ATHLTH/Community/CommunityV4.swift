@@ -614,7 +614,9 @@ struct ATHLTHCommunityV4View: View {
                 .horizontal,
                 showsIndicators: false
             ) {
-                LazyHStack(spacing: 14) {
+                // At most five Clubs: eager layout keeps the scroll strip
+                // stable when a Club header image is refreshed.
+                HStack(alignment: .top, spacing: 14) {
                     ForEach(discoveryGroups) { group in
                         NavigationLink {
                             CommunityGroupDetailView(
@@ -3120,10 +3122,10 @@ private struct CommunityDiscoveryClubCard:
                         "CommunityHero",
                     maxPixelSize: 420
                 )
-                .frame(
-                    maxWidth: .infinity
-                )
-                .frame(height: 92)
+                // Uploaded headers may have a very wide intrinsic aspect
+                // ratio. Bound the image before laying out the Club card.
+                .athlthBoundedFill()
+                .frame(width: 252, height: 92)
                 .clipped()
 
                 LinearGradient(
@@ -3292,6 +3294,7 @@ private struct CommunityDiscoveryClubCard:
                 alignment: .leading
             )
         }
+        .frame(width: 252, alignment: .leading)
         .background(
             Color.white.opacity(
                 0.96
