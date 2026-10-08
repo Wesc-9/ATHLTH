@@ -38,6 +38,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var focusedExerciseMediaIndex = 0
     @State private var showingExerciseInstructions = false
     @State private var showingWorkoutReview = false
+    @State private var showingExerciseQueue = false
 
     var body: some View {
         NavigationStack {
@@ -163,6 +164,10 @@ struct ActiveStrengthWorkoutView: View {
                         finishInProgress
                     )
                 }
+            }
+            .sheet(isPresented: $showingExerciseQueue) {
+                StrengthActiveExerciseQueueView()
+                    .environmentObject(strength)
             }
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
@@ -1611,6 +1616,32 @@ struct ActiveStrengthWorkoutView: View {
                 workout
             )
 
+            Button {
+                showingExerciseQueue = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "list.bullet")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Exercises & order",
+                            norwegian: "Øvelser og rekkefølge"
+                        )
+                    )
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 42)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+            }
+            .buttonStyle(.plain)
+
             if workoutComplete &&
                 showingWorkoutReview {
                 focusedWorkoutCompletionHero(
@@ -1705,10 +1736,18 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                focusedExerciseHero(
-                    workout: workout,
-                    exercise: exercise
-                )
+                if strength.currentExerciseAllSetsCompleted,
+                   let upcoming = strength.nextPendingExercise {
+                    focusedUpcomingExerciseHero(
+                        upcoming,
+                        completed: exercise
+                    )
+                } else {
+                    focusedExerciseHero(
+                        workout: workout,
+                        exercise: exercise
+                    )
+                }
 
                 if let suggestion =
                         strength
@@ -3345,6 +3384,76 @@ struct ActiveStrengthWorkoutView: View {
             radius: 18,
             y: 8
         )
+    }
+
+    @ViewBuilder
+    private func focusedUpcomingExerciseHero(
+        _ next: StrengthExerciseLog,
+        completed previous: StrengthExerciseLog
+    ) -> some View {
+        let urls = focusedExerciseMediaURLs(next)
+
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let url = urls.first {
+                    focusedExerciseArtwork(url: url, exercise: next)
+                } else {
+                    focusedExerciseArtworkFallback(next)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 220)
+            .clipped()
+
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.78)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Next exercise",
+                        norwegian: "Neste øvelse"
+                    ),
+                    systemImage: "arrow.right.circle.fill"
+                )
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.86))
+
+                Text(next.exercise.displayName)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "\(next.sets.count) sets · \(next.sets.first?.plannedReps ?? 0) reps planned",
+                        norwegian: "\(next.sets.count) sett · \(next.sets.first?.plannedReps ?? 0) planlagte reps"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.82))
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Completed: \(previous.exercise.displayName)",
+                        norwegian: "Fullført: \(previous.exercise.displayName)"
+                    )
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.74))
+                .lineLimit(1)
+            }
+            .padding(16)
+        }
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(ATHLTHTheme.border, lineWidth: 1)
+        }
     }
 
     @ViewBuilder
@@ -5371,6 +5480,22 @@ struct ActiveStrengthWorkoutView: View {
                             ATHLTHTheme
                                 .accentDeep
                         )
+
+                        Button {
+                            showingExerciseQueue = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Choose another exercise",
+                                    norwegian: "Velg en annen øvelse"
+                                ),
+                                systemImage: "arrow.left.arrow.right"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.accentDeep)
 
                         Button {
                             // Rest never blocks navigation. Clearing the timer
@@ -9851,6 +9976,120 @@ private struct StrengthPlateCalculatorView: View {
     }
 }
 
+
+
+private struct StrengthActiveExerciseQueueView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let workout = strength.activeWorkout {
+                    List {
+                        Section {
+                            ForEach(workout.exercises) { exercise in
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(exercise.exercise.displayName)
+                                            .font(.subheadline.weight(.semibold))
+                                            .lineLimit(2)
+
+                                        let done = exercise.sets.filter(\.isCompleted).count
+                                        Text(
+                                            ATHLTHLocalization.choose(
+                                                english: "\(done)/\(exercise.sets.count) sets",
+                                                norwegian: "\(done)/\(exercise.sets.count) sett"
+                                            )
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer(minLength: 6)
+
+                                    if exercise.id ==
+                                        strength.currentExercise?.id {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Now",
+                                                norwegian: "Nå"
+                                            ),
+                                            systemImage: "play.fill"
+                                        )
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(ATHLTHTheme.vitality)
+                                    } else if exercise.isCompleted {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(ATHLTHTheme.vitality)
+                                    } else {
+                                        Button(
+                                            ATHLTHLocalization.choose(
+                                                english: "Train now",
+                                                norwegian: "Tren nå"
+                                            )
+                                        ) {
+                                            if strength.selectExerciseForNow(exercise.id) {
+                                                dismiss()
+                                            }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                    }
+                                }
+                                .padding(.vertical, 5)
+                            }
+                            .onMove { from, to in
+                                strength.reorderActiveExercises(
+                                    fromOffsets: from,
+                                    toOffset: to
+                                )
+                            }
+                        } footer: {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Choose a free station now, or use Edit to drag the exercise order. Completed sets stay saved and your original training plan is unchanged.",
+                                    norwegian: "Velg et ledig apparat med «Tren nå», eller trykk Rediger for å flytte øvelser. Registrerte sett beholdes, og den opprinnelige planen endres ikke."
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No active workout",
+                            norwegian: "Ingen aktiv økt"
+                        ),
+                        systemImage: "dumbbell"
+                    )
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Exercise order",
+                    norwegian: "Øvelsesrekkefølge"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Done",
+                            norwegian: "Ferdig"
+                        )
+                    ) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    EditButton()
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
 
 private struct StrengthClearableNumericField: View {
     let value: Binding<Double>
