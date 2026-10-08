@@ -2619,6 +2619,7 @@ struct PerformanceStatsView: View {
                     .interpolation(.high)
                     .scaledToFill()
                     .scaleEffect(1.10)
+                    .athlthBoundedFill()
                     .frame(
                         maxWidth: .infinity
                     )
@@ -2911,6 +2912,7 @@ struct PerformanceStatsView: View {
                     .interpolation(.high)
                     .scaledToFill()
                     .scaleEffect(1.08)
+                    .athlthBoundedFill()
                     .frame(
                         maxWidth: .infinity
                     )
