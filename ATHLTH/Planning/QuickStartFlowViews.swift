@@ -973,7 +973,6 @@ struct RunQuickStartSheet: View {
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var environment: RunEnvironment = .outdoor
-    @State private var treadmillInclinePercent: Double = 0
     @StateObject private var routeLocationProbe =
         QuickStartRouteLocationProbe()
 
@@ -1627,55 +1626,6 @@ struct RunQuickStartSheet: View {
             }
             .padding(.top, 10)
 
-            if environment == .treadmill {
-                VStack(alignment: .leading, spacing: 10) {
-                    Divider()
-                        .padding(.top, 4)
-
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Incline",
-                                norwegian: "Stigning"
-                            ),
-                            systemImage: "arrow.up.right"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        Spacer()
-
-                        Text(
-                            String(
-                                format: "%.1f%%",
-                                treadmillInclinePercent
-                            )
-                        )
-                        .font(
-                            .title3
-                                .weight(.bold)
-                                .monospacedDigit()
-                        )
-                    }
-
-                    Slider(
-                        value: $treadmillInclinePercent,
-                        in: 0...20,
-                        step: 0.5
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Set the treadmill incline for this workout. You can adjust it in 0.5% steps before or during the run, and correct it after the workout.",
-                            norwegian:
-                                "Angi stigningen på tredemøllen for denne økten. Du kan justere i trinn på 0,5 % før eller under økten, og korrigere den etterpå."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-            }
         }
     }
 
@@ -2334,7 +2284,7 @@ struct RunQuickStartSheet: View {
                 environment: environment,
                 treadmillInclinePercent:
                     environment == .treadmill
-                        ? treadmillInclinePercent
+                        ? 0
                         : nil,
                 audioCoach:
                     isAdvancedSetup
