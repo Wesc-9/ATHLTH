@@ -938,7 +938,8 @@ enum StrengthMuscleResolver {
             "rowing machine",
             "row erg",
             "rower",
-            "ergometer"
+            "ergometer",
+            "romaskin"
         ) {
             return [
                 .lats,
@@ -957,7 +958,10 @@ enum StrengthMuscleResolver {
             "chest press",
             "push up",
             "pushup",
-            "dip"
+            "dip",
+            "benkpress",
+            "brystpress",
+            "armheving"
         ) {
             return [
                 .chest,
@@ -970,7 +974,8 @@ enum StrengthMuscleResolver {
             value,
             "shoulder press",
             "overhead press",
-            "military press"
+            "military press",
+            "skulderpress"
         ) {
             return [
                 .frontDelts,
@@ -982,7 +987,8 @@ enum StrengthMuscleResolver {
         if contains(
             value,
             "lateral raise",
-            "side raise"
+            "side raise",
+            "sidehev"
         ) {
             return [.sideDelts]
         }
@@ -1008,7 +1014,8 @@ enum StrengthMuscleResolver {
             "pull up",
             "pullup",
             "chin up",
-            "chinup"
+            "chinup",
+            "nedtrekk"
         ) {
             return [
                 .lats,
@@ -1019,7 +1026,9 @@ enum StrengthMuscleResolver {
 
         if contains(
             value,
-            "row"
+            "row",
+            "roing",
+            "sittende ro"
         ) {
             return [
                 .lats,
@@ -1055,7 +1064,8 @@ enum StrengthMuscleResolver {
             "deadlift",
             "romanian deadlift",
             "rdl",
-            "good morning"
+            "good morning",
+            "markløft"
         ) {
             return [
                 .hamstrings,
@@ -1070,7 +1080,11 @@ enum StrengthMuscleResolver {
             "leg press",
             "lunge",
             "split squat",
-            "step up"
+            "step up",
+            "knebøy",
+            "beinpress",
+            "benpress",
+            "utfall"
         ) {
             return [
                 .quads,
@@ -1081,7 +1095,9 @@ enum StrengthMuscleResolver {
 
         if contains(
             value,
-            "leg extension"
+            "leg extension",
+            "beinstrekk",
+            "benstrekk"
         ) {
             return [.quads]
         }
@@ -1089,7 +1105,8 @@ enum StrengthMuscleResolver {
         if contains(
             value,
             "leg curl",
-            "hamstring curl"
+            "hamstring curl",
+            "lårcurl"
         ) {
             return [.hamstrings]
         }
@@ -1097,7 +1114,8 @@ enum StrengthMuscleResolver {
         if contains(
             value,
             "hip thrust",
-            "glute bridge"
+            "glute bridge",
+            "hoftehev"
         ) {
             return [
                 .glutes,
@@ -1107,7 +1125,8 @@ enum StrengthMuscleResolver {
 
         if contains(
             value,
-            "calf raise"
+            "calf raise",
+            "tåhev"
         ) {
             return [.calves]
         }
@@ -1118,7 +1137,9 @@ enum StrengthMuscleResolver {
             "crunch",
             "sit up",
             "situp",
-            "ab wheel"
+            "ab wheel",
+            "planke",
+            "magecrunch"
         ) {
             return [
                 .abs,
