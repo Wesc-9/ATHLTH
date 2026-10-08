@@ -26,6 +26,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var injuryFree = true
     @State private var injuriesOrLimitations = ""
     @State private var selectedMuscles: Set<String> = []
+    @State private var primaryMuscle: String?
 
     @State private var sessionsPerWeek = 3
     @State private var selectedDays: Set<Int> = [1, 3, 5]
@@ -57,12 +58,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startsAtSourceChoice
         self.initialAdvanced =
             initialAdvanced
-        _step = State(
-            initialValue:
-                startsAtSourceChoice
-                    ? .source
-                    : .basics
-        )
+        // Name and duration come first for every entry path.
+        _step = State(initialValue: .basics)
         _mode = State(
             initialValue:
                 initialAdvanced
@@ -163,14 +160,29 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             norwegian: "Skuldre"
         ),
         .init(
-            id: "arms",
-            english: "Arms",
-            norwegian: "Armer"
+            id: "biceps",
+            english: "Biceps",
+            norwegian: "Biceps"
+        ),
+        .init(
+            id: "triceps",
+            english: "Triceps",
+            norwegian: "Triceps"
+        ),
+        .init(
+            id: "forearms",
+            english: "Forearms",
+            norwegian: "Underarmer"
         ),
         .init(
             id: "quads",
-            english: "Quads",
-            norwegian: "Lår"
+            english: "Quadriceps",
+            norwegian: "Forside lår"
+        ),
+        .init(
+            id: "hamstrings",
+            english: "Hamstrings",
+            norwegian: "Bakside lår"
         ),
         .init(
             id: "glutes",
@@ -437,7 +449,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     withAnimation(
                         .easeInOut(duration: 0.18)
                     ) {
-                        step = .basics
+                        step = .profile
                     }
                 } label: {
                     sourceCard(
@@ -1405,6 +1417,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
 
                         muscleGrid
+
+                        if !selectedMuscles.isEmpty {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Tap a star to choose the primary muscle. Suggested strength workouts will include editable exercises for that area.",
+                                    norwegian: "Trykk på stjernen for å velge hovedmuskel. Forslag til styrkeøkter får redigerbare øvelser for området."
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
                     }
                 }
             }
@@ -1807,15 +1830,29 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
                 Button {
                     if selected {
-                        selectedMuscles
-                            .remove(muscle.id)
+                        selectedMuscles.remove(muscle.id)
+                        if primaryMuscle == muscle.id {
+                            primaryMuscle = selectedMuscles.sorted().first
+                        }
                     } else {
-                        selectedMuscles
-                            .insert(muscle.id)
+                        selectedMuscles.insert(muscle.id)
+                        if primaryMuscle == nil {
+                            primaryMuscle = muscle.id
+                        }
                     }
                 } label: {
-                    Text(muscle.title)
-                        .font(.caption.weight(.semibold))
+                    HStack(spacing: 5) {
+                        if selected {
+                            Image(
+                                systemName: primaryMuscle == muscle.id
+                                    ? "star.fill"
+                                    : "checkmark"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                        }
+                        Text(muscle.title)
+                            .font(.caption.weight(.semibold))
+                    }
                         .foregroundStyle(
                             selected
                                 ? Color.white
@@ -1833,6 +1870,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    if selected && primaryMuscle != muscle.id {
+                        Button {
+                            primaryMuscle = muscle.id
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Set as primary focus",
+                                    norwegian: "Velg som hovedfokus"
+                                ),
+                                systemImage: "star.fill"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -3184,8 +3236,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .opacity(0.35)
 
             HStack(spacing: 10) {
-                if step != .basics ||
-                    startsAtSourceChoice {
+                if step != .basics {
                     Button {
                         goBack()
                     } label: {
@@ -3290,11 +3341,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var backButtonTitle: String {
-        if step == .source ||
-            (
-                step == .basics &&
-                !startsAtSourceChoice
-            ) {
+        if step == .basics {
             return ATHLTHLocalization.choose(
                 english: "Cancel",
                 norwegian: "Avbryt"
@@ -3388,14 +3435,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             "\(100 - focusWeight)% \(secondaryFocus.title)"
     }
 
+    private var orderedPriorityMuscles: [String] {
+        let others = selectedMuscles.sorted()
+        guard let primaryMuscle,
+              selectedMuscles.contains(primaryMuscle)
+        else {
+            return others
+        }
+        return [primaryMuscle] + others.filter { $0 != primaryMuscle }
+    }
+
     private var selectedMuscleTitles: String {
-        Self.muscleOptions
-            .filter {
-                selectedMuscles
-                    .contains($0.id)
-            }
-            .map(\.title)
-            .joined(separator: ", ")
+        orderedPriorityMuscles.compactMap { id in
+            Self.muscleOptions.first { $0.id == id }?.title
+        }
+        .joined(separator: ", ")
     }
 
     private func goForward() {
@@ -3404,9 +3458,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             switch step {
             case .source:
-                step = .basics
-            case .basics:
                 step = .profile
+            case .basics:
+                step = startsAtSourceChoice ? .source : .profile
             case .profile:
                 step = .week
             case .week:
@@ -3423,17 +3477,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             switch step {
             case .source:
-                dismiss()
+                step = .basics
 
             case .basics:
-                if startsAtSourceChoice {
-                    step = .source
-                } else {
-                    dismiss()
-                }
+                dismiss()
 
             case .profile:
-                step = .basics
+                step = startsAtSourceChoice ? .source : .basics
 
             case .week:
                 step = .profile
@@ -3910,25 +3960,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             TrainingPlanBuilderProfile(
                 mode: mode,
                 primaryFocus: focus,
-                secondaryFocus:
-                    mode == .advanced
-                        ? secondaryFocus
-                        : nil,
+                secondaryFocus: secondaryFocus,
                 primaryFocusWeightPercent:
-                    mode == .advanced &&
-                    secondaryFocus != nil
-                        ? focusWeight
-                        : nil,
+                    secondaryFocus != nil ? focusWeight : nil,
                 goal: goal,
                 goalDetail:
                     cleanGoalDetail.isEmpty
                         ? nil
                         : cleanGoalDetail,
                 competitionDate:
-                    mode == .advanced &&
-                    hasCompetitionDate
-                        ? competitionDate
-                        : nil,
+                    hasCompetitionDate ? competitionDate : nil,
                 sessionsPerWeek:
                     selectedDays.count,
                 preferredDayIndexes:
@@ -3939,15 +3980,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         ? nil
                         : cleanLimitations,
                 priorityMuscles:
-                    selectedMuscles.sorted(),
-                equipmentContext:
-                    mode == .advanced
-                        ? equipment.rawValue
-                        : nil,
+                    orderedPriorityMuscles,
+                equipmentContext: equipment.rawValue,
                 weeklyTimeBudgetMinutes:
-                    mode == .advanced
-                        ? weeklyTimeBudgetMinutes
-                        : nil,
+                    weeklyTimeBudgetMinutes,
                 preferredWorkoutKindsByDay:
                     Dictionary(
                         uniqueKeysWithValues:
@@ -3972,10 +4008,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     weekCount: weekCount,
                     startDate: startDate,
                     endDate: resolvedEndDate,
-                    visibility:
-                        mode == .advanced
-                            ? visibility
-                            : .privateOnly,
+                    visibility: visibility,
                     builderProfile: profile,
                     seedSuggestedWeek:
                         seedSuggestedWeek
