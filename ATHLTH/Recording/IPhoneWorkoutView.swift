@@ -227,6 +227,14 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let isTreadmill =
                 workout.runEnvironment ==
                 .treadmill
+            let treadmillAveragePace: TimeInterval? =
+                isTreadmill &&
+                workout.distanceMeters >= 20 &&
+                elapsed > 0
+                ? elapsed / (workout.distanceMeters / 1_000) *
+                    (isMetric ? 1.0 : 1.609344)
+                : nil
+            let displayedPace = currentPace ?? treadmillAveragePace
 
             VStack(spacing: 0) {
                 heroMetric(
@@ -244,43 +252,50 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     .opacity(0.55)
 
                 if isTreadmill {
-                    HStack(spacing: 0) {
-                        focusedMetric(
-                            title:
-                                ATHLTHLocalization.choose(
+                    VStack(spacing: 0) {
+                        HStack(spacing: 0) {
+                            focusedMetric(
+                                title: ATHLTHLocalization.choose(
                                     english: "INCLINE",
                                     norwegian: "STIGNING"
                                 ),
-                            value:
-                                String(
+                                value: String(
                                     format: "%.1f",
-                                    workout
-                                        .treadmillInclinePercent ??
-                                    0
+                                    workout.treadmillInclinePercent ?? 0
                                 ),
-                            unit: "%"
-                        )
+                                unit: "%"
+                            )
 
-                        if workout.distanceMeters >= 50 {
                             focusedDivider
 
                             focusedMetric(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english: "DISTANCE",
-                                        norwegian: "DISTANSE"
-                                    ),
-                                value:
-                                    String(
-                                        format: "%.2f",
-                                        distance
-                                    ),
-                                unit:
-                                    isMetric
-                                        ? "km"
-                                        : "mi"
+                                title: ATHLTHLocalization.choose(
+                                    english: "DISTANCE",
+                                    norwegian: "DISTANSE"
+                                ),
+                                value: String(format: "%.2f", distance),
+                                unit: isMetric ? "km" : "mi"
                             )
                         }
+
+                        Divider()
+                            .opacity(0.4)
+                            .padding(.horizontal, 18)
+
+                        focusedMetric(
+                            title: treadmillAveragePace != nil && currentPace == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "AVERAGE PACE",
+                                    norwegian: "SNITTEMPO"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "PACE",
+                                    norwegian: "TEMPO"
+                                ),
+                            value: paceValue(displayedPace),
+                            unit: isMetric ? "/km" : "/mi"
+                        )
+                        .padding(.horizontal, 18)
                     }
                 } else {
                     HStack(spacing: 0) {
