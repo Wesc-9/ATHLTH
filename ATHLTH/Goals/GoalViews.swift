@@ -2829,6 +2829,7 @@ struct GoalCreationView: View {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
+                            .athlthBoundedFill()
                             .frame(height: 150)
                             .frame(
                                 maxWidth:
@@ -5515,6 +5516,7 @@ private struct GoalPreviewCard: View {
                     ATHLTHTheme.accentSoft
                 }
             }
+            .athlthBoundedFill()
             .frame(maxWidth: .infinity)
             .frame(height: 158)
             .clipped()
