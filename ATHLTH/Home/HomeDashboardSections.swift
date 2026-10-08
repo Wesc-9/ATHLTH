@@ -3308,7 +3308,9 @@ struct HomeWeeklyProgressStrip:
 
     private var compactWeekMetrics:
         some View {
-        HStack(spacing: 4) {
+        HStack(
+            spacing: visibleWeekOtherWorkouts.isEmpty ? 4 : 2
+        ) {
             compactWeekMetric(
                 icon: "figure.run",
                 value:
@@ -3368,6 +3370,18 @@ struct HomeWeeklyProgressStrip:
                             "Løpe- og gåøkter"
                     )
             )
+
+            // Keep the regular four metrics unchanged unless the selected
+            // week contains a different workout activity.
+            if !visibleWeekOtherWorkouts.isEmpty {
+                compactWeekMetric(
+                    icon: visibleWeekOtherWorkoutIcon,
+                    value:
+                        "\(visibleWeekOtherWorkouts.count)",
+                    accessibilityTitle:
+                        visibleWeekOtherWorkoutTitle
+                )
+            }
         }
     }
 
@@ -3376,11 +3390,16 @@ struct HomeWeeklyProgressStrip:
         value: String,
         accessibilityTitle: String
     ) -> some View {
-        HStack(spacing: 4) {
+        let hasFifthMetric =
+            !visibleWeekOtherWorkouts.isEmpty
+
+        return HStack(
+            spacing: hasFifthMetric ? 2 : 4
+        ) {
             Image(systemName: icon)
                 .font(
                     .system(
-                        size: 9,
+                        size: hasFifthMetric ? 8 : 9,
                         weight: .semibold
                     )
                 )
@@ -3392,7 +3411,7 @@ struct HomeWeeklyProgressStrip:
             Text(value)
                 .font(
                     .system(
-                        size: 10.5,
+                        size: hasFifthMetric ? 9.5 : 10.5,
                         weight: .semibold,
                         design: .rounded
                     )
@@ -3457,6 +3476,101 @@ struct HomeWeeklyProgressStrip:
                     $0.activity == .walking
             }
             .count
+    }
+
+    private var visibleWeekOtherWorkouts:
+        [WorkoutSummary] {
+        visibleWorkouts.filter {
+            $0.activity != .running &&
+                $0.activity != .walking &&
+                $0.activity != .strength
+        }
+    }
+
+    // Display the relevant sport when all extra sessions share one
+    // activity. Different extra sports are grouped in the fifth slot.
+    private var visibleWeekOtherActivity:
+        WorkoutActivity? {
+        let activities =
+            Set(visibleWeekOtherWorkouts.map(\.activity))
+        guard activities.count == 1 else {
+            return nil
+        }
+        return activities.first
+    }
+
+    private var visibleWeekOtherWorkoutIcon:
+        String {
+        visibleWeekOtherActivity?.icon ??
+            "figure.mixed.cardio"
+    }
+
+    private var visibleWeekOtherWorkoutTitle:
+        String {
+        guard let activity = visibleWeekOtherActivity
+        else {
+            return ATHLTHLocalization.choose(
+                english: "Other workouts",
+                norwegian: "Andre økter"
+            )
+        }
+
+        switch activity {
+        case .cycling:
+            return ATHLTHLocalization.choose(
+                english: "Cycling workouts",
+                norwegian: "Sykkeløkter"
+            )
+        case .swimming:
+            return ATHLTHLocalization.choose(
+                english: "Swimming workouts",
+                norwegian: "Svømmeøkter"
+            )
+        case .hiking:
+            return ATHLTHLocalization.choose(
+                english: "Hiking workouts",
+                norwegian: "Turøkter"
+            )
+        case .hiit:
+            return "HIIT"
+        case .rowing:
+            return ATHLTHLocalization.choose(
+                english: "Rowing workouts",
+                norwegian: "Roøkter"
+            )
+        case .elliptical:
+            return ATHLTHLocalization.choose(
+                english: "Elliptical workouts",
+                norwegian: "Ellipseøkter"
+            )
+        case .stairClimbing:
+            return ATHLTHLocalization.choose(
+                english: "Stair climbing workouts",
+                norwegian: "Trappeøkter"
+            )
+        case .yoga:
+            return ATHLTHLocalization.choose(
+                english: "Yoga workouts",
+                norwegian: "Yogaøkter"
+            )
+        case .coreTraining:
+            return ATHLTHLocalization.choose(
+                english: "Core workouts",
+                norwegian: "Kjerneøkter"
+            )
+        case .other:
+            return ATHLTHLocalization.choose(
+                english: "Other workouts",
+                norwegian: "Andre økter"
+            )
+        case .running, .walking, .strength:
+            // These workouts are already represented by the four
+            // standard values and cannot enter the other group.
+            return ATHLTHLocalization.choose(
+                english: "Other workouts",
+                norwegian: "Andre økter"
+            )
+        }
     }
 
     private var visibleWeekDurationText:
