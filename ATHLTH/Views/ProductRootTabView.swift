@@ -1684,7 +1684,7 @@ struct ATHLTHHomeView: View {
         homeWorkoutsThisWeek.count
     }
 
-    private let homeGoalCalendarContentMinHeight: CGFloat = 90
+    private let homeGoalCalendarContentMinHeight: CGFloat = 82
 
     @ViewBuilder
     private var homeGoalAndCalendarRow:
