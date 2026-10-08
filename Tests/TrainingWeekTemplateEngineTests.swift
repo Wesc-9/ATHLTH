@@ -144,6 +144,52 @@ final class TrainingWeekTemplateEngineTests: XCTestCase {
         XCTAssertEqual(preview.copiedSessions, 3)
     }
 
+    func testCopyMatchesPreviewForLegacyZeroNumberedWeek() {
+        var plan = makePlan()
+        // Legacy imported plans may have weekNumber == 0.
+        plan.weeks[2].weekNumber = 0
+        let secondWeek = calendar.date(
+            byAdding: .day,
+            value: 8,
+            to: startDate
+        )!
+
+        // Week three is upcoming but week one is no longer available to
+        // copy into week two. Preview and copy must agree on calendar dates.
+        let preview = TrainingWeekTemplateEngine.preview(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            now: secondWeek,
+            calendar: calendar
+        )
+        XCTAssertEqual(preview.targetWeeks, 1)
+        XCTAssertEqual(preview.copiedSessions, 2)
+
+        guard let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            now: secondWeek,
+            calendar: calendar
+        ) else {
+            return XCTFail("Preview showed sessions to copy")
+        }
+        XCTAssertEqual(result.summary, preview)
+        XCTAssertEqual(result.plan.weeks[2].days[0].sessions.count, 1)
+        XCTAssertEqual(result.plan.weeks[2].days[2].sessions.count, 1)
+        XCTAssertTrue(result.plan.weeks[1].days[0].sessions.isEmpty)
+
+        let copiedDate = result.plan.weeks[2].days[0].sessions[0]
+            .scheduledStart!
+        let expected = calendar.date(
+            byAdding: .day,
+            value: 14,
+            to: startDate
+        )!
+        XCTAssertTrue(calendar.isDate(copiedDate, inSameDayAs: expected))
+    }
+
     func testCopyDoesNotOverwriteExistingOrSourceSessions() {
         let plan = makePlan()
         let sourceID = plan.weeks[0].days[0].sessions[0].id
