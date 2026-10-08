@@ -1785,7 +1785,12 @@ struct ChallengeCreationView: View {
                                 )
                                 .resizable()
                                 .scaledToFill()
-                                .athlthBoundedFill()
+                                // PhotosPicker labels are evaluated in a
+                                // nonisolated Swift 6 context. Keep this
+                                // thumbnail bounded without calling the
+                                // main-actor isolated view helper.
+                                .frame(width: 88, height: 56)
+                                .clipped()
                             } else {
                                 VStack(spacing: 3) {
                                     Image(
