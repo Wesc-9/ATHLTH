@@ -247,7 +247,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: challenge, error: challengeError } = await admin
     .from("official_weekly_challenges")
-    .select("id,title,subtitle,kind,target_value")
+    .select("id,title,subtitle,kind,target_value,starts_at,ends_at")
     .eq("id", challengeId)
     .maybeSingle();
 
@@ -262,6 +262,26 @@ Deno.serve(async (req: Request) => {
 
   if (!challenge) {
     return json({ error: "Challenge not found." }, 404);
+  }
+
+  const now = new Date();
+  const startsAt = new Date(challenge.starts_at ?? "");
+  const endsAt = new Date(challenge.ends_at ?? "");
+
+  if (
+    Number.isFinite(startsAt.getTime()) &&
+    Number.isFinite(endsAt.getTime()) &&
+    startsAt <= now &&
+    endsAt > now
+  ) {
+    return json(
+      {
+        generated: false,
+        reason: "active_challenge_locked",
+        error: "The active weekly challenge is locked and its cover cannot be changed.",
+      },
+      409,
+    );
   }
 
   let recipe = fallbackRecipe(challenge.kind);
