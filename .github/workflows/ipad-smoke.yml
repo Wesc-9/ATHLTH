@@ -161,24 +161,37 @@ jobs:
           validate_screen() {
             local label="$1"
             local screenshot="$RUNNER_TEMP/athlth-ipad-$label.png"
+            local entropy="0"
 
-            sleep 6
-            xcrun simctl io "$UDID" screenshot "$screenshot"
-            test -s "$screenshot"
+            # Fresh iPad simulators can continue rendering their launch
+            # surface after simctl launch returns a PID. Do not mistake one
+            # unfinished frame for an application-level rendering failure.
+            # Still fail when every sample stays visually blank.
+            for attempt in 1 2 3 4; do
+              sleep 8
+              xcrun simctl io "$UDID" screenshot "$screenshot"
+              test -s "$screenshot"
 
-            local entropy
-            entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
-            echo "iPad $label screenshot entropy: $entropy"
+              entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
+              echo "iPad $label screenshot entropy (attempt $attempt): $entropy"
 
-            python3 - "$entropy" "$label" <<'PY'
+              if python3 - "$entropy" <<'PY'
           import sys
-          entropy=float(sys.argv[1])
-          label=sys.argv[2]
-          if entropy < 0.025:
-              raise SystemExit(
-                  f"ATHLTH iPad {label} appears visually blank: entropy={entropy:.5f}"
-              )
+          raise SystemExit(0 if float(sys.argv[1]) >= 0.025 else 1)
           PY
+              then
+                return 0
+              fi
+            done
+
+            echo "::error::ATHLTH iPad $label stayed visually blank after four frames (entropy=$entropy)."
+            # A live PID is not sufficient evidence that a SwiftUI surface
+            # rendered. Capture simulator diagnostics when the image remains
+            # blank; retain the PNG even on failure for visual inspection.
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact \
+              --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' \
+              2>&1 | tail -n 250 || true
+            return 1
           }
 
           LAUNCH_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth 2>&1)
@@ -208,3 +221,12 @@ jobs:
           done
 
           echo "ATHLTH onboarding and all five main tabs rendered on iPad."
+
+      - name: Upload iPad smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-ipad-smoke-screenshots
+          path: ${{ runner.temp }}/athlth-ipad-*.png
+          if-no-files-found: warn
+          retention-days: 7
