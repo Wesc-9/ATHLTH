@@ -6572,9 +6572,7 @@ struct CommunityEventDetailView: View {
                     )
                 }
                 .chartYScale(
-                    domain:
-                        (minimum - padding)...
-                        (maximum + padding)
+                    domain: (minimum - padding)...(maximum + padding)
                 )
                 .frame(height: 170)
                 .padding(.top, 8)
