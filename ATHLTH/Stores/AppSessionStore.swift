@@ -1690,6 +1690,15 @@ final class AppSessionStore: ObservableObject {
                 plan.weeks.append(makeEmptyWeek(number: number))
             }
         } else if resolvedWeekCount < currentWeekCount {
+            // Never silently discard programmed sessions when changing the
+            // plan duration in Settings. Athletes can remove populated weeks
+            // through the planner's explicit week-removal confirmation.
+            let removedWeeks = plan.weeks.dropFirst(resolvedWeekCount)
+            guard removedWeeks.allSatisfy({ week in
+                week.days.allSatisfy(\.sessions.isEmpty)
+            }) else {
+                return false
+            }
             plan.weeks = Array(
                 plan.weeks.prefix(resolvedWeekCount)
             )
