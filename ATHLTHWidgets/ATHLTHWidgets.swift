@@ -549,14 +549,16 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label(
-                    focusTitle(context),
+                    context.state.strengthExerciseName != nil
+                        ? context.attributes.workoutTitle
+                        : focusTitle(context),
                     systemImage: focusIcon(context)
                 )
                 .font(.headline)
 
                 Spacer()
 
-                Text(context.state.phase.capitalized)
+                Text(workoutPhaseLabel(context.state.phase))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(focusTint(context))
             }
@@ -764,6 +766,10 @@ struct ATHLTHWorkoutLiveActivity: Widget {
 
         case .workout:
             VStack(alignment: .leading, spacing: 8) {
+                if context.state.strengthExerciseName != nil {
+                    strengthSummary(context)
+                }
+
                 if let step =
                     context.state.runningStepTitle {
                     HStack {
@@ -827,6 +833,71 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func strengthSummary(
+        _ context: Context
+    ) -> some View {
+        if let exerciseName = context.state.strengthExerciseName {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(exerciseName)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(2)
+
+                HStack(spacing: 12) {
+                    if let setCount = context.state.strengthSetCount,
+                       setCount > 0 {
+                        let setNumber = min(
+                            max((context.state.strengthSetIndex ?? 0) + 1, 1),
+                            setCount
+                        )
+                        Label(
+                            "\(setNumber) / \(setCount) sett",
+                            systemImage: "list.number"
+                        )
+                    }
+
+                    if let reps = context.state.strengthReps {
+                        Label(
+                            "\(reps) reps",
+                            systemImage: "repeat"
+                        )
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.80))
+
+                if let restEndsAt = context.state.strengthRestEndsAt {
+                    HStack(spacing: 8) {
+                        Label("Pause", systemImage: "timer")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.78))
+
+                        Text(restEndsAt, style: .timer)
+                            .font(.title3.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+        }
+    }
+
+    private func workoutPhaseLabel(_ phase: String) -> String {
+        let norwegian = ["nb", "nn", "no"].contains(
+            Locale.current.language.languageCode?.identifier ?? ""
+        )
+
+        switch phase {
+        case "running": return norwegian ? "Pågår" : "Active"
+        case "paused": return norwegian ? "Pauset" : "Paused"
+        case "preparing": return norwegian ? "Klargjør" : "Preparing"
+        case "ending": return norwegian ? "Avslutter" : "Finishing"
+        case "completed": return norwegian ? "Fullført" : "Completed"
+        case "failed": return norwegian ? "Feil" : "Error"
+        default: return phase.capitalized
         }
     }
 
