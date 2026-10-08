@@ -42,10 +42,14 @@ struct PlannedWorkoutDetailView: View {
         )
     }
 
-    private var linkedHealthWorkout: WorkoutSummary? {
-        guard let linkedID = session.linkedHealthWorkoutID(
+    private var storedLinkedHealthID: UUID? {
+        session.linkedHealthWorkoutID(
             planID: planID, sessionID: currentWorkout.id
-        ) else { return nil }
+        )
+    }
+
+    private var linkedHealthWorkout: WorkoutSummary? {
+        guard let linkedID = storedLinkedHealthID else { return nil }
         return health.workouts.first { $0.id == linkedID }
     }
 
@@ -950,7 +954,8 @@ struct PlannedWorkoutDetailView: View {
                     )
                 )
 
-                if isCompleted && !isManuallyCompleted {
+                if isCompleted && !isManuallyCompleted ||
+                    storedLinkedHealthID != nil {
                     Label(
                         ATHLTHLocalization.choose(
                             english: "Completed with a recorded workout",
@@ -961,7 +966,7 @@ struct PlannedWorkoutDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                    if linkedHealthWorkout != nil {
+                    if storedLinkedHealthID != nil {
                         Button {
                             session.unlinkHealthWorkout(
                                 planID: planID, sessionID: currentWorkout.id
@@ -973,6 +978,25 @@ struct PlannedWorkoutDetailView: View {
                                     norwegian: "Fjern koblingen til Apple Health"
                                 ),
                                 systemImage: "link.badge.minus"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if isManuallyCompleted {
+                        Button {
+                            session.setPlanSessionManuallyCompleted(
+                                planID: planID,
+                                sessionID: currentWorkout.id,
+                                completed: false
+                            )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Undo manual completion",
+                                    norwegian: "Angre manuell fullføring"
+                                ),
+                                systemImage: "arrow.uturn.backward"
                             )
                         }
                         .buttonStyle(.bordered)
