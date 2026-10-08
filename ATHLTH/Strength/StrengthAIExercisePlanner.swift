@@ -112,6 +112,7 @@ struct StrengthAIExercisePlan:
     let exercises: [StrengthAIExerciseSuggestion]
 }
 
+@MainActor
 private final class StrengthAIExerciseService {
     private let client: SupabaseClient
 
