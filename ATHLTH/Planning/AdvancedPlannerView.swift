@@ -22,6 +22,7 @@ struct AdvancedPlannerView: View {
         let sourceWeekID: UUID
         let sourceWeekNumber: Int
         let scope: TrainingWeekCopyScope
+        let progression: TrainingWeekProgressionMode
         let summary: TrainingWeekCopySummary
     }
 
@@ -177,7 +178,8 @@ struct AdvancedPlannerView: View {
                     _ = session.copyTrainingWeekToEmptyDays(
                         planID: request.planID,
                         sourceWeekID: request.sourceWeekID,
-                        scope: request.scope
+                        scope: request.scope,
+                        progression: request.progression
                     )
                     pendingWeekCopy = nil
                 }
@@ -195,8 +197,8 @@ struct AdvancedPlannerView: View {
             if let request = pendingWeekCopy {
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Copy \(request.summary.copiedSessions) workouts from week \(request.sourceWeekNumber) into \(request.summary.filledDays) empty future days across \(request.summary.targetWeeks) weeks. Existing or past workouts are not changed.",
-                        norwegian: "Kopier \(request.summary.copiedSessions) økter fra uke \(request.sourceWeekNumber) til \(request.summary.filledDays) tomme fremtidige dager over \(request.summary.targetWeeks) uker. Eksisterende og tidligere økter endres ikke."
+                        english: "Copy \(request.summary.copiedSessions) workouts from week \(request.sourceWeekNumber) to \(request.summary.filledDays) empty future days across \(request.summary.targetWeeks) weeks. \(progressionDescription(request.progression, norwegian: false)) Existing and past workouts are untouched.",
+                        norwegian: "Kopier \(request.summary.copiedSessions) økter fra uke \(request.sourceWeekNumber) til \(request.summary.filledDays) tomme fremtidige dager over \(request.summary.targetWeeks) uker. \(progressionDescription(request.progression, norwegian: true)) Eksisterende og tidligere økter endres ikke."
                     )
                 )
             }
@@ -646,6 +648,52 @@ struct AdvancedPlannerView: View {
                                                 norwegian: "Fyll tomme dager fremover"
                                             ),
                                             systemImage: "calendar"
+                                        )
+                                    }
+
+                                    Menu {
+                                        Button {
+                                            requestWeekCopy(
+                                                from: week,
+                                                plan: plan,
+                                                scope: .allFutureWeeks,
+                                                summary: future,
+                                                progression: .addWeightPerWeek(2.5)
+                                            )
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "+2.5 kg per week",
+                                                    norwegian: "+2,5 kg per uke"
+                                                ),
+                                                systemImage: "scalemass"
+                                            )
+                                        }
+
+                                        Button {
+                                            requestWeekCopy(
+                                                from: week,
+                                                plan: plan,
+                                                scope: .allFutureWeeks,
+                                                summary: future,
+                                                progression: .addRepsPerWeek(1)
+                                            )
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "+1 repetition per week",
+                                                    norwegian: "+1 repetisjon per uke"
+                                                ),
+                                                systemImage: "plus"
+                                            )
+                                        }
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Copy with progression",
+                                                norwegian: "Kopier med progresjon"
+                                            ),
+                                            systemImage: "chart.line.uptrend.xyaxis"
                                         )
                                     }
                                 }
@@ -1495,7 +1543,8 @@ struct AdvancedPlannerView: View {
         from week: TrainingPlanWeek,
         plan: TrainingPlan,
         scope: TrainingWeekCopyScope,
-        summary: TrainingWeekCopySummary
+        summary: TrainingWeekCopySummary,
+        progression: TrainingWeekProgressionMode = .unchanged
     ) {
         guard summary.hasWork else { return }
         pendingWeekCopy = PendingWeekCopy(
@@ -1503,8 +1552,29 @@ struct AdvancedPlannerView: View {
             sourceWeekID: week.id,
             sourceWeekNumber: week.weekNumber,
             scope: scope,
+            progression: progression,
             summary: summary
         )
+    }
+
+    private func progressionDescription(
+        _ progression: TrainingWeekProgressionMode,
+        norwegian: Bool
+    ) -> String {
+        switch progression {
+        case .unchanged:
+            return norwegian
+                ? "Målene kopieres uendret."
+                : "Targets are copied unchanged."
+        case .addWeightPerWeek(let kilograms):
+            return norwegian
+                ? "Forhåndsutfylte styrkevekter økes med \(kilograms.formatted()) kg per uke. Tomme vektfelt forblir tomme."
+                : "Pre-filled strength weights increase by \(kilograms.formatted()) kg per week; empty weights stay empty."
+        case .addRepsPerWeek(let repetitions):
+            return norwegian
+                ? "Repetisjonsmål økes med \(repetitions) per uke. Tidsbaserte mål endres ikke."
+                : "Repetition targets increase by \(repetitions) per week; timed targets stay unchanged."
+        }
     }
 
     private func requestWeekRemoval(
