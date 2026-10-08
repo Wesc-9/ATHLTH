@@ -2746,6 +2746,45 @@ struct HomeHealthMetricDetailView:
     }
 }
 
+/// Pure calendar calculations shared by Home's week pager and tests.
+/// Plan weeks start on the configured plan start, not necessarily Monday.
+enum HomeWeeklyProgressCalendar {
+    static func weekInterval(
+        offset: Int,
+        referenceDate: Date,
+        calendar: Calendar
+    ) -> DateInterval {
+        let currentStart = calendar.dateInterval(
+            of: .weekOfYear, for: referenceDate
+        )?.start ?? calendar.startOfDay(for: referenceDate)
+        let start = calendar.date(
+            byAdding: .weekOfYear,
+            value: offset,
+            to: currentStart
+        ) ?? currentStart
+        let end = calendar.date(
+            byAdding: .weekOfYear,
+            value: 1,
+            to: start
+        ) ?? start.addingTimeInterval(7 * 86_400)
+        return DateInterval(start: start, end: end)
+    }
+
+    static func planPosition(
+        for date: Date,
+        startDate: Date,
+        calendar: Calendar
+    ) -> (weekIndex: Int, dayIndex: Int)? {
+        let first = calendar.startOfDay(for: startDate)
+        let selected = calendar.startOfDay(for: date)
+        let elapsed = calendar.dateComponents(
+            [.day], from: first, to: selected
+        ).day ?? -1
+        guard elapsed >= 0 else { return nil }
+        return (weekIndex: elapsed / 7, dayIndex: elapsed % 7 + 1)
+    }
+}
+
 private struct HomeWeeklyProgressDaySelection:
     Identifiable {
     var id: Date { date }
@@ -3278,25 +3317,11 @@ struct HomeWeeklyProgressStrip:
 
     private var visibleWeekInterval:
         DateInterval {
-        let start =
-            calendar.date(
-                byAdding: .day,
-                value:
-                    weekOffset * 7,
-                to:
-                    currentWeekInterval
-                        .start
-            ) ??
-            currentWeekInterval
-                .start
-
-        let end = calendar.date(
-            byAdding: .weekOfYear,
-            value: 1,
-            to: start
-        ) ?? start.addingTimeInterval(7 * 86_400)
-
-        return DateInterval(start: start, end: end)
+        HomeWeeklyProgressCalendar.weekInterval(
+            offset: weekOffset,
+            referenceDate: Date(),
+            calendar: calendar
+        )
     }
 
     private var visibleWeekDates:
@@ -3632,7 +3657,44 @@ struct HomeWeeklyProgressStrip:
     // while unfinished planned sessions remain in the denominator.
     private var completedCount:
         Int {
-        visibleWorkouts.count
+        // Health-recorded workouts count once. Confirmed planned sessions
+        // without a corresponding Health workout also count (e.g. a
+        // manually completed plan workout or a Watch strength result
+        // awaiting Health synchronisation).
+        var completed = visibleWorkouts.count
+
+        for date in visibleWeekDates {
+            let planned = plannedSessions(for: date)
+            let confirmedIDs = completedPlanSessionIDs(
+                date: date, planned: planned
+            )
+            let recorded = workoutsForDay(date)
+
+            for item in planned where confirmedIDs.contains(item.id) {
+                if let plan,
+                   let linkedID = session.linkedHealthWorkoutID(
+                    planID: plan.id,
+                    sessionID: item.id
+                   ),
+                   recorded.contains(where: { $0.id == linkedID }) {
+                    continue
+                }
+
+                let recordedStrength = strength.workoutHistory.contains {
+                    $0.isFinished && $0.plannedSessionID == item.id
+                }
+                if recordedStrength &&
+                    recorded.contains(where: { $0.activity == .strength }) {
+                    continue
+                }
+
+                // Never guess that an unrelated same-day Health workout
+                // fulfills this manually confirmed planned session.
+                completed += 1
+            }
+        }
+
+        return completed
     }
 
     private var unfinishedPlannedCount:
@@ -3822,93 +3884,19 @@ struct HomeWeeklyProgressStrip:
         date: Date,
         planned: [PlannedSession]
     ) -> Set<UUID> {
-        guard !planned.isEmpty
-        else {
-            return []
-        }
+        guard let plan else { return [] }
 
-        var completed =
-            Set<UUID>()
-
-        if let plan {
-            for item in planned
-            where session
-                .isPlanSessionManuallyCompleted(
+        return Set(
+            planned.filter {
+                session.isPlanSessionCompleted(
                     planID: plan.id,
-                    sessionID: item.id
-                ) {
-                completed.insert(
-                    item.id
+                    sessionID: $0.id,
+                    healthWorkouts: workouts,
+                    strengthHistory: strength.workoutHistory
                 )
             }
-        }
-
-        var unused =
-            workoutsForDay(date)
-
-        for item in planned
-        where !completed
-            .contains(item.id) {
-            guard let index =
-                    unused.firstIndex(
-                        where: {
-                            healthWorkout(
-                                $0,
-                                matches: item
-                            )
-                        }
-                    )
-            else {
-                continue
-            }
-
-            completed.insert(
-                item.id
-            )
-            unused.remove(
-                at: index
-            )
-        }
-
-        return completed
-    }
-
-    private func healthWorkout(
-        _ workout: WorkoutSummary,
-        matches planned:
-            PlannedSession
-    ) -> Bool {
-        switch planned.kind {
-        case .running:
-            return workout.activity ==
-                .running
-        case .walking:
-            return workout.activity ==
-                .walking ||
-                workout.activity ==
-                    .hiking
-        case .strength:
-            return workout.activity ==
-                .strength
-        case .mobility:
-            return workout.activity ==
-                .yoga ||
-                workout.activity ==
-                    .coreTraining
-        case .recovery:
-            return false
-        case .custom:
-            return workout.activity ==
-                .hiit ||
-                workout.activity ==
-                    .rowing ||
-                workout.activity ==
-                    .cycling ||
-                workout.activity ==
-                    .stairClimbing ||
-                workout.activity ==
-                    .other
-        }
+            .map(\.id)
+        )
     }
 
     private func plannedSessions(
@@ -3921,78 +3909,37 @@ struct HomeWeeklyProgressStrip:
         }
 
         let weekIndex: Int
+        let dayIndex: Int
 
-        if let startDate =
-                plan.startDate {
-            let start =
-                calendar
-                    .startOfDay(
-                        for: startDate
-                    )
-            let target =
-                calendar
-                    .startOfDay(
-                        for: date
-                    )
-            let days =
-                calendar
-                    .dateComponents(
-                        [.day],
-                        from: start,
-                        to: target
-                    )
-                    .day ?? 0
-
-            guard days >= 0 else {
+        if let startDate = plan.startDate {
+            guard let position = HomeWeeklyProgressCalendar.planPosition(
+                for: date,
+                startDate: startDate,
+                calendar: calendar
+            ) else {
                 return []
             }
-
-            weekIndex =
-                days / 7
+            weekIndex = position.weekIndex
+            dayIndex = position.dayIndex
         } else {
-            let targetWeek =
-                calendar.dateInterval(
-                    of: .weekOfYear,
-                    for: date
-                )?
-                .start ??
-                calendar.startOfDay(
-                    for: date
-                )
-            let days =
-                calendar
-                    .dateComponents(
-                        [.day],
-                        from:
-                            currentWeekInterval
-                                .start,
-                        to: targetWeek
-                    )
-                    .day ?? 0
-            guard days >= 0 else { return [] }
-            weekIndex = days / 7
-        }
-
-        guard
-            plan.weeks.indices
-                .contains(weekIndex)
-        else {
-            return []
-        }
-
-        let dayIndex: Int
-        if let startDate = plan.startDate {
-            // The plan's first day can be any weekday; its seven-day
-            // cycle must stay aligned with the actual plan start.
-            let first = calendar.startOfDay(for: startDate)
-            let selected = calendar.startOfDay(for: date)
-            let dayOffset = calendar.dateComponents(
-                [.day], from: first, to: selected
+            // Legacy undated plans are anchored to the current week.
+            let weekStart = calendar.dateInterval(
+                of: .weekOfYear,
+                for: date
+            )?.start ?? calendar.startOfDay(for: date)
+            let elapsed = calendar.dateComponents(
+                [.day],
+                from: currentWeekInterval.start,
+                to: weekStart
             ).day ?? 0
-            dayIndex = (dayOffset % 7) + 1
-        } else {
+            guard elapsed >= 0 else { return [] }
+            weekIndex = elapsed / 7
             let weekday = calendar.component(.weekday, from: date)
             dayIndex = ((weekday + 5) % 7) + 1
+        }
+
+        guard plan.weeks.indices.contains(weekIndex) else {
+            return []
         }
 
         return plan.weeks[
