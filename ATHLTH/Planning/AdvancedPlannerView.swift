@@ -12,6 +12,7 @@ struct AdvancedPlannerView: View {
     @State private var showingSessionEditor = false
     @State private var showingStandaloneSessionEditor = false
     @State private var showingPlanEditor = false
+    @State private var showingPlanProgress = false
     @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
     @State private var weekPendingRemoval: TrainingPlanWeek?
@@ -97,6 +98,11 @@ struct AdvancedPlannerView: View {
         .sheet(isPresented: $showingPlanEditor) {
             if let plan = displayedPlan {
                 PlanMetadataEditorView(plan: plan)
+            }
+        }
+        .sheet(isPresented: $showingPlanProgress) {
+            if let plan = displayedPlan {
+                TrainingPlanProgressDetailView(planID: plan.id)
             }
         }
         .sheet(isPresented: $showingAllPlans) {
@@ -515,6 +521,22 @@ struct AdvancedPlannerView: View {
                     Spacer()
 
                     HStack(spacing: 8) {
+                        Button {
+                            showingPlanProgress = true
+                        } label: {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(width: 38, height: 38)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Plan progress",
+                                norwegian: "Planprogresjon"
+                            )
+                        )
+
                         if planID == nil {
                             Button {
                                 showingAllPlans = true
