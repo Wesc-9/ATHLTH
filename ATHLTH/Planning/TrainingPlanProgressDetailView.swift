@@ -27,12 +27,19 @@ struct TrainingPlanProgressDetailView: View {
                         plan: plan,
                         strengthHistory: strength.workoutHistory
                     )
+                    let guidance = TrainingPlanLoadAdvisor.evaluate(
+                        plan: plan,
+                        strengthHistory: strength.workoutHistory
+                    )
 
                     LazyVStack(alignment: .leading, spacing: 16) {
                         header(plan: plan)
                         overallCard(overall)
                         strengthCard(report)
                         exerciseCard(report)
+                        if !guidance.isEmpty {
+                            adjustmentCard(guidance)
+                        }
                         muscleCard(report)
                         weeklyCard(report, currentWeek: overall.currentWeek)
                         sourceNote
@@ -318,6 +325,116 @@ struct TrainingPlanProgressDetailView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func adjustmentCard(
+        _ advice: [TrainingPlanLoadAdvisor.Advice]
+    ) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 13) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Adjusting your next workout",
+                        norwegian: "Tilpass neste økt"
+                    ),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.headline)
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Conservative suggestions based on achieved rep targets, prescribed weight and logged reps in reserve (RIR).",
+                        norwegian: "Forsiktige forslag basert på oppnådde repetisjonsmål, planlagt vekt og registrerte repetisjoner i reserve (RIR)."
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                ForEach(advice) { item in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(item.exerciseName)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer(minLength: 4)
+                            Text(
+                                item.workoutDate.formatted(
+                                    date: .abbreviated,
+                                    time: .omitted
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+
+                        Text(guidanceTitle(item.verdict))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                        Text(guidanceExplanation(item.verdict))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if item.id != advice.last?.id {
+                        Divider().opacity(0.45)
+                    }
+                }
+
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Advisory only. The plan is never changed automatically.",
+                        norwegian: "Kun anbefalinger. Treningsplanen endres aldri automatisk."
+                    ),
+                    systemImage: "hand.raised"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    private func guidanceTitle(
+        _ verdict: TrainingPlanLoadAdvisor.Verdict
+    ) -> String {
+        switch verdict {
+        case .considerIncrease:
+            return ATHLTHLocalization.choose(
+                english: "A small increase may be appropriate",
+                norwegian: "En liten økning kan vurderes"
+            )
+        case .targetMet:
+            return ATHLTHLocalization.choose(
+                english: "Targets met",
+                norwegian: "Målene er oppnådd"
+            )
+        case .reviewTargets:
+            return ATHLTHLocalization.choose(
+                english: "Review the next session",
+                norwegian: "Vurder neste økt"
+            )
+        }
+    }
+
+    private func guidanceExplanation(
+        _ verdict: TrainingPlanLoadAdvisor.Verdict
+    ) -> String {
+        switch verdict {
+        case .considerIncrease:
+            return ATHLTHLocalization.choose(
+                english: "All planned working sets were achieved at their specified load, with at least 2 actual reps in reserve. Consider a small, controlled load increase next time.",
+                norwegian: "Alle planlagte arbeidssett ble gjennomført med oppgitt belastning og minst 2 faktiske repetisjoner i reserve. Vurder en liten og kontrollert vektøkning neste gang."
+            )
+        case .targetMet:
+            return ATHLTHLocalization.choose(
+                english: "The recorded reps reached the plan. Maintain the load until effort and execution support further progression.",
+                norwegian: "Registrerte repetisjoner nådde målet. Behold belastningen til innsats og utførelse tilsier videre progresjon."
+            )
+        case .reviewTargets:
+            return ATHLTHLocalization.choose(
+                english: "The planned work sets, reps or prescribed load were not all achieved. Consider keeping the same load or adjusting the next workout.",
+                norwegian: "Ikke alle planlagte sett, repetisjoner eller belastningsmål ble oppnådd. Vurder å beholde belastningen eller justere neste økt."
+            )
         }
     }
 
