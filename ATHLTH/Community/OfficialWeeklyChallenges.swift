@@ -4041,6 +4041,7 @@ struct OfficialWeeklyChallengeAdminListView: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+            .disabled(challenge.isActive)
         }
     }
 
