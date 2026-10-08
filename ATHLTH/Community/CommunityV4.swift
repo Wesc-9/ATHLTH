@@ -3534,6 +3534,7 @@ private struct CommunityDiscoveryPeopleCardShell:
                     .resizable()
                     .interpolation(.medium)
                     .scaledToFill()
+                    .athlthBoundedFill()
                     .frame(
                         maxWidth:
                             .infinity
@@ -3749,6 +3750,7 @@ private struct CommunityDiscoveryVisualEmptyCard:
             Image(assetName)
                 .resizable()
                 .scaledToFill()
+                .athlthBoundedFill()
                 .frame(height: 130)
                 .frame(
                     maxWidth:
