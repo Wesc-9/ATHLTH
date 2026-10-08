@@ -2184,6 +2184,18 @@ final class AppSessionStore: ObservableObject {
         ) -> PlannedSession {
             let duration: Int
             let distance: Double?
+            // Only add editable suggestions when the user requested a muscle
+            // priority and explicitly chose the suggested week structure.
+            let suggestedExercises: [PlannedExercise]
+            if kind == .strength,
+               let primaryMuscle = builderProfile.priorityMuscles.first {
+                suggestedExercises = FocusedMuscleExerciseSuggestions.makeExercises(
+                    for: primaryMuscle,
+                    sessionIndex: slot
+                )
+            } else {
+                suggestedExercises = []
+            }
 
             switch kind {
             case .running:
@@ -2221,7 +2233,7 @@ final class AppSessionStore: ObservableObject {
                 targetPaceSecondsPerKilometer:
                     nil,
                 routeID: nil,
-                exercises: [],
+                exercises: suggestedExercises,
                 notes: nil,
                 runningWorkout: nil
             )
