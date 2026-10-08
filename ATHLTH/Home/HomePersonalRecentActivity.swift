@@ -4552,17 +4552,16 @@ private struct HomeStrengthMuscleArtwork:
                     activationTint:
                         activationTint
                 )
-                // Fit both complete silhouettes inside the small Home
-                // thumbnail. Enlarging past the card used to cut off feet
-                // and the lower muscle regions.
+                // Full-length figures with readable muscle detail.
+                // Keep the lower feet clear of the front/back caption pills.
                 .frame(
                     width: min(
-                        max(height * 1.12, 108),
-                        max(proxy.size.width - 28, 1)
+                        max(height * 1.68, 184),
+                        max(proxy.size.width - 12, 1)
                     ),
-                    height: max(height - 18, 75)
+                    height: max(height - 26, 80)
                 )
-                .padding(.top, 1)
+                .offset(y: -9)
 
                 VStack {
                     Spacer()
