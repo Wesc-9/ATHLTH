@@ -13655,6 +13655,7 @@ struct CommunityGroupCreateView: View {
                 .medium
             )
             .scaledToFill()
+            .athlthBoundedFill()
         }
     }
 
@@ -16168,6 +16169,7 @@ struct CommunityGroupSettingsView: View {
                 groupHeaderImagePlaceholder
             }
         }
+        .athlthBoundedFill()
         .frame(
             maxWidth: .infinity,
             maxHeight: .infinity
