@@ -219,6 +219,48 @@ final class TrainingWeekTemplateEngineTests: XCTestCase {
         )
     }
 
+    func testWeightProgressionAdjustsOnlyPrescribedWeightsByWeek() {
+        let plan = makePlan()
+        let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            progression: .addWeightPerWeek(2.5),
+            now: startDate,
+            calendar: calendar
+        )
+        XCTAssertNotNil(result)
+        let sourceExercise = plan.weeks[0].days[0].sessions[0].exercises[0]
+        let secondWeekExercise = result?.plan.weeks[1].days[0].sessions[0].exercises[0]
+        let thirdWeekExercise = result?.plan.weeks[2].days[0].sessions[0].exercises[0]
+        XCTAssertEqual(sourceExercise.targetWeightKilograms, 12)
+        XCTAssertEqual(secondWeekExercise?.targetWeightKilograms, 14.5)
+        XCTAssertEqual(thirdWeekExercise?.targetWeightKilograms, 17)
+        XCTAssertEqual(secondWeekExercise?.setTargets?[1].weightKilograms, 16.5)
+        XCTAssertEqual(thirdWeekExercise?.setTargets?[1].weightKilograms, 19)
+        XCTAssertEqual(secondWeekExercise?.setTargets?[1].reps, 8)
+    }
+
+    func testRepetitionProgressionKeepsOriginalAndPerSetPrescriptions() {
+        let plan = makePlan()
+        let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            progression: .addRepsPerWeek(1),
+            now: startDate,
+            calendar: calendar
+        )
+        let second = result?.plan.weeks[1].days[0].sessions[0].exercises[0]
+        let third = result?.plan.weeks[2].days[0].sessions[0].exercises[0]
+        XCTAssertEqual(plan.weeks[0].days[0].sessions[0].exercises[0].reps, 10)
+        XCTAssertEqual(second?.reps, 11)
+        XCTAssertEqual(third?.reps, 12)
+        XCTAssertEqual(second?.setTargets?[0].reps, 11)
+        XCTAssertEqual(third?.setTargets?[1].reps, 10)
+        XCTAssertEqual(third?.setTargets?[1].weightKilograms, 14)
+    }
+
     func testRepeatDoesNotDuplicateAlreadyCopiedWorkouts() {
         let plan = makePlan()
         let first = TrainingWeekTemplateEngine.copy(
