@@ -657,6 +657,7 @@ private struct QuickTrainingHeroCard: View {
             Image(imageName)
                 .resizable()
                 .scaledToFill()
+                .athlthBoundedFill()
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity
