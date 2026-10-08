@@ -41,14 +41,15 @@ private struct RecoveryCoachLegacyConversationHero<
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Image(backgroundAsset)
-                .resizable()
-                .scaledToFill()
-                .scaleEffect(1.14)
-                .frame(maxWidth: .infinity)
-                .frame(height: 214)
-                .clipped()
+        GeometryReader { viewport in
+            ZStack(alignment: .top) {
+                Image(backgroundAsset)
+                    .resizable()
+                    .scaledToFill()
+                    // Cropping needs a finite width or this image expands
+                    // the entire chat beyond the iPhone screen.
+                    .frame(width: viewport.size.width, height: 214)
+                    .clipped()
 
             LinearGradient(
                 colors: [
@@ -140,7 +141,7 @@ private struct RecoveryCoachLegacyConversationHero<
             .padding(.horizontal, 14)
             .padding(.top, 14)
         }
-        .frame(height: 214)
+        .frame(width: viewport.size.width, height: 214)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 30,
@@ -165,6 +166,8 @@ private struct RecoveryCoachLegacyConversationHero<
             radius: 15,
             y: 7
         )
+        }
+        .frame(height: 214)
     }
 }
 
@@ -1190,6 +1193,8 @@ struct RecoveryCoachView: View {
                                 )
                         }
                         .padding()
+                        // Wrap long replies within the chat viewport.
+                        .containerRelativeFrame(.horizontal)
                     }
                     .scrollDismissesKeyboard(
                         .interactively
@@ -1254,6 +1259,7 @@ struct RecoveryCoachView: View {
                 )
                 .zIndex(1)
             }
+            .containerRelativeFrame(.horizontal)
         }
         .safeAreaInset(
             edge: .bottom
