@@ -163,14 +163,6 @@ struct ATHLTHCommunityV4View: View {
         )
     }
 
-    private var discoveryGroupRefreshKey: String {
-        discoveryGroups
-            .map {
-                "\($0.id.uuidString)-\($0.updatedAt.timeIntervalSince1970)"
-            }
-            .joined(separator: "|")
-    }
-
     private var publicDiscoveryGroups:
         [CommunityGroupRecord] {
         groups.groups.filter {
@@ -668,7 +660,6 @@ struct ATHLTHCommunityV4View: View {
                     }
                 }
             }
-            .id(discoveryGroupRefreshKey)
         }
     }
 
