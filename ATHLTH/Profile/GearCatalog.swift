@@ -50,6 +50,132 @@ final class GearCatalogStore: ObservableObject {
     private let client: SupabaseClient
     private var loadedCategories: Set<ProfileGearCategory> = []
 
+    // Stable, app-bundled choices: available even when the remote catalog
+    // is empty/offline. These IDs are local-only and MUST NOT be written into
+    // the gear_details.catalog_item_id FK.
+    private static let builtInHeadphones: [GearCatalogEntry] = {
+        let products: [(String, String)] = [
+            ("Apple", "AirPods Pro 2"),
+            ("Apple", "AirPods 4"),
+            ("Apple", "AirPods 4 with ANC"),
+            ("Apple", "AirPods Max"),
+            ("Beats", "Powerbeats Pro 2"),
+            ("Beats", "Beats Fit Pro"),
+            ("Beats", "Studio Pro"),
+            ("Beats", "Solo 4"),
+            ("Shokz", "OpenRun Pro 2"),
+            ("Shokz", "OpenRun"),
+            ("Shokz", "OpenFit 2"),
+            ("Shokz", "OpenSwim Pro"),
+            ("Sony", "WH-1000XM6"),
+            ("Sony", "WH-1000XM5"),
+            ("Sony", "WF-1000XM5"),
+            ("Sony", "LinkBuds Fit"),
+            ("Sony", "LinkBuds Open"),
+            ("Sony", "ULT WEAR"),
+            ("Sonos", "Ace"),
+            ("Samsung", "Galaxy Buds3 Pro"),
+            ("Samsung", "Galaxy Buds3"),
+            ("Samsung", "Galaxy Buds2 Pro"),
+            ("Samsung", "Galaxy Buds FE"),
+            ("Bose", "QuietComfort Ultra Headphones"),
+            ("Bose", "QuietComfort Ultra Earbuds"),
+            ("Bose", "QuietComfort Headphones"),
+            ("Sennheiser", "MOMENTUM 4 Wireless"),
+            ("Sennheiser", "MOMENTUM True Wireless 4"),
+            ("Sennheiser", "ACCENTUM Plus Wireless"),
+            ("JBL", "Tour Pro 3"),
+            ("JBL", "Live Pro 2 TWS"),
+            ("JBL", "Endurance Peak 3"),
+            ("JBL", "Tune 770NC"),
+            ("Jabra", "Elite 8 Active Gen 2"),
+            ("Jabra", "Elite 10 Gen 2"),
+            ("Jabra", "Elite 7 Active"),
+            ("Anker Soundcore", "Sport X20"),
+            ("Anker Soundcore", "Liberty 4 NC"),
+            ("Anker Soundcore", "AeroFit 2"),
+            ("Anker Soundcore", "Space One"),
+            ("Bowers & Wilkins", "Px8"),
+            ("Bowers & Wilkins", "Px7 S2e"),
+            ("Bowers & Wilkins", "Pi8"),
+            ("Bang & Olufsen", "Beoplay H100"),
+            ("Bang & Olufsen", "Beoplay EX"),
+            ("Marshall", "Major V"),
+            ("Marshall", "Monitor III A.N.C."),
+            ("Marshall", "Motif II A.N.C."),
+            ("Nothing", "Ear"),
+            ("Nothing", "Ear (a)"),
+            ("Nothing", "Headphone (1)"),
+            ("Skullcandy", "Crusher ANC 2"),
+            ("Skullcandy", "Rail ANC"),
+            ("Google", "Pixel Buds Pro 2"),
+            ("Google", "Pixel Buds A-Series"),
+            ("Huawei", "FreeClip"),
+            ("Huawei", "FreeBuds Pro 4"),
+            ("OnePlus", "Buds Pro 3"),
+            ("Technics", "EAH-AZ100"),
+            ("Technics", "EAH-AZ80")
+        ]
+        let featured = Set([
+            "AirPods Pro 2",
+            "Powerbeats Pro 2",
+            "OpenRun Pro 2",
+            "WH-1000XM6",
+            "Ace",
+            "Galaxy Buds3 Pro",
+            "QuietComfort Ultra Earbuds",
+            "MOMENTUM 4 Wireless"
+        ])
+        return products.enumerated().compactMap { index, item in
+            guard let id = UUID(
+                uuidString: String(
+                    format: "a7c00001-0000-4000-8000-%012x",
+                    index + 1
+                )
+            ) else {
+                return nil
+            }
+
+            return GearCatalogEntry(
+                id: id,
+                category: .headphones,
+                brand: item.0,
+                model: item.1,
+                variants: [],
+                isFeatured: featured.contains(item.1),
+                sortOrder: 10_000 + index,
+                isActive: true
+            )
+        }
+    }()
+
+    func isBuiltIn(_ item: GearCatalogEntry) -> Bool {
+        Self.builtInHeadphones.contains { $0.id == item.id }
+    }
+
+    private func availableEntries(
+        for category: ProfileGearCategory
+    ) -> [GearCatalogEntry] {
+        let remote = entries.filter {
+            $0.category == category && $0.isActive
+        }
+        guard category == .headphones else {
+            return remote
+        }
+
+        var seen: Set<String> = []
+        return (remote + Self.builtInHeadphones).filter { item in
+            let key = item.brand.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .current
+            ) + "|" + item.model.folding(
+                options: [.caseInsensitive, .diacriticInsensitive],
+                locale: .current
+            )
+            return seen.insert(key).inserted
+        }
+    }
+
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
     }
@@ -96,11 +222,7 @@ final class GearCatalogStore: ObservableObject {
     func brands(
         for category: ProfileGearCategory
     ) -> [String] {
-        let rows = entries
-            .filter {
-                $0.category == category &&
-                $0.isActive
-            }
+        let rows = availableEntries(for: category)
             .sorted(by: catalogSort)
 
         var seen: Set<String> = []
@@ -122,14 +244,12 @@ final class GearCatalogStore: ObservableObject {
         for category: ProfileGearCategory,
         brand: String
     ) -> [GearCatalogEntry] {
-        entries
+        availableEntries(for: category)
             .filter {
-                $0.category == category &&
                 $0.brand.compare(
                     brand,
                     options: [.caseInsensitive, .diacriticInsensitive]
-                ) == .orderedSame &&
-                $0.isActive
+                ) == .orderedSame
             }
             .sorted(by: catalogSort)
     }
@@ -140,12 +260,9 @@ final class GearCatalogStore: ObservableObject {
         limit: Int = 6
     ) -> [GearCatalogEntry] {
         Array(
-            entries
+            availableEntries(for: category)
                 .filter {
-                    guard $0.category == category,
-                          $0.isActive,
-                          $0.isFeatured
-                    else {
+                    guard $0.isFeatured else {
                         return false
                     }
 
@@ -177,8 +294,7 @@ final class GearCatalogStore: ObservableObject {
         brand: String,
         model: String
     ) -> GearCatalogEntry? {
-        entries.first {
-            $0.category == category &&
+        availableEntries(for: category).first {
             $0.brand.compare(
                 brand,
                 options: [.caseInsensitive, .diacriticInsensitive]
