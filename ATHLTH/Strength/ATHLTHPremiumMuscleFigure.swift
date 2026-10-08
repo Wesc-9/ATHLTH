@@ -279,3 +279,40 @@ enum ATHLTHPremiumMuscleAtlas {
         return result
     }
 }
+
+
+#if DEBUG
+/// Xcode canvas fixture. No hard-coded activations are used in the shipped app.
+private struct ATHLTHPremiumMuscleFigure_Previews: PreviewProvider {
+    private static let sample = StrengthMuscleProfile(
+        activations: [
+            StrengthMuscleActivation(region: .glutes, score: 4.0),
+            StrengthMuscleActivation(region: .hamstrings, score: 3.7),
+            StrengthMuscleActivation(region: .quads, score: 3.5),
+            StrengthMuscleActivation(region: .calves, score: 1.2),
+            StrengthMuscleActivation(region: .abs, score: 0.8)
+        ],
+        primaryRegions: [.glutes, .hamstrings, .quads],
+        secondaryRegions: [.calves, .abs]
+    )
+
+    static var previews: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ATHLTHPremiumMuscleFigure(
+                profile: sample,
+                isFront: true,
+                activationTint: Color(red: 0.93, green: 0.32, blue: 0.22)
+            )
+            ATHLTHPremiumMuscleFigure(
+                profile: sample,
+                isFront: false,
+                activationTint: Color(red: 0.93, green: 0.32, blue: 0.22)
+            )
+        }
+        .frame(width: 316, height: 275)
+        .padding(20)
+        .background(Color(red: 0.98, green: 0.98, blue: 0.975))
+        .previewDisplayName("ATHLTH – styrke, front og bak")
+    }
+}
+#endif
