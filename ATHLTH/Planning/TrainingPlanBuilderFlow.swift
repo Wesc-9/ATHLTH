@@ -46,6 +46,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var selectedGoalIDs: Set<UUID> = []
     @State private var creationError: String?
+    @State private var createdPlanID: UUID?
+    @State private var showingCreatedPlan = false
     @State private var showingAIBuilder = false
     @State private var dismissAfterAI = false
     @State private var didApplySuggestedStartDate = false
@@ -263,6 +265,41 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 case .mine:
                     MyTrainingPlansLibraryView()
+                }
+            }
+            .navigationDestination(
+                isPresented: $showingCreatedPlan
+            ) {
+                if let createdPlanID {
+                    ScrollView {
+                        AdvancedPlannerView(planID: createdPlanID)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 14)
+                    }
+                    .background(
+                        ATHLTHPremiumCanvas(
+                            accent: ATHLTHTheme.accent.opacity(0.30)
+                        )
+                    )
+                    .navigationTitle(
+                        ATHLTHLocalization.choose(
+                            english: "Build your workouts",
+                            norwegian: "Bygg treningsøktene"
+                        )
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(
+                                ATHLTHLocalization.choose(
+                                    english: "Done",
+                                    norwegian: "Ferdig"
+                                )
+                            ) {
+                                dismiss()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -4082,6 +4119,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
         }
 
-        dismiss()
+        // Open the real day-by-day planner directly after saving so the
+        // user can immediately add exercises, edit days and review the week.
+        createdPlanID = created.id
+        showingCreatedPlan = true
     }
 }
