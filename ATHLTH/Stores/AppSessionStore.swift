@@ -2710,13 +2710,15 @@ final class AppSessionStore: ObservableObject {
     func copyTrainingWeekToEmptyDays(
         planID: UUID,
         sourceWeekID: UUID,
-        scope: TrainingWeekCopyScope
+        scope: TrainingWeekCopyScope,
+        progression: TrainingWeekProgressionMode = .unchanged
     ) -> TrainingWeekCopySummary? {
         guard let plan = trainingPlan(withID: planID),
               let result = TrainingWeekTemplateEngine.copy(
                   plan: plan,
                   sourceWeekID: sourceWeekID,
-                  scope: scope
+                  scope: scope,
+                  progression: progression
               )
         else {
             return nil
