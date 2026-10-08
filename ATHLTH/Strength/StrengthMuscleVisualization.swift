@@ -1300,15 +1300,26 @@ struct StrengthMuscleMapView: View {
         label: String
     ) -> some View {
         VStack(spacing: compact ? 2 : 6) {
-            StrengthBodyFigureCanvas(
-                profile: profile,
-                side: side,
-                style: style,
-                presentation:
-                    presentation,
-                activationTint:
-                    activationTint
-            )
+            Group {
+                if style == .activation {
+                    // Premium vector plates follow the exact recorded
+                    // primary/secondary muscle profile. Recovery keeps its
+                    // established continuous load heatmap unchanged.
+                    ATHLTHPremiumMuscleFigure(
+                        profile: profile,
+                        isFront: side == .front,
+                        activationTint: activationTint
+                    )
+                } else {
+                    StrengthBodyFigureCanvas(
+                        profile: profile,
+                        side: side,
+                        style: style,
+                        presentation: presentation,
+                        activationTint: activationTint
+                    )
+                }
+            }
             .shadow(
                 color:
                     figureShadowColor,
