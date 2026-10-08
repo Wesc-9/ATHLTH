@@ -1962,6 +1962,7 @@ struct WatchRunWorkoutExperienceView: View {
         .padding(.horizontal, 10)
     }
 
+    @ViewBuilder
     private var planPage: some View {
         if let workout =
                 workoutManager
