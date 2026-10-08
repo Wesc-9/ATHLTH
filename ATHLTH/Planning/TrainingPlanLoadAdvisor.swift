@@ -16,6 +16,9 @@ enum TrainingPlanLoadAdvisor {
         let verdict: Verdict
         let completedWorkSets: Int
         let plannedWorkSets: Int
+        // Only when all work sets had the same prescribed weight and
+        // every target was verified with actual effort data.
+        let suggestedNextWeightKilograms: Double?
     }
 
     static func evaluate(
@@ -118,6 +121,30 @@ enum TrainingPlanLoadAdvisor {
                     verdict = .targetMet
                 }
 
+                // Avoid an invented exact prescription for pyramids,
+                // missing weight data or sets of different prescribed loads.
+                // For a uniform load, a modest ~5% step capped at 2.5 kg
+                // can be offered for the athlete to consider manually.
+                let prescribedWeights = prescribedWorkSets.compactMap {
+                    $0.weightKilograms ?? planned.targetWeightKilograms
+                }
+                let uniformWeight: Double?
+                if verdict == .considerIncrease,
+                   let first = prescribedWeights.first,
+                   prescribedWeights.count == prescribedWorkSets.count,
+                   prescribedWeights.allSatisfy({ abs($0 - first) < 0.01 }) {
+                    uniformWeight = first
+                } else {
+                    uniformWeight = nil
+                }
+                let suggestedWeight = uniformWeight.map { weight in
+                    let increase = min(
+                        2.5,
+                        max(0.5, (weight * 0.05 * 2).rounded() / 2)
+                    )
+                    return (weight + increase) * 2
+                }.map { $0.rounded() / 2 }
+
                 seenExercises.insert(key)
                 recommendations.append(
                     Advice(
@@ -126,7 +153,8 @@ enum TrainingPlanLoadAdvisor {
                         workoutDate: workout.endedAt ?? workout.startedAt,
                         verdict: verdict,
                         completedWorkSets: completedWorkSets.count,
-                        plannedWorkSets: prescribedWorkSets.count
+                        plannedWorkSets: prescribedWorkSets.count,
+                        suggestedNextWeightKilograms: suggestedWeight
                     )
                 )
 
