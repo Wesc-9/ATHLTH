@@ -121,8 +121,13 @@ enum TrainingWeekTemplateEngine {
                       }), !sourceDay.sessions.isEmpty
                 else { continue }
 
-                let offset = max(updated.weeks[targetIndex].weekNumber - 1, 0) * 7
-                    + targetDay.dayIndex - 1
+                // Match preview's legacy week-number fallback exactly.
+                // Older saved plans can contain weekNumber == 0; using
+                // week zero here would copy into the wrong calendar date.
+                let targetWeekNumber = updated.weeks[targetIndex].weekNumber
+                let offset = (targetWeekNumber > 0
+                    ? (targetWeekNumber - 1) * 7
+                    : targetIndex * 7) + targetDay.dayIndex - 1
                 guard let scheduledDay = calendar.date(
                     byAdding: .day,
                     value: offset,
