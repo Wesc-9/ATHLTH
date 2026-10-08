@@ -1028,6 +1028,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             return
         }
 
+        guard !rejectInsecureTailnetURL(baseURL) else {
+            return
+        }
+
         Task {
             await completeLocalPairing(
                 baseURL: baseURL,
@@ -1070,6 +1074,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             )
             lastErrorMessage = message
             connectionState = .error(message)
+            return
+        }
+
+        guard !rejectInsecureTailnetURL(baseURL) else {
             return
         }
 
@@ -1117,6 +1125,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             )
             lastErrorMessage = message
             connectionState = .error(message)
+            return
+        }
+
+        guard !rejectInsecureTailnetURL(alternateURL) else {
             return
         }
 
@@ -4476,6 +4488,45 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
             return nil
         }
         return url
+    }
+
+    // HTTP to Tailscale's shared-address-space IP is blocked by ATS on
+    // supported iOS versions. A valid HTTPS MagicDNS/Tailscale Serve URL
+    // avoids weakening ATS for the rest of ATHLTH's network traffic.
+    static func isInsecureTailnetAddress(_ raw: String) -> Bool {
+        guard let url = normalizedBaseURL(from: raw) else {
+            return false
+        }
+        return isInsecureTailnetAddress(url)
+    }
+
+    private static func isInsecureTailnetAddress(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "http",
+              let host = url.host
+        else {
+            return false
+        }
+
+        let octets = host.split(separator: ".").compactMap {
+            UInt8($0)
+        }
+        return octets.count == 4 &&
+            octets[0] == 100 &&
+            (64...127).contains(Int(octets[1]))
+    }
+
+    private func rejectInsecureTailnetURL(_ url: URL) -> Bool {
+        guard Self.isInsecureTailnetAddress(url) else {
+            return false
+        }
+
+        let message = ATHLTHLocalization.choose(
+            english: "Tailscale IP addresses using HTTP are blocked by iOS. Use an HTTPS .ts.net address from Tailscale Serve instead. Your local Home Assistant address can stay unchanged.",
+            norwegian: "iOS blokkerer HTTP til Tailscale-IP-adresser. Bruk en HTTPS-adresse som slutter på .ts.net fra Tailscale Serve. Den lokale Home Assistant-adressen kan beholdes."
+        )
+        lastErrorMessage = message
+        connectionState = .error(message)
+        return true
     }
 
     private static func normalizedBaseURL(
