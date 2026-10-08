@@ -6,6 +6,8 @@ struct PlannedWorkoutDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let planID: UUID
     let workout: PlannedSession
@@ -13,11 +15,10 @@ struct PlannedWorkoutDetailView: View {
 
     @State private var showingEditor = false
     @State private var showingStructuredWorkout = false
+    @State private var showingHealthLinkPicker = false
 
     private var currentWorkout: PlannedSession {
-        guard let plan = session.activePlan,
-              plan.id == planID
-        else {
+        guard let plan = session.trainingPlan(withID: planID) else {
             return workout
         }
 
@@ -41,8 +42,51 @@ struct PlannedWorkoutDetailView: View {
         )
     }
 
+    private var linkedHealthWorkout: WorkoutSummary? {
+        guard let linkedID = session.linkedHealthWorkoutID(
+            planID: planID, sessionID: currentWorkout.id
+        ) else { return nil }
+        return health.workouts.first { $0.id == linkedID }
+    }
+
+    private var hasRecordedStrengthWorkout: Bool {
+        strength.workoutHistory.contains {
+            $0.isFinished && $0.plannedSessionID == currentWorkout.id
+        }
+    }
+
+    private var matchingHealthWorkouts: [WorkoutSummary] {
+        health.workouts
+            .filter { item in
+                switch currentWorkout.kind {
+                case .running: return item.activity == .running
+                case .walking: return item.activity == .walking ||
+                    item.activity == .hiking
+                case .strength: return item.activity == .strength
+                case .mobility: return item.activity == .yoga ||
+                    item.activity == .coreTraining
+                case .recovery: return false
+                case .custom: return item.activity == .hiit ||
+                    item.activity == .rowing ||
+                    item.activity == .cycling ||
+                    item.activity == .stairClimbing ||
+                    item.activity == .other
+                }
+            }
+            .sorted { $0.startDate > $1.startDate }
+            .prefix(30)
+            .map { $0 }
+    }
+
     private var isCompleted: Bool {
-        isHealthCompleted || isManuallyCompleted
+        !session.isPlanSessionSkipped(
+            planID: planID, sessionID: currentWorkout.id
+        ) && (
+            isManuallyCompleted ||
+            isHealthCompleted ||
+            hasRecordedStrengthWorkout ||
+            linkedHealthWorkout != nil
+        )
     }
 
     var body: some View {
@@ -114,6 +158,9 @@ struct PlannedWorkoutDetailView: View {
                     planID: planID,
                     workout: currentWorkout
                 )
+            }
+            .sheet(isPresented: $showingHealthLinkPicker) {
+                healthLinkPicker
             }
             .fullScreenCover(
                 isPresented:
@@ -821,31 +868,112 @@ struct PlannedWorkoutDetailView: View {
         }
     }
 
+    private var healthLinkPicker: some View {
+        NavigationStack {
+            List {
+                if matchingHealthWorkouts.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No matching workouts available",
+                            norwegian: "Ingen passende økter tilgjengelig"
+                        ),
+                        systemImage: "heart.text.square"
+                    )
+                } else {
+                    ForEach(matchingHealthWorkouts) { item in
+                        Button {
+                            if session.linkHealthWorkout(
+                                item,
+                                toPlan: planID,
+                                sessionID: currentWorkout.id
+                            ) {
+                                showingHealthLinkPicker = false
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "heart.circle")
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(item.activity.rawValue)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(item.startDate.formatted(
+                                        date: .abbreviated,
+                                        time: .shortened
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "link")
+                                    .foregroundStyle(ATHLTHTheme.accent)
+                            }
+                        }
+                        .disabled(
+                            session.linkedHealthWorkoutsByPlanSession.contains {
+                                $0.value == item.id &&
+                                $0.key != "\(planID.uuidString)|\(currentWorkout.id.uuidString)"
+                            }
+                        )
+                    }
+                }
+            }
+            .navigationTitle(
+                ATHLTHLocalization.choose(
+                    english: "Link workout",
+                    norwegian: "Koble til økt"
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )
+                    ) {
+                        showingHealthLinkPicker = false
+                    }
+                }
+            }
+        }
+    }
+
     private var completionCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("Completion")
+                sectionTitle(
+                    ATHLTHLocalization.choose(
+                        english: "Completion",
+                        norwegian: "Gjennomføring"
+                    )
+                )
 
-                if isHealthCompleted {
-                    HStack(spacing: 12) {
-                        Image(systemName: "heart.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accent)
+                if isCompleted && !isManuallyCompleted {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Completed with a recorded workout",
+                            norwegian: "Fullført med registrert treningsøkt"
+                        ),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Completed")
-                                .font(.headline)
-
-                            Text("Matched automatically from Apple Health.")
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                    if linkedHealthWorkout != nil {
+                        Button {
+                            session.unlinkHealthWorkout(
+                                planID: planID, sessionID: currentWorkout.id
+                            )
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Unlink Apple Health workout",
+                                    norwegian: "Fjern koblingen til Apple Health"
+                                ),
+                                systemImage: "link.badge.minus"
+                            )
                         }
-
-                        Spacer()
-
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(ATHLTHTheme.accent)
+                        .buttonStyle(.bordered)
                     }
                 } else {
                     Button {
@@ -855,56 +983,60 @@ struct PlannedWorkoutDetailView: View {
                             completed: !isManuallyCompleted
                         )
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(
-                                systemName: isManuallyCompleted
-                                    ? "arrow.uturn.backward.circle.fill"
-                                    : "checkmark.circle.fill"
-                            )
-                            .font(.title3)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(
-                                    isManuallyCompleted
-                                        ? "Mark as Not Completed"
-                                        : "Mark as Completed"
-                                )
-                                .font(.headline)
-
-                                Text(
-                                    isManuallyCompleted
-                                        ? "Remove the manual completion."
-                                        : "Set this planned workout as performed."
-                                )
-                                .font(.caption)
-                                .opacity(0.78)
-                            }
-
-                            Spacer()
-                        }
-                        .foregroundStyle(
+                        Label(
                             isManuallyCompleted
-                                ? ATHLTHTheme.accentDeep
-                                : Color.white
+                                ? ATHLTHLocalization.choose(
+                                    english: "Undo manual completion",
+                                    norwegian: "Angre manuell fullføring"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Mark as completed",
+                                    norwegian: "Marker som fullført"
+                                ),
+                            systemImage: isManuallyCompleted
+                                ? "arrow.uturn.backward.circle.fill"
+                                : "checkmark.circle.fill"
                         )
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, minHeight: 60)
-                        .background(
-                            isManuallyCompleted
-                                ? ATHLTHTheme.accentSoft
-                                : ATHLTHTheme.accent,
-                            in: RoundedRectangle(cornerRadius: 18)
-                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 54)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accent)
 
                     Text(
-                        "Manual completion updates your ATHLTH plan only. It does not create an Apple Health workout."
+                        ATHLTHLocalization.choose(
+                            english: "Manual completion updates only this plan, not Apple Health.",
+                            norwegian: "Manuell fullføring oppdaterer bare planen, ikke Apple Health."
+                        )
                     )
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
                 }
+
+                if linkedHealthWorkout == nil && !isHealthCompleted {
+                    Button {
+                        showingHealthLinkPicker = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Link an Apple Health workout",
+                                norwegian: "Koble til en Apple Health-økt"
+                            ),
+                            systemImage: "heart.text.square"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(matchingHealthWorkouts.isEmpty)
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Only workouts you explicitly link are credited to this plan. Other Health workouts are never matched by date alone.",
+                        norwegian: "Bare økter du selv kobler til, telles i denne planen. Andre Health-økter matches aldri kun på dato."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
         }
     }
