@@ -1088,7 +1088,7 @@ private struct HomePersonalHorizontalWorkoutCard:
     let phoneWorkout: PhoneWorkout?
 
     private var cardTitle: String {
-        let generic = ["running", "run", "løping", "løp"]
+        let generic = ["running", "run", "løping", "løp", "iphone run", "iPhone run".lowercased(), "running completed", "løpeøkt fullført"]
         if workout.activity == .running,
            workout.isIndoor == true,
            generic.contains(
