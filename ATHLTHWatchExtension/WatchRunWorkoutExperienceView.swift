@@ -1797,10 +1797,8 @@ struct WatchRunWorkoutExperienceView: View {
                     .minimumScaleFactor(0.8)
 
                 liveHeroMetric(
-                    title: "PACE",
-                    value: paceText(
-                        workoutManager.currentPaceSecondsPerKilometer
-                    ),
+                    title: livePaceIsAverage ? "AVG PACE" : "PACE",
+                    value: paceText(liveDisplayedPace),
                     unit: "/km",
                     tint: WatchTheme.liveLime,
                     fontSize: compact ? 35 : 42
@@ -1846,6 +1844,16 @@ struct WatchRunWorkoutExperienceView: View {
             .background(WatchTheme.liveCanvas)
         }
         .background(WatchTheme.liveCanvas.ignoresSafeArea())
+    }
+
+    private var liveDisplayedPace: TimeInterval? {
+        workoutManager.currentPaceSecondsPerKilometer ??
+            workoutManager.averagePaceSecondsPerKilometer
+    }
+
+    private var livePaceIsAverage: Bool {
+        workoutManager.currentPaceSecondsPerKilometer == nil &&
+            workoutManager.averagePaceSecondsPerKilometer != nil
     }
 
     private var liveWorkoutStepTitle: String {
