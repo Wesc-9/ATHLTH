@@ -250,6 +250,7 @@ final class TrainingPlanStrengthReportTests: XCTestCase {
         )
         XCTAssertEqual(advice.count, 1)
         XCTAssertEqual(advice.first?.verdict, .reviewTargets)
+        XCTAssertNil(advice.first?.suggestedNextWeightKilograms)
         XCTAssertEqual(advice.first?.completedWorkSets, 2)
         XCTAssertEqual(advice.first?.plannedWorkSets, 2)
     }
@@ -276,6 +277,7 @@ final class TrainingPlanStrengthReportTests: XCTestCase {
             strengthHistory: [workout]
         )
         XCTAssertEqual(ready.first?.verdict, .considerIncrease)
+        XCTAssertEqual(ready.first?.suggestedNextWeightKilograms, 10.5)
 
         workout.exercises[0].sets[1].rir = nil
         let withoutRealRIR = TrainingPlanLoadAdvisor.evaluate(
@@ -283,6 +285,7 @@ final class TrainingPlanStrengthReportTests: XCTestCase {
             strengthHistory: [workout]
         )
         XCTAssertEqual(withoutRealRIR.first?.verdict, .targetMet)
+        XCTAssertNil(withoutRealRIR.first?.suggestedNextWeightKilograms)
     }
 
     func testAdvisorNeverLinksUnrelatedOrUnfinishedWorkouts() {
