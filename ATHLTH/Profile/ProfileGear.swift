@@ -1566,6 +1566,31 @@ private enum ProfileGearEditorMode: String, CaseIterable, Identifiable {
     }
 }
 
+private struct ProfileGearColorChoice: Identifiable {
+    let english: String
+    let norwegian: String
+
+    var id: String { english }
+
+    var title: String {
+        ATHLTHLocalization.choose(
+            english: english,
+            norwegian: norwegian
+        )
+    }
+
+    func matches(_ value: String) -> Bool {
+        english.compare(
+            value,
+            options: [.caseInsensitive, .diacriticInsensitive]
+        ) == .orderedSame ||
+        norwegian.compare(
+            value,
+            options: [.caseInsensitive, .diacriticInsensitive]
+        ) == .orderedSame
+    }
+}
+
 struct ProfileGearEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var gear: ProfileGearStore
@@ -1591,7 +1616,41 @@ struct ProfileGearEditorView: View {
     @State private var editorMode: ProfileGearEditorMode
     @State private var manualBrand = false
     @State private var manualModel = false
+    @State private var manualColor = false
     @State private var lastAutoName: String?
+
+    private static let colorChoices: [ProfileGearColorChoice] = [
+        .init(english: "Black", norwegian: "Svart"),
+        .init(english: "White", norwegian: "Hvit"),
+        .init(english: "Gray", norwegian: "Grå"),
+        .init(english: "Silver", norwegian: "Sølv"),
+        .init(english: "Midnight", norwegian: "Midnatt"),
+        .init(english: "Starlight", norwegian: "Stjerneskinn"),
+        .init(english: "Blue", norwegian: "Blå"),
+        .init(english: "Navy", norwegian: "Mørkeblå"),
+        .init(english: "Red", norwegian: "Rød"),
+        .init(english: "Green", norwegian: "Grønn"),
+        .init(english: "Pink", norwegian: "Rosa"),
+        .init(english: "Purple", norwegian: "Lilla"),
+        .init(english: "Beige", norwegian: "Beige"),
+        .init(english: "Brown", norwegian: "Brun"),
+        .init(english: "Gold", norwegian: "Gull"),
+        .init(english: "Orange", norwegian: "Oransje"),
+        .init(english: "Yellow", norwegian: "Gul"),
+        .init(english: "Transparent", norwegian: "Gjennomsiktig")
+    ]
+
+    private var selectedColorTitle: String {
+        guard !detailDraft.colorName.isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "Choose",
+                norwegian: "Velg"
+            )
+        }
+        return Self.colorChoices.first {
+            $0.matches(detailDraft.colorName)
+        }?.title ?? detailDraft.colorName
+    }
 
     init(
         category: ProfileGearCategory,
@@ -1816,6 +1875,10 @@ struct ProfileGearEditorView: View {
                 }
 
                 reconcileCatalogSelection()
+                manualColor = !detailDraft.colorName.isEmpty &&
+                    !Self.colorChoices.contains {
+                        $0.matches(detailDraft.colorName)
+                    }
             } else if category == .shoes,
                       gear.defaultRunningShoe == nil {
                 detailDraft.isDefaultForRunning = true
@@ -2093,10 +2156,74 @@ struct ProfileGearEditorView: View {
                 }
             }
 
-            TextField(
-                "Color",
-                text: $detailDraft.colorName
-            )
+            if manualColor {
+                TextField(
+                    ATHLTHLocalization.choose(
+                        english: "Color",
+                        norwegian: "Farge"
+                    ),
+                    text: $detailDraft.colorName
+                )
+
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Choose from colors",
+                        norwegian: "Velg fra farger"
+                    )
+                ) {
+                    manualColor = false
+                }
+                .font(.caption.weight(.semibold))
+            } else {
+                LabeledContent(
+                    ATHLTHLocalization.choose(
+                        english: "Color",
+                        norwegian: "Farge"
+                    )
+                ) {
+                    Menu {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Not specified",
+                                norwegian: "Ikke angitt"
+                            )
+                        ) {
+                            detailDraft.colorName = ""
+                        }
+
+                        Divider()
+
+                        ForEach(Self.colorChoices) { color in
+                            Button(color.title) {
+                                detailDraft.colorName = color.english
+                            }
+                        }
+
+                        Divider()
+
+                        Button {
+                            manualColor = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Enter manually",
+                                    norwegian: "Legg inn manuelt"
+                                ),
+                                systemImage: "square.and.pencil"
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(selectedColorTitle)
+                            Image(
+                                systemName:
+                                    "chevron.up.chevron.down"
+                            )
+                            .font(.caption2)
+                        }
+                    }
+                }
+            }
 
             if catalog.isLoading {
                 HStack(spacing: 8) {
@@ -2131,7 +2258,10 @@ struct ProfileGearEditorView: View {
     private func selectCatalogEntry(
         _ item: GearCatalogEntry
     ) {
-        detailDraft.catalogItemID = item.id
+        // Bundled choices are not Supabase rows; never send their
+        // synthetic IDs to the catalog_item_id database foreign key.
+        detailDraft.catalogItemID =
+            catalog.isBuiltIn(item) ? nil : item.id
         detailDraft.brand = item.brand
         detailDraft.model = item.model
         detailDraft.variantLabel = ""
@@ -2156,8 +2286,12 @@ struct ProfileGearEditorView: View {
             brand: detailDraft.brand,
             model: detailDraft.model
         ) {
-            detailDraft.catalogItemID =
-                detailDraft.catalogItemID ?? matched.id
+            if !catalog.isBuiltIn(matched) {
+                detailDraft.catalogItemID =
+                    detailDraft.catalogItemID ?? matched.id
+            }
+            // Preserve an existing stored catalog FK when offline;
+            // new built-in choices are saved by brand and model only.
             manualBrand = false
             manualModel = false
             return
