@@ -4,6 +4,7 @@ import Foundation
 struct ATHLTHWorkoutActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var phase: String
+        var workoutDisplayTitle: String? = nil
         var elapsedTime: TimeInterval
         var distanceMeters: Double
         var heartRate: Double
