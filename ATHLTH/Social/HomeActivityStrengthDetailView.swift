@@ -109,6 +109,10 @@ struct HomeActivityStrengthDetailView: View {
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 28)
+            // The vertical ScrollView must use the device viewport width.
+            // Otherwise a scaled-to-fill hero can make the entire detail
+            // page wider than the iPhone and cut off both edges.
+            .containerRelativeFrame(.horizontal)
         }
         .background(
             LinearGradient(
@@ -604,8 +608,11 @@ struct HomeActivityStrengthDetailView: View {
 
     private var workoutHeroCard:
         some View {
-        ZStack(alignment: .bottomLeading) {
-            workoutHeroArtwork
+        GeometryReader { viewport in
+            ZStack(alignment: .bottomLeading) {
+                workoutHeroArtwork
+                    .frame(width: viewport.size.width, height: 196)
+                    .clipped()
 
             LinearGradient(
                 colors: [
@@ -683,10 +690,7 @@ struct HomeActivityStrengthDetailView: View {
             }
             .padding(16)
         }
-        .frame(height: 196)
-        .frame(
-            maxWidth: .infinity
-        )
+        .frame(width: viewport.size.width, height: 196)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 22,
@@ -709,6 +713,8 @@ struct HomeActivityStrengthDetailView: View {
         .accessibilityLabel(
             displayTitle
         )
+        }
+        .frame(height: 196)
     }
 
     @ViewBuilder
