@@ -168,6 +168,8 @@ struct GoalSummaryCard: View {
 struct GoalCoverView: View {
     @EnvironmentObject private var goalStore: GoalStore
     let goal: ATHLTHGoal
+    // Compact Home previews use artwork without the oversized watermark.
+    var showsDecorativeSymbol: Bool = true
 
     var body: some View {
         GeometryReader { proxy in
@@ -197,10 +199,12 @@ struct GoalCoverView: View {
                         )
                     }
                     .overlay(alignment: .topTrailing) {
-                        Image(systemName: goal.category.systemImage)
-                            .font(.system(size: 64, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.16))
-                            .padding(22)
+                        if showsDecorativeSymbol {
+                            Image(systemName: goal.category.systemImage)
+                                .font(.system(size: 64, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.16))
+                                .padding(22)
+                        }
                     }
                 } else {
                     LinearGradient(
