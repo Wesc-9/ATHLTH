@@ -37,8 +37,14 @@ struct ATHLTHWorkoutReplayCard: View {
 
                     Text(
                         isStrength
-                            ? "Your session, condensed into the moments that mattered."
-                            : "A quick story of how the workout unfolded."
+                            ? ATHLTHLocalization.choose(
+                                english: "Your session, condensed into the moments that mattered.",
+                                norwegian: "Høydepunktene fra styrkeøkten din."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "A quick story of how the workout unfolded.",
+                                norwegian: "Et raskt tilbakeblikk på hvordan økten utviklet seg."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -46,7 +52,7 @@ struct ATHLTHWorkoutReplayCard: View {
 
                 Spacer()
 
-                Text("REPLAY")
+                Text(ATHLTHLocalization.choose(english: "REPLAY", norwegian: "TILBAKEBLIKK"))
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.1)
                     .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -97,7 +103,10 @@ struct ATHLTHWorkoutReplayCard: View {
             if !isStrength &&
                 usableSegments.isEmpty {
                 Label(
-                    "Detailed phases appear when the workout contains enough route or heart-rate data.",
+                    ATHLTHLocalization.choose(
+                        english: "Detailed phases appear when the workout contains enough route or heart-rate data.",
+                        norwegian: "Detaljerte faser vises når økten har nok rute- eller pulsdata."
+                    ),
                     systemImage: "waveform.path.ecg"
                 )
                 .font(.caption2)
@@ -123,7 +132,7 @@ struct ATHLTHWorkoutReplayCard: View {
             let names = groups.prefix(3).joined(separator: ", ")
             moments.append(
                 ReplayMoment(
-                    title: "Training focus",
+                    title: ATHLTHLocalization.choose(english: "Training focus", norwegian: "Treningsfokus"),
                     detail: names,
                     icon: "figure.strengthtraining.traditional",
                     tint: ATHLTHTheme.vitality
@@ -135,7 +144,7 @@ struct ATHLTHWorkoutReplayCard: View {
            volume > 0 {
             moments.append(
                 ReplayMoment(
-                    title: "Total volume",
+                    title: ATHLTHLocalization.choose(english: "Total volume", norwegian: "Totalt volum"),
                     detail: formatWeight(volume),
                     icon: "sum",
                     tint: ATHLTHTheme.accent
@@ -147,7 +156,7 @@ struct ATHLTHWorkoutReplayCard: View {
            heaviest > 0 {
             moments.append(
                 ReplayMoment(
-                    title: "Heaviest load",
+                    title: ATHLTHLocalization.choose(english: "Heaviest load", norwegian: "Tyngste løft"),
                     detail: formatWeight(heaviest),
                     icon: "dumbbell.fill",
                     tint: ATHLTHTheme.premiumGold
@@ -161,7 +170,7 @@ struct ATHLTHWorkoutReplayCard: View {
             moments.append(
                 ReplayMoment(
                     title: "Work completed",
-                    detail: "\(reps) total reps",
+                    detail: ATHLTHLocalization.choose(english: "\(reps) total reps", norwegian: "\(reps) repetisjoner totalt"),
                     icon: "repeat",
                     tint: .blue
                 )
@@ -171,7 +180,7 @@ struct ATHLTHWorkoutReplayCard: View {
         if moments.isEmpty {
             moments.append(
                 ReplayMoment(
-                    title: "Session complete",
+                    title: ATHLTHLocalization.choose(english: "Session complete", norwegian: "Økt fullført"),
                     detail: durationText(workout.duration),
                     icon: "checkmark.circle.fill",
                     tint: ATHLTHTheme.vitality
@@ -194,8 +203,14 @@ struct ATHLTHWorkoutReplayCard: View {
            let pace = fastest.paceSecondsPerKilometer {
             moments.append(
                 ReplayMoment(
-                    title: "Fastest phase · \(fastest.label)",
-                    detail: "\(paceText(pace)) average pace",
+                    title: ATHLTHLocalization.choose(
+                        english: "Fastest phase · \(fastest.label)",
+                        norwegian: "Raskeste fase · \(fastest.label)"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "\(paceText(pace)) average pace",
+                        norwegian: "\(paceText(pace)) snittempo"
+                    ),
                     icon: "speedometer",
                     tint: ATHLTHTheme.vitality
                 )
@@ -211,8 +226,14 @@ struct ATHLTHWorkoutReplayCard: View {
            let maxHR = peak.maxHeartRateBPM {
             moments.append(
                 ReplayMoment(
-                    title: "Highest effort · \(peak.label)",
-                    detail: "Heart rate reached \(Int(maxHR.rounded())) bpm",
+                    title: ATHLTHLocalization.choose(
+                        english: "Highest effort · \(peak.label)",
+                        norwegian: "Høyeste belastning · \(peak.label)"
+                    ),
+                    detail: ATHLTHLocalization.choose(
+                        english: "Heart rate reached \(Int(maxHR.rounded())) bpm",
+                        norwegian: "Pulsen nådde \(Int(maxHR.rounded())) slag/min"
+                    ),
                     icon: "heart.fill",
                     tint: .red
                 )
@@ -231,12 +252,18 @@ struct ATHLTHWorkoutReplayCard: View {
                     ReplayMoment(
                         title:
                             percent > 0
-                                ? "You finished stronger"
-                                : "The finish got tougher",
+                                ? ATHLTHLocalization.choose(english: "You finished stronger", norwegian: "Du avsluttet sterkere")
+                                : ATHLTHLocalization.choose(english: "The finish got tougher", norwegian: "Avslutningen ble tyngre"),
                         detail:
                             percent > 0
-                                ? "Final-phase pace was about \(Int(abs(percent).rounded()))% faster than the opening phase."
-                                : "Final-phase pace was about \(Int(abs(percent).rounded()))% slower than the opening phase.",
+                                ? ATHLTHLocalization.choose(
+                                    english: "Final-phase pace was about \(Int(abs(percent).rounded()))% faster than the opening phase.",
+                                    norwegian: "Tempoet mot slutten var omtrent \(Int(abs(percent).rounded())) % raskere enn i starten."
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Final-phase pace was about \(Int(abs(percent).rounded()))% slower than the opening phase.",
+                                    norwegian: "Tempoet mot slutten var omtrent \(Int(abs(percent).rounded())) % saktere enn i starten."
+                                ),
                         icon:
                             percent > 0
                                 ? "arrow.up.forward.circle.fill"
@@ -255,7 +282,7 @@ struct ATHLTHWorkoutReplayCard: View {
            distance > 0 {
             moments.append(
                 ReplayMoment(
-                    title: "Distance covered",
+                    title: ATHLTHLocalization.choose(english: "Distance covered", norwegian: "Tilbakelagt distanse"),
                     detail: String(
                         format: "%.2f km in %@",
                         distance / 1_000,
@@ -272,8 +299,11 @@ struct ATHLTHWorkoutReplayCard: View {
            calories > 0 {
             moments.append(
                 ReplayMoment(
-                    title: "Energy",
-                    detail: "\(Int(calories.rounded())) active kcal",
+                    title: ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"),
+                    detail: ATHLTHLocalization.choose(
+                        english: "\(Int(calories.rounded())) active kcal",
+                        norwegian: "\(Int(calories.rounded())) aktive kcal"
+                    ),
                     icon: "flame.fill",
                     tint: .orange
                 )
@@ -283,7 +313,7 @@ struct ATHLTHWorkoutReplayCard: View {
         if moments.isEmpty {
             moments.append(
                 ReplayMoment(
-                    title: "Workout complete",
+                    title: ATHLTHLocalization.choose(english: "Workout complete", norwegian: "Økt fullført"),
                     detail: durationText(workout.duration),
                     icon: "checkmark.circle.fill",
                     tint: ATHLTHTheme.vitality
