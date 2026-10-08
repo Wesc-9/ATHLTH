@@ -122,6 +122,32 @@ final class StrengthMuscleProfileTests: XCTestCase {
         )
     }
 
+    func testNorwegianExerciseFallbacksUseActualMuscleRegions() {
+        let squat = Set(
+            StrengthMuscleResolver.fallbackRegions(
+                forExerciseName: "Knebøy"
+            )
+        )
+        XCTAssertTrue(squat.contains(.quads))
+        XCTAssertTrue(squat.contains(.glutes))
+
+        let bench = Set(
+            StrengthMuscleResolver.fallbackRegions(
+                forExerciseName: "Benkpress"
+            )
+        )
+        XCTAssertTrue(bench.contains(.chest))
+        XCTAssertTrue(bench.contains(.triceps))
+
+        let deadlift = Set(
+            StrengthMuscleResolver.fallbackRegions(
+                forExerciseName: "Rumensk markløft"
+            )
+        )
+        XCTAssertTrue(deadlift.contains(.hamstrings))
+        XCTAssertTrue(deadlift.contains(.glutes))
+    }
+
     func testRepDBBodyPartFallbackAlwaysProducesVisualRegions() {
         let supported = [
             "Chest",
