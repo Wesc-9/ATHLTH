@@ -546,7 +546,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     var averagePaceSecondsPerKilometer: TimeInterval? {
-        guard distanceMeters >= 100,
+        // GPS pace is unavailable indoors. Derive measured average pace
+        // from Watch distance after a short warm-up to avoid early spikes.
+        guard distanceMeters >= 20,
               elapsedTime > 0
         else {
             return nil
