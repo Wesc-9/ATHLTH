@@ -848,6 +848,9 @@ private struct WorkoutPlacePickerView:
                             currentLocation
                     )
 
+            // Show nearby gyms as soon as MapKit answers. Resolving
+            // older Apple Place IDs can be slower and is supplementary.
+            loading = false
             frequent =
                 await places
                     .resolvedFrequentPlaces(
@@ -862,6 +865,10 @@ private struct WorkoutPlacePickerView:
                                 item.id
                         }
                     }
+        } catch is CancellationError {
+            // A replaced GPS task must not block the next valid search.
+            lastSearchAt = nil
+            return
         } catch let mapError as MKError
             where mapError.code == .placemarkNotFound {
             nearby = []
@@ -873,6 +880,7 @@ private struct WorkoutPlacePickerView:
                     )
             errorMessage = nil
         } catch {
+            lastSearchAt = nil
             errorMessage =
                 error.localizedDescription
         }
