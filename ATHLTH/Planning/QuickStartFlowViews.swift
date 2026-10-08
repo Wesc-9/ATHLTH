@@ -1040,9 +1040,9 @@ struct RunQuickStartSheet: View {
                     modeCard
                     runEnvironmentCard
 
-                    if ATHLTHDeviceRole.isIPad {
-                        runDeviceCard
-                    }
+                    // Pick the recorder explicitly on both iPhone and iPad.
+                    // The fixed action at the bottom follows this selection.
+                    runDeviceCard
 
                     selectionCard
 
@@ -1401,8 +1401,8 @@ struct RunQuickStartSheet: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "Workout device",
-                        norwegian: "Treningsenhet"
+                        english: "Where do you want to record?",
+                        norwegian: "Hvor vil du registrere økten?"
                     )
                 )
                 .font(
@@ -1451,15 +1451,15 @@ struct RunQuickStartSheet: View {
                         captureDevice == .appleWatch
                             ? ATHLTHLocalization.choose(
                                 english:
-                                    "Apple Watch keeps the workout ready. Time, distance and HealthKit recording begin only after START.",
+                                    "The workout is sent to Apple Watch. Recording starts when you press START on the watch.",
                                 norwegian:
-                                    "Apple Watch holder økten klar. Tid, distanse og HealthKit-registrering starter først etter START."
+                                    "Økten sendes til Apple Watch. Registreringen starter når du trykker START på klokken."
                             )
                             : ATHLTHLocalization.choose(
                                 english:
-                                    "This choice applies only to this workout.",
+                                    "Start directly on iPhone. GPS, time and distance are recorded here.",
                                 norwegian:
-                                    "Valget gjelder bare denne økten."
+                                    "Start direkte på iPhone. Tid, distanse og GPS registreres på telefonen."
                             )
                     )
             )
@@ -2109,13 +2109,7 @@ struct RunQuickStartSheet: View {
     }
 
     private var runStickyStartBar: some View {
-        Group {
-            if ATHLTHDeviceRole.isIPad {
-                startButton
-            } else {
-                iPhoneRunActions
-            }
-        }
+        startButton
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 8)
@@ -2127,69 +2121,6 @@ struct RunQuickStartSheet: View {
         ) {
             Divider()
                 .opacity(0.35)
-        }
-    }
-
-    private var iPhoneRunActions: some View {
-        VStack(spacing: 7) {
-            Button {
-                submitQuickRun(
-                    captureDevice: .iPhone
-                )
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Start Workout",
-                        norwegian: "Start økt"
-                    ),
-                    systemImage: "play.fill"
-                )
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(ATHLTHTheme.vitality)
-            .disabled(!canSubmitQuickRun(
-                captureDevice: .iPhone
-            ))
-
-            HStack {
-                Spacer(minLength: 24)
-
-                Button {
-                    submitQuickRun(
-                        captureDevice: .appleWatch
-                    )
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Send to Apple Watch",
-                            norwegian: "Send til Apple Watch"
-                        ),
-                        systemImage: "applewatch"
-                    )
-                    .font(
-                        .footnote
-                            .weight(.semibold)
-                    )
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(ATHLTHTheme.accentDeep)
-                .disabled(
-                    !canSubmitQuickRun(
-                        captureDevice: .appleWatch
-                    )
-                )
-                .opacity(
-                    watchConnected
-                        ? 1
-                        : 0.55
-                )
-
-                Spacer(minLength: 24)
-            }
         }
     }
 
@@ -2218,6 +2149,17 @@ struct RunQuickStartSheet: View {
                 captureDevice:
                     captureDevice
             )
+        )
+        .accessibilityHint(
+            captureDevice == .appleWatch
+                ? ATHLTHLocalization.choose(
+                    english: "Send to Apple Watch; start the workout from the watch.",
+                    norwegian: "Send til Apple Watch og start økten på klokken."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Start recording the workout on iPhone.",
+                    norwegian: "Start registrering av økten på iPhone."
+                )
         )
     }
 
