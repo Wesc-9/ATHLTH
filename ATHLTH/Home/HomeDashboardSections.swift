@@ -3357,16 +3357,15 @@ struct HomeWeeklyProgressStrip:
             )
 
             compactWeekMetric(
-                icon:
-                    "checkmark.circle.fill",
+                icon: "figure.walk",
                 value:
-                    "\(visibleWorkouts.count)",
+                    "\(visibleWeekRunningWalkingSessions)",
                 accessibilityTitle:
                     ATHLTHLocalization.choose(
                         english:
-                            "Workouts",
+                            "Running and walking workouts",
                         norwegian:
-                            "Økter"
+                            "Løpe- og gåøkter"
                     )
             )
         }
@@ -3446,6 +3445,16 @@ struct HomeWeeklyProgressStrip:
         visibleWorkouts
             .filter {
                 $0.activity == .strength
+            }
+            .count
+    }
+
+    private var visibleWeekRunningWalkingSessions:
+        Int {
+        visibleWorkouts
+            .filter {
+                $0.activity == .running ||
+                    $0.activity == .walking
             }
             .count
     }
