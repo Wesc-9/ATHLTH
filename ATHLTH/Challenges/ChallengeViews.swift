@@ -1438,6 +1438,7 @@ struct ChallengeCreationView: View {
                     )
                 }
             }
+            .athlthBoundedFill()
             .frame(
                 maxWidth: .infinity,
                 maxHeight: .infinity
@@ -1784,6 +1785,7 @@ struct ChallengeCreationView: View {
                                 )
                                 .resizable()
                                 .scaledToFill()
+                                .athlthBoundedFill()
                             } else {
                                 VStack(spacing: 3) {
                                     Image(
@@ -7792,6 +7794,7 @@ private struct ChallengeReviewCard: View {
                     )
                 }
             }
+            .athlthBoundedFill()
             .frame(maxWidth: .infinity)
             .clipped()
 
