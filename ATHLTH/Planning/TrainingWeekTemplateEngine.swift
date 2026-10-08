@@ -12,6 +12,9 @@ enum TrainingWeekProgressionMode: Equatable {
     case unchanged
     case addWeightPerWeek(Double)
     case addRepsPerWeek(Int)
+    /// Three strength-loading weeks followed by one deload week, repeated.
+    /// Does not touch running targets or workouts already placed in the plan.
+    case fourWeekStrengthBlock
 }
 
 struct TrainingWeekCopySummary: Equatable {
@@ -107,6 +110,9 @@ enum TrainingWeekTemplateEngine {
 
         for targetIndex in indexes {
             let weekOffset = targetIndex - sourceIndex
+            var copiedStrengthSessions = false
+            let hadExistingStrength = updated.weeks[targetIndex].days
+                .flatMap(\.sessions).contains { $0.kind == .strength }
             for dayIndex in updated.weeks[targetIndex].days.indices {
                 let targetDay = updated.weeks[targetIndex].days[dayIndex]
                 guard targetDay.sessions.isEmpty,
@@ -133,6 +139,18 @@ enum TrainingWeekTemplateEngine {
                             progression: progression
                         )
                     }
+                if sourceDay.sessions.contains(where: { $0.kind == .strength }) {
+                    copiedStrengthSessions = true
+                }
+            }
+
+            // Mark only weeks whose strength sessions came from this block.
+            // Partial future weeks with their own strength sessions remain
+            // unmarked to avoid implying a complete deload prescription.
+            if case .fourWeekStrengthBlock = progression,
+               copiedStrengthSessions && !hadExistingStrength {
+                updated.weeks[targetIndex].strengthPhase =
+                    strengthPhase(forWeekOffset: weekOffset)
             }
         }
 
@@ -153,6 +171,11 @@ enum TrainingWeekTemplateEngine {
         }
     }
 
+    /// Offset 1-2 build; offset 3 deload; repeat every four weeks.
+    static func strengthPhase(forWeekOffset offset: Int) -> TrainingWeekStrengthPhase {
+        offset % 4 == 3 ? .deload : .build
+    }
+
     private static func applyUserSelectedProgression(
         to exercise: inout PlannedExercise,
         offsetWeeks: Int,
@@ -166,20 +189,27 @@ enum TrainingWeekTemplateEngine {
         switch mode {
         case .unchanged:
             break
+        case .fourWeekStrengthBlock:
+            if strengthPhase(forWeekOffset: offsetWeeks) == .deload {
+                applyDeload(to: &exercise, weightFactor: 0.9)
+            } else if exercise.resolvedLoadKind == .weightKilograms {
+                // Two 2.5 kg increases per cycle; after the recovery week
+                // a new cycle builds from the previous cycle's final load.
+                let cycle = offsetWeeks / 4
+                let weekInCycle = offsetWeeks % 4
+                let earnedSteps = cycle * 2 + min(weekInCycle, 2)
+                addPrescribedWeight(
+                    to: &exercise,
+                    amount: Double(earnedSteps) * 2.5
+                )
+            }
         case .addWeightPerWeek(let increment):
             guard exercise.resolvedLoadKind == .weightKilograms,
                   increment > 0 else { return }
-            let total = increment * Double(offsetWeeks)
-            if let original = exercise.targetWeightKilograms {
-                exercise.targetWeightKilograms = max(original + total, 0)
-            }
-            exercise.setTargets = exercise.setTargets?.map { target in
-                var adjusted = target
-                if let weight = adjusted.weightKilograms {
-                    adjusted.weightKilograms = max(weight + total, 0)
-                }
-                return adjusted
-            }
+            addPrescribedWeight(
+                to: &exercise,
+                amount: increment * Double(offsetWeeks)
+            )
         case .addRepsPerWeek(let increment):
             guard increment > 0 else { return }
             let total = offsetWeeks * increment
@@ -193,6 +223,71 @@ enum TrainingWeekTemplateEngine {
                 }
                 return adjusted
             }
+        }
+    }
+
+    private static func addPrescribedWeight(
+        to exercise: inout PlannedExercise,
+        amount: Double
+    ) {
+        guard amount > 0, exercise.resolvedLoadKind == .weightKilograms else {
+            return
+        }
+        if let weight = exercise.targetWeightKilograms {
+            exercise.targetWeightKilograms = max(0, weight + amount)
+        }
+        exercise.setTargets = exercise.setTargets?.map { target in
+            var updated = target
+            if let weight = updated.weightKilograms {
+                updated.weightKilograms = max(0, weight + amount)
+            }
+            return updated
+        }
+    }
+
+    private static func applyDeload(
+        to exercise: inout PlannedExercise,
+        weightFactor: Double
+    ) {
+        // Only real work sets are reduced. Never erase every working set or
+        // turn unprescribed load into an invented weight target.
+        let resolved = exercise.resolvedSetTargets
+        let workCount = resolved.filter {
+            $0.isWarmUp != true && $0.setType != .warmUp
+        }.count
+        guard workCount > 0 else { return }
+
+        let keepWorkCount = max(1, Int((Double(workCount) * 0.6).rounded()))
+        var keptWorkSets = 0
+        var kept: [PlannedExerciseSetTarget] = []
+
+        for target in resolved {
+            let isWarmUp = target.isWarmUp == true || target.setType == .warmUp
+            if !isWarmUp {
+                guard keptWorkSets < keepWorkCount else { continue }
+                keptWorkSets += 1
+            }
+
+            var adjusted = target
+            if exercise.resolvedLoadKind == .weightKilograms,
+               let weight = adjusted.weightKilograms {
+                // Warmup sets remain unchanged.
+                if !isWarmUp {
+                    adjusted.weightKilograms = (weight * weightFactor * 2)
+                        .rounded() / 2
+                }
+            }
+            kept.append(adjusted)
+        }
+
+        exercise.sets = kept.count
+        if exercise.hasIndividualSetTargets {
+            exercise.setTargets = kept
+        }
+        if exercise.resolvedLoadKind == .weightKilograms,
+           let weight = exercise.targetWeightKilograms {
+            exercise.targetWeightKilograms = (weight * weightFactor * 2)
+                .rounded() / 2
         }
     }
 
@@ -244,11 +339,13 @@ enum TrainingWeekTemplateEngine {
                     notes: target.notes
                 )
             }
-            applyUserSelectedProgression(
-                to: &new,
-                offsetWeeks: offsetWeeks,
-                mode: progression
-            )
+            if source.kind == .strength {
+                applyUserSelectedProgression(
+                    to: &new,
+                    offsetWeeks: offsetWeeks,
+                    mode: progression
+                )
+            }
             return new
         }
 
