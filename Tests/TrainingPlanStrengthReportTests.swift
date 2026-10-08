@@ -200,4 +200,113 @@ final class TrainingPlanStrengthReportTests: XCTestCase {
         XCTAssertEqual(report.totalPerformedStrengthSets, 0)
         XCTAssertEqual(report.totalRecordedVolumeKilograms, 0)
     }
+    private func strengthPlanWithPrescribedWeight(
+        sessionID: UUID,
+        exerciseID: UUID
+    ) -> TrainingPlan {
+        var training = plan(sessionID: sessionID, exerciseID: exerciseID)
+        training.weeks[0].days[0].sessions[0]
+            .exercises[0].targetWeightKilograms = 10
+        return training
+    }
+
+    private func secondRecordedWorkSet(
+        reps: Int = 8,
+        rir: Double? = 2
+    ) -> StrengthSetLog {
+        var logged = StrengthSetLog(
+            id: UUID(),
+            setNumber: 3,
+            plannedReps: 8,
+            plannedWeightKilograms: 10,
+            completedReps: reps,
+            completedWeightKilograms: 10,
+            rpe: nil,
+            completedAt: date,
+            restSeconds: 90
+        )
+        logged.rir = rir
+        return logged
+    }
+
+    func testAdvisorDoesNotTreatSplitSetAsTargetWeightCompleted() {
+        let sessionID = UUID()
+        let exerciseID = UUID()
+        let training = strengthPlanWithPrescribedWeight(
+            sessionID: sessionID,
+            exerciseID: exerciseID
+        )
+        var workout = loggedWorkout(
+            sessionID: sessionID,
+            exerciseID: exerciseID
+        )
+        // The first working set was 8x10 kg + 2x8 kg, not 10x10 kg.
+        workout.exercises[0].sets[1].rir = 2
+        workout.exercises[0].sets.append(secondRecordedWorkSet())
+
+        let advice = TrainingPlanLoadAdvisor.evaluate(
+            plan: training,
+            strengthHistory: [workout]
+        )
+        XCTAssertEqual(advice.count, 1)
+        XCTAssertEqual(advice.first?.verdict, .reviewTargets)
+        XCTAssertEqual(advice.first?.completedWorkSets, 2)
+        XCTAssertEqual(advice.first?.plannedWorkSets, 2)
+    }
+
+    func testAdvisorRequiresLoggedRIRForIncreaseSuggestion() {
+        let sessionID = UUID()
+        let exerciseID = UUID()
+        let training = strengthPlanWithPrescribedWeight(
+            sessionID: sessionID,
+            exerciseID: exerciseID
+        )
+        var workout = loggedWorkout(
+            sessionID: sessionID,
+            exerciseID: exerciseID
+        )
+        workout.exercises[0].sets[1].effortSegments = [
+            StrengthSetEffortSegment(reps: 10, weightKilograms: 10)
+        ]
+        workout.exercises[0].sets[1].rir = 2
+        workout.exercises[0].sets.append(secondRecordedWorkSet())
+
+        let ready = TrainingPlanLoadAdvisor.evaluate(
+            plan: training,
+            strengthHistory: [workout]
+        )
+        XCTAssertEqual(ready.first?.verdict, .considerIncrease)
+
+        workout.exercises[0].sets[1].rir = nil
+        let withoutRealRIR = TrainingPlanLoadAdvisor.evaluate(
+            plan: training,
+            strengthHistory: [workout]
+        )
+        XCTAssertEqual(withoutRealRIR.first?.verdict, .targetMet)
+    }
+
+    func testAdvisorNeverLinksUnrelatedOrUnfinishedWorkouts() {
+        let sessionID = UUID()
+        let exerciseID = UUID()
+        let training = strengthPlanWithPrescribedWeight(
+            sessionID: sessionID,
+            exerciseID: exerciseID
+        )
+        let unrelated = loggedWorkout(
+            sessionID: UUID(),
+            exerciseID: exerciseID
+        )
+        let unfinished = loggedWorkout(
+            sessionID: sessionID,
+            exerciseID: exerciseID,
+            completed: false
+        )
+
+        let advice = TrainingPlanLoadAdvisor.evaluate(
+            plan: training,
+            strengthHistory: [unrelated, unfinished]
+        )
+        XCTAssertTrue(advice.isEmpty)
+    }
+
 }
