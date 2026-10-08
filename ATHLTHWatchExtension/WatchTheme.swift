@@ -1,6 +1,13 @@
 import SwiftUI
 
 enum WatchTheme {
+    // High-contrast workout-only palette. Navigation and non-training
+    // screens retain their existing light design.
+    static let liveCanvas = Color(red: 0.035, green: 0.065, blue: 0.105)
+    static let liveCyan = Color(red: 0.32, green: 0.87, blue: 0.98)
+    static let liveLime = Color(red: 0.74, green: 0.98, blue: 0.37)
+    static let liveHeart = Color(red: 1.00, green: 0.48, blue: 0.60)
+
     // ATHLTH Watch uses a bright Performance Tiles language. Petrol is the
     // primary action/performance colour; cool slate is reserved for secondary
     // actions so the UI stays calm and data-first.
