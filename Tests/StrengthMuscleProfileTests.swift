@@ -207,6 +207,39 @@ final class StrengthMuscleProfileTests: XCTestCase {
         XCTAssertFalse(profile.secondaryRegions.contains(.quads))
     }
 
+    func testPremiumVectorAtlasCoversWorkoutMusclesOnBothSides() {
+        let front = ATHLTHPremiumMuscleAtlas.coveredRegions(isFront: true)
+        let back = ATHLTHPremiumMuscleAtlas.coveredRegions(isFront: false)
+
+        XCTAssertTrue(front.isSuperset(of: [
+            .chest, .frontDelts, .sideDelts, .biceps,
+            .forearms, .abs, .obliques, .serratus,
+            .hipFlexors, .quads, .calves, .shins
+        ]))
+        XCTAssertTrue(back.isSuperset(of: [
+            .traps, .rearDelts, .upperBack, .lats,
+            .triceps, .lowerBack, .glutes, .hamstrings, .calves
+        ]))
+    }
+
+    func testPremiumVectorAtlasDoesNotChangeRecoveryActivationSemantics() {
+        let profile = StrengthMuscleProfile(
+            activations: [
+                StrengthMuscleActivation(region: .quads, score: 5),
+                StrengthMuscleActivation(region: .glutes, score: 2)
+            ],
+            primaryRegions: [.quads],
+            secondaryRegions: [.glutes]
+        )
+
+        XCTAssertEqual(profile.highlightRole(for: .quads), .primary)
+        XCTAssertEqual(profile.highlightRole(for: .glutes), .secondary)
+        XCTAssertGreaterThan(
+            profile.intensity(for: .quads),
+            profile.intensity(for: .glutes)
+        )
+    }
+
     func testNorwegianExerciseNameLocalization() {
         XCTAssertEqual(
             ATHLTHExerciseNameLocalization
