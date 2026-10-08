@@ -109,6 +109,9 @@ jobs:
           print("ATHLTH app icons are valid 1024x1024 RGB PNGs.")
           PY
 
+      - name: Check aspect-fill image bounds
+        run: python3 scripts/check_aspect_fill_bounds.py
+
       - name: Optimize hero assets for runtime memory
         shell: bash
         run: bash scripts/optimize_hero_assets.sh
