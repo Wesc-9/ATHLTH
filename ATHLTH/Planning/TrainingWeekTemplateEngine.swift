@@ -242,13 +242,13 @@ enum TrainingWeekTemplateEngine {
         guard amount > 0, exercise.resolvedLoadKind == .weightKilograms else {
             return
         }
-        if let weight = exercise.targetWeightKilograms {
-            exercise.targetWeightKilograms = max(0, weight + amount)
+        if let weight = exercise.targetWeightKilograms, weight > 0 {
+            exercise.targetWeightKilograms = weight + amount
         }
         exercise.setTargets = exercise.setTargets?.map { target in
             var updated = target
-            if let weight = updated.weightKilograms {
-                updated.weightKilograms = max(0, weight + amount)
+            if let weight = updated.weightKilograms, weight > 0 {
+                updated.weightKilograms = weight + amount
             }
             return updated
         }
