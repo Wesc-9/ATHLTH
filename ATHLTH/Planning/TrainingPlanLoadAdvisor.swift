@@ -28,9 +28,11 @@ enum TrainingPlanLoadAdvisor {
         let sessions = plan.weeks
             .flatMap(\.days)
             .flatMap(\.sessions)
-        let plannedBySessionID = Dictionary(
-            uniqueKeysWithValues: sessions.map { ($0.id, $0) }
-        )
+        let plannedBySessionID = sessions.reduce(
+            into: [UUID: PlannedSession]()
+        ) { result, workout in
+            result[workout.id] = workout
+        }
 
         let completed = strengthHistory
             .filter { workout in
@@ -81,7 +83,9 @@ enum TrainingPlanLoadAdvisor {
 
                 let completedWorkSets = log.sets.filter(\.countsTowardTrainingLoad)
                 let metTarget = completedWorkSets.count >= prescribedWorkSets.count &&
-                    zip(prescribedWorkSets, completedWorkSets).allSatisfy { target, actual in
+                    zip(prescribedWorkSets, completedWorkSets).allSatisfy { pair in
+                        let target = pair.0
+                        let actual = pair.1
                         let reps = target.reps ?? planned.reps ?? 0
                         if let weight = target.weightKilograms ??
                                 planned.targetWeightKilograms,
