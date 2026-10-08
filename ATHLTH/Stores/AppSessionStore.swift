@@ -2704,6 +2704,31 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Fill only empty, future days using a selected week as the template.
+    /// Original sessions and completion IDs are never replaced.
+    @discardableResult
+    func copyTrainingWeekToEmptyDays(
+        planID: UUID,
+        sourceWeekID: UUID,
+        scope: TrainingWeekCopyScope
+    ) -> TrainingWeekCopySummary? {
+        guard let plan = trainingPlan(withID: planID),
+              let result = TrainingWeekTemplateEngine.copy(
+                  plan: plan,
+                  sourceWeekID: sourceWeekID,
+                  scope: scope
+              )
+        else {
+            return nil
+        }
+
+        var updated = result.plan
+        updated.version += 1
+        updated.updatedAt = Date()
+        replaceTrainingPlan(updated)
+        return result.summary
+    }
+
     func removeWeekFromActivePlan(_ weekID: UUID) {
         guard let planID = activePlan?.id else {
             return
