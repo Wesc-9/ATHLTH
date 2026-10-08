@@ -4854,6 +4854,7 @@ private struct HomePersonalWorkoutVisual:
                 Image(uiImage: routePreviewImage)
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
             } else {
                 genericBackground
             }
