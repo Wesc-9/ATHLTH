@@ -1505,7 +1505,9 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                 ? phoneWorkout.distanceMeters
                 : nil
         activeEnergyKilocalories = nil
-        isIndoor = false
+        // Preserve the workout environment recorded on iPhone. Indoor runs
+        // must not be rendered or interpreted as GPS/outdoor sessions.
+        isIndoor = phoneWorkout.runEnvironment == .treadmill
         strengthMuscleGroups = nil
         strengthExerciseCount = nil
         strengthTotalVolumeKilograms = nil
