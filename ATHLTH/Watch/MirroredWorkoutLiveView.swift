@@ -989,23 +989,22 @@ struct MirroredWorkoutLiveView: View {
         _ snapshot:
             WatchWorkoutLiveSnapshot
     ) -> String {
-        guard let pace =
-                snapshot
-                    .currentPaceSecondsPerKilometer,
-              pace.isFinite,
-              pace > 0
-        else {
-            return "—"
+        if let pace = snapshot.currentPaceSecondsPerKilometer,
+           pace.isFinite,
+           pace > 0 {
+            return paceText(pace)
         }
 
-        return paceText(pace)
+        // Indoor runs have no GPS speed. Prefer the measured average pace
+        // when Watch distance and elapsed time are available.
+        return averageRunningPaceText(snapshot)
     }
 
     private func averageRunningPaceText(
         _ snapshot:
             WatchWorkoutLiveSnapshot
     ) -> String {
-        guard snapshot.distanceMeters >
+        guard snapshot.distanceMeters >=
                 20,
               snapshot.elapsedTime > 0
         else {
