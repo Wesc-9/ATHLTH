@@ -5244,6 +5244,7 @@ struct CommunityGroupsView: View {
             Image("CommunityHero")
                 .resizable()
                 .scaledToFill()
+                .athlthBoundedFill()
                 .frame(
                     maxWidth:
                         .infinity
