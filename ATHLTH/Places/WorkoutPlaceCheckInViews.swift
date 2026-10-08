@@ -366,7 +366,10 @@ struct WorkoutPlaceCheckInSection: View {
             return "First workout here"
         }
 
-        return "(count) workouts here"
+        return ATHLTHLocalization.choose(
+            english: "\(count) workouts here",
+            norwegian: "\(count) økter her"
+        )
     }
 }
 
@@ -731,7 +734,10 @@ private struct WorkoutPlacePickerView:
                         if count > 0 {
                             Text("·")
                             Text(
-                                "(count) previous"
+                                ATHLTHLocalization.choose(
+                                    english: "\(count) previous",
+                                    norwegian: "\(count) tidligere"
+                                )
                             )
                         }
                     }
@@ -857,14 +863,10 @@ private struct WorkoutPlacePickerView:
     private func distanceText(
         _ meters: Double
     ) -> String {
-        if meters < 100 {
-            return "(Int(meters.rounded())) m away"
-        }
-
-        return String(
-            format:
-                "%.0f m away",
-            meters
+        let rounded = Int(max(meters, 0).rounded())
+        return ATHLTHLocalization.choose(
+            english: "\(rounded) m away",
+            norwegian: "\(rounded) m unna"
         )
     }
 }
