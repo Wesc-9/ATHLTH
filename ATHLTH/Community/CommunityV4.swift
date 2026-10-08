@@ -163,6 +163,14 @@ struct ATHLTHCommunityV4View: View {
         )
     }
 
+    private var discoveryGroupRefreshKey: String {
+        discoveryGroups
+            .map {
+                "\($0.id.uuidString)-\($0.updatedAt.timeIntervalSince1970)"
+            }
+            .joined(separator: "|")
+    }
+
     private var publicDiscoveryGroups:
         [CommunityGroupRecord] {
         groups.groups.filter {
@@ -610,36 +618,38 @@ struct ATHLTHCommunityV4View: View {
             .font(.subheadline.weight(.bold))
             .foregroundStyle(ATHLTHTheme.primaryText)
 
-            ScrollView(
-                .horizontal,
-                showsIndicators: false
-            ) {
-                LazyHStack(spacing: 14) {
-                    ForEach(discoveryGroups) { group in
-                        NavigationLink {
-                            CommunityGroupDetailView(
-                                group: group
-                            )
-                        } label: {
-                            CommunityDiscoveryClubCard(
-                                group: group,
-                                memberCount:
-                                    groups.members(
-                                        in: group.id
-                                    ).count,
-                                isJoined:
-                                    groups
-                                        .joinedGroupIDs
-                                        .contains(
-                                            group.id
-                                        )
-                            )
-                            .frame(width: 252)
+            ScrollViewReader { proxy in
+                ScrollView(
+                    .horizontal,
+                    showsIndicators: false
+                ) {
+                    LazyHStack(spacing: 14) {
+                        ForEach(discoveryGroups) { group in
+                            NavigationLink {
+                                CommunityGroupDetailView(
+                                    group: group
+                                )
+                            } label: {
+                                CommunityDiscoveryClubCard(
+                                    group: group,
+                                    memberCount:
+                                        groups.members(
+                                            in: group.id
+                                        ).count,
+                                    isJoined:
+                                        groups
+                                            .joinedGroupIDs
+                                            .contains(
+                                                group.id
+                                            )
+                                )
+                                .frame(width: 252)
+                            }
+                            .id(group.id)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                    }
 
-                    if discoveryGroups.isEmpty {
+                        if discoveryGroups.isEmpty {
                         CommunityDiscoveryVisualEmptyCard(
                             title:
                                 ATHLTHLocalization.choose(
@@ -657,6 +667,15 @@ struct ATHLTHCommunityV4View: View {
                                 "person.3.fill"
                         )
                         .frame(width: 252)
+                    }
+                    }
+                    .onChange(of: discoveryGroupRefreshKey) { _, _ in
+                        guard let firstID = discoveryGroups.first?.id else {
+                            return
+                        }
+                        withAnimation(.easeOut(duration: 0.22)) {
+                            proxy.scrollTo(firstID, anchor: .leading)
+                        }
                     }
                 }
             }
