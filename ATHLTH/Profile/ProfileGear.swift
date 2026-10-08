@@ -2513,6 +2513,7 @@ struct ProfileGearEditorView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+        .listRowBackground(Color.white.opacity(0.82))
     }
 
     private var generalDetailsSection: some View {
@@ -2565,6 +2566,7 @@ struct ProfileGearEditorView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
+        .listRowBackground(Color.white.opacity(0.82))
     }
 
     private func usageSection(
@@ -2605,6 +2607,7 @@ struct ProfileGearEditorView: View {
                 )
             }
         }
+        .listRowBackground(Color.white.opacity(0.82))
     }
 
     @ViewBuilder
@@ -2664,9 +2667,19 @@ struct ProfileGearEditorView: View {
         }
         .frame(width: 82, height: 82)
         .background(
-            Color.primary.opacity(0.04),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.93),
+                    ATHLTHGearGhostStyle.tint(
+                        for: category
+                    ).opacity(0.13)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
-                cornerRadius: 16
+                cornerRadius: 16,
+                style: .continuous
             )
         )
     }
