@@ -188,6 +188,15 @@ enum TrainingWeekTemplateEngine {
             break
         case .fourWeekStrengthBlock:
             if strengthPhase(forWeekOffset: offsetWeeks) == .deload {
+                // The recovery week of later blocks keeps the previous
+                // block's baseline rather than resetting to week one.
+                let completedBlocks = offsetWeeks / 4
+                if exercise.resolvedTargetKind == .reps {
+                    addPrescribedWeight(
+                        to: &exercise,
+                        amount: Double(completedBlocks * 2) * 2.5
+                    )
+                }
                 applyDeload(to: &exercise, weightFactor: 0.9)
             } else if exercise.resolvedTargetKind == .reps &&
                         exercise.resolvedLoadKind == .weightKilograms {
