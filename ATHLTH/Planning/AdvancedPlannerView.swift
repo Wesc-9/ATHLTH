@@ -709,6 +709,28 @@ struct AdvancedPlannerView: View {
                                                 systemImage: "plus"
                                             )
                                         }
+
+                                        if let selectedIndex = plan.weeks.firstIndex(
+                                            where: { $0.id == week.id }
+                                        ), plan.weeks.count - selectedIndex >= 4 {
+                                            Button {
+                                                requestWeekCopy(
+                                                    from: week,
+                                                    plan: plan,
+                                                    scope: .allFutureWeeks,
+                                                    summary: future,
+                                                    progression: .fourWeekStrengthBlock
+                                                )
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "4-week block with deload",
+                                                        norwegian: "4-ukersblokk med deload"
+                                                    ),
+                                                    systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                                                )
+                                            }
+                                        }
                                     } label: {
                                         Label(
                                             ATHLTHLocalization.choose(
@@ -783,6 +805,22 @@ struct AdvancedPlannerView: View {
                                         )
                                     )
                                     .opacity(0.78)
+
+                                    if let phase = week.strengthPhase {
+                                        Text(
+                                            phase == .deload
+                                                ? ATHLTHLocalization.choose(
+                                                    english: "DELOAD",
+                                                    norwegian: "ROLIG UKE"
+                                                )
+                                                : ATHLTHLocalization.choose(
+                                                    english: "BUILD",
+                                                    norwegian: "OPPBYGG"
+                                                )
+                                        )
+                                        .font(.system(size: 8, weight: .bold))
+                                        .tracking(0.2)
+                                    }
                                 }
                                 .foregroundStyle(
                                     selected
@@ -1596,6 +1634,10 @@ struct AdvancedPlannerView: View {
             return norwegian
                 ? "Repetisjonsmål økes med \(repetitions) per uke. Tidsbaserte mål endres ikke."
                 : "Repetition targets increase by \(repetitions) per week; timed targets stay unchanged."
+        case .fourWeekStrengthBlock:
+            return norwegian
+                ? "Fireukersblokk for styrke: +2,5 kg per oppbyggingsuke der vekter allerede er satt. Hver fjerde uke er deload med omtrent 40 % færre arbeidssett og ca. 10 % lavere vekt. Løpeøkter og eksisterende økter endres ikke."
+                : "Four-week strength block: +2.5 kg per build week only for pre-filled weights. Every fourth week is a deload with around 40% fewer working sets and roughly 10% lighter load. Running and existing sessions are unchanged."
         }
     }
 
