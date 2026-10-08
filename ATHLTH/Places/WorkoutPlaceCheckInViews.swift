@@ -396,6 +396,9 @@ private struct WorkoutPlacePickerView:
         String?
     @State private var errorMessage:
         String?
+    @State private var lastSearchLocation: CLLocation?
+    @State private var lastSearchAt: Date?
+    @State private var forceNextSearch = false
 
     var body: some View {
         NavigationStack {
@@ -506,6 +509,7 @@ private struct WorkoutPlacePickerView:
                         .topBarTrailing
                 ) {
                     Button {
+                        forceNextSearch = true
                         location.refresh()
                     } label: {
                         Image(
@@ -815,6 +819,20 @@ private struct WorkoutPlacePickerView:
             return
         }
 
+        // A new GPS fix can arrive while MapKit is still responding.
+        // Ignore ordinary drift instead of restarting the venue search.
+        let explicitlyRequested = forceNextSearch
+        forceNextSearch = false
+        if !explicitlyRequested,
+           let lastSearchLocation,
+           let lastSearchAt,
+           Date().timeIntervalSince(lastSearchAt) < 60,
+           currentLocation.distance(from: lastSearchLocation) < 30 {
+            return
+        }
+
+        lastSearchLocation = currentLocation
+        lastSearchAt = Date()
         loading = true
         errorMessage = nil
 
