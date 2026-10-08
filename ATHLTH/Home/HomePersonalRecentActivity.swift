@@ -1087,6 +1087,23 @@ private struct HomePersonalHorizontalWorkoutCard:
     let strengthWorkout: StrengthWorkoutLog?
     let phoneWorkout: PhoneWorkout?
 
+    private var cardTitle: String {
+        let generic = ["running", "run", "løping", "løp"]
+        if workout.activity == .running,
+           workout.isIndoor == true,
+           generic.contains(
+               workout.title.trimmingCharacters(
+                   in: .whitespacesAndNewlines
+               ).lowercased()
+           ) {
+            return ATHLTHLocalization.choose(
+                english: "Treadmill",
+                norwegian: "Tredemølle"
+            )
+        }
+        return workout.title
+    }
+
     var body: some View {
         let muscleProfile =
             workout.activity == .strength
@@ -1150,7 +1167,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     .lineLimit(1)
                 }
 
-                Text(workout.title)
+                Text(cardTitle)
                     .font(
                         .system(
                             size: 15,
