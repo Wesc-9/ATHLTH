@@ -286,6 +286,126 @@ final class TrainingWeekTemplateEngineTests: XCTestCase {
         XCTAssertEqual(third?.setTargets?[1].weightKilograms, 14)
     }
 
+    private func eightWeekPlan() -> TrainingPlan {
+        var plan = makePlan()
+        let source = plan.weeks[0]
+        let protectedSession = plan.weeks[1].days[2].sessions
+        plan.weeks = (1...8).map { number in
+            TrainingPlanWeek(
+                id: number == 1 ? source.id : UUID(),
+                weekNumber: number,
+                title: "Week \(number)",
+                days: (1...7).map { day in
+                    TrainingPlanDay(
+                        id: UUID(),
+                        dayIndex: day,
+                        title: "Day \(day)",
+                        sessions: number == 1
+                            ? source.days[day - 1].sessions
+                            : number == 2 && day == 3
+                                ? protectedSession
+                                : []
+                    )
+                }
+            )
+        }
+        plan.endDate = calendar.date(byAdding: .day, value: 55, to: startDate)
+        return plan
+    }
+
+    func testFourWeekBlockBuildAndDeloadRepeatAcrossTwoCycles() {
+        let plan = eightWeekPlan()
+        let originalProtected = plan.weeks[1].days[2].sessions[0]
+        guard let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            progression: .fourWeekStrengthBlock,
+            now: startDate,
+            calendar: calendar
+        ) else {
+            XCTFail("Expected two blocks")
+            return
+        }
+
+        let weeks = result.plan.weeks
+        XCTAssertEqual(weeks[1].days[2].sessions[0], originalProtected)
+        XCTAssertNil(weeks[1].strengthPhase, "Mixed existing strength workouts are not labeled a full block")
+        XCTAssertEqual(weeks[2].strengthPhase, .build)
+        XCTAssertEqual(weeks[3].strengthPhase, .deload)
+        XCTAssertEqual(weeks[4].strengthPhase, .build)
+        XCTAssertEqual(weeks[7].strengthPhase, .deload)
+
+        XCTAssertEqual(weeks[1].days[0].sessions[0].exercises[0].targetWeightKilograms, 14.5)
+        XCTAssertEqual(weeks[2].days[0].sessions[0].exercises[0].targetWeightKilograms, 17)
+        XCTAssertEqual(weeks[3].days[0].sessions[0].exercises[0].targetWeightKilograms, 11)
+        XCTAssertEqual(weeks[3].days[0].sessions[0].exercises[0].sets, 1)
+        XCTAssertEqual(weeks[3].days[0].sessions[0].exercises[0].setTargets?.count, 1)
+        XCTAssertEqual(weeks[4].days[0].sessions[0].exercises[0].targetWeightKilograms, 17)
+        XCTAssertEqual(weeks[5].days[0].sessions[0].exercises[0].targetWeightKilograms, 19.5)
+        XCTAssertEqual(weeks[7].days[0].sessions[0].exercises[0].targetWeightKilograms, 15.5)
+
+        // Running is copied as normal: no periodization applied to its metrics.
+        let originalRun = plan.weeks[0].days[2].sessions[0]
+        let copiedRun = weeks[3].days[2].sessions[0]
+        XCTAssertEqual(copiedRun.kind, .running)
+        XCTAssertEqual(copiedRun.durationMinutes, originalRun.durationMinutes)
+        XCTAssertEqual(copiedRun.targetDistanceKilometers, originalRun.targetDistanceKilometers)
+        XCTAssertEqual(copiedRun.exercises, originalRun.exercises)
+        XCTAssertEqual(plan.weeks[0].days[0].sessions[0].exercises[0].sets, 2)
+    }
+
+    func testBlockLeavesUnknownLoadEmptyAndPreservesTimedTargets() {
+        var plan = eightWeekPlan()
+        var source = plan.weeks[0].days[0].sessions[0]
+        source.exercises[0].targetWeightKilograms = nil
+        source.exercises[0].setTargets = source.exercises[0].setTargets?.map { old in
+            var updated = old
+            updated.weightKilograms = nil
+            return updated
+        }
+        source.exercises[1].targetKind = .time
+        source.exercises[1].reps = nil
+        source.exercises[1].targetWeightKilograms = nil
+        source.exercises[1].sets = 4
+        source.exercises[1].setTargets = (0..<4).map { _ in
+            PlannedExerciseSetTarget(durationSeconds: 45)
+        }
+        plan.weeks[0].days[0].sessions[0] = source
+
+        let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            progression: .fourWeekStrengthBlock,
+            now: startDate,
+            calendar: calendar
+        )
+        let load = result?.plan.weeks[2].days[0].sessions[0].exercises[0]
+        XCTAssertNil(load?.targetWeightKilograms)
+        XCTAssertNil(load?.setTargets?.first?.weightKilograms)
+
+        let deload = result?.plan.weeks[3].days[0].sessions[0]
+        XCTAssertNil(deload?.exercises[0].targetWeightKilograms)
+        XCTAssertEqual(deload?.exercises[1].sets, 2)
+        XCTAssertEqual(deload?.exercises[1].setTargets?.first?.durationSeconds, 45)
+    }
+
+    func testStrengthPhaseEncodesAndLegacyWeekDecodesWithoutIt() throws {
+        let plan = makePlan()
+        var tagged = plan.weeks[0]
+        XCTAssertNil(tagged.strengthPhase)
+        tagged.strengthPhase = .deload
+
+        let data = try JSONEncoder().encode(tagged)
+        let decoded = try JSONDecoder().decode(TrainingPlanWeek.self, from: data)
+        XCTAssertEqual(decoded.strengthPhase, .deload)
+
+        let oldData = try JSONEncoder().encode(plan.weeks[0])
+        let legacy = try JSONDecoder().decode(TrainingPlanWeek.self, from: oldData)
+        XCTAssertNil(legacy.strengthPhase)
+    }
+
     func testRepeatDoesNotDuplicateAlreadyCopiedWorkouts() {
         let plan = makePlan()
         let first = TrainingWeekTemplateEngine.copy(
