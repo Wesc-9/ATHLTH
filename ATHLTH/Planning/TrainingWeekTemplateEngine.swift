@@ -128,6 +128,7 @@ enum TrainingWeekTemplateEngine {
                         cloneSession(
                             $0,
                             offsetWeeks: weekOffset,
+                            scheduledDay: scheduledDay,
                             calendar: calendar,
                             progression: progression
                         )
@@ -198,6 +199,7 @@ enum TrainingWeekTemplateEngine {
     private static func cloneSession(
         _ source: PlannedSession,
         offsetWeeks: Int,
+        scheduledDay: Date,
         calendar: Calendar,
         progression: TrainingWeekProgressionMode
     ) -> PlannedSession {
@@ -254,8 +256,17 @@ enum TrainingWeekTemplateEngine {
             id: UUID(),
             title: source.title,
             kind: source.kind,
-            scheduledStart: source.scheduledStart.flatMap {
-                calendar.date(byAdding: .weekOfYear, value: offsetWeeks, to: $0)
+            scheduledStart: source.scheduledStart.flatMap { original in
+                let clock = calendar.dateComponents(
+                    [.hour, .minute, .second],
+                    from: original
+                )
+                return calendar.date(
+                    bySettingHour: clock.hour ?? 18,
+                    minute: clock.minute ?? 0,
+                    second: clock.second ?? 0,
+                    of: scheduledDay
+                )
             },
             durationMinutes: source.durationMinutes,
             targetDistanceKilometers: source.targetDistanceKilometers,
