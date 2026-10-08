@@ -1431,9 +1431,9 @@ private struct StrengthBodyFigureCanvas:
         case (.home, .activation):
             base =
                 Color(
-                    red: 0.885,
-                    green: 0.882,
-                    blue: 0.872
+                    red: 0.930,
+                    green: 0.933,
+                    blue: 0.930
                 )
             outline =
                 Color(
@@ -1981,13 +1981,25 @@ private struct StrengthBodyFigureCanvas:
                     ? 0.68
                     : 0.74
 
-            fill =
-                activationTint
-                    .opacity(
-                        baseOpacity +
-                        intensity *
-                        intensityOpacity
-                    )
+            // Separate exercise roles visually without estimating EMG.
+            // Primary muscles get the strongest coral, while secondary
+            // muscles remain a noticeably softer shade.
+            let roleFactor: Double
+            switch profile.highlightRole(for: region) {
+            case .primary:
+                roleFactor = 1.0
+            case .secondary:
+                roleFactor = 0.56
+            case .estimated:
+                roleFactor = 0.80
+            }
+            fill = activationTint.opacity(
+                min(
+                    (baseOpacity + intensity * intensityOpacity)
+                        * roleFactor,
+                    1.0
+                )
+            )
 
         case .recoveryLoad:
             fill =
