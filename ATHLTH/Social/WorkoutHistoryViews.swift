@@ -1258,7 +1258,10 @@ struct PostWorkoutReviewView: View {
             ) {
                 HStack {
                     Label(
-                        "WORKOUT COMPLETE",
+                        ATHLTHLocalization.choose(
+                            english: "WORKOUT COMPLETE",
+                            norwegian: "ØKT FULLFØRT"
+                        ),
                         systemImage:
                             "checkmark.circle.fill"
                     )
@@ -1280,14 +1283,14 @@ struct PostWorkoutReviewView: View {
 
                 Spacer()
 
-                Text(workout.activity.rawValue)
+                Text(completionActivityTitle)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
                         Color.white.opacity(0.70)
                     )
                     .padding(.bottom, 4)
 
-                Text(workout.title)
+                Text(completionWorkoutTitle)
                     .font(
                         .system(
                             size: 31,
@@ -1334,6 +1337,45 @@ struct PostWorkoutReviewView: View {
             color: Color.black.opacity(0.10),
             radius: 22,
             y: 12
+        )
+    }
+
+    private var completionActivityTitle: String {
+        switch workout.activity {
+        case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking: return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåtur")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .cycling: return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+        case .swimming: return ATHLTHLocalization.choose(english: "Swimming", norwegian: "Svømming")
+        case .hiking: return ATHLTHLocalization.choose(english: "Hiking", norwegian: "Fottur")
+        case .hiit: return "HIIT"
+        case .rowing: return ATHLTHLocalization.choose(english: "Rowing", norwegian: "Roing")
+        case .elliptical: return ATHLTHLocalization.choose(english: "Elliptical", norwegian: "Ellipsemaskin")
+        case .stairClimbing: return ATHLTHLocalization.choose(english: "Stair climbing", norwegian: "Trappetrening")
+        case .yoga: return "Yoga"
+        case .coreTraining: return ATHLTHLocalization.choose(english: "Core training", norwegian: "Kjernetrening")
+        case .other: return ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt")
+        }
+    }
+
+    private var completionWorkoutTitle: String {
+        let original = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let genericEnglish = [
+            workout.activity.rawValue,
+            "\(workout.activity.rawValue) completed",
+            "Run completed",
+            "Walk completed",
+            "Løp completed",
+            "Styrke completed"
+        ]
+        guard genericEnglish.contains(where: {
+            $0.caseInsensitiveCompare(original) == .orderedSame
+        }) else {
+            return original
+        }
+        return ATHLTHLocalization.choose(
+            english: "\(completionActivityTitle) completed",
+            norwegian: "\(completionActivityTitle) fullført"
         )
     }
 
@@ -1591,7 +1633,7 @@ struct PostWorkoutReviewView: View {
     private var resultStrip: some View {
         HStack(spacing: 0) {
             resultMetric(
-                title: "Time",
+                title: ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
                 value: durationText(
                     workout.duration
                 ),
@@ -1604,7 +1646,7 @@ struct PostWorkoutReviewView: View {
                     workout.distanceMeters,
                distance > 0 {
                 resultMetric(
-                    title: "Distance",
+                    title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
                     value: String(
                         format: "%.2f km",
                         distance / 1_000
@@ -1615,7 +1657,7 @@ struct PostWorkoutReviewView: View {
                 resultDivider
 
                 resultMetric(
-                    title: "Pace",
+                    title: ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"),
                     value: averagePaceText(
                         duration:
                             workout.duration,
@@ -1630,7 +1672,7 @@ struct PostWorkoutReviewView: View {
                     workout.strengthExerciseCount,
                 exerciseCount > 0 {
                 resultMetric(
-                    title: "Exercises",
+                    title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser"),
                     value: "\(exerciseCount)",
                     icon: "dumbbell.fill"
                 )
@@ -1638,7 +1680,7 @@ struct PostWorkoutReviewView: View {
                 resultDivider
 
                 resultMetric(
-                    title: "Volume",
+                    title: ATHLTHLocalization.choose(english: "Volume", norwegian: "Volum"),
                     value:
                         strengthVolumeText ??
                         "—",
@@ -1650,7 +1692,7 @@ struct PostWorkoutReviewView: View {
                             .activeEnergyKilocalories,
                       calories > 0 {
                 resultMetric(
-                    title: "Energy",
+                    title: ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"),
                     value: String(
                         format: "%.0f kcal",
                         calories
@@ -1659,7 +1701,7 @@ struct PostWorkoutReviewView: View {
                 )
             } else {
                 resultMetric(
-                    title: "Activity",
+                    title: ATHLTHLocalization.choose(english: "Activity", norwegian: "Aktivitet"),
                     value:
                         workout.activity.rawValue,
                     icon:
@@ -2990,7 +3032,12 @@ struct PostWorkoutReviewView: View {
                     alignment: .leading,
                     spacing: 4
                 ) {
-                    Text("HOW DID IT FEEL?")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "HOW DID IT FEEL?",
+                            norwegian: "HVORDAN FØLTES ØKTEN?"
+                        )
+                    )
                         .font(.caption2.weight(.bold))
                         .tracking(1.7)
                         .foregroundStyle(
@@ -3043,9 +3090,9 @@ struct PostWorkoutReviewView: View {
             .tint(completionAccent)
 
             HStack {
-                Text("Easy")
+                Text(ATHLTHLocalization.choose(english: "Easy", norwegian: "Lett"))
                 Spacer()
-                Text("Max")
+                Text(ATHLTHLocalization.choose(english: "Max", norwegian: "Maks"))
             }
             .font(.caption2)
             .foregroundStyle(
@@ -3605,7 +3652,12 @@ struct PostWorkoutReviewView: View {
                     alignment: .leading,
                     spacing: 2
                 ) {
-                    Text("Workout review")
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Workout review",
+                            norwegian: "Øktoppsummering"
+                        )
+                    )
                         .font(
                             .caption.weight(
                                 .semibold
@@ -3749,15 +3801,17 @@ struct PostWorkoutReviewView: View {
 
     private var saveButtonTitle: String {
         if visibility == .privateOnly {
-            return "Save"
+            return ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")
         }
 
-        if alreadyPublished ||
-            wasAutoPublished {
-            return "Update"
+        if alreadyPublished || wasAutoPublished {
+            return ATHLTHLocalization.choose(english: "Update", norwegian: "Oppdater")
         }
 
-        return "Save & Share"
+        return ATHLTHLocalization.choose(
+            english: "Save & Share",
+            norwegian: "Lagre og del"
+        )
     }
 
     private func averagePaceText(
@@ -4077,12 +4131,12 @@ struct PostWorkoutReviewView: View {
 
     static func effortLabel(_ effort: Int) -> String {
         switch effort {
-        case ...2: return "Very easy"
-        case 3...4: return "Easy"
-        case 5...6: return "Moderate"
-        case 7...8: return "Hard"
-        case 9: return "Very hard"
-        default: return "Maximum"
+        case ...2: return ATHLTHLocalization.choose(english: "Very easy", norwegian: "Svært lett")
+        case 3...4: return ATHLTHLocalization.choose(english: "Easy", norwegian: "Lett")
+        case 5...6: return ATHLTHLocalization.choose(english: "Moderate", norwegian: "Moderat")
+        case 7...8: return ATHLTHLocalization.choose(english: "Hard", norwegian: "Hard")
+        case 9: return ATHLTHLocalization.choose(english: "Very hard", norwegian: "Svært hard")
+        default: return ATHLTHLocalization.choose(english: "Maximum", norwegian: "Maksimal")
         }
     }
 
