@@ -2570,6 +2570,41 @@ private struct WatchStrengthPrimaryCrownMetric: View {
     var compact: Bool = false
 
     @FocusState private var crownFocused: Bool
+    // Keep the Crown's transient rotation separate from the live Watch/iPhone
+    // snapshot. Remote updates during rotation must not reset its position.
+    @State private var crownPosition: Double = 0
+
+    private var discreteCrownValue: Binding<Double> {
+        Binding(
+            get: { crownPosition },
+            set: { proposed in
+                let next = snapped(proposed)
+                guard abs(next - crownPosition) > 0.0001 else { return }
+                crownPosition = next
+                if abs(next - value) > 0.0001 {
+                    value = next
+                }
+            }
+        )
+    }
+
+    private func snapped(_ proposed: Double) -> Double {
+        guard proposed.isFinite, step > 0 else { return value }
+        let clamped = min(max(proposed, range.lowerBound), range.upperBound)
+        let ticks = ((clamped - range.lowerBound) / step).rounded()
+        return min(max(range.lowerBound + ticks * step, range.lowerBound),
+                   range.upperBound)
+    }
+
+    private func adjustOneClick(_ direction: Double) {
+        let next = snapped(value + step * direction)
+        guard abs(next - value) > 0.0001 else { return }
+        crownPosition = next
+        value = next
+        // One tactile click per deliberate screen tap; rotational detents
+        // retain watchOS's built-in Crown haptic feedback.
+        WKInterfaceDevice.current().play(.click)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -2603,25 +2638,43 @@ private struct WatchStrengthPrimaryCrownMetric: View {
                 .minimumScaleFactor(0.68)
 
             HStack(spacing: 3) {
-                Image(
-                    systemName:
-                        "digitalcrown.horizontal.arrow.clockwise"
-                )
-                .font(.system(size: 8, weight: .bold))
+                Button {
+                    adjustOneClick(-1)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: 27, height: 27)
+                        .background(
+                            tint.opacity(0.13),
+                            in: RoundedRectangle(cornerRadius: 8)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(value <= range.lowerBound)
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Crown",
-                        norwegian: "Krone"
-                    )
-                )
-                .font(.system(size: 7, weight: .semibold))
+                Spacer(minLength: 0)
+
+                Image(systemName: "digitalcrown.horizontal.arrow.clockwise")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(crownFocused ? tint : WatchTheme.muted)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    adjustOneClick(1)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: 27, height: 27)
+                        .background(
+                            tint.opacity(0.13),
+                            in: RoundedRectangle(cornerRadius: 8)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(value >= range.upperBound)
             }
-            .foregroundStyle(
-                crownFocused
-                    ? tint
-                    : WatchTheme.muted
-            )
+            .foregroundStyle(tint)
         }
         .padding(
             compact
@@ -2662,14 +2715,27 @@ private struct WatchStrengthPrimaryCrownMetric: View {
         .focusable()
         .focused($crownFocused)
         .digitalCrownRotation(
-            $value,
+            discreteCrownValue,
             from: range.lowerBound,
             through: range.upperBound,
             by: step,
-            sensitivity: .medium,
+            sensitivity: .low,
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
+        .onAppear {
+            crownPosition = snapped(value)
+        }
+        .onChange(of: value) { _, updated in
+            if !crownFocused {
+                crownPosition = snapped(updated)
+            }
+        }
+        .onChange(of: crownFocused) { _, focused in
+            if !focused {
+                crownPosition = snapped(value)
+            }
+        }
         .onTapGesture {
             crownFocused = true
         }
