@@ -15,6 +15,15 @@ struct AdvancedPlannerView: View {
     @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
     @State private var weekPendingRemoval: TrainingPlanWeek?
+    @State private var pendingWeekCopy: PendingWeekCopy?
+
+    private struct PendingWeekCopy {
+        let planID: UUID
+        let sourceWeekID: UUID
+        let sourceWeekNumber: Int
+        let scope: TrainingWeekCopyScope
+        let summary: TrainingWeekCopySummary
+    }
 
     init(
         planID: UUID? = nil,
@@ -143,6 +152,52 @@ struct AdvancedPlannerView: View {
                     count == 1
                         ? "This week contains 1 planned workout. Removing the week will also remove that workout."
                         : "This week contains \(count) planned workouts. Removing the week will also remove those workouts."
+                )
+            }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Repeat training week?",
+                norwegian: "Gjenta treningsuken?"
+            ),
+            isPresented: Binding(
+                get: { pendingWeekCopy != nil },
+                set: { showing in
+                    if !showing { pendingWeekCopy = nil }
+                }
+            )
+        ) {
+            if let request = pendingWeekCopy {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Copy workouts",
+                        norwegian: "Kopier økter"
+                    )
+                ) {
+                    _ = session.copyTrainingWeekToEmptyDays(
+                        planID: request.planID,
+                        sourceWeekID: request.sourceWeekID,
+                        scope: request.scope
+                    )
+                    pendingWeekCopy = nil
+                }
+            }
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Cancel",
+                    norwegian: "Avbryt"
+                ),
+                role: .cancel
+            ) {
+                pendingWeekCopy = nil
+            }
+        } message: {
+            if let request = pendingWeekCopy {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Copy \(request.summary.copiedSessions) workouts from week \(request.sourceWeekNumber) into \(request.summary.filledDays) empty future days across \(request.summary.targetWeeks) weeks. Existing or past workouts are not changed.",
+                        norwegian: "Kopier \(request.summary.copiedSessions) økter fra uke \(request.sourceWeekNumber) til \(request.summary.filledDays) tomme fremtidige dager over \(request.summary.targetWeeks) uker. Eksisterende og tidligere økter endres ikke."
+                    )
                 )
             }
         }
@@ -546,16 +601,68 @@ struct AdvancedPlannerView: View {
 
                         Menu {
                             if let week = selectedWeek(in: plan) {
-                                Button(role: .destructive) {
-                                    requestWeekRemoval(
-                                        week,
-                                        from: plan
-                                    )
-                                } label: {
-                                    Label(
-                                        "Remove W\(week.weekNumber)",
-                                        systemImage: "trash"
-                                    )
+                                let next = TrainingWeekTemplateEngine.preview(
+                                    plan: plan,
+                                    sourceWeekID: week.id,
+                                    scope: .nextWeek
+                                )
+                                let future = TrainingWeekTemplateEngine.preview(
+                                    plan: plan,
+                                    sourceWeekID: week.id,
+                                    scope: .allFutureWeeks
+                                )
+
+                                if next.hasWork {
+                                    Button {
+                                        requestWeekCopy(
+                                            from: week,
+                                            plan: plan,
+                                            scope: .nextWeek,
+                                            summary: next
+                                        )
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Copy to next week",
+                                                norwegian: "Kopier til neste uke"
+                                            ),
+                                            systemImage: "calendar.badge.plus"
+                                        )
+                                    }
+                                }
+
+                                if future.hasWork {
+                                    Button {
+                                        requestWeekCopy(
+                                            from: week,
+                                            plan: plan,
+                                            scope: .allFutureWeeks,
+                                            summary: future
+                                        )
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Fill future empty days",
+                                                norwegian: "Fyll tomme dager fremover"
+                                            ),
+                                            systemImage: "calendar"
+                                        )
+                                    }
+                                }
+
+                                if plan.weeks.count > 1 {
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        requestWeekRemoval(
+                                            week,
+                                            from: plan
+                                        )
+                                    } label: {
+                                        Label(
+                                            "Remove W\(week.weekNumber)",
+                                            systemImage: "trash"
+                                        )
+                                    }
                                 }
                             }
                         } label: {
@@ -1382,6 +1489,22 @@ struct AdvancedPlannerView: View {
         return plan.weeks.first {
             $0.weekNumber == targetNumber
         } ?? plan.weeks.last
+    }
+
+    private func requestWeekCopy(
+        from week: TrainingPlanWeek,
+        plan: TrainingPlan,
+        scope: TrainingWeekCopyScope,
+        summary: TrainingWeekCopySummary
+    ) {
+        guard summary.hasWork else { return }
+        pendingWeekCopy = PendingWeekCopy(
+            planID: plan.id,
+            sourceWeekID: week.id,
+            sourceWeekNumber: week.weekNumber,
+            scope: scope,
+            summary: summary
+        )
     }
 
     private func requestWeekRemoval(
