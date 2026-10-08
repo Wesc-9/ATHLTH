@@ -608,7 +608,10 @@ struct WatchActiveWorkoutView: View {
                         onSkip: {
                             workoutManager
                                 .skipStrengthRest()
-                        }
+                        },
+                        onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
+                            ? { workoutManager.moveToNextStrengthExercise() }
+                            : nil
                     )
                 }
                 .padding(
@@ -1503,7 +1506,10 @@ struct WatchActiveWorkoutView: View {
                         },
                         onSkip: {
                             workoutManager.skipStrengthRest()
-                        }
+                        },
+                        onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
+                            ? { workoutManager.moveToNextStrengthExercise() }
+                            : nil
                     )
                 }
             } else if snapshot.isResting,
@@ -1552,7 +1558,10 @@ struct WatchActiveWorkoutView: View {
                     },
                     onSkip: {
                         workoutManager.skipStrengthRest()
-                    }
+                    },
+                    onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
+                        ? { workoutManager.moveToNextStrengthExercise() }
+                        : nil
                 )
             } else if snapshot.currentExerciseComplete {
                 VStack(spacing: 8) {
@@ -2783,6 +2792,7 @@ private struct WatchStrengthRestView: View {
     let restEndsAt: Date
     let onAdd: () -> Void
     let onSkip: () -> Void
+    let onNextExercise: (() -> Void)?
 
     @State private var sentCompletion = false
 
@@ -2819,8 +2829,27 @@ private struct WatchStrengthRestView: View {
                         }
                         .buttonStyle(.bordered)
 
-                        Button("Skip") {
-                            onSkip()
+                        Button {
+                            if let onNextExercise {
+                                onNextExercise()
+                            } else {
+                                onSkip()
+                            }
+                        } label: {
+                            Text(
+                                onNextExercise != nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Next exercise",
+                                        norwegian: "Neste øvelse"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Skip rest",
+                                        norwegian: "Hopp over"
+                                    )
+                            )
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(WatchTheme.green)
