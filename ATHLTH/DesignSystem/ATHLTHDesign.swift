@@ -1970,6 +1970,7 @@ struct ATHLTHStandardArtworkPicker: View {
                                     anchor:
                                         .trailing
                                 )
+                                .athlthBoundedFill()
                             } else {
                                 ATHLTHTheme
                                     .accentSoft
