@@ -3032,7 +3032,7 @@ struct HomeWeeklyProgressStrip:
                 date
             )
 
-        return VStack(spacing: 3) {
+        return VStack(spacing: 2) {
             ZStack {
                 Circle()
                     .fill(
@@ -3134,8 +3134,8 @@ struct HomeWeeklyProgressStrip:
                 }
             }
             .frame(
-                width: 27,
-                height: 27
+                width: 24,
+                height: 24
             )
             .overlay {
                 if isToday {
