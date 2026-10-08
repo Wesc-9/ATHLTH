@@ -966,6 +966,97 @@ final class StrengthWorkoutStore: ObservableObject {
             }
     }
 
+    // Only the active workout log is reordered: the saved training plan
+    // and all completed set records keep their original identifiers.
+    var nextPendingExercise: StrengthExerciseLog? {
+        guard let workout = activeWorkout else {
+            return nil
+        }
+
+        let later = workout.exercises.indices
+            .dropFirst(currentExerciseIndex + 1)
+            .first { !workout.exercises[$0].isCompleted }
+        let earlier = workout.exercises.indices
+            .prefix(currentExerciseIndex)
+            .first { !workout.exercises[$0].isCompleted }
+        guard let index = later ?? earlier else {
+            return nil
+        }
+        return workout.exercises[index]
+    }
+
+    @discardableResult
+    func selectExerciseForNow(_ exerciseID: UUID) -> Bool {
+        guard var workout = activeWorkout,
+              let target = workout.exercises.firstIndex(where: {
+                  $0.id == exerciseID && !$0.isCompleted
+              })
+        else {
+            return false
+        }
+
+        guard target != currentExerciseIndex else {
+            return true
+        }
+
+        // Changing stations is deliberate; never mark the postponed
+        // exercise complete or erase its partially completed sets.
+        finalizeActualRestIfNeeded()
+        restStartedAt = nil
+        restEndsAt = nil
+
+        if workout.exercises.indices.contains(currentExerciseIndex),
+           let completedAt = workout.exercises[currentExerciseIndex].completedAt {
+            workout.exercises[currentExerciseIndex]
+                .transitionToNextExerciseSeconds =
+                max(Date().timeIntervalSince(completedAt), 0)
+        }
+
+        currentExerciseIndex = target
+        currentSetIndex = workout.exercises[target].sets
+            .firstIndex(where: { !$0.isCompleted }) ?? 0
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
+    func reorderActiveExercises(
+        fromOffsets: IndexSet,
+        toOffset: Int
+    ) {
+        guard var workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex),
+              !fromOffsets.isEmpty,
+              fromOffsets.allSatisfy({
+                  workout.exercises.indices.contains($0)
+              })
+        else {
+            return
+        }
+
+        let activeID = workout.exercises[currentExerciseIndex].id
+        let moving = fromOffsets.sorted().map { workout.exercises[$0] }
+        for index in fromOffsets.sorted(by: >) {
+            workout.exercises.remove(at: index)
+        }
+
+        let removedBeforeDestination =
+            fromOffsets.filter { $0 < toOffset }.count
+        let insertion = min(
+            max(toOffset - removedBeforeDestination, 0),
+            workout.exercises.count
+        )
+        workout.exercises.insert(contentsOf: moving, at: insertion)
+
+        // The selected exercise follows its stable ID, not its old index.
+        currentExerciseIndex = workout.exercises.firstIndex {
+            $0.id == activeID
+        } ?? 0
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
     func setDraft(
         reps: Int? = nil,
         durationSeconds: Int? = nil,
