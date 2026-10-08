@@ -104,7 +104,7 @@ enum FocusedMuscleExerciseSuggestions {
                 ),
                 targetRIR: nil,
                 supersetGroupID: nil,
-                progression: .none
+                progression: StrengthProgressionRule.none
             )
         }
     }
