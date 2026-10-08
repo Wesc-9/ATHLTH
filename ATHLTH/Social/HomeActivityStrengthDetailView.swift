@@ -787,6 +787,7 @@ struct HomeActivityStrengthDetailView: View {
                     )
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
                     .frame(
                         maxWidth:
                             .infinity,
