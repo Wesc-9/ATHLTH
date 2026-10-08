@@ -802,10 +802,17 @@ struct MirroredWorkoutLiveView: View {
 
                 runningMetric(
                     title:
-                        ATHLTHLocalization.choose(
-                            english: "PACE",
-                            norwegian: "TEMPO"
-                        ),
+                        snapshot.currentPaceSecondsPerKilometer == nil &&
+                        snapshot.distanceMeters >= 20 &&
+                        snapshot.elapsedTime > 0
+                            ? ATHLTHLocalization.choose(
+                                english: "AVERAGE PACE",
+                                norwegian: "SNITTEMPO"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "PACE",
+                                norwegian: "TEMPO"
+                            ),
                     value:
                         runningPaceText(
                             snapshot
