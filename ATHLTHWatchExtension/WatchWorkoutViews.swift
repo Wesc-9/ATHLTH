@@ -116,7 +116,8 @@ struct WatchActiveWorkoutView: View {
                 WatchRunWorkoutExperienceView()
                     .environmentObject(workoutManager)
             } else if isLuminanceReduced {
-                nonRunningAlwaysOnPage
+                WatchTrainingAlwaysOnDashboard()
+                    .environmentObject(workoutManager)
             } else {
                 TabView(
                     selection:
@@ -703,7 +704,7 @@ struct WatchActiveWorkoutView: View {
                             .borderedProminent
                         )
                         .tint(
-                            WatchTheme.green
+                            WatchTheme.liveAction
                         )
                         .disabled(
                             workoutManager
@@ -786,7 +787,7 @@ struct WatchActiveWorkoutView: View {
                                 step: 15,
                                 icon: "timer",
                                 tint:
-                                    WatchTheme.accent,
+                                    WatchTheme.liveStrengthReps,
                                 compact: true
                             )
                         } else {
@@ -800,7 +801,7 @@ struct WatchActiveWorkoutView: View {
                                 step: 1,
                                 icon: "repeat",
                                 tint:
-                                    WatchTheme.accent,
+                                    WatchTheme.liveStrengthReps,
                                 compact: true
                             )
                         }
@@ -832,7 +833,7 @@ struct WatchActiveWorkoutView: View {
                                 icon:
                                     "dial.medium",
                                 tint:
-                                    WatchTheme.slate,
+                                    WatchTheme.liveStrengthLoad,
                                 compact: true
                             )
                         } else {
@@ -859,7 +860,7 @@ struct WatchActiveWorkoutView: View {
                                 icon:
                                     "scalemass.fill",
                                 tint:
-                                    WatchTheme.slate,
+                                    WatchTheme.liveStrengthLoad,
                                 compact: true
                             )
                         }
@@ -874,10 +875,10 @@ struct WatchActiveWorkoutView: View {
                         )
                     )
                     .font(
-                        .system(size: 7)
+                        .system(size: 8, weight: .semibold)
                     )
                     .foregroundStyle(
-                        WatchTheme.muted
+                        WatchTheme.textSecondary
                     )
                     .lineLimit(1)
 
@@ -936,7 +937,7 @@ struct WatchActiveWorkoutView: View {
                         .borderedProminent
                     )
                     .tint(
-                        WatchTheme.green
+                        WatchTheme.liveAction
                     )
                     .disabled(
                         workoutManager
@@ -993,7 +994,7 @@ struct WatchActiveWorkoutView: View {
             VStack(spacing: 8) {
                 ProgressView()
                     .tint(
-                        WatchTheme.green
+                        WatchTheme.liveAction
                     )
 
                 Text(
@@ -2579,7 +2580,7 @@ private struct WatchStrengthPrimaryCrownMetric: View {
 
                 Text(title)
                     .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(WatchTheme.muted)
+                    .foregroundStyle(WatchTheme.textSecondary)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
@@ -2590,13 +2591,14 @@ private struct WatchStrengthPrimaryCrownMetric: View {
                     .system(
                         size:
                             compact
-                                ? 20
-                                : 22,
+                                ? 24
+                                : 26,
                         weight: .bold,
                         design: .rounded
                     )
                 )
                 .monospacedDigit()
+                .foregroundStyle(WatchTheme.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
 
@@ -2636,7 +2638,7 @@ private struct WatchStrengthPrimaryCrownMetric: View {
         )
         .background(
             tint.opacity(
-                crownFocused ? 0.15 : 0.07
+                crownFocused ? 0.23 : 0.14
             ),
             in: RoundedRectangle(
                 cornerRadius: 14,
@@ -2650,7 +2652,7 @@ private struct WatchStrengthPrimaryCrownMetric: View {
             )
             .stroke(
                 tint.opacity(
-                    crownFocused ? 0.48 : 0.14
+                    crownFocused ? 0.85 : 0.38
                 ),
                 lineWidth:
                     crownFocused ? 1.2 : 0.8
