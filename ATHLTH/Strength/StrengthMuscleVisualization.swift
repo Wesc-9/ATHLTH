@@ -1429,7 +1429,7 @@ private struct StrengthBodyFigureCanvas:
             }
         }
         .aspectRatio(
-            0.48,
+            0.59,
             contentMode: .fit
         )
     }
@@ -1856,7 +1856,15 @@ private struct StrengthBodyFigureCanvas:
 
         context.fill(
             torso,
-            with: .color(base)
+            with: .linearGradient(
+                Gradient(colors: [
+                    base,
+                    Color.white.opacity(0.98),
+                    base
+                ]),
+                startPoint: point(x: 0.28, y: 0.36, size: size),
+                endPoint: point(x: 0.72, y: 0.48, size: size)
+            )
         )
         context.stroke(
             torso,
@@ -1985,6 +1993,195 @@ private struct StrengthBodyFigureCanvas:
                 ),
             lineWidth: 0.55
         )
+
+        // Native vector anatomy is painted before recorded activations.
+        // This makes all untrained regions readable (neutral stone-grey),
+        // while dynamic primary/secondary fills remain authoritative.
+        drawNeutralAnatomy(
+            context: &context,
+            size: size
+        )
+        drawHandsAndFeet(
+            context: &context,
+            size: size,
+            base: base,
+            outline: outline
+        )
+    }
+
+    // A single inexpensive Canvas pass; no raster atlases, 3D renderer or AI.
+    // Neutral muscle plates share coordinates with the workout overlays.
+    private func drawNeutralAnatomy(
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let plate = Color(
+            red: 0.989,
+            green: 0.988,
+            blue: 0.984
+        ).opacity(0.84)
+
+        func pair(
+            _ y: CGFloat,
+            _ width: CGFloat,
+            _ height: CGFloat,
+            _ spacing: CGFloat,
+            _ lean: CGFloat = 0.1
+        ) {
+            organicPair(
+                centerY: y,
+                width: width,
+                height: height,
+                spacing: spacing,
+                lean: lean,
+                fill: plate,
+                emphasis: 0,
+                context: &context,
+                size: size
+            )
+        }
+
+        func single(
+            _ x: CGFloat,
+            _ y: CGFloat,
+            _ width: CGFloat,
+            _ height: CGFloat
+        ) {
+            organicSingle(
+                centerX: x,
+                centerY: y,
+                width: width,
+                height: height,
+                lean: 0,
+                fill: plate,
+                emphasis: 0,
+                context: &context,
+                size: size
+            )
+        }
+
+        // Deliberately simplified editorial anatomy, not a medical atlas.
+        // Every panel uses the same relative geometry as its active region.
+        switch side {
+        case .front:
+            pair(0.250, 0.120, 0.092, 0.385, 0.42) // deltoids
+            pair(0.300, 0.178, 0.094, 0.175, 0.18) // pectorals
+            pair(0.365, 0.064, 0.135, 0.505, 0.18) // biceps
+            pair(0.495, 0.050, 0.135, 0.570)       // forearms
+            pair(0.365, 0.050, 0.105, 0.247, 0.44) // serratus
+            pair(0.455, 0.062, 0.155, 0.205, 0.30) // obliques
+            for row: CGFloat in [0.385, 0.438, 0.492] {
+                pair(row, 0.064, 0.050, 0.072, 0.04)
+            }
+            pair(0.585, 0.050, 0.095, 0.118, 0.30) // hip flexors
+            pair(0.570, 0.057, 0.105, 0.255, 0.34) // outer hip
+            pair(0.675, 0.092, 0.205, 0.170)       // quads
+            pair(0.675, 0.052, 0.180, 0.078)       // adductors
+            pair(0.845, 0.064, 0.145, 0.172)       // calves
+        case .back:
+            single(0.5, 0.225, 0.205, 0.120)       // trapezius
+            pair(0.252, 0.122, 0.094, 0.385, 0.34) // rear delts
+            pair(0.320, 0.160, 0.118, 0.185, 0.22) // upper back
+            pair(0.405, 0.106, 0.205, 0.225, 0.34) // lats
+            pair(0.365, 0.066, 0.145, 0.505)       // triceps
+            pair(0.495, 0.050, 0.135, 0.570)       // forearms
+            single(0.5, 0.480, 0.170, 0.115)       // lumbar
+            pair(0.565, 0.138, 0.090, 0.135)       // glutes
+            pair(0.682, 0.090, 0.205, 0.170)       // hamstrings
+            pair(0.845, 0.064, 0.145, 0.172)       // calves
+        }
+
+        let groove = Color(
+            red: 0.51,
+            green: 0.55,
+            blue: 0.57
+        ).opacity(presentation == .home ? 0.20 : 0.24)
+
+        func contour(_ coordinates: [(CGFloat, CGFloat)]) {
+            guard let first = coordinates.first else { return }
+            var path = Path()
+            path.move(to: point(x: first.0, y: first.1, size: size))
+            for coordinate in coordinates.dropFirst() {
+                path.addLine(
+                    to: point(
+                        x: coordinate.0,
+                        y: coordinate.1,
+                        size: size
+                    )
+                )
+            }
+            context.stroke(
+                path,
+                with: .color(groove),
+                style: StrokeStyle(lineWidth: 0.55, lineCap: .round)
+            )
+        }
+
+        if side == .front {
+            // Collarbone, midline, lower rib taper and knee joints.
+            contour([(0.438, 0.178), (0.390, 0.199), (0.332, 0.231)])
+            contour([(0.562, 0.178), (0.610, 0.199), (0.668, 0.231)])
+            contour([(0.500, 0.347), (0.500, 0.522)])
+            contour([(0.377, 0.369), (0.405, 0.399), (0.431, 0.426)])
+            contour([(0.623, 0.369), (0.595, 0.399), (0.569, 0.426)])
+            contour([(0.379, 0.773), (0.406, 0.779), (0.436, 0.772)])
+            contour([(0.564, 0.772), (0.594, 0.779), (0.621, 0.773)])
+        } else {
+            // Trapezius ridge, shoulder blades and spine.
+            contour([(0.500, 0.166), (0.453, 0.214), (0.397, 0.255)])
+            contour([(0.500, 0.166), (0.547, 0.214), (0.603, 0.255)])
+            contour([(0.398, 0.310), (0.449, 0.354), (0.466, 0.391)])
+            contour([(0.602, 0.310), (0.551, 0.354), (0.534, 0.391)])
+            contour([(0.500, 0.280), (0.500, 0.520)])
+        }
+    }
+
+    private func drawHandsAndFeet(
+        context: inout GraphicsContext,
+        size: CGSize,
+        base: Color,
+        outline: Color
+    ) {
+        func limb(
+            _ coordinates: [(CGFloat, CGFloat)],
+            rounded: CGFloat = 0
+        ) {
+            guard let first = coordinates.first else { return }
+            var path = Path()
+            path.move(to: point(x: first.0, y: first.1, size: size))
+            for c in coordinates.dropFirst() {
+                path.addLine(to: point(x: c.0, y: c.1, size: size))
+            }
+            path.closeSubpath()
+            context.fill(path, with: .color(base))
+            context.stroke(
+                path,
+                with: .color(outline),
+                lineWidth: 0.70
+            )
+        }
+
+        // Soft, understated silhouette details stay legible at thumbnail size.
+        limb([
+            (0.178, 0.591), (0.185, 0.625),
+            (0.187, 0.655), (0.205, 0.668),
+            (0.225, 0.645), (0.230, 0.606)
+        ])
+        limb([
+            (0.822, 0.591), (0.815, 0.625),
+            (0.813, 0.655), (0.795, 0.668),
+            (0.775, 0.645), (0.770, 0.606)
+        ])
+        limb([
+            (0.363, 0.947), (0.365, 0.983),
+            (0.388, 0.993), (0.434, 0.992),
+            (0.438, 0.979), (0.425, 0.952)
+        ])
+        limb([
+            (0.637, 0.947), (0.635, 0.983),
+            (0.612, 0.993), (0.566, 0.992),
+            (0.562, 0.979), (0.575, 0.952)
+        ])
     }
 
     private func draw(
