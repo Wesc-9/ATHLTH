@@ -1718,7 +1718,23 @@ struct ATHLTHHomeView: View {
     private func homeCompactGoalCard(
         _ goal: ATHLTHGoal
     ) -> some View {
-        VStack(
+        let progress = min(max(goal.progress, 0), 1)
+        let percentage =
+            Int((progress * 100).rounded())
+        let progressCaption =
+            goal.milestones.isEmpty
+                ? ATHLTHLocalization.choose(
+                    english: "Progress",
+                    norwegian: "Fremdrift"
+                )
+                : ATHLTHLocalization.format(
+                    english: "%d of %d steps",
+                    norwegian: "%d av %d delmål",
+                    goal.completedMilestones,
+                    goal.milestones.count
+                )
+
+        return VStack(
             alignment: .leading,
             spacing: 8
         ) {
@@ -1726,16 +1742,13 @@ struct ATHLTHHomeView: View {
                 Text("Aktuelt mål")
                     .font(
                         .subheadline
-                            .weight(
-                                .bold
-                            )
+                            .weight(.bold)
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
+                        ATHLTHTheme.primaryText
                     )
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 NavigationLink {
                     GoalsHubView()
@@ -1744,15 +1757,13 @@ struct ATHLTHHomeView: View {
                         Text("Se alle")
                             .font(
                                 .system(
-                                    size: 9.5,
-                                    weight:
-                                        .semibold
+                                    size: 10,
+                                    weight: .semibold
                                 )
                             )
 
                         Image(
-                            systemName:
-                                "chevron.right"
+                            systemName: "chevron.right"
                         )
                         .font(
                             .system(
@@ -1762,140 +1773,187 @@ struct ATHLTHHomeView: View {
                         )
                     }
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        ATHLTHTheme.accentDeep
                     )
-                    .contentShape(
-                        Rectangle()
-                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(
-                    "Se alle mål"
-                )
+                .accessibilityLabel("Se alle mål")
             }
 
             NavigationLink {
-                GoalDetailView(
-                    goalID: goal.id
-                )
+                GoalDetailView(goalID: goal.id)
             } label: {
-                HStack(spacing: 8) {
-                    ZStack(
-                        alignment:
-                            .bottomTrailing
-                    ) {
-                        GoalCoverView(
-                            goal: goal
+                HStack(
+                    alignment: .center,
+                    spacing: 9
+                ) {
+                    GoalCoverView(
+                        goal: goal,
+                        showsDecorativeSymbol: false
+                    )
+                    .frame(
+                        width: 68,
+                        height:
+                            homeGoalCalendarContentMinHeight
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
                         )
-                        // Keep the artwork prominent without stealing
-                        // the width needed for readable goal text.
-                        .frame(
-                            width: 74,
-                            height: 90
-                        )
-                        .scaleEffect(
-                            1.34,
-                            anchor: .center
-                        )
-                        .clipped()
-                        .clipShape(
-                            RoundedRectangle(
-                                cornerRadius: 16,
-                                style:
-                                    .continuous
-                            )
-                        )
-
-                        Text(
-                            "\(Int((goal.progress * 100).rounded()))%"
+                    )
+                    .overlay(alignment: .topLeading) {
+                        Image(
+                            systemName:
+                                goal.category.systemImage
                         )
                         .font(
                             .system(
-                                size: 9,
-                                weight: .bold
+                                size: 10,
+                                weight: .semibold
                             )
                         )
                         .foregroundStyle(
-                            .white
+                            ATHLTHTheme.accentDeep
                         )
-                        .padding(
-                            .horizontal,
-                            6
-                        )
-                        .padding(
-                            .vertical,
-                            4
+                        .frame(
+                            width: 23,
+                            height: 23
                         )
                         .background(
-                            .black.opacity(
-                                0.64
-                            ),
-                            in: Capsule()
+                            Color.white.opacity(0.88),
+                            in: Circle()
                         )
-                        .padding(5)
+                        .padding(7)
+                    }
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 15,
+                            style: .continuous
+                        )
+                        .stroke(
+                            Color.white.opacity(0.38),
+                            lineWidth: 0.7
+                        )
+                        .allowsHitTesting(false)
                     }
 
                     VStack(
                         alignment: .leading,
-                        spacing: 5
+                        spacing: 4
                     ) {
+                        Text(
+                            homeCompactGoalCategoryTitle(
+                                for: goal.category
+                            )
+                        )
+                        .font(
+                            .system(
+                                size: 8.5,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme.accentDeep
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+
                         Text(goal.title)
                             .font(
                                 .system(
-                                    size: 13,
+                                    size: 12.5,
                                     weight: .bold,
                                     design: .rounded
                                 )
                             )
                             .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
+                                ATHLTHTheme.primaryText
                             )
                             .lineLimit(2)
-                            .minimumScaleFactor(
-                                0.88
+                            .minimumScaleFactor(0.85)
+                            .multilineTextAlignment(
+                                .leading
                             )
-                            .fixedSize(
-                                horizontal: false,
-                                vertical: true
-                            )
-                            .layoutPriority(2)
+                            .layoutPriority(1)
 
-                        Text(
-                            homeNextMilestone(
-                                for: goal
-                            )?
-                            .title ??
-                            "Fortsett mot målet"
-                        )
-                        .font(
-                            .system(
-                                size: 10.5,
-                                weight: .medium
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                                .opacity(0.68)
-                        )
-                        .lineLimit(2)
-                        .minimumScaleFactor(
-                            0.90
-                        )
+                        Spacer(minLength: 2)
 
-                        ProgressView(
-                            value:
-                                goal.progress
-                        )
-                        .tint(
-                            ATHLTHTheme
-                                .vitality
-                        )
+                        GeometryReader { geometry in
+                            ZStack(
+                                alignment: .leading
+                            ) {
+                                Capsule()
+                                    .fill(
+                                        ATHLTHTheme
+                                            .accentDeep
+                                            .opacity(0.09)
+                                    )
+
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                ATHLTHTheme
+                                                    .accentDeep,
+                                                ATHLTHTheme
+                                                    .vitality
+                                            ],
+                                            startPoint:
+                                                .leading,
+                                            endPoint:
+                                                .trailing
+                                        )
+                                    )
+                                    .frame(
+                                        width:
+                                            geometry.size.width *
+                                            CGFloat(progress)
+                                    )
+                            }
+                        }
+                        .frame(height: 5)
+                        .accessibilityHidden(true)
+
+                        HStack(spacing: 3) {
+                            Text(progressCaption)
+                                .font(
+                                    .system(
+                                        size: 8.5,
+                                        weight: .medium
+                                    )
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(
+                                    0.75
+                                )
+
+                            Spacer(minLength: 1)
+
+                            Text("\(percentage)%")
+                                .font(
+                                    .system(
+                                        size: 9.5,
+                                        weight: .bold,
+                                        design: .rounded
+                                    )
+                                    .monospacedDigit()
+                                )
+                                .foregroundStyle(
+                                    ATHLTHTheme.accentDeep
+                                )
+                        }
                     }
                     .frame(
                         maxWidth: .infinity,
+                        minHeight:
+                            homeGoalCalendarContentMinHeight,
+                        maxHeight:
+                            homeGoalCalendarContentMinHeight,
                         alignment: .leading
                     )
                 }
@@ -1903,38 +1961,71 @@ struct ATHLTHHomeView: View {
                     minHeight:
                         homeGoalCalendarContentMinHeight
                 )
-                .contentShape(
-                    Rectangle()
-                )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
-                "Åpne mål: \(goal.title)"
+                "Åpne mål: \(goal.title), \(percentage)%"
             )
         }
         .padding(11)
         .background(
-            Color.white.opacity(
-                0.90
-            ),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style:
-                        .continuous
-                )
+            Color.white.opacity(0.92),
+            in: RoundedRectangle(
+                cornerRadius: 19,
+                style: .continuous
+            )
         )
         .overlay {
             RoundedRectangle(
                 cornerRadius: 19,
-                style:
-                    .continuous
+                style: .continuous
             )
             .stroke(
-                Color.black.opacity(
-                    0.04
-                ),
+                Color.black.opacity(0.04),
                 lineWidth: 0.7
+            )
+        }
+    }
+
+    private func homeCompactGoalCategoryTitle(
+        for category: GoalCategory
+    ) -> String {
+        switch category {
+        case .event:
+            return ATHLTHLocalization.choose(
+                english: "Event",
+                norwegian: "Arrangement"
+            )
+        case .endurance:
+            return ATHLTHLocalization.choose(
+                english: "Running",
+                norwegian: "Løping"
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Strength",
+                norwegian: "Styrke"
+            )
+        case .body:
+            return ATHLTHLocalization.choose(
+                english: "Wellness",
+                norwegian: "Helse"
+            )
+        case .consistency:
+            return ATHLTHLocalization.choose(
+                english: "Consistency",
+                norwegian: "Vaner"
+            )
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Recovery",
+                norwegian: "Restitusjon"
+            )
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english: "Personal",
+                norwegian: "Personlig"
             )
         }
     }
