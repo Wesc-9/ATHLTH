@@ -1536,7 +1536,8 @@ final class AppSessionStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             startDate: proposedStart,
-            endDate: proposedEnd
+            endDate: proposedEnd,
+            builderProfile: source.builderProfile
         )
 
         guard addTrainingPlan(duplicate) else {
@@ -3033,7 +3034,8 @@ final class AppSessionStore: ObservableObject {
             spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: nil
+            startDate: nil,
+            builderProfile: source.builderProfile
         )
 
         planTemplates.insert(template, at: 0)
@@ -3086,7 +3088,8 @@ final class AppSessionStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             startDate: resolvedStartDate,
-            endDate: resolvedEndDate
+            endDate: resolvedEndDate,
+            builderProfile: template.builderProfile
         )
 
         guard addTrainingPlan(plan) else {
@@ -3408,7 +3411,8 @@ final class AppSessionStore: ObservableObject {
             spotifyAutoplayOnWorkoutStart: source.spotifyAutoplayOnWorkoutStart,
             createdAt: Date(),
             updatedAt: Date(),
-            startDate: nil
+            startDate: nil,
+            builderProfile: source.builderProfile
         )
         copy.sharedSourceOwnerID =
             source.sharedSourceOwnerID ?? sourceOwnerID ?? source.ownerID
