@@ -7374,6 +7374,7 @@ struct CommunityGroupDetailView: View {
                 .resizable()
                 .interpolation(.medium)
                 .scaledToFill()
+                .athlthBoundedFill()
 
             LinearGradient(
                 colors: [
@@ -17089,6 +17090,7 @@ private struct CommunityContentCoverPicker: View {
                         }
                     }
                 }
+                .athlthBoundedFill()
                 .frame(maxWidth: .infinity)
                 .frame(height: 150)
                 .clipped()
