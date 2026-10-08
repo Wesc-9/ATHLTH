@@ -4631,27 +4631,10 @@ struct ActiveStrengthWorkoutView: View {
                     )
             }
         ) {
-            TextField(
-                "0",
+            StrengthClearableNumericField(
                 value: value,
-                format:
-                    .number
-                    .precision(
-                        .fractionLength(
-                            0...1
-                        )
-                    )
+                allowsDecimal: true
             )
-            .keyboardType(.decimalPad)
-            .font(
-                .system(
-                    size: 28,
-                    weight: .bold,
-                    design: .rounded
-                )
-            )
-            .monospacedDigit()
-            .multilineTextAlignment(.leading)
         }
     }
 
@@ -4677,21 +4660,13 @@ struct ActiveStrengthWorkoutView: View {
                     )
             }
         ) {
-            TextField(
-                "0",
-                value: value,
-                format: .number
+            StrengthClearableNumericField(
+                value: Binding(
+                    get: { Double(value.wrappedValue) },
+                    set: { value.wrappedValue = Int($0) }
+                ),
+                allowsDecimal: false
             )
-            .keyboardType(.numberPad)
-            .font(
-                .system(
-                    size: 28,
-                    weight: .bold,
-                    design: .rounded
-                )
-            )
-            .monospacedDigit()
-            .multilineTextAlignment(.leading)
         }
     }
 
@@ -9873,6 +9848,70 @@ private struct StrengthPlateCalculatorView: View {
                 }
             }
         }
+    }
+}
+
+
+private struct StrengthClearableNumericField: View {
+    let value: Binding<Double>
+    let allowsDecimal: Bool
+
+    @State private var text = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("0", text: $text)
+            .keyboardType(allowsDecimal ? .decimalPad : .numberPad)
+            .font(.system(size: 28, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .multilineTextAlignment(.leading)
+            .focused($isFocused)
+            .onAppear {
+                text = formatted(value.wrappedValue)
+            }
+            .onChange(of: text) { _, newText in
+                // Keep the field empty while the athlete replaces the value.
+                // A formatter-backed numeric TextField restores the old
+                // digit on every keystroke and prevents clearing "235".
+                let entry = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if entry.isEmpty {
+                    value.wrappedValue = 0
+                    return
+                }
+
+                let normalized = entry.replacingOccurrences(of: ",", with: ".")
+                guard let parsed = Double(normalized),
+                      parsed.isFinite,
+                      parsed >= 0 else {
+                    return
+                }
+                value.wrappedValue = allowsDecimal
+                    ? min(parsed, 999.5)
+                    : min(parsed.rounded(.towardZero), 999)
+            }
+            .onChange(of: value.wrappedValue) { oldValue, newValue in
+                // Sync +/- buttons and changes to the current set, but do
+                // not overwrite partial edits such as an empty field or "5,".
+                if !isFocused || parsedValue(text) == oldValue {
+                    text = formatted(newValue)
+                }
+            }
+            .onChange(of: isFocused) { _, editing in
+                if !editing {
+                    text = formatted(value.wrappedValue)
+                }
+            }
+    }
+
+    private func parsedValue(_ input: String) -> Double? {
+        Double(input.replacingOccurrences(of: ",", with: "."))
+    }
+
+    private func formatted(_ number: Double) -> String {
+        if !allowsDecimal || number.rounded() == number {
+            return String(Int(number))
+        }
+        return String(format: "%.1f", number)
     }
 }
 
