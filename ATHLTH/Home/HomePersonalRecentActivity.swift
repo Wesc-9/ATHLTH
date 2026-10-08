@@ -1264,6 +1264,18 @@ private struct HomePersonalHorizontalWorkoutCard:
 
     private var homeMuscleProfile:
         StrengthMuscleProfile {
+        if let strengthWorkout {
+            // Use the completed exercises and set counts, not a flat list
+            // of muscle names. The log already carries its muscle metadata.
+            let actual = StrengthMuscleProfileBuilder.make(
+                workout: strengthWorkout,
+                library: []
+            ).profile
+            if !actual.activations.isEmpty {
+                return actual
+            }
+        }
+
         guard let groups =
                 workout
                     .strengthMuscleGroups,
@@ -4540,27 +4552,17 @@ private struct HomeStrengthMuscleArtwork:
                     activationTint:
                         activationTint
                 )
+                // Fit both complete silhouettes inside the small Home
+                // thumbnail. Enlarging past the card used to cut off feet
+                // and the lower muscle regions.
                 .frame(
-                    width:
-                        min(
-                            max(
-                                height * 1.86,
-                                184
-                            ),
-                            proxy.size.width -
-                                10
-                        ),
-                    height:
-                        max(
-                            height + 28,
-                            142
-                        )
+                    width: min(
+                        max(height * 1.12, 108),
+                        max(proxy.size.width - 28, 1)
+                    ),
+                    height: max(height - 18, 75)
                 )
-                .scaleEffect(
-                    1.08,
-                    anchor: .center
-                )
-                .padding(.top, 7)
+                .padding(.top, 1)
 
                 VStack {
                     Spacer()
@@ -4696,6 +4698,15 @@ private struct HomePersonalWorkoutVisual:
         StrengthMuscleProfile {
         if let precomputedStrengthProfile {
             return precomputedStrengthProfile
+        }
+        if let strengthWorkout {
+            let actual = StrengthMuscleProfileBuilder.make(
+                workout: strengthWorkout,
+                library: []
+            ).profile
+            if !actual.activations.isEmpty {
+                return actual
+            }
         }
 
         guard let groups =
