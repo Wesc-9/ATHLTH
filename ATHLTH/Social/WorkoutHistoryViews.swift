@@ -1454,6 +1454,7 @@ struct PostWorkoutReviewView: View {
             Image("StrengthPostWorkoutHero")
                 .resizable()
                 .scaledToFill()
+                .athlthBoundedFill()
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity
