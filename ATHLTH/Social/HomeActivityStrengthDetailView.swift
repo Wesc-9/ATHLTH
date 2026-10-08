@@ -732,18 +732,26 @@ struct HomeActivityStrengthDetailView: View {
                     alignment: .leading,
                     spacing: 3
                 ) {
-                    Text("Muscle focus")
-                        .font(
-                            .headline.weight(
-                                .semibold
-                            )
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Muscle focus",
+                            norwegian: "Muskelfokus"
                         )
+                    )
+                    .font(
+                        .headline.weight(
+                            .semibold
+                        )
+                    )
                         .foregroundStyle(
                             ATHLTHTheme.primaryText
                         )
 
                     Text(
-                        "Based on the exercises and completed sets in this session."
+                        ATHLTHLocalization.choose(
+                            english: "Based on the exercises and completed sets in this session.",
+                            norwegian: "Basert på øvelser og fullførte sett i denne økten."
+                        )
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -878,8 +886,47 @@ struct HomeActivityStrengthDetailView: View {
                     )
                 }
 
+                if !muscleSummary.profile.primaryRegions.isEmpty ||
+                   !muscleSummary.profile.secondaryRegions.isEmpty {
+                    HStack(spacing: 17) {
+                        if !muscleSummary.profile.primaryRegions.isEmpty {
+                            Label {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Primary",
+                                        norwegian: "Primær"
+                                    )
+                                )
+                            } icon: {
+                                Circle()
+                                    .fill(activationTint.opacity(0.94))
+                                    .frame(width: 9, height: 9)
+                            }
+                        }
+                        if !muscleSummary.profile.secondaryRegions.isEmpty {
+                            Label {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Supporting",
+                                        norwegian: "Sekundær"
+                                    )
+                                )
+                            } icon: {
+                                Circle()
+                                    .fill(activationTint.opacity(0.39))
+                                    .frame(width: 9, height: 9)
+                            }
+                        }
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
                 Text(
-                    "The shading is a relative session-focus estimate from primary/secondary exercise roles and set count. It is not a measured muscle-activation percentage."
+                    ATHLTHLocalization.choose(
+                        english: "Colors estimate relative muscle focus from exercises and completed sets, not measured activation.",
+                        norwegian: "Fargene anslår muskelfokus basert på øvelser og fullførte sett – ikke målt muskelaktivering."
+                    )
                 )
                 .font(.caption2)
                 .foregroundStyle(
