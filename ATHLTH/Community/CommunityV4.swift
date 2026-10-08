@@ -3114,17 +3114,25 @@ private struct CommunityDiscoveryClubCard:
             ZStack(
                 alignment: .bottomLeading
             ) {
-                ATHLTHArtworkImage(
-                    reference:
-                        group.headerImageURL ??
-                        group.imageURL,
-                    fallbackAssetName:
-                        "CommunityHero",
-                    maxPixelSize: 420
-                )
-                // Uploaded headers may have a very wide intrinsic aspect
-                // ratio. Bound the image before laying out the Club card.
-                .athlthBoundedFill()
+                // Use a fixed-size viewport before loading the artwork.
+                // A newly uploaded ultrawide Club header must never change
+                // the intrinsic width of the horizontally scrolling cards.
+                GeometryReader { viewport in
+                    ATHLTHArtworkImage(
+                        reference:
+                            group.headerImageURL ??
+                            group.imageURL,
+                        fallbackAssetName:
+                            "CommunityHero",
+                        maxPixelSize: 420
+                    )
+                    .athlthBoundedFill()
+                    .frame(
+                        width: viewport.size.width,
+                        height: viewport.size.height
+                    )
+                    .clipped()
+                }
                 .frame(width: 252, height: 92)
                 .clipped()
 
@@ -3219,7 +3227,7 @@ private struct CommunityDiscoveryClubCard:
                     alignment: .top
                 )
             }
-            .frame(height: 92)
+            .frame(width: 252, height: 92)
 
             VStack(
                 alignment: .leading,
