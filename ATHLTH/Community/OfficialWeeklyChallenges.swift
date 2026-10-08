@@ -4018,8 +4018,8 @@ struct OfficialWeeklyChallengeAdminListView: View {
                     .font(.caption2.bold())
                     .foregroundStyle(
                         challenge.isActive
-                            ? .orange
-                            : .tertiary
+                            ? Color.orange
+                            : Color.secondary.opacity(0.65)
                     )
                 }
             }
