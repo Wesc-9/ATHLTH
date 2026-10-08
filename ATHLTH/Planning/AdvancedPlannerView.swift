@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AdvancedPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
 
     let planID: UUID?
     let showsEmptyState: Bool
@@ -857,6 +859,41 @@ struct AdvancedPlannerView: View {
                     .padding(.vertical, 2)
                 }
                 .scrollIndicators(.hidden)
+
+                if let week = selectedWeek(in: plan) {
+                    let workouts = week.days.flatMap(\.sessions)
+                    let completed = workouts.filter {
+                        session.isPlanSessionCompleted(
+                            planID: plan.id,
+                            sessionID: $0.id,
+                            healthWorkouts: health.workouts,
+                            strengthHistory: strength.workoutHistory
+                        )
+                    }.count
+
+                    VStack(spacing: 7) {
+                        HStack {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Week \(week.weekNumber) progress",
+                                    norwegian: "Fremdrift uke \(week.weekNumber)"
+                                )
+                            )
+                            .font(.caption.weight(.semibold))
+                            Spacer()
+                            Text("\(completed) / \(workouts.count)")
+                                .font(.caption.weight(.bold))
+                                .monospacedDigit()
+                        }
+                        ProgressView(
+                            value: Double(completed),
+                            total: Double(max(workouts.count, 1))
+                        )
+                        .tint(ATHLTHTheme.accent)
+                    }
+                    .padding(.top, 5)
+                    .accessibilityElement(children: .combine)
+                }
             }
         }
     }
@@ -1220,9 +1257,11 @@ struct AdvancedPlannerView: View {
         let planID = displayedPlan?.id
         let completed =
             planID.map {
-                session.isPlanSessionManuallyCompleted(
+                session.isPlanSessionCompleted(
                     planID: $0,
-                    sessionID: workout.id
+                    sessionID: workout.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
                 )
             } ?? false
 
