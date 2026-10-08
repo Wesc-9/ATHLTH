@@ -50,6 +50,9 @@ struct AccountTrainingContent: Codable {
     var standalonePlannedSessions: [PlannedSession]? = nil
     var manuallyCompletedPlanSessions: Set<String>
     var skippedPlanSessions: Set<String>? = nil
+    // Explicit user-approved Apple Health to planned-session associations.
+    // Optional for legacy account content and local backup compatibility.
+    var linkedHealthWorkoutsByPlanSession: [String: UUID]? = nil
     var savedRoutes: [TrainingRoute]
     var onboardingProfile: OnboardingProfileData?
     var pendingCoachPlanProposal: CoachPlanChangeProposal? = nil
@@ -70,6 +73,7 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
     @Published private(set) var skippedPlanSessions: Set<String>
+    @Published private(set) var linkedHealthWorkoutsByPlanSession: [String: UUID]
     @Published private(set) var pendingCoachPlanProposal: CoachPlanChangeProposal?
     @Published private(set) var coachPlanAdaptationHistory: [CoachPlanAdaptationRecord]
     @Published var savedRoutes: [TrainingRoute] {
@@ -112,6 +116,7 @@ final class AppSessionStore: ObservableObject {
         self.standalonePlannedSessions = []
         self.manuallyCompletedPlanSessions = []
         self.skippedPlanSessions = []
+        self.linkedHealthWorkoutsByPlanSession = [:]
         self.pendingCoachPlanProposal = nil
         self.coachPlanAdaptationHistory = []
         self.savedRoutes = savedRoutes
@@ -572,6 +577,7 @@ final class AppSessionStore: ObservableObject {
         standalonePlannedSessions = []
         manuallyCompletedPlanSessions = []
         skippedPlanSessions = []
+        linkedHealthWorkoutsByPlanSession = [:]
         pendingCoachPlanProposal = nil
         coachPlanAdaptationHistory = []
         loadingAccountContent = false
@@ -658,6 +664,80 @@ final class AppSessionStore: ObservableObject {
         }
 
         persistAccountContent()
+    }
+
+    /// Links an already available Health workout only after an athlete
+    /// explicitly chooses it. Never guesses from activity type or date.
+    @discardableResult
+    func linkHealthWorkout(
+        _ workout: WorkoutSummary,
+        toPlan planID: UUID,
+        sessionID: UUID
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID),
+              let planned = plan.weeks
+                .flatMap(\.days)
+                .flatMap(\.sessions)
+                .first(where: { $0.id == sessionID }),
+              Self.healthWorkout(workout, matches: planned) else {
+            return false
+        }
+
+        let key = Self.manualCompletionKey(
+            planID: planID,
+            sessionID: sessionID
+        )
+        // A Health workout cannot complete two separate plan sessions.
+        guard !linkedHealthWorkoutsByPlanSession.contains(
+            where: { $0.key != key && $0.value == workout.id }
+        ) else {
+            return false
+        }
+
+        linkedHealthWorkoutsByPlanSession[key] = workout.id
+        skippedPlanSessions.remove(key)
+        persistAccountContent()
+        return true
+    }
+
+    func unlinkHealthWorkout(planID: UUID, sessionID: UUID) {
+        let key = Self.manualCompletionKey(
+            planID: planID, sessionID: sessionID
+        )
+        guard linkedHealthWorkoutsByPlanSession.removeValue(forKey: key) != nil
+        else { return }
+        persistAccountContent()
+    }
+
+    func linkedHealthWorkoutID(planID: UUID, sessionID: UUID) -> UUID? {
+        linkedHealthWorkoutsByPlanSession[
+            Self.manualCompletionKey(planID: planID, sessionID: sessionID)
+        ]
+    }
+
+    func isPlanSessionCompleted(
+        planID: UUID,
+        sessionID: UUID,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        if isPlanSessionSkipped(planID: planID, sessionID: sessionID) {
+            return false
+        }
+        if isPlanSessionManuallyCompleted(planID: planID, sessionID: sessionID) {
+            return true
+        }
+        if strengthHistory.contains(where: {
+            $0.isFinished && $0.plannedSessionID == sessionID
+        }) {
+            return true
+        }
+        guard let linkedID = linkedHealthWorkoutID(
+            planID: planID, sessionID: sessionID
+        ) else {
+            return false
+        }
+        return healthWorkouts.contains { $0.id == linkedID }
     }
 
     func togglePlanSessionManualCompletion(
@@ -1221,9 +1301,12 @@ final class AppSessionStore: ObservableObject {
             }
         }
 
-        var unusedHealth = healthWorkouts.sorted {
-            $0.startDate < $1.startDate
-        }
+        // Only explicitly linked Health workouts count. Matching a random
+        // run to a planned run based on its day/type creates false progress.
+        let availableHealthIDs = Set(healthWorkouts.map(\.id))
+        let finishedStrengthSessionIDs = Set(
+            strengthHistory.filter(\.isFinished).compactMap(\.plannedSessionID)
+        )
         var completedIDs = Set<UUID>()
         var skippedIDs = Set<UUID>()
 
@@ -1246,30 +1329,16 @@ final class AppSessionStore: ObservableObject {
                 continue
             }
 
-            if strengthHistory.contains(
-                where: {
-                    $0.isFinished &&
-                    $0.plannedSessionID == planned.id
-                }
-            ) {
+            if finishedStrengthSessionIDs.contains(planned.id) {
                 completedIDs.insert(planned.id)
                 continue
             }
 
-            if let matchIndex = unusedHealth.firstIndex(
-                where: { workout in
-                    calendar.isDate(
-                        workout.startDate,
-                        inSameDayAs: occurrence.date
-                    ) &&
-                    Self.healthWorkout(
-                        workout,
-                        matches: planned
-                    )
-                }
-            ) {
+            if let linked = linkedHealthWorkoutID(
+                planID: plan.id,
+                sessionID: planned.id
+            ), availableHealthIDs.contains(linked) {
                 completedIDs.insert(planned.id)
-                unusedHealth.remove(at: matchIndex)
             }
         }
 
@@ -3567,6 +3636,7 @@ final class AppSessionStore: ObservableObject {
             standalonePlannedSessions: standalonePlannedSessions,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
+            linkedHealthWorkoutsByPlanSession: linkedHealthWorkoutsByPlanSession,
             savedRoutes: savedRoutes,
             onboardingProfile: onboardingProfile,
             pendingCoachPlanProposal: pendingCoachPlanProposal,
@@ -3660,6 +3730,7 @@ final class AppSessionStore: ObservableObject {
                 }
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
         skippedPlanSessions = stored?.skippedPlanSessions ?? []
+        linkedHealthWorkoutsByPlanSession = stored?.linkedHealthWorkoutsByPlanSession ?? [:]
         pendingCoachPlanProposal = stored?.pendingCoachPlanProposal
         coachPlanAdaptationHistory = stored?.coachPlanAdaptationHistory ?? []
         onboardingProfile = stored?.onboardingProfile
