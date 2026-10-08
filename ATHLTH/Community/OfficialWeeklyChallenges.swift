@@ -4005,13 +4005,23 @@ struct OfficialWeeklyChallengeAdminListView: View {
                                 : ATHLTHTheme.mutedText
                         )
 
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.tertiary)
+                    Image(
+                        systemName:
+                            challenge.isActive
+                                ? "lock.fill"
+                                : "chevron.right"
+                    )
+                    .font(.caption2.bold())
+                    .foregroundStyle(
+                        challenge.isActive
+                            ? .orange
+                            : .tertiary
+                    )
                 }
             }
         }
         .buttonStyle(.plain)
+        .disabled(challenge.isActive)
         .swipeActions {
             Button {
                 Task {
