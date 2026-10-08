@@ -949,97 +949,28 @@ struct AppRootView: View {
             if appSession.signedIn,
                phoneWorkout.active != nil,
                phoneWorkout.isUserMinimized {
-                Button {
+                ATHLTHMinimizedWorkoutReturnPill(
+                    title: phoneWorkout.hasRecoveredActiveWorkout
+                        ? ATHLTHLocalization.choose(
+                            english: "Unfinished iPhone workout",
+                            norwegian: "Uferdig iPhone-økt"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Return to iPhone workout",
+                            norwegian: "Tilbake til iPhone-økt"
+                        ),
+                    systemImage: phoneWorkout.active?.walking == true
+                        ? "figure.walk"
+                        : "figure.run",
+                    detail: phoneWorkout.recoveredActiveWorkoutReferenceDate?
+                        .formatted(
+                            date: .abbreviated,
+                            time: .shortened
+                        ),
+                    attention: phoneWorkout.recoveredActiveWorkoutNeedsReview
+                ) {
                     phoneWorkout.presentWorkout()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(
-                            systemName:
-                                phoneWorkout
-                                    .active?
-                                    .walking == true
-                                    ? "figure.walk"
-                                    : "figure.run"
-                        )
-                        .font(
-                            .system(
-                                size: 20,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            phoneWorkout
-                                .recoveredActiveWorkoutNeedsReview
-                                ? Color.orange
-                                : ATHLTHTheme.accentDeep
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 1
-                        ) {
-                            Text(
-                                phoneWorkout
-                                    .hasRecoveredActiveWorkout
-                                    ? ATHLTHLocalization.choose(
-                                        english:
-                                            "Unfinished iPhone workout",
-                                        norwegian:
-                                            "Uferdig iPhone-økt"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english:
-                                            "Return to iPhone workout",
-                                        norwegian:
-                                            "Tilbake til iPhone-økt"
-                                    )
-                            )
-                            .font(
-                                .headline
-                                    .weight(.semibold)
-                            )
-
-                            if let recoveredAt =
-                                    phoneWorkout
-                                        .recoveredActiveWorkoutReferenceDate {
-                                Text(
-                                    recoveredAt.formatted(
-                                        date: .abbreviated,
-                                        time: .shortened
-                                    )
-                                )
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                            }
-                        }
-                    }
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-                    .padding(.horizontal, 22)
-                    .frame(height: 58)
-                    .background(
-                        .regularMaterial,
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(
-                                Color.black.opacity(
-                                    0.05
-                                ),
-                                lineWidth: 0.8
-                            )
-                    }
-                    .shadow(
-                        color: Color.black.opacity(0.10),
-                        radius: 14,
-                        y: 6
-                    )
                 }
-                .buttonStyle(.plain)
                 .padding(.top, 10)
                 .padding(.horizontal, 18)
                 .transition(
