@@ -3429,8 +3429,12 @@ struct ActiveStrengthWorkoutView: View {
 
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "\(next.sets.count) sets · \(next.sets.first?.plannedReps ?? 0) reps planned",
-                        norwegian: "\(next.sets.count) sett · \(next.sets.first?.plannedReps ?? 0) planlagte reps"
+                        english: next.sets.first?.plannedReps.map {
+                            "\(next.sets.count) sets · \($0) planned reps"
+                        } ?? "\(next.sets.count) sets",
+                        norwegian: next.sets.first?.plannedReps.map {
+                            "\(next.sets.count) sett · \($0) planlagte reps"
+                        } ?? "\(next.sets.count) sett"
                     )
                 )
                 .font(.caption)
