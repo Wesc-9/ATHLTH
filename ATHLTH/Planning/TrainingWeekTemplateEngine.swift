@@ -7,6 +7,13 @@ enum TrainingWeekCopyScope {
     case allFutureWeeks
 }
 
+/// Opt-in target progression when the user repeats a training week.
+enum TrainingWeekProgressionMode: Equatable {
+    case unchanged
+    case addWeightPerWeek(Double)
+    case addRepsPerWeek(Int)
+}
+
 struct TrainingWeekCopySummary: Equatable {
     var targetWeeks: Int = 0
     var filledDays: Int = 0
@@ -73,6 +80,7 @@ enum TrainingWeekTemplateEngine {
         plan: TrainingPlan,
         sourceWeekID: UUID,
         scope: TrainingWeekCopyScope,
+        progression: TrainingWeekProgressionMode = .unchanged,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> (plan: TrainingPlan, summary: TrainingWeekCopySummary)? {
@@ -117,7 +125,12 @@ enum TrainingWeekTemplateEngine {
 
                 updated.weeks[targetIndex].days[dayIndex].sessions =
                     sourceDay.sessions.map {
-                        cloneSession($0, offsetWeeks: weekOffset, calendar: calendar)
+                        cloneSession(
+                            $0,
+                            offsetWeeks: weekOffset,
+                            calendar: calendar,
+                            progression: progression
+                        )
                     }
             }
         }
@@ -139,10 +152,54 @@ enum TrainingWeekTemplateEngine {
         }
     }
 
+    private static func applyUserSelectedProgression(
+        to exercise: inout PlannedExercise,
+        offsetWeeks: Int,
+        mode: TrainingWeekProgressionMode
+    ) {
+        guard offsetWeeks > 0,
+              exercise.resolvedTargetKind == .reps else {
+            return
+        }
+
+        switch mode {
+        case .unchanged:
+            break
+        case .addWeightPerWeek(let increment):
+            guard exercise.resolvedLoadKind == .weightKilograms,
+                  increment > 0 else { return }
+            let total = increment * Double(offsetWeeks)
+            if let original = exercise.targetWeightKilograms {
+                exercise.targetWeightKilograms = max(original + total, 0)
+            }
+            exercise.setTargets = exercise.setTargets?.map { target in
+                var adjusted = target
+                if let weight = adjusted.weightKilograms {
+                    adjusted.weightKilograms = max(weight + total, 0)
+                }
+                return adjusted
+            }
+        case .addRepsPerWeek(let increment):
+            guard increment > 0 else { return }
+            let total = offsetWeeks * increment
+            if let original = exercise.reps {
+                exercise.reps = min(original + total, 100)
+            }
+            exercise.setTargets = exercise.setTargets?.map { target in
+                var adjusted = target
+                if let original = adjusted.reps {
+                    adjusted.reps = min(original + total, 100)
+                }
+                return adjusted
+            }
+        }
+    }
+
     private static func cloneSession(
         _ source: PlannedSession,
         offsetWeeks: Int,
-        calendar: Calendar
+        calendar: Calendar,
+        progression: TrainingWeekProgressionMode
     ) -> PlannedSession {
         var supersetIDMap: [UUID: UUID] = [:]
         let exercises: [PlannedExercise] = source.exercises.map { old in
@@ -185,6 +242,11 @@ enum TrainingWeekTemplateEngine {
                     notes: target.notes
                 )
             }
+            applyUserSelectedProgression(
+                to: &new,
+                offsetWeeks: offsetWeeks,
+                mode: progression
+            )
             return new
         }
 
