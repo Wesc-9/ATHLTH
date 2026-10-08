@@ -284,7 +284,8 @@ enum ATHLTHPremiumMuscleAtlas {
 #if DEBUG
 /// Xcode canvas fixture. No hard-coded activations are used in the shipped app.
 private struct ATHLTHPremiumMuscleFigure_Previews: PreviewProvider {
-    private static let sample = StrengthMuscleProfile(
+    private static var sample: StrengthMuscleProfile {
+        StrengthMuscleProfile(
         activations: [
             StrengthMuscleActivation(region: .glutes, score: 4.0),
             StrengthMuscleActivation(region: .hamstrings, score: 3.7),
@@ -294,7 +295,8 @@ private struct ATHLTHPremiumMuscleFigure_Previews: PreviewProvider {
         ],
         primaryRegions: [.glutes, .hamstrings, .quads],
         secondaryRegions: [.calves, .abs]
-    )
+        )
+    }
 
     static var previews: some View {
         HStack(alignment: .top, spacing: 14) {
