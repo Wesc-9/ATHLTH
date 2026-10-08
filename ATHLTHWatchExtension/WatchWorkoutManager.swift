@@ -1730,9 +1730,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let shouldAdvanceExercise =
-            snapshot.currentExerciseComplete &&
-            snapshot.hasNextExercise
+        // Advance in one durable command when the final set is done.
+        // Sending skipRest + nextExercise separately can cause the second
+        // action to be missed while the companion processes the first.
+        if snapshot.currentExerciseComplete &&
+            snapshot.hasNextExercise {
+            moveToNextStrengthExercise()
+            return
+        }
 
         let sent =
             sendStrengthCommand(
@@ -1757,10 +1762,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.strengthSession = updated
             }
             persistWorkoutRecoveryState()
-
-            if shouldAdvanceExercise {
-                moveToNextStrengthExercise()
-            }
         }
     }
 
