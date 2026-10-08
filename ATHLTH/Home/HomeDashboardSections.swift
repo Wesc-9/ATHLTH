@@ -2776,6 +2776,8 @@ struct HomeWeeklyProgressStrip:
     View {
     @EnvironmentObject private var session:
         AppSessionStore
+    @EnvironmentObject private var strength:
+        StrengthWorkoutStore
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
@@ -2812,7 +2814,33 @@ struct HomeWeeklyProgressStrip:
                             .primaryText
                     )
 
-                Spacer()
+                Text(
+                    "Uke \(calendar.component(.weekOfYear, from: visibleWeekInterval.start))"
+                )
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(1)
+
+                Spacer(minLength: 2)
+
+                if weekOffset != 0 {
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            weekOffset = 0
+                        }
+                    } label: {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Back to current week",
+                            norwegian: "Tilbake til denne uken"
+                        )
+                    )
+                }
 
                 Text(progressText)
                     .font(
@@ -2840,22 +2868,11 @@ struct HomeWeeklyProgressStrip:
             )
 
             HStack(spacing: 3) {
-                if weekOffset > 0 {
-                    weekNavigationButton(
-                        systemImage:
-                            "chevron.left"
-                    ) {
-                        withAnimation(
-                            .snappy(
-                                duration: 0.22
-                            )
-                        ) {
-                            weekOffset =
-                                max(
-                                    weekOffset - 1,
-                                    0
-                                )
-                        }
+                weekNavigationButton(
+                    systemImage: "chevron.left"
+                ) {
+                    withAnimation(.snappy(duration: 0.22)) {
+                        weekOffset -= 1
                     }
                 }
 
@@ -2867,10 +2884,7 @@ struct HomeWeeklyProgressStrip:
                 }
 
                 weekNavigationButton(
-                    systemImage:
-                        "chevron.right",
-                    enabled:
-                        canAdvance
+                    systemImage: "chevron.right"
                 ) {
                     withAnimation(
                         .snappy(
@@ -3232,15 +3246,15 @@ struct HomeWeeklyProgressStrip:
                 "chevron.right"
                 ? ATHLTHLocalization.choose(
                     english:
-                        "Next days",
+                        "Next week",
                     norwegian:
-                        "Neste dager"
+                        "Neste uke"
                 )
                 : ATHLTHLocalization.choose(
                     english:
-                        "Previous days",
+                        "Previous week",
                     norwegian:
-                        "Forrige dager"
+                        "Forrige uke"
                 )
         )
     }
@@ -3276,11 +3290,13 @@ struct HomeWeeklyProgressStrip:
             currentWeekInterval
                 .start
 
-        return DateInterval(
-            start: start,
-            duration:
-                7 * 86_400
-        )
+        let end = calendar.date(
+            byAdding: .weekOfYear,
+            value: 1,
+            to: start
+        ) ?? start.addingTimeInterval(7 * 86_400)
+
+        return DateInterval(start: start, end: end)
     }
 
     private var visibleWeekDates:
@@ -3685,87 +3701,6 @@ struct HomeWeeklyProgressStrip:
         "\(completedCount) av \(weeklyTotalCount)"
     }
 
-    private var canAdvance:
-        Bool {
-        let nextWeekStart =
-            calendar.date(
-                byAdding: .day,
-                value: 7,
-                to:
-                    visibleWeekInterval
-                        .start
-            )
-        let nextWeekEnd =
-            nextWeekStart.flatMap {
-                calendar.date(
-                    byAdding: .day,
-                    value: 7,
-                    to: $0
-                )
-            }
-
-        if let nextWeekStart,
-           let nextWeekEnd,
-           events.contains(
-                where: {
-                    $0.startsAt >=
-                        nextWeekStart &&
-                    $0.startsAt <
-                        nextWeekEnd
-                }
-           ) {
-            return true
-        }
-
-        guard let plan,
-              !plan.weeks.isEmpty
-        else {
-            return false
-        }
-
-        if let startDate =
-                plan.startDate {
-            let currentStart =
-                calendar.startOfDay(
-                    for:
-                        currentWeekInterval
-                            .start
-                )
-            let planStart =
-                calendar.startOfDay(
-                    for: startDate
-                )
-            let daysFromPlanStart =
-                calendar
-                    .dateComponents(
-                        [.day],
-                        from: planStart,
-                        to: currentStart
-                    )
-                    .day ?? 0
-            let currentPlanWeek =
-                max(
-                    daysFromPlanStart / 7,
-                    0
-                )
-            let remaining =
-                max(
-                    plan.weeks.count -
-                        currentPlanWeek -
-                        1,
-                    0
-                )
-            return weekOffset <
-                remaining
-        }
-
-        return weekOffset <
-            max(
-                plan.weeks.count - 1,
-                0
-            )
-    }
-
     private func workoutsForDay(
         _ date: Date
     ) -> [WorkoutSummary] {
@@ -4034,11 +3969,8 @@ struct HomeWeeklyProgressStrip:
                         to: targetWeek
                     )
                     .day ?? 0
-            weekIndex =
-                max(
-                    days / 7,
-                    0
-                )
+            guard days >= 0 else { return [] }
+            weekIndex = days / 7
         }
 
         guard
@@ -4048,14 +3980,20 @@ struct HomeWeeklyProgressStrip:
             return []
         }
 
-        let weekday =
-            calendar.component(
-                .weekday,
-                from: date
-            )
-        let dayIndex =
-            ((weekday + 5) % 7) +
-            1
+        let dayIndex: Int
+        if let startDate = plan.startDate {
+            // The plan's first day can be any weekday; its seven-day
+            // cycle must stay aligned with the actual plan start.
+            let first = calendar.startOfDay(for: startDate)
+            let selected = calendar.startOfDay(for: date)
+            let dayOffset = calendar.dateComponents(
+                [.day], from: first, to: selected
+            ).day ?? 0
+            dayIndex = (dayOffset % 7) + 1
+        } else {
+            let weekday = calendar.component(.weekday, from: date)
+            dayIndex = ((weekday + 5) % 7) + 1
+        }
 
         return plan.weeks[
             weekIndex
