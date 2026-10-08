@@ -181,10 +181,7 @@ enum TrainingWeekTemplateEngine {
         offsetWeeks: Int,
         mode: TrainingWeekProgressionMode
     ) {
-        guard offsetWeeks > 0,
-              exercise.resolvedTargetKind == .reps else {
-            return
-        }
+        guard offsetWeeks > 0 else { return }
 
         switch mode {
         case .unchanged:
@@ -192,7 +189,8 @@ enum TrainingWeekTemplateEngine {
         case .fourWeekStrengthBlock:
             if strengthPhase(forWeekOffset: offsetWeeks) == .deload {
                 applyDeload(to: &exercise, weightFactor: 0.9)
-            } else if exercise.resolvedLoadKind == .weightKilograms {
+            } else if exercise.resolvedTargetKind == .reps &&
+                        exercise.resolvedLoadKind == .weightKilograms {
                 // Two 2.5 kg increases per cycle; after the recovery week
                 // a new cycle builds from the previous cycle's final load.
                 let cycle = offsetWeeks / 4
@@ -204,14 +202,16 @@ enum TrainingWeekTemplateEngine {
                 )
             }
         case .addWeightPerWeek(let increment):
-            guard exercise.resolvedLoadKind == .weightKilograms,
+            guard exercise.resolvedTargetKind == .reps,
+                  exercise.resolvedLoadKind == .weightKilograms,
                   increment > 0 else { return }
             addPrescribedWeight(
                 to: &exercise,
                 amount: increment * Double(offsetWeeks)
             )
         case .addRepsPerWeek(let increment):
-            guard increment > 0 else { return }
+            guard exercise.resolvedTargetKind == .reps,
+                  increment > 0 else { return }
             let total = offsetWeeks * increment
             if let original = exercise.reps {
                 exercise.reps = min(original + total, 100)
