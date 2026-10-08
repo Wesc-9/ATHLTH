@@ -3613,6 +3613,7 @@ struct MissedWorkoutsReviewView: View {
     let planID: UUID
 
     @State private var actionError: String?
+    @State private var pendingRecoveryWarning: TrainingPlanSessionOccurrence?
     @State private var showingCoach = false
     @State private var showingSubscriptionOffer = false
 
@@ -3788,6 +3789,47 @@ struct MissedWorkoutsReviewView: View {
                 }
                 .environmentObject(subscriptionStore)
             }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Strength sessions close together",
+                    norwegian: "Styrkeøkter tett på hverandre"
+                ),
+                isPresented: Binding(
+                    get: { pendingRecoveryWarning != nil },
+                    set: { shown in
+                        if !shown { pendingRecoveryWarning = nil }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                if let occurrence = pendingRecoveryWarning {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Move anyway",
+                            norwegian: "Flytt likevel"
+                        )
+                    ) {
+                        moveToTomorrow(occurrence)
+                        pendingRecoveryWarning = nil
+                    }
+                }
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Keep schedule",
+                        norwegian: "Behold planen"
+                    ),
+                    role: .cancel
+                ) {
+                    pendingRecoveryWarning = nil
+                }
+            } message: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Another strength workout is planned on this day or the day before/after. Consider recovery before moving.",
+                        norwegian: "En annen styrkeøkt er planlagt samme dag eller dagen før/etter. Vurder restitusjonen før du flytter."
+                    )
+                )
+            }
             .alert(
                 "Could not update workout",
                 isPresented: Binding(
@@ -3861,7 +3903,11 @@ struct MissedWorkoutsReviewView: View {
 
             HStack(spacing: 9) {
                 Button {
-                    moveToTomorrow(occurrence)
+                    if needsRecoveryWarning(whenMoving: occurrence) {
+                        pendingRecoveryWarning = occurrence
+                    } else {
+                        moveToTomorrow(occurrence)
+                    }
                 } label: {
                     Label(
                         "Tomorrow",
@@ -3911,6 +3957,45 @@ struct MissedWorkoutsReviewView: View {
                 lineWidth: 0.8
             )
         }
+    }
+
+    private func needsRecoveryWarning(
+        whenMoving occurrence: TrainingPlanSessionOccurrence
+    ) -> Bool {
+        guard occurrence.session.kind == .strength,
+              let plan,
+              let start = plan.startDate
+        else { return false }
+
+        let calendar = Calendar.current
+        let tomorrow = calendar.startOfDay(
+            for: calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        )
+        let firstDay = calendar.startOfDay(for: start)
+
+        for (weekIndex, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                let plannedDay = calendar.date(
+                    byAdding: .day,
+                    value: weekIndex * 7 + max(day.dayIndex - 1, 0),
+                    to: firstDay
+                ) ?? firstDay
+
+                for workout in day.sessions
+                where workout.id != occurrence.session.id && workout.kind == .strength {
+                    let existingDay = calendar.startOfDay(
+                        for: workout.scheduledStart ?? plannedDay
+                    )
+                    let gap = calendar.dateComponents(
+                        [.day], from: tomorrow, to: existingDay
+                    ).day ?? Int.max
+                    if abs(gap) <= 1 {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private func moveToTomorrow(
