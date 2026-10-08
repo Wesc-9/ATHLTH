@@ -734,10 +734,18 @@ final class AppSessionStore: ObservableObject {
         }
         guard let linkedID = linkedHealthWorkoutID(
             planID: planID, sessionID: sessionID
-        ) else {
+        ),
+              let matchingWorkout = healthWorkouts.first(where: { $0.id == linkedID }),
+              let plan = trainingPlan(withID: planID),
+              let planned = plan.weeks
+                .flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == sessionID })
+        else {
             return false
         }
-        return healthWorkouts.contains { $0.id == linkedID }
+        // A link does not remain a valid completion when the planned workout
+        // has since been changed to an incompatible activity.
+        return Self.healthWorkout(matchingWorkout, matches: planned)
     }
 
     func togglePlanSessionManualCompletion(
@@ -1303,7 +1311,9 @@ final class AppSessionStore: ObservableObject {
 
         // Only explicitly linked Health workouts count. Matching a random
         // run to a planned run based on its day/type creates false progress.
-        let availableHealthIDs = Set(healthWorkouts.map(\.id))
+        let healthByID = Dictionary(
+            uniqueKeysWithValues: healthWorkouts.map { ($0.id, $0) }
+        )
         let finishedStrengthSessionIDs = Set(
             strengthHistory.filter(\.isFinished).compactMap(\.plannedSessionID)
         )
@@ -1337,7 +1347,8 @@ final class AppSessionStore: ObservableObject {
             if let linked = linkedHealthWorkoutID(
                 planID: plan.id,
                 sessionID: planned.id
-            ), availableHealthIDs.contains(linked) {
+            ), let matchingWorkout = healthByID[linked],
+               Self.healthWorkout(matchingWorkout, matches: planned) {
                 completedIDs.insert(planned.id)
             }
         }
