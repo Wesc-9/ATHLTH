@@ -5904,6 +5904,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
                 },
             workoutDisplayTitle:
+                (kind == .strength ? strengthSession?.title : nil) ??
                 structuredRunningWorkout?.title ??
                 plannedRoute?.title ??
                 kind.title,
