@@ -47,6 +47,73 @@ final class TrainingContinuityTests: XCTestCase {
     }
 
     @MainActor
+    func testStrengthSwitchingStationsPreservesPartialSetsAndOrder() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(
+            watchSessionID: nil,
+            trackingMode: .advanced,
+            captureDevice: .iPhone
+        )
+
+        for name in ["Squat", "Bench", "Cable"] {
+            let exercise = Exercise(
+                id: UUID(),
+                origin: .custom,
+                ownerID: owner,
+                name: name,
+                instructions: [],
+                primaryMuscles: [],
+                secondaryMuscles: [],
+                equipment: [],
+                imageURL: nil,
+                isVisibleOutsideOwnerLibrary: false
+            )
+            store.appendExercise(exercise, sets: 2, reps: 8)
+        }
+
+        guard let initial = store.activeWorkout else {
+            XCTFail("Strength workout did not start")
+            return
+        }
+
+        let squat = initial.exercises[0].id
+        let cable = initial.exercises[2].id
+
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 50,
+            rpe: 7
+        )
+
+        XCTAssertTrue(store.selectExerciseForNow(cable))
+        XCTAssertEqual(store.currentExercise?.id, cable)
+        XCTAssertFalse(store.isResting)
+
+        store.reorderActiveExercises(
+            fromOffsets: IndexSet(integer: 2),
+            toOffset: 0
+        )
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.id, cable)
+        XCTAssertEqual(store.currentExercise?.id, cable)
+
+        XCTAssertTrue(store.selectExerciseForNow(squat))
+        XCTAssertEqual(store.currentExercise?.id, squat)
+        XCTAssertEqual(store.currentSetIndex, 1)
+        XCTAssertEqual(
+            store.currentExercise?.sets.first?.completedWeightKilograms,
+            50
+        )
+        XCTAssertEqual(
+            store.activeWorkout?.exercises.count,
+            3
+        )
+    }
+
+    @MainActor
     func testBasicStrengthKeepsBasicModeWhenAddingExercise() {
         let owner = UUID()
         defer { clear(owner) }
