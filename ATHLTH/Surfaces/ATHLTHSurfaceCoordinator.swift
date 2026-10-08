@@ -240,6 +240,7 @@ private final class ATHLTHLiveActivityController {
         let contentState =
             ATHLTHWorkoutActivityAttributes.ContentState(
                 phase: snapshot.state.rawValue,
+                workoutDisplayTitle: snapshot.workoutDisplayTitle,
                 elapsedTime: snapshot.elapsedTime,
                 distanceMeters: snapshot.distanceMeters,
                 heartRate: snapshot.heartRate,
