@@ -335,6 +335,7 @@ struct HomeAroundYouSection: View {
                         Image(uiImage: mapSnapshot)
                             .resizable()
                             .scaledToFill()
+                            .athlthBoundedFill()
                     } else {
                         LinearGradient(
                             colors: [
