@@ -909,10 +909,12 @@ struct PlannedWorkoutDetailView: View {
                             }
                         }
                         .disabled(
-                            session.linkedHealthWorkoutsByPlanSession.contains {
-                                $0.value == item.id &&
-                                $0.key != "\(planID.uuidString)|\(currentWorkout.id.uuidString)"
-                            }
+                            session.linkedHealthWorkoutsByPlanSession.values
+                                .contains(item.id) &&
+                            session.linkedHealthWorkoutID(
+                                planID: planID,
+                                sessionID: currentWorkout.id
+                            ) != item.id
                         )
                     }
                 }
