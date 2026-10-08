@@ -47,8 +47,18 @@ struct TrainingPlanStrengthReport {
         }
     }
 
+    struct ExerciseSummary: Identifiable {
+        let id: String
+        let name: String
+        let loggedSessions: Int
+        let workingSets: Int
+        let volumeKilograms: Double
+        let peakWeightKilograms: Double?
+    }
+
     let weeks: [Week]
     let muscles: [Muscle]
+    let exerciseSummaries: [ExerciseSummary]
     let totalPlannedStrengthSets: Int
     let totalPerformedStrengthSets: Int
     let totalRecordedVolumeKilograms: Double
@@ -77,6 +87,13 @@ struct TrainingPlanStrengthReport {
         var recordedSetsByMuscle: [String: Int] = [:]
         var recordedLoadByMuscle: [String: Double] = [:]
         var weekReports: [Week] = []
+        var exercisesByName: [String: (
+            title: String,
+            sessionIDs: Set<UUID>,
+            workingSets: Int,
+            volume: Double,
+            peakWeight: Double?
+        )] = [:]
 
         for (index, week) in plan.weeks.enumerated() {
             let plannedSessions = week.days.flatMap(\.sessions)
@@ -105,6 +122,39 @@ struct TrainingPlanStrengthReport {
                     let volume = workingSets.reduce(0.0) { $0 + $1.volumeKilograms }
                     recordedSets += sets
                     recordedLoad += volume
+
+                    // Exercise trends are based strictly on completed,
+                    // directly linked strength sessions.
+                    let exerciseName = exercise.exercise.name
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !exerciseName.isEmpty && !workingSets.isEmpty {
+                        let key = exerciseName.lowercased()
+                        var entry = exercisesByName[key] ?? (
+                            title: exercise.exercise.displayName,
+                            sessionIDs: Set<UUID>(),
+                            workingSets: 0,
+                            volume: 0,
+                            peakWeight: nil as Double?
+                        )
+                        entry.sessionIDs.insert(workout.id)
+                        entry.workingSets += sets
+                        entry.volume += volume
+                        for set in workingSets {
+                            let recordedWeights: [Double]
+                            if let segments = set.effortSegments,
+                               !segments.isEmpty {
+                                recordedWeights = segments.compactMap {
+                                    $0.weightKilograms
+                                }
+                            } else {
+                                recordedWeights = set.completedWeightKilograms.map { [$0] } ?? []
+                            }
+                            for weight in recordedWeights where weight > 0 {
+                                entry.peakWeight = max(entry.peakWeight ?? 0, weight)
+                            }
+                        }
+                        exercisesByName[key] = entry
+                    }
 
                     for muscle in normalizedMuscles(exercise.exercise.primaryMuscles) {
                         recordedSetsByMuscle[muscle, default: 0] += sets
@@ -144,9 +194,30 @@ struct TrainingPlanStrengthReport {
             return $0.id < $1.id
         }
 
+        let exercises = exercisesByName.map { key, value in
+            ExerciseSummary(
+                id: key,
+                name: value.title,
+                loggedSessions: value.sessionIDs.count,
+                workingSets: value.workingSets,
+                volumeKilograms: value.volume,
+                peakWeightKilograms: value.peakWeight
+            )
+        }
+        .sorted {
+            if $0.loggedSessions != $1.loggedSessions {
+                return $0.loggedSessions > $1.loggedSessions
+            }
+            if $0.workingSets != $1.workingSets {
+                return $0.workingSets > $1.workingSets
+            }
+            return $0.id < $1.id
+        }
+
         return TrainingPlanStrengthReport(
             weeks: weekReports,
             muscles: muscles,
+            exerciseSummaries: exercises,
             totalPlannedStrengthSets: weekReports.reduce(0) {
                 $0 + $1.plannedWorkingSets
             },
