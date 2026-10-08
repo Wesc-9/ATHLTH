@@ -1,11 +1,11 @@
-name: ATHLTH 1.6.8 backend regressions
+name: ATHLTH 1.6.9 backend regressions
 
 on:
   workflow_dispatch:
   pull_request:
-    branches: [release/v1.6.8]
+    branches: [release/v1.6.9]
   push:
-    branches: [release/v1.6.8]
+    branches: [release/v1.6.9]
 
 permissions:
   contents: read
