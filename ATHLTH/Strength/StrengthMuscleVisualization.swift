@@ -2070,7 +2070,7 @@ private struct StrengthBodyFigureCanvas:
             pair(0.495, 0.050, 0.135, 0.570)       // forearms
             pair(0.365, 0.050, 0.105, 0.247, 0.44) // serratus
             pair(0.455, 0.062, 0.155, 0.205, 0.30) // obliques
-            for row: CGFloat in [0.385, 0.438, 0.492] {
+            for row in [CGFloat(0.385), 0.438, 0.492] {
                 pair(row, 0.064, 0.050, 0.072, 0.04)
             }
             pair(0.585, 0.050, 0.095, 0.118, 0.30) // hip flexors
@@ -2143,8 +2143,7 @@ private struct StrengthBodyFigureCanvas:
         outline: Color
     ) {
         func limb(
-            _ coordinates: [(CGFloat, CGFloat)],
-            rounded: CGFloat = 0
+            _ coordinates: [(CGFloat, CGFloat)]
         ) {
             guard let first = coordinates.first else { return }
             var path = Path()
