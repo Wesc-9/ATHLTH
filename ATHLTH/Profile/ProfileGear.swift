@@ -1333,13 +1333,13 @@ struct ProfileGearManagerView: View {
                         Button {
                             addingCategory = category
                         } label: {
-                            Label(
-                                ATHLTHLocalization.format(
-                            english: "Add %@",
-                            norwegian: "Legg til %@",
-                            category.shortTitle.lowercased()
-                        ),
-                                systemImage: "plus.circle.fill"
+                            addGearRow(
+                                title: ATHLTHLocalization.format(
+                                    english: "Add %@",
+                                    norwegian: "Legg til %@",
+                                    category.shortTitle.lowercased()
+                                ),
+                                category: category
                             )
                         }
                     } else {
@@ -1365,34 +1365,60 @@ struct ProfileGearManagerView: View {
                         Button {
                             addingCategory = category
                         } label: {
-                            Label("Add another", systemImage: "plus")
+                            addGearRow(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Add another",
+                                    norwegian: "Legg til en til"
+                                ),
+                                category: category
+                            )
                         }
                     }
                 } header: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 9) {
                         ProfileGearCategoryIcon(
                             category: category,
-                            size: 15,
-                            color: .secondary
+                            size: 16,
+                            color: ATHLTHGearGhostStyle.tint(
+                                for: category
+                            )
+                        )
+                        .frame(width: 30, height: 30)
+                        .background(
+                            ATHLTHGearGhostStyle.tint(
+                                for: category
+                            ).opacity(0.10),
+                            in: RoundedRectangle(
+                                cornerRadius: 10,
+                                style: .continuous
+                            )
                         )
 
                         Text(category.title)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
                         if let featured =
                             gear.featuredItem(in: category) {
                             Text(ATHLTHLocalization.format(
-                            english: "Profile: %@",
-                            norwegian: "Profil: %@",
-                            featured.name
-                        ))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                                english: "Profile: %@",
+                                norwegian: "Profil: %@",
+                                featured.name
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
                         }
                     }
+                    .textCase(nil)
+                    .padding(.bottom, 4)
                 }
+                .listRowBackground(
+                    Color.white.opacity(0.84)
+                )
             }
 
             if let error = gear.errorMessage {
@@ -1406,6 +1432,14 @@ struct ProfileGearManagerView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.accentDeep.opacity(0.18)
+            )
+        )
+        .tint(ATHLTHTheme.accentDeep)
         .navigationTitle("My Gear")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -1420,6 +1454,38 @@ struct ProfileGearManagerView: View {
             }
             .environmentObject(gear)
         }
+    }
+
+    private func addGearRow(
+        title: String,
+        category: ProfileGearCategory
+    ) -> some View {
+        let tint = ATHLTHGearGhostStyle.tint(
+            for: category
+        )
+
+        return HStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 34)
+                .background(
+                    tint.opacity(0.12),
+                    in: Circle()
+                )
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 
     private func gearRow(
@@ -1465,10 +1531,24 @@ struct ProfileGearManagerView: View {
 
             if item.isFeatured {
                 Image(systemName: "star.fill")
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        ATHLTHGearGhostStyle.tint(
+                            for: item.category
+                        ).opacity(0.11),
+                        in: Circle()
+                    )
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Shown on profile",
+                            norwegian: "Vises på profilen"
+                        )
+                    )
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 6)
     }
 
     private func rowSubtitle(
@@ -1522,7 +1602,18 @@ struct ProfileGearThumb: View {
                 cornerRadius: 11,
                 style: .continuous
             )
-            .fill(Color.primary.opacity(0.045))
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.88),
+                        ATHLTHGearGhostStyle.tint(
+                            for: item.category
+                        ).opacity(0.12)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
 
             if let value = item.imageURL,
                let url = URL(string: value) {
@@ -1545,9 +1636,9 @@ struct ProfileGearThumb: View {
     }
 
     private var fallback: some View {
-        ProfileGearCategoryIcon(
-            category: item.category,
-            size: 21
+        ProfileGearProductMark(
+            item: item,
+            size: 23
         )
     }
 }
