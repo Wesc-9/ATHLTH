@@ -83,13 +83,16 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private var isCompleted: Bool {
-        !session.isPlanSessionSkipped(
-            planID: planID, sessionID: currentWorkout.id
-        ) && (
-            isManuallyCompleted ||
-            isHealthCompleted ||
-            hasRecordedStrengthWorkout ||
-            linkedHealthWorkout != nil
+        session.isPlanSessionCompleted(
+            planID: planID,
+            sessionID: currentWorkout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        ) || (
+            isHealthCompleted &&
+            !session.isPlanSessionSkipped(
+                planID: planID, sessionID: currentWorkout.id
+            )
         )
     }
 
@@ -957,11 +960,18 @@ struct PlannedWorkoutDetailView: View {
                 if isCompleted && !isManuallyCompleted ||
                     storedLinkedHealthID != nil {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "Completed with a recorded workout",
-                            norwegian: "Fullført med registrert treningsøkt"
-                        ),
-                        systemImage: "checkmark.circle.fill"
+                        isCompleted
+                            ? ATHLTHLocalization.choose(
+                                english: "Completed with a recorded workout",
+                                norwegian: "Fullført med registrert treningsøkt"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Linked workout is unavailable or no longer matches",
+                                norwegian: "Den koblede økten er utilgjengelig eller passer ikke lenger"
+                            ),
+                        systemImage: isCompleted
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.triangle"
                     )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
