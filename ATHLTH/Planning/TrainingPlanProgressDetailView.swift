@@ -11,6 +11,7 @@ struct TrainingPlanProgressDetailView: View {
     let planID: UUID
 
     @State private var showAllMuscles = false
+    @State private var showAllExercises = false
     @State private var showAllWeeks = false
 
     var body: some View {
@@ -31,6 +32,7 @@ struct TrainingPlanProgressDetailView: View {
                         header(plan: plan)
                         overallCard(overall)
                         strengthCard(report)
+                        exerciseCard(report)
                         muscleCard(report)
                         weeklyCard(report, currentWeek: overall.currentWeek)
                         sourceNote
@@ -212,6 +214,113 @@ struct TrainingPlanProgressDetailView: View {
         }
     }
 
+    private func exerciseCard(_ report: TrainingPlanStrengthReport) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Exercise development",
+                        norwegian: "Utvikling per øvelse"
+                    ),
+                    systemImage: "chart.line.uptrend.xyaxis"
+                )
+                .font(.headline)
+
+                if report.exerciseSummaries.isEmpty {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Recorded exercise details will appear here after you complete a planned strength session.",
+                            norwegian: "Øvelsesresultatene vises her når du har gjennomført en planlagt styrkeøkt."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                } else {
+                    let displayed = showAllExercises
+                        ? report.exerciseSummaries
+                        : Array(report.exerciseSummaries.prefix(5))
+
+                    ForEach(displayed) { exercise in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(exercise.name)
+                                    .font(.subheadline.weight(.semibold))
+                                Spacer(minLength: 8)
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "\(exercise.loggedSessions) sessions",
+                                        norwegian: "\(exercise.loggedSessions) økter"
+                                    )
+                                )
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            }
+                            HStack(spacing: 12) {
+                                Label(
+                                    "\(exercise.workingSets)",
+                                    systemImage: "checkmark.circle"
+                                )
+                                Text(
+                                    exercise.volumeKilograms.formatted(
+                                        .number.precision(.fractionLength(0))
+                                    ) + " kg"
+                                )
+                                if let maximum = exercise.peakWeightKilograms {
+                                    Label(
+                                        maximum.formatted(
+                                            .number.precision(.fractionLength(0...1))
+                                        ) + " kg",
+                                        systemImage: "arrow.up"
+                                    )
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .monospacedDigit()
+                        }
+                        if exercise.id != displayed.last?.id {
+                            Divider().opacity(0.4)
+                        }
+                    }
+
+                    if report.exerciseSummaries.count > 5 {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showAllExercises.toggle()
+                            }
+                        } label: {
+                            Label(
+                                showAllExercises
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Show fewer exercises",
+                                        norwegian: "Vis færre øvelser"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Show all exercises",
+                                        norwegian: "Vis alle øvelser"
+                                    ),
+                                systemImage: showAllExercises
+                                    ? "chevron.up" : "chevron.down"
+                            )
+                            .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                }
+
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Working sets · recorded total load · highest logged working weight. Exercises with different names are not automatically treated as identical.",
+                        norwegian: "Arbeidssett · registrert totalbelastning · høyeste loggførte arbeidsvekt. Øvelser med ulike navn slås ikke automatisk sammen."
+                    )
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func muscleCard(_ report: TrainingPlanStrengthReport) -> some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -223,6 +332,27 @@ struct TrainingPlanProgressDetailView: View {
                     systemImage: "figure.strengthtraining.traditional"
                 )
                 .font(.headline)
+
+                HStack(spacing: 14) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Planned",
+                            norwegian: "Planlagt"
+                        ),
+                        systemImage: "circle.fill"
+                    )
+                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.6))
+
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Logged",
+                            norwegian: "Loggført"
+                        ),
+                        systemImage: "circle.fill"
+                    )
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                }
+                .font(.caption2)
 
                 if report.muscles.isEmpty {
                     Text(
