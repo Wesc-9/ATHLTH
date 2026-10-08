@@ -1613,12 +1613,9 @@ final class AppSessionStore: ObservableObject {
             return false
         }
 
-        let weekday = calendar.component(
-            .weekday,
-            from: target
-        )
-        let targetDayNumber =
-            ((weekday + 5) % 7) + 1
+        // Plan day indexes count from the plan's start date, not
+        // the calendar weekday. A plan can start on any weekday.
+        let targetDayNumber = (dayOffset % 7) + 1
         guard let targetDayIndex =
                 plan.weeks[targetWeekIndex]
                     .days
@@ -1636,7 +1633,17 @@ final class AppSessionStore: ObservableObject {
             .sessions
             .removeAll { $0.id == sessionID }
 
-        movedSession.scheduledStart = target
+        // Preserve the athlete's selected start time when rescheduling.
+        // A previously unscheduled session uses the standard 18:00 time.
+        let clock = movedSession.scheduledStart.map {
+            calendar.dateComponents([.hour, .minute, .second], from: $0)
+        }
+        movedSession.scheduledStart = calendar.date(
+            bySettingHour: clock?.hour ?? 18,
+            minute: clock?.minute ?? 0,
+            second: clock?.second ?? 0,
+            of: target
+        ) ?? target
         plan.weeks[targetWeekIndex]
             .days[targetDayIndex]
             .sessions
