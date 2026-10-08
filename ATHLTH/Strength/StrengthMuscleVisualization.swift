@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum StrengthMuscleRegion: String, CaseIterable, Identifiable {
+enum StrengthMuscleRegion: String, CaseIterable, Identifiable, Sendable {
     case chest
     case frontDelts
     case sideDelts
