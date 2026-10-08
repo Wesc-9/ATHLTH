@@ -70,9 +70,9 @@ struct HomeActivityStrengthDetailView: View {
     private var activationTint:
         Color {
         Color(
-            red: 0.91,
-            green: 0.54,
-            blue: 0.24
+            red: 0.93,
+            green: 0.32,
+            blue: 0.22
         )
     }
 
@@ -82,6 +82,13 @@ struct HomeActivityStrengthDetailView: View {
                 workoutHeroCard
 
                 overviewCard
+
+                // The finished-workout muscle map was previously defined
+                // but never placed in this view's scroll hierarchy.
+                // Show it only when actual exercise-derived muscles exist.
+                if !muscleSummary.profile.activations.isEmpty {
+                    muscleMapCard
+                }
 
                 if hasRestFlowData {
                     restFlowCard
