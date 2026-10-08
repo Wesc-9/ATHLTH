@@ -1273,12 +1273,18 @@ struct StrengthMuscleMapView: View {
         HStack(spacing: compact ? 5 : 12) {
             bodyFigure(
                 side: .front,
-                label: "Front"
+                label: ATHLTHLocalization.choose(
+                    english: "Front",
+                    norwegian: "Forside"
+                )
             )
 
             bodyFigure(
                 side: .back,
-                label: "Back"
+                label: ATHLTHLocalization.choose(
+                    english: "Back",
+                    norwegian: "Bakside"
+                )
             )
         }
         .accessibilityElement(
@@ -1339,23 +1345,21 @@ struct StrengthMuscleMapView: View {
     }
 
     private var accessibilityText: String {
-        let top =
-            profile.topActivations
-                .prefix(5)
-                .map {
-                    $0.region.title
-                }
+        let top = profile.topActivations
+            .prefix(5)
+            .map { $0.region.activityDisplayTitle }
 
         guard !top.isEmpty else {
-            return
-                "Muscle map with no recorded muscle focus."
+            return ATHLTHLocalization.choose(
+                english: "Muscle map without recorded muscle focus.",
+                norwegian: "Muskelkart uten registrert muskelfokus."
+            )
         }
 
-        return
-            "Muscle map. Main areas: " +
-            top.joined(
-                separator: ", "
-            )
+        return ATHLTHLocalization.choose(
+            english: "Muscle map. Main areas: ",
+            norwegian: "Muskelkart. Viktigste muskelgrupper: "
+        ) + top.joined(separator: ", ")
     }
 }
 
