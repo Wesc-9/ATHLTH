@@ -1633,13 +1633,13 @@ struct AppRootView: View {
             // starve the simulator's first frame and leave a blank launch
             // surface even though the app process is healthy.
             ATHLTHCompatibilityPreviewRootView()
-        } else if ATHLTHDeviceRole.isIPad && !appSession.signedIn {
-            // A signed-out iPad needs only account onboarding. Constructing
-            // the complete workout/social/Health observer tree before login
-            // delays the first SwiftUI frame on a fresh tablet simulator,
-            // sometimes leaving a nearly blank launch image. Authentication,
-            // email callbacks and onboarding actions remain on the same
-            // OnboardingFlowView; the full lifecycle attaches after sign-in.
+        } else if !appSession.signedIn {
+            // Signed-out iPhones and iPads need only account onboarding.
+            // Avoid constructing the workout/social/Health observer tree
+            // before authentication: on slower/smaller simulator devices it
+            // can starve the first frame and leave a blank launch surface.
+            // The same interactive sign-in flow remains intact; all
+            // production lifecycle observers attach once sign-in succeeds.
             OnboardingFlowView()
         } else {
             lifecycleAccountContent
