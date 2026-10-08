@@ -181,6 +181,31 @@ final class TrainingWeekTemplateEngineTests: XCTestCase {
         )
     }
 
+    func testCopiedClockTimeUsesCorrectTargetCalendarDay() {
+        let plan = makePlan()
+        // The source running session deliberately has a Monday timestamp
+        // despite being placed on Wednesday, simulating a stale date field.
+        let result = TrainingWeekTemplateEngine.copy(
+            plan: plan,
+            sourceWeekID: plan.weeks[0].id,
+            scope: .allFutureWeeks,
+            now: startDate,
+            calendar: calendar
+        )
+        let copiedRun = result?.plan.weeks[2].days[2].sessions.first
+        let targetDay = calendar.date(
+            byAdding: .day,
+            value: 16,
+            to: startDate
+        )!
+        let expected = calendar.date(
+            byAdding: .hour,
+            value: 18,
+            to: targetDay
+        )
+        XCTAssertEqual(copiedRun?.scheduledStart, expected)
+    }
+
     func testNextWeekScopeCopiesOnlyNextWeek() {
         let plan = makePlan()
         let result = TrainingWeekTemplateEngine.copy(
