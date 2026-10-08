@@ -1373,9 +1373,16 @@ struct PostWorkoutReviewView: View {
         }) else {
             return original
         }
+        let norwegianTitle: String
+        switch workout.activity {
+        case .running: norwegianTitle = "Løpeøkt fullført"
+        case .walking: norwegianTitle = "Gåtur fullført"
+        case .strength: norwegianTitle = "Styrkeøkt fullført"
+        default: norwegianTitle = "\(completionActivityTitle) fullført"
+        }
         return ATHLTHLocalization.choose(
-            english: "\(completionActivityTitle) completed",
-            norwegian: "\(completionActivityTitle) fullført"
+            english: "\(workout.activity.rawValue) completed",
+            norwegian: norwegianTitle
         )
     }
 
