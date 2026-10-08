@@ -156,8 +156,34 @@ struct StrengthMuscleActivation: Identifiable {
     var id: String { region.rawValue }
 }
 
+enum StrengthMuscleHighlightRole: Equatable {
+    case primary
+    case secondary
+    case estimated
+}
+
 struct StrengthMuscleProfile {
     let activations: [StrengthMuscleActivation]
+    let primaryRegions: Set<StrengthMuscleRegion>
+    let secondaryRegions: Set<StrengthMuscleRegion>
+
+    init(
+        activations: [StrengthMuscleActivation],
+        primaryRegions: Set<StrengthMuscleRegion> = [],
+        secondaryRegions: Set<StrengthMuscleRegion> = []
+    ) {
+        self.activations = activations
+        self.primaryRegions = primaryRegions
+        self.secondaryRegions = secondaryRegions.subtracting(primaryRegions)
+    }
+
+    func highlightRole(
+        for region: StrengthMuscleRegion
+    ) -> StrengthMuscleHighlightRole {
+        if primaryRegions.contains(region) { return .primary }
+        if secondaryRegions.contains(region) { return .secondary }
+        return .estimated
+    }
 
     static let empty =
         StrengthMuscleProfile(
@@ -316,6 +342,8 @@ enum StrengthMuscleProfileBuilder {
 
         var scores:
             [StrengthMuscleRegion: Double] = [:]
+        var primaryRegions: Set<StrengthMuscleRegion> = []
+        var secondaryRegions: Set<StrengthMuscleRegion> = []
         var summaries:
             [StrengthExerciseMuscleSummary] = []
 
@@ -400,6 +428,7 @@ enum StrengthMuscleProfileBuilder {
                     scores[region, default: 0] +=
                         primaryWeight *
                         workload
+                    primaryRegions.insert(region)
                     mappedAny = true
                 }
             }
@@ -415,6 +444,7 @@ enum StrengthMuscleProfileBuilder {
                     scores[region, default: 0] +=
                         secondaryWeight *
                         workload
+                    secondaryRegions.insert(region)
                     mappedAny = true
                 }
             }
@@ -534,8 +564,9 @@ enum StrengthMuscleProfileBuilder {
         return StrengthMuscleSessionSummary(
             profile:
                 StrengthMuscleProfile(
-                    activations:
-                        activations
+                    activations: activations,
+                    primaryRegions: primaryRegions,
+                    secondaryRegions: secondaryRegions
                 ),
             exercises:
                 summaries,
