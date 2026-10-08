@@ -3955,6 +3955,19 @@ struct OfficialWeeklyChallengeAdminListView: View {
         }
     }
 
+    private func adminRowDescription(
+        _ challenge: OfficialWeeklyChallenge
+    ) -> String {
+        let target = challenge.kind.targetText(challenge.targetValue)
+        let startDate = challenge.startsAt.formatted(
+            .dateTime.month(.abbreviated).day()
+        )
+        let endDate = challenge.endsAt.formatted(
+            .dateTime.month(.abbreviated).day()
+        )
+        return "\(target) · \(startDate)–\(endDate)"
+    }
+
     private func adminRow(
         _ challenge: OfficialWeeklyChallenge
     ) -> some View {
@@ -3980,16 +3993,7 @@ struct OfficialWeeklyChallengeAdminListView: View {
                         .font(.headline)
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
-                    Text(
-                        "\(challenge.kind.targetText(challenge.targetValue)) · " +
-                        challenge.startsAt.formatted(
-                            .dateTime.month(.abbreviated).day()
-                        ) +
-                        "–" +
-                        challenge.endsAt.formatted(
-                            .dateTime.month(.abbreviated).day()
-                        )
-                    )
+                    Text(adminRowDescription(challenge))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
