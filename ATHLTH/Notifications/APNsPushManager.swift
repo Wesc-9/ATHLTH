@@ -576,17 +576,33 @@ final class ATHLTHAppDelegate: NSObject,
         APNsPushManager.shared.didFailToRegister(error)
     }
 
+    // APNs payloads are JSON. Serialize before crossing to MainActor so
+    // Swift 6 does not transfer a non-Sendable [AnyHashable: Any] dictionary.
+    // The original payload is reconstructed before dispatching notifications.
+    nonisolated private func notificationPayload(
+        _ userInfo: [AnyHashable: Any]
+    ) -> Data? {
+        try? JSONSerialization.data(withJSONObject: userInfo)
+    }
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        let userInfo = notification.request.content.userInfo
+        let payload = notificationPayload(notification.request.content.userInfo)
 
-        NotificationCenter.default.post(
-            name: .athlthRemoteNotificationReceived,
-            object: nil,
-            userInfo: userInfo
-        )
+        await MainActor.run {
+            guard let payload,
+                  let userInfo = try? JSONSerialization.jsonObject(with: payload)
+                    as? [AnyHashable: Any] else {
+                return
+            }
+            NotificationCenter.default.post(
+                name: .athlthRemoteNotificationReceived,
+                object: nil,
+                userInfo: userInfo
+            )
+        }
 
         return [.banner, .sound, .badge, .list]
     }
@@ -595,25 +611,27 @@ final class ATHLTHAppDelegate: NSObject,
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        let userInfo = response.notification.request.content.userInfo
+        let payload = notificationPayload(response.notification.request.content.userInfo)
 
         await MainActor.run {
-            APNsPushManager.shared
-                .captureTappedNotification(
-                    userInfo
-                )
+            guard let payload,
+                  let userInfo = try? JSONSerialization.jsonObject(with: payload)
+                    as? [AnyHashable: Any] else {
+                return
+            }
+
+            APNsPushManager.shared.captureTappedNotification(userInfo)
+
+            NotificationCenter.default.post(
+                name: .athlthRemoteNotificationReceived,
+                object: nil,
+                userInfo: userInfo
+            )
+            NotificationCenter.default.post(
+                name: .athlthRemoteNotificationTapped,
+                object: nil,
+                userInfo: userInfo
+            )
         }
-
-        NotificationCenter.default.post(
-            name: .athlthRemoteNotificationReceived,
-            object: nil,
-            userInfo: userInfo
-        )
-
-        NotificationCenter.default.post(
-            name: .athlthRemoteNotificationTapped,
-            object: nil,
-            userInfo: userInfo
-        )
     }
 }
