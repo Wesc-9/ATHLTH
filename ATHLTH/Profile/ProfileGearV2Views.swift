@@ -1,5 +1,113 @@
 import SwiftUI
 
+// Scoped to the My Gear management flow. The profile summary intentionally
+// keeps its existing presentation and does not use these modifiers.
+enum ATHLTHGearGhostStyle {
+    static func tint(
+        for category: ProfileGearCategory
+    ) -> Color {
+        switch category {
+        case .watch: return ATHLTHTheme.recoveryBlue
+        case .shoes: return ATHLTHTheme.vitality
+        case .headphones: return ATHLTHTheme.accentDeep
+        case .other: return ATHLTHTheme.premiumGold
+        }
+    }
+}
+
+private struct ATHLTHGearGhostCardModifier: ViewModifier {
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: ATHLTHTheme.cornerRadius,
+                    style: .continuous
+                )
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.94),
+                            tint.opacity(0.17),
+                            Color.white.opacity(0.70)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+                .allowsHitTesting(false)
+            }
+            .shadow(
+                color: tint.opacity(0.07),
+                radius: 9,
+                y: 3
+            )
+    }
+}
+
+extension View {
+    func athlthGearGhostCard(tint: Color) -> some View {
+        modifier(ATHLTHGearGhostCardModifier(tint: tint))
+    }
+}
+
+/// Icon-only familiar product silhouettes. No image downloads or new binary
+/// assets: a real uploaded photo still takes precedence in the management UI.
+struct ProfileGearProductMark: View {
+    let item: ProfileGearItem
+    var size: CGFloat = 24
+
+    private var symbol: String {
+        switch item.category {
+        case .watch:
+            return "applewatch"
+        case .headphones:
+            let name = item.name.lowercased()
+            if name.contains("airpods") {
+                return "airpodspro"
+            }
+            if name.contains("buds") || name.contains("openfit") {
+                return "earbuds"
+            }
+            return "headphones"
+        case .shoes:
+            return "shoeprints.fill"
+        case .other:
+            return "square.grid.2x2.fill"
+        }
+    }
+
+    var body: some View {
+        Group {
+            if item.category == .shoes {
+                RunningShoeIcon(
+                    color: ATHLTHGearGhostStyle.tint(for: .shoes)
+                )
+                .frame(
+                    width: size * 1.30,
+                    height: size * 0.85
+                )
+            } else {
+                Image(systemName: symbol)
+                    .font(
+                        .system(
+                            size: size,
+                            weight: .medium
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHGearGhostStyle.tint(
+                            for: item.category
+                        )
+                    )
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 struct RunningShoeIcon: View {
     var color: Color = ATHLTHTheme.accentDeep
 
@@ -601,7 +709,16 @@ struct ProfileGearDetailView: View {
                         style: .continuous
                     )
                     .fill(
-                        ATHLTHTheme.surfaceSage.opacity(0.62)
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.82),
+                                ATHLTHGearGhostStyle.tint(
+                                    for: currentItem.category
+                                ).opacity(0.13)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
 
                     if let value = currentItem.imageURL,
@@ -614,15 +731,15 @@ struct ProfileGearDetailView: View {
                                     .scaledToFit()
                                     .padding(8)
                             default:
-                                ProfileGearCategoryIcon(
-                                    category: currentItem.category,
+                                ProfileGearProductMark(
+                                    item: currentItem,
                                     size: 36
                                 )
                             }
                         }
                     } else {
-                        ProfileGearCategoryIcon(
-                            category: currentItem.category,
+                        ProfileGearProductMark(
+                            item: currentItem,
                             size: 36
                         )
                     }
@@ -666,6 +783,11 @@ struct ProfileGearDetailView: View {
                 Spacer()
             }
         }
+        .athlthGearGhostCard(
+            tint: ATHLTHGearGhostStyle.tint(
+                for: currentItem.category
+            )
+        )
     }
 
     @ViewBuilder
@@ -798,6 +920,11 @@ struct ProfileGearDetailView: View {
                 .padding(.top, 12)
             }
         }
+        .athlthGearGhostCard(
+            tint: ATHLTHGearGhostStyle.tint(
+                for: currentItem.category
+            )
+        )
     }
 
     private var shoeInsightsCard: some View {
@@ -865,6 +992,11 @@ struct ProfileGearDetailView: View {
             }
             .padding(.top, 12)
         }
+        .athlthGearGhostCard(
+            tint: ATHLTHGearGhostStyle.tint(
+                for: currentItem.category
+            )
+        )
     }
 
     private var detailsCard: some View {
@@ -949,6 +1081,11 @@ struct ProfileGearDetailView: View {
             }
             .padding(.top, 10)
         }
+        .athlthGearGhostCard(
+            tint: ATHLTHGearGhostStyle.tint(
+                for: currentItem.category
+            )
+        )
     }
 
     private var historyCard: some View {
@@ -1052,6 +1189,11 @@ struct ProfileGearDetailView: View {
                 .padding(.top, 6)
             }
         }
+        .athlthGearGhostCard(
+            tint: ATHLTHGearGhostStyle.tint(
+                for: currentItem.category
+            )
+        )
     }
 
     private var itemSubtitle: String? {
@@ -1116,12 +1258,31 @@ struct ProfileGearDetailView: View {
             alignment: .leading
         )
         .background(
-            Color.primary.opacity(0.035),
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.91),
+                    ATHLTHGearGhostStyle.tint(
+                        for: currentItem.category
+                    ).opacity(0.075)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
             in: RoundedRectangle(
                 cornerRadius: 13,
                 style: .continuous
             )
         )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: 13,
+                style: .continuous
+            )
+            .stroke(
+                Color.white.opacity(0.86),
+                lineWidth: 0.8
+            )
+        }
     }
 
     private func detailRow(
