@@ -182,6 +182,12 @@ final class WorkoutPlaceCheckInStore:
 
     private var lastRefreshAt: Date?
 
+    // MapKit searches may take several seconds. A fresh result can be
+    // reused when the picker reopens or GPS drifts a few meters.
+    private var cachedNearbyOrigin: CLLocation?
+    private var cachedNearbyAt: Date?
+    private var cachedNearbyCandidates: [WorkoutPlacePresentation] = []
+
     init(
         service:
             SupabaseWorkoutPlaceCheckInService =
@@ -412,6 +418,16 @@ final class WorkoutPlaceCheckInStore:
             return []
         }
 
+        if let cachedNearbyOrigin,
+           let cachedNearbyAt,
+           Date().timeIntervalSince(cachedNearbyAt) < 120,
+           location.distance(from: cachedNearbyOrigin) < 35 {
+            return nearbyWithinRange(
+                cachedNearbyCandidates,
+                from: location
+            )
+        }
+
         let request =
             MKLocalPointsOfInterestRequest(
                 center:
@@ -470,7 +486,7 @@ final class WorkoutPlaceCheckInStore:
                         )
 
                     guard distance.isFinite,
-                          distance <= 150
+                          distance <= 400
                     else {
                         return nil
                     }
@@ -497,13 +513,49 @@ final class WorkoutPlaceCheckInStore:
                     )
                 }
 
-        for place in places {
-            resolvedPlaces[
-                place.id
-            ] = place
+        cachedNearbyOrigin = location
+        cachedNearbyAt = Date()
+        cachedNearbyCandidates = places
+
+        let visible = nearbyWithinRange(
+            places,
+            from: location
+        )
+        for place in visible {
+            resolvedPlaces[place.id] = place
         }
 
-        return places
+        return visible
+    }
+
+    private func nearbyWithinRange(
+        _ candidates: [WorkoutPlacePresentation],
+        from location: CLLocation
+    ) -> [WorkoutPlacePresentation] {
+        candidates.compactMap { place in
+            let distance = location.distance(
+                from: CLLocation(
+                    latitude: place.coordinate.latitude,
+                    longitude: place.coordinate.longitude
+                )
+            )
+            guard distance.isFinite,
+                  distance >= 0,
+                  distance <= 150 else {
+                return nil
+            }
+
+            return WorkoutPlacePresentation(
+                id: place.id,
+                name: place.name,
+                coordinate: place.coordinate,
+                distanceMeters: distance
+            )
+        }
+        .sorted {
+            ($0.distanceMeters ?? .greatestFiniteMagnitude) <
+            ($1.distanceMeters ?? .greatestFiniteMagnitude)
+        }
     }
 
     func resolvedFrequentPlaces(
