@@ -2801,6 +2801,39 @@ private struct WatchStrengthCrownControl: View {
     let tint: Color
 
     @FocusState private var crownFocused: Bool
+    @State private var crownPosition: Double = 0
+
+    private var discreteCrownValue: Binding<Double> {
+        Binding(
+            get: { crownPosition },
+            set: { proposed in
+                let next = snapped(proposed)
+                guard abs(next - crownPosition) > 0.0001 else { return }
+                crownPosition = next
+                if abs(next - value) > 0.0001 {
+                    value = next
+                }
+            }
+        )
+    }
+
+    private func snapped(_ proposed: Double) -> Double {
+        guard proposed.isFinite, step > 0 else { return value }
+        let clamped = min(max(proposed, range.lowerBound), range.upperBound)
+        return min(max(
+            range.lowerBound +
+                ((clamped - range.lowerBound) / step).rounded() * step,
+            range.lowerBound
+        ), range.upperBound)
+    }
+
+    private func adjustOneClick(_ direction: Double) {
+        let next = snapped(value + step * direction)
+        guard abs(next - value) > 0.0001 else { return }
+        crownPosition = next
+        value = next
+        WKInterfaceDevice.current().play(.click)
+    }
 
     var body: some View {
         HStack(spacing: 9) {
@@ -2827,13 +2860,31 @@ private struct WatchStrengthCrownControl: View {
 
             Spacer()
 
+            Button {
+                adjustOneClick(-1)
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .disabled(value <= range.lowerBound)
+
             Image(systemName: "digitalcrown.horizontal.arrow.clockwise")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(
-                    crownFocused
-                        ? tint
-                        : WatchTheme.muted
-                )
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(crownFocused ? tint : WatchTheme.muted)
+
+            Button {
+                adjustOneClick(1)
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .disabled(value >= range.upperBound)
         }
         .padding(9)
         .watchSurface()
@@ -2841,14 +2892,27 @@ private struct WatchStrengthCrownControl: View {
         .focusable()
         .focused($crownFocused)
         .digitalCrownRotation(
-            $value,
+            discreteCrownValue,
             from: range.lowerBound,
             through: range.upperBound,
             by: step,
-            sensitivity: .medium,
+            sensitivity: .low,
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
+        .onAppear {
+            crownPosition = snapped(value)
+        }
+        .onChange(of: value) { _, updated in
+            if !crownFocused {
+                crownPosition = snapped(updated)
+            }
+        }
+        .onChange(of: crownFocused) { _, focused in
+            if !focused {
+                crownPosition = snapped(value)
+            }
+        }
         .onTapGesture {
             crownFocused = true
         }
