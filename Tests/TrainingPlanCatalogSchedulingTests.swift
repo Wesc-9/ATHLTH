@@ -289,6 +289,60 @@ final class TrainingPlanCatalogSchedulingTests: XCTestCase {
         XCTAssertEqual(calendar.component(.minute, from: when), 0)
     }
 
+    @MainActor
+    func testShorteningPlanCannotSilentlyDeleteScheduledWorkouts() {
+        let suiteName = "TrainingPlanTruncationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AppSessionStore(defaults: defaults)
+        let start = Calendar.current.date(from: DateComponents(
+            year: 2030, month: 1, day: 8
+        ))!
+        guard let plan = store.createTrainingPlan(
+            title: "Protected history",
+            summary: "",
+            weekCount: 3,
+            startDate: start
+        ) else {
+            return XCTFail("Expected plan")
+        }
+        let session = PlannedSession(
+            id: UUID(),
+            title: "Planned long run",
+            kind: .running,
+            scheduledStart: nil,
+            durationMinutes: 60,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil,
+            runningWorkout: nil
+        )
+        let lastDayID = plan.weeks[2].days[0].id
+        store.addSession(session, toDay: lastDayID, inPlan: plan.id)
+
+        XCTAssertFalse(store.setTrainingPlanWeekCount(
+            planID: plan.id, weekCount: 2
+        ))
+        XCTAssertEqual(store.trainingPlan(withID: plan.id)?.weeks.count, 3)
+        XCTAssertEqual(
+            store.trainingPlan(withID: plan.id)?
+                .weeks[2].days[0].sessions.first?.id,
+            session.id
+        )
+
+        // After explicitly removing the workout, reducing the duration is
+        // safe and must not affect earlier weeks.
+        store.removeSession(
+            session.id, fromDay: lastDayID, inPlan: plan.id
+        )
+        XCTAssertTrue(store.setTrainingPlanWeekCount(
+            planID: plan.id, weekCount: 2
+        ))
+        XCTAssertEqual(store.trainingPlan(withID: plan.id)?.weeks.count, 2)
+    }
+
     private func makeEntry(
         slug: String,
         title: String
