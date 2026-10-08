@@ -2942,15 +2942,19 @@ private struct WatchRunWalkWorkoutPager: View {
             WatchLiveWorkoutFocusCard()
 
             VStack(spacing: 2) {
-                Text("CURRENT PACE")
+                Text(
+                    workoutManager.currentPaceSecondsPerKilometer == nil
+                        ? "AVG PACE"
+                        : "CURRENT PACE"
+                )
                     .font(.system(size: 8, weight: .bold))
                     .tracking(1.1)
                     .foregroundStyle(WatchTheme.muted)
 
                 Text(
                     paceText(
-                        workoutManager
-                            .currentPaceSecondsPerKilometer
+                        workoutManager.currentPaceSecondsPerKilometer ??
+                        workoutManager.averagePaceSecondsPerKilometer
                     )
                 )
                 .font(
