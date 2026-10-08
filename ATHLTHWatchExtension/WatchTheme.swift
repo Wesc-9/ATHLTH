@@ -7,6 +7,10 @@ enum WatchTheme {
     static let liveCyan = Color(red: 0.32, green: 0.87, blue: 0.98)
     static let liveLime = Color(red: 0.74, green: 0.98, blue: 0.37)
     static let liveHeart = Color(red: 1.00, green: 0.48, blue: 0.60)
+    // Strong accents on the light strength editor, with dark text.
+    static let liveStrengthReps = Color(red: 0.03, green: 0.49, blue: 0.65)
+    static let liveStrengthLoad = Color(red: 0.33, green: 0.28, blue: 0.70)
+    static let liveAction = Color(red: 0.02, green: 0.50, blue: 0.45)
 
     // ATHLTH Watch uses a bright Performance Tiles language. Petrol is the
     // primary action/performance colour; cool slate is reserved for secondary
