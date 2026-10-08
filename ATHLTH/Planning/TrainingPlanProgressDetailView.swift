@@ -371,6 +371,19 @@ struct TrainingPlanProgressDetailView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTheme.accentDeep)
 
+                        if let kilograms = item.suggestedNextWeightKilograms {
+                            Label(
+                                ATHLTHLocalization.format(
+                                    english: "Consider %.1f kg next time",
+                                    norwegian: "Vurder %.1f kg neste gang",
+                                    kilograms
+                                ),
+                                systemImage: "scalemass"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+
                         Text(guidanceExplanation(item.verdict))
                             .font(.caption)
                             .foregroundStyle(.secondary)
