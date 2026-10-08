@@ -3233,6 +3233,7 @@ private struct HomeActivityRoutePreviewV2: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
                     .transition(.opacity)
             } else if safeCoordinates.count >= 2 {
                 ZStack {
