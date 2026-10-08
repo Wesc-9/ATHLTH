@@ -75,11 +75,12 @@ enum TrainingPlanLoadAdvisor {
                 }
                 // Without specific rep targets, ATHLTH cannot objectively
                 // compare logged results with the user's plan.
-                guard !prescribedWorkSets.isEmpty,
-                      prescribedWorkSets.allSatisfy {
-                        ($0.reps ?? planned.reps ?? 0) > 0
-                      }
-                else { continue }
+                let hasValidRepTargets = prescribedWorkSets.allSatisfy { target in
+                    (target.reps ?? planned.reps ?? 0) > 0
+                }
+                guard !prescribedWorkSets.isEmpty, hasValidRepTargets else {
+                    continue
+                }
 
                 let completedWorkSets = log.sets.filter(\.countsTowardTrainingLoad)
                 let metTarget = completedWorkSets.count >= prescribedWorkSets.count &&
