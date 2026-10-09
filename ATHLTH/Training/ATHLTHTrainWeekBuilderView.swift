@@ -191,7 +191,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                     VStack(spacing: 7) {
                         Text(dayName(day.dayIndex))
                             .font(.system(size: 10, weight: .semibold))
-                        Text("\(day.dayIndex)")
+                        Text(dayDate(day.dayIndex).formatted(.dateTime.day()))
                             .font(.system(size: 20, weight: .regular, design: .serif))
                         Capsule()
                             .fill(day.sessions.isEmpty ? Color.clear : bronze)
@@ -359,6 +359,15 @@ struct ATHLTHTrainWeekBuilderView: View {
         }
     }
 
+    private func dayDate(_ index: Int) -> Date {
+        guard let plan, let start = plan.startDate else { return Date() }
+        return Calendar.current.date(
+            byAdding: .day,
+            value: weekIndex * 7 + index - 1,
+            to: Calendar.current.startOfDay(for: start)
+        ) ?? start
+    }
+
     private func dayName(_ index: Int) -> String {
         let no = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
         let en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -429,8 +438,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                             strengthEditing
                         } else if draft.kind == .running || draft.kind == .walking {
                             runningEditing
-                        } else {
-                            durationEditing
                         }
                         notesEditing
                     }
@@ -977,7 +984,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
     private func save() {
         guard let plan = session.trainingPlan(withID: planID),
-              let (weekIndex, dayIndex) = plan.weeks.enumerated()
+              let location = plan.weeks.enumerated()
                 .compactMap({ weekOffset, week -> (Int, Int)? in
                     guard let index = week.days.firstIndex(where: { $0.id == dayID }) else {
                         return nil
@@ -991,6 +998,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             return
         }
 
+        let (weekIndex, dayIndex) = location
         var updated = draft
         let day = plan.weeks[weekIndex].days[dayIndex]
         if scheduled, let start = plan.startDate {
