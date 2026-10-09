@@ -17,6 +17,7 @@ struct ATHLTHTrainWeekBuilderView: View {
     @State private var transferRequest: TransferRequest?
     @State private var showingSavedWorkouts = false
     @State private var showingPeriodization = false
+    @State private var planActionError: String?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -46,6 +47,7 @@ struct ATHLTHTrainWeekBuilderView: View {
         let dayID: UUID
         let workoutID: UUID
         let title: String
+        let expectedPlanVersion: Int
     }
 
     private var plan: TrainingPlan? { session.trainingPlan(withID: planID) }
@@ -68,6 +70,13 @@ struct ATHLTHTrainWeekBuilderView: View {
                     if let plan, let week = currentWeek {
                         introduction(plan)
                         weekSelector(plan)
+                        if let planActionError {
+                            Label(planActionError, systemImage: "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundStyle(ink)
+                                .padding(12)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                        }
                         Button {
                             showingPeriodization = true
                         } label: {
@@ -168,16 +177,17 @@ struct ATHLTHTrainWeekBuilderView: View {
                         "Fjerne \(request.title) fra planen? Registrert treningshistorikk blir ikke slettet."
                     )),
                     primaryButton: .destructive(Text(tr("Remove", "Fjern"))) {
-                        guard !session.isPlanSessionCompleted(
+                        let removed = session.removePlanStudioWorkout(
                             planID: planID,
-                            sessionID: request.workoutID,
+                            workoutID: request.workoutID,
+                            dayID: request.dayID,
+                            expectedVersion: request.expectedPlanVersion,
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
-                        ) else { return }
-                        session.removeSession(
-                            request.workoutID,
-                            fromDay: request.dayID,
-                            inPlan: planID
+                        )
+                        planActionError = removed ? nil : tr(
+                            "This session has changed or is already completed. Reopen the plan and try again.",
+                            "Økten er endret eller allerede gjennomført. Åpne planen på nytt og prøv igjen."
                         )
                     },
                     secondaryButton: .cancel()
@@ -362,7 +372,8 @@ struct ATHLTHTrainWeekBuilderView: View {
                                 removeRequest = .init(
                                     dayID: day.id,
                                     workoutID: workout.id,
-                                    title: workout.title
+                                    title: workout.title,
+                                    expectedPlanVersion: plan.version
                                 )
                             } label: {
                                 Label(tr("Remove", "Fjern"), systemImage: "trash")
