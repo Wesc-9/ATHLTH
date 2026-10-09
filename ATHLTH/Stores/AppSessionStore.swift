@@ -3432,6 +3432,69 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    /// Atomic Plan Studio save. Rejects stale editors, completed/skipped
+    /// workouts and past dates; no existing execution or history is touched.
+    @discardableResult
+    func savePlanStudioWorkout(
+        _ draft: PlannedSession,
+        inPlan planID: UUID,
+        dayID: UUID,
+        editingWorkoutID: UUID?,
+        expectedPlanVersion: Int,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedPlanVersion,
+              let start = plan.startDate,
+              !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              draft.title.count <= 120,
+              let location = plan.weeks.enumerated().compactMap({
+                weekOffset, week -> (Int, Int)? in
+                guard let dayOffset = week.days.firstIndex(where: {
+                    $0.id == dayID
+                }) else { return nil }
+                return (weekOffset, dayOffset)
+              }).first else { return false }
+
+        let (weekIndex, dayIndex) = location
+        let day = plan.weeks[weekIndex].days[dayIndex]
+        guard let plannedDate = Calendar.current.date(
+            byAdding: .day,
+            value: weekIndex * 7 + day.dayIndex - 1,
+            to: Calendar.current.startOfDay(for: start)
+        ), plannedDate >= Calendar.current.startOfDay(for: Date())
+        else { return false }
+
+        if let editingWorkoutID {
+            guard draft.id == editingWorkoutID,
+                  let workoutIndex = day.sessions.firstIndex(where: {
+                    $0.id == editingWorkoutID
+                  }),
+                  !isPlanSessionSkipped(
+                    planID: planID, sessionID: editingWorkoutID
+                  ),
+                  !isPlanSessionCompleted(
+                    planID: planID,
+                    sessionID: editingWorkoutID,
+                    healthWorkouts: healthWorkouts,
+                    strengthHistory: strengthHistory
+                  )
+            else { return false }
+            plan.weeks[weekIndex].days[dayIndex]
+                .sessions[workoutIndex] = draft
+        } else {
+            // New IDs must not collide with any workout already in the plan.
+            guard !plan.weeks.flatMap(\.days).flatMap(\.sessions)
+                .contains(where: { $0.id == draft.id }) else { return false }
+            plan.weeks[weekIndex].days[dayIndex].sessions.append(draft)
+        }
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     func updateSession(
         _ updatedSession: PlannedSession,
         inPlan planID: UUID
