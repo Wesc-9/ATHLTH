@@ -214,6 +214,10 @@ struct LegalDocumentView: View {
             LegalSectionData(
                 title: "18. Optional Coach history sharing",
                 body: "History sharing with Coach is a separate opt-in, off by default. When enabled, requesting a new or adapted plan sends Groq a limited summary of up to the preceding 28 days of available workouts, such as activity type, dates, duration, distance and workout counts. Raw GPS traces, pulse, sleep and HRV readings are excluded from this history summary. Goals, plan information and notes you supply for the requested Coach function are processed separately as part of that request. Cloud backup permission does not authorize Coach history sharing. Turn history sharing off in Settings > Training data & Coach to prevent future history summaries being sent. Withdrawal cannot undo a request already processed."
+            ),
+            LegalSectionData(
+                title: "19. ATHLTH Coach AI chat and optional health sharing",
+                body: "ATHLTH Coach AI chat is optional and uses Groq, an external AI provider. Before first use you must actively allow AI chat: messages you type are then sent to Groq to generate answers. You may decline and still use other ATHLTH features. Sleep, heart-rate variability (HRV), resting heart rate, training load, muscle recovery and check-in values are a separate, optional permission that is OFF by default. Even if you allow it, you must select Share health data and confirm every health-aware question before these metrics are sent. A confirmed health-aware question can also include up to 16 preceding chat turns for context; ordinary questions do not include previous turns. You can change health sharing or withdraw AI permission in the Coach menu. Withdrawal stops future requests but cannot undo information already processed by the provider. Chat history is kept locally on your device and can be deleted by starting a new conversation or deleting your account. Information processed by Groq is governed by the provider agreements and retention arrangements; see the current privacy notice and provider information for details."
             )
         ]
     }
