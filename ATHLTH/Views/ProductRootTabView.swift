@@ -10893,6 +10893,8 @@ struct ATHLTHRecoveryView: View {
     @State private var recoveryAIInsight: RecoveryAIInsight?
     @State private var isLoadingRecoveryAI = false
     @State private var recoveryAIError: String?
+    @State private var insightAIConsent: RecoveryInsightAIConsentRecord?
+    @State private var showingInsightAIConsentSheet = false
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
     @State private var showingRecoveryCoach = false
@@ -10982,7 +10984,7 @@ struct ATHLTHRecoveryView: View {
                 LazyVStack(spacing: 16) {
                     if shouldShowWearableRecoveryContent {
                         if session.hasPaidAccess &&
-                            session.aiHealthDataSharingEnabled {
+                            insightAISharingAllowed {
                             RecoveryAIInsightCard(
                                 insight:
                                     recoveryAIInsight ??
@@ -11063,7 +11065,7 @@ struct ATHLTHRecoveryView: View {
                         recoveryPatternsCard
 
                         if session.hasPaidAccess &&
-                            session.aiHealthDataSharingEnabled {
+                            insightAISharingAllowed {
                             RecoverySuggestedTodayCard(
                                 suggestion:
                                     (recoveryAIInsight ??
@@ -11147,10 +11149,13 @@ struct ATHLTHRecoveryView: View {
                     force: true
                 )
             }
-            .task(id: isActive) {
+            .task(
+                id: "\(isActive)-\(session.profile.userID)-\(session.hasPaidAccess)-\(shouldShowWearableRecoveryContent)"
+            ) {
                 guard isActive else {
                     return
                 }
+                reloadInsightAIConsent()
 
                 let performanceID =
                     ATHLTHPerformance.begin(
@@ -11196,6 +11201,9 @@ struct ATHLTHRecoveryView: View {
                 ATHLTHPerformance.event(
                     "InsightAppear"
                 )
+            }
+            .sheet(isPresented: $showingInsightAIConsentSheet) {
+                insightAIConsentSheet
             }
             .sheet(isPresented: $showingSorenessLog) {
                 RecoverySorenessLogView(
@@ -13443,7 +13451,7 @@ struct ATHLTHRecoveryView: View {
         force: Bool = false
     ) async {
         guard session.hasPaidAccess,
-              session.aiHealthDataSharingEnabled,
+              insightAISharingAllowed,
               shouldShowWearableRecoveryContent else {
             recoveryAIInsight = nil
             recoveryAIError = nil
@@ -13469,11 +13477,18 @@ struct ATHLTHRecoveryView: View {
         }
 
         do {
-            recoveryAIInsight = try await RecoveryAIService()
+            let requestedUserID = session.profile.userID
+            let generated = try await RecoveryAIService()
                 .generate(
                     recoveryAIContext,
+                    authorizedUserID: requestedUserID,
                     bypassCache: force
                 )
+            guard session.profile.userID == requestedUserID,
+                  insightAISharingAllowed else {
+                return
+            }
+            recoveryAIInsight = generated
         } catch {
             // The deterministic fallback remains visible so Recovery
             // never becomes an empty screen when AI is unavailable.
