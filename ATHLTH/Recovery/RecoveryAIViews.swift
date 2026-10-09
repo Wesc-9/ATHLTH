@@ -1352,7 +1352,7 @@ struct RecoveryCoachView: View {
                                 "AI chat (required to use Coach)",
                                 "AI-chat (nødvendig for å bruke Coach)"
                             ),
-                            systemImage: "bubble.left.and.text.bubble.right"
+                            systemImage: "bubble.left.and.bubble.right.fill"
                         )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
@@ -1465,7 +1465,7 @@ struct RecoveryCoachView: View {
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity)
             }
-            .background(ATHLTHTheme.canvas)
+            .background(ATHLTHTheme.canvasTop)
             .navigationTitle(
                 recoveryAIText("Privacy choices", "Personvernvalg")
             )
