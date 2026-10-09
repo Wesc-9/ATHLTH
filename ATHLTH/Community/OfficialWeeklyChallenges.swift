@@ -1854,6 +1854,7 @@ struct OfficialWeeklyChallengeCard: View {
                             .background(.white.opacity(0.88), in: Circle())
                     }
                     .buttonStyle(.plain)
+                }
             }
             .padding(16)
 
