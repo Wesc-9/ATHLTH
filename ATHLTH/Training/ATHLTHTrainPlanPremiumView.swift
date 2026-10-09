@@ -60,10 +60,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             selectedWeekIndex = nil
         }
         .sheet(isPresented: $showingCreation) {
-            ATHLTHTrainingPlanBuilderFlow(
-                startsAtSourceChoice: false,
-                initialAdvanced: advanced
-            )
+            ATHLTHTrainProgramComposerView()
         }
         .sheet(isPresented: $showingMyPlans) {
             MyTrainingPlansLibraryView()
