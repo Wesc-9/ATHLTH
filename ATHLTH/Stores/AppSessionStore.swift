@@ -2826,6 +2826,7 @@ final class AppSessionStore: ObservableObject {
         planID: UUID,
         blockID: UUID,
         expectedVersion: Int,
+        expectedWorkoutIDs: Set<UUID>,
         rule: TrainingBlockProgressionRule,
         healthWorkouts: [WorkoutSummary],
         strengthHistory: [StrengthWorkoutLog]
@@ -2850,7 +2851,9 @@ final class AppSessionStore: ObservableObject {
             blockID: blockID,
             rule: rule,
             protectedSessionIDs: protected
-        ), result.summary.hasChanges else { return nil }
+        ), result.summary.hasChanges,
+        Set(result.summary.changes.map(\.workoutID)) == expectedWorkoutIDs
+        else { return nil }
 
         var updated = result.plan
         updated.version += 1
