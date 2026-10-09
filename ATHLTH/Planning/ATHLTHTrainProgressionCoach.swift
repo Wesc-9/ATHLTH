@@ -25,6 +25,7 @@ enum ATHLTHTrainProgressionCoach {
         let workoutID: UUID
         let sets: Int
         let highestLoad: Double
+        let metTargets: Bool
     }
 
     static func suggestions(
@@ -85,12 +86,12 @@ enum ATHLTHTrainProgressionCoach {
                     }
                     loads.append(contentsOf: actualLoads)
                 }
-                guard allMet, let highest = loads.max() else { continue }
                 evidenceByName[key, default: []].append(Evidence(
                     date: log.endedAt ?? log.startedAt,
                     workoutID: log.id,
                     sets: working.count,
-                    highestLoad: highest
+                    highestLoad: loads.max() ?? 0,
+                    metTargets: allMet && !loads.isEmpty
                 ))
             }
         }
@@ -131,7 +132,9 @@ enum ATHLTHTrainProgressionCoach {
                             if unique.count == 2 { break }
                         }
                         guard unique.count == 2,
-                              unique.allSatisfy({ $0.highestLoad >= current }) else { continue }
+                              unique.allSatisfy({
+                                  $0.metTargets && $0.highestLoad >= current
+                              }) else { continue }
 
                         let proposed = (current + increaseKg).rounded(toPlaces: 2)
                         guard proposed > current else { continue }
