@@ -8,6 +8,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let onOpenPlan: () -> Void
+    var onPlanCreated: ((UUID) -> Void)? = nil
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var section: LibrarySection = .plans
@@ -124,7 +125,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await catalog.refresh() }
         .sheet(isPresented: $showingCreatePlan) {
-            ATHLTHTrainProgramComposerView()
+            ATHLTHTrainProgramComposerView { planID in
+                onPlanCreated?(planID)
+                onOpenPlan()
+            }
         }
         .sheet(item: $selectedTemplate) { plan in
             templatePreview(plan)
