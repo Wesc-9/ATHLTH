@@ -134,6 +134,7 @@ struct ATHLTHTrainSessionTransferView: View {
 
     @State private var selectedWeek = 0
     @State private var selectedDayID: UUID?
+    @State private var expectedPlanVersion: Int?
     @State private var errorMessage: String?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -163,9 +164,12 @@ struct ATHLTHTrainSessionTransferView: View {
         )
     }
     private var canCommit: Bool {
-        guard selectedDayID != nil, let date = selectedDate else { return false }
-        if copyInsteadOfMove { return true }
-        return !completed && date >= Calendar.current.startOfDay(for: Date())
+        guard selectedDayID != nil,
+              expectedPlanVersion != nil,
+              let date = selectedDate,
+              date >= Calendar.current.startOfDay(for: Date())
+        else { return false }
+        return copyInsteadOfMove || !completed
     }
 
     var body: some View {
@@ -259,6 +263,9 @@ struct ATHLTHTrainSessionTransferView: View {
                     Button(tr("Close", "Lukk")) { dismiss() }
                 }
             }
+            .onAppear {
+                expectedPlanVersion = plan?.version
+            }
             .alert(tr("Unable to update plan", "Kunne ikke endre planen"),
                    isPresented: Binding(
                     get: { errorMessage != nil },
@@ -273,19 +280,24 @@ struct ATHLTHTrainSessionTransferView: View {
     }
 
     private func commit() {
-        guard canCommit, let dayID = selectedDayID else { return }
+        guard canCommit, let dayID = selectedDayID,
+              let expectedPlanVersion else { return }
         let success: Bool
         if copyInsteadOfMove {
-            success = session.copyPlanWorkout(
+            success = session.copyPlanStudioWorkout(
                 planID: planID,
-                workoutID: sessionID,
-                dayID: dayID
+                sourceWorkoutID: sessionID,
+                targetDayID: dayID,
+                expectedVersion: expectedPlanVersion
             )
         } else if let date = selectedDate {
-            success = session.movePlanSession(
+            success = session.movePlanStudioWorkout(
                 planID: planID,
-                sessionID: sessionID,
-                to: date
+                workoutID: sessionID,
+                targetDate: date,
+                expectedVersion: expectedPlanVersion,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
             )
         } else {
             return
