@@ -21,6 +21,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingEditor = false
     @State private var showingProgress = false
     @State private var showingGoals = false
+    @State private var showingCoach = false
     @State private var showingAIHelp = false
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
@@ -94,6 +95,11 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingGoals) {
             if let plan {
                 ATHLTHTrainGoalHubView(planID: plan.id)
+            }
+        }
+        .sheet(isPresented: $showingCoach) {
+            if let plan {
+                ATHLTHTrainProgressionCoachView(planID: plan.id)
             }
         }
         .sheet(isPresented: $showingEditor) {
@@ -308,6 +314,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                         Label(tr("Goals and progress", "Mål og fremgang"), systemImage: "target")
                     }
                     Button {
+                        showingCoach = true
+                    } label: {
+                        Label(tr("Progression suggestions", "Progresjonsforslag"), systemImage: "arrow.up.forward")
+                    }
+                    Button {
                         showingProgress = true
                     } label: {
                         Label(tr("Analyze", "Analyser"), systemImage: "chart.xyaxis.line")
@@ -372,6 +383,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Image(systemName: "target")
                         .foregroundStyle(warmGold)
                     Text(tr("Goals and program progress", "Mål og programfremgang"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                }
+                .foregroundStyle(graphite)
+                .padding(13)
+                .background(soft, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingCoach = true
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "arrow.up.forward")
+                        .foregroundStyle(warmGold)
+                    Text(tr("Progression suggestions", "Forslag til neste belastning"))
                         .font(.subheadline.weight(.semibold))
                     Spacer()
                     Image(systemName: "arrow.right")
