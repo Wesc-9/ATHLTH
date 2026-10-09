@@ -1,4 +1,8 @@
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
+import {
+  canForwardRecoveryHealth,
+  mustRejectUnconsentedInsight,
+} from "../_shared/recovery-privacy.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type RecoveryContext = {
@@ -437,10 +441,15 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Invalid request body." }, 400);
   }
 
-  // Privacy enforcement at the edge, not only in the iOS interface.
-  // An ordinary chat request never forwards raw health metrics to Groq.
-  const canShareHealth = body.mode !== "ask" ||
-    body.shareHealthData === true;
+  // Enforce the consent boundary at the API, not only in SwiftUI.
+  // Old clients that omit shareHealthData must never disclose metrics.
+  if (body.mode !== "ask" && body.mode !== "insight") {
+    return json({ error: "Unsupported recovery request." }, 400);
+  }
+  if (mustRejectUnconsentedInsight(body.mode, body.shareHealthData)) {
+    return json({ error: "Explicit Insights health permission required." }, 403);
+  }
+  const canShareHealth = canForwardRecoveryHealth(body.shareHealthData);
   const context = sanitizeContext(
     canShareHealth ? body.context : undefined,
   );
