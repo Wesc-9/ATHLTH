@@ -2818,6 +2818,62 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Adds or updates a named, non-overlapping training block. A block is
+    /// descriptive metadata; it never rewrites scheduled or completed sessions.
+    @discardableResult
+    func saveTrainingPlanBlock(planID: UUID, block: TrainingPlanBlock) -> Bool {
+        guard var plan = trainingPlan(withID: planID) else { return false }
+        var proposed = block
+        proposed.title = proposed.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        proposed.goal = proposed.goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !proposed.title.isEmpty,
+              proposed.title.count <= 80,
+              proposed.goal.count <= 500,
+              proposed.startWeek >= 1,
+              proposed.endWeek >= proposed.startWeek,
+              proposed.endWeek <= plan.weeks.count
+        else { return false }
+
+        var blocks = plan.trainingBlocks ?? []
+        guard !blocks.contains(where: {
+            $0.id != proposed.id &&
+            proposed.startWeek <= $0.endWeek &&
+            proposed.endWeek >= $0.startWeek
+        }) else { return false }
+
+        if let existingIndex = blocks.firstIndex(where: { $0.id == proposed.id }) {
+            blocks[existingIndex] = proposed
+        } else {
+            blocks.append(proposed)
+        }
+        blocks.sort {
+            $0.startWeek == $1.startWeek
+                ? $0.endWeek < $1.endWeek
+                : $0.startWeek < $1.startWeek
+        }
+        plan.trainingBlocks = blocks
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
+    /// Removing a training block removes only its annotation and goal.
+    @discardableResult
+    func removeTrainingPlanBlock(planID: UUID, blockID: UUID) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              var blocks = plan.trainingBlocks,
+              blocks.contains(where: { $0.id == blockID })
+        else { return false }
+
+        blocks.removeAll(where: { $0.id == blockID })
+        plan.trainingBlocks = blocks.isEmpty ? nil : blocks
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     /// Changes only the planning label and phase; completed workouts,
     /// individual sets, and future prescriptions are not recalculated.
     @discardableResult
