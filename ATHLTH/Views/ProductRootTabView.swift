@@ -13267,6 +13267,194 @@ struct ATHLTHRecoveryView: View {
             .unmappedExerciseNames
     }
 
+    private var insightAISharingAllowed: Bool {
+        session.signedIn &&
+        insightAIConsent?.allowsExternalHealthProcessing == true &&
+        RecoveryInsightAIConsentPreferences.isAuthorized(
+            userID: session.profile.userID
+        )
+    }
+
+    @MainActor
+    private func reloadInsightAIConsent() {
+        guard session.signedIn else {
+            insightAIConsent = nil
+            recoveryAIInsight = nil
+            return
+        }
+        insightAIConsent = RecoveryInsightAIConsentPreferences.load(
+            userID: session.profile.userID
+        )
+        if insightAIConsent == nil,
+           isActive,
+           session.hasPaidAccess,
+           shouldShowWearableRecoveryContent {
+            showingInsightAIConsentSheet = true
+        }
+    }
+
+    @MainActor
+    private func setInsightAISharing(_ allowed: Bool) {
+        guard session.signedIn else { return }
+        insightAIConsent = RecoveryInsightAIConsentPreferences.decide(
+            userID: session.profile.userID,
+            allowExternalHealthProcessing: allowed
+        )
+        showingInsightAIConsentSheet = false
+        if allowed {
+            Task { @MainActor in
+                await loadRecoveryAIIfNeeded(force: true)
+            }
+        } else {
+            // The old global toggle must not silently reactivate sharing.
+            session.setAIHealthDataSharingEnabled(false)
+            recoveryAIInsight = nil
+            recoveryAIError = nil
+        }
+    }
+
+    private var insightAIConsentSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 17) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                        .frame(width: 64, height: 64)
+                        .background(
+                            ATHLTHTheme.recoveryBlueSoft,
+                            in: RoundedRectangle(cornerRadius: 19)
+                        )
+
+                    Text(insightText(
+                        "AI insights & your health data",
+                        "AI-innsikt og dine helseopplysninger"
+                    ))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(insightText(
+                        "ATHLTH can calculate your recovery signals locally without sharing them with AI. If you choose AI insights, ATHLTH sends selected health information to the external AI provider Groq to create personalized recommendations.",
+                        "ATHLTH kan beregne restitusjonen lokalt uten å dele data med AI. Hvis du velger AI-innsikt, sender ATHLTH utvalgte helseopplysninger til den eksterne AI-leverandøren Groq for å lage personlige anbefalinger."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 11) {
+                        Label(
+                            insightText(
+                                "What can be shared",
+                                "Dette kan deles"
+                            ),
+                            systemImage: "heart.text.square"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(insightText(
+                            "Recovery score, sleep duration, HRV, resting heart rate, training minutes/load, muscle recovery and your energy, stress, soreness or motivation check-ins if available. Current values and relevant personal baselines are included. Raw GPS routes are not shared.",
+                            "Restitusjonsscore, søvnlengde, HRV, hvilepuls, treningsminutter/belastning, muskelrestitusjon og eventuelle innsjekker om energi, stress, stølhet eller motivasjon. Både dagens verdier og relevante personlige referanseverdier kan inngå. Rå GPS-ruter deles ikke."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                        Divider()
+
+                        Label(
+                            insightText(
+                                "Your choice",
+                                "Du bestemmer"
+                            ),
+                            systemImage: "hand.raised"
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Text(insightText(
+                            "AI analysis is optional and off by default. You can withdraw permission here at any time. It stops future requests, but cannot undo data already processed by Groq. Local Insights remain available.",
+                            "AI-analysen er frivillig og avslått som standard. Du kan trekke tilbake tillatelsen her når som helst. Det stopper nye forespørsler, men kan ikke oppheve behandling som allerede har skjedd hos Groq. Lokale Insights fortsetter å fungere."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(17)
+                    .background(
+                        Color.white.opacity(0.94),
+                        in: RoundedRectangle(cornerRadius: 19)
+                    )
+
+                    NavigationLink {
+                        LegalDocumentView(kind: .privacy)
+                    } label: {
+                        Label(
+                            insightText(
+                                "Read the privacy policy",
+                                "Les personvernerklæringen"
+                            ),
+                            systemImage: "doc.text"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    Button {
+                        setInsightAISharing(true)
+                    } label: {
+                        Text(insightText(
+                            "Allow AI insights with health data",
+                            "Tillat AI-innsikt med helsedata"
+                        ))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 51)
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        setInsightAISharing(false)
+                    } label: {
+                        Text(insightText(
+                            insightAISharingAllowed
+                                ? "Withdraw permission · local insights only"
+                                : "Continue with local insights only",
+                            insightAISharingAllowed
+                                ? "Trekk tilbake · kun lokale innsikter"
+                                : "Fortsett med kun lokale innsikter"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(
+                            insightAISharingAllowed
+                                ? Color.red
+                                : ATHLTHTheme.primaryText
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 49)
+                        .background(
+                            Color.white.opacity(0.92),
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(20)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHTheme.canvasTop)
+            .navigationTitle(
+                insightText("Privacy choices", "Personvernvalg")
+            )
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .interactiveDismissDisabled()
+    }
+
     private var recoveryAIContext: RecoveryAIContext {
         RecoveryAIContext(
             recoveryScore: health.recovery.score,
