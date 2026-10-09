@@ -546,6 +546,7 @@ final class AppSessionStore: ObservableObject {
             // Coach history and generated insights can contain health data.
             // Remove both separately from the regular training-data cleanup.
             RecoveryCoachConversationPersistence.delete(userID: deletedID)
+            RecoveryCoachConsentPreferences.revoke(userID: deletedID)
             for language in ["nb", "en"] {
                 let key = "athlth.recoveryAIInsight.\(deletedID.uuidString).\(language)"
                 defaults.removeObject(forKey: key)
