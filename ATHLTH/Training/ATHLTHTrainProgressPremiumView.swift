@@ -13,6 +13,7 @@ struct ATHLTHTrainProgressPremiumView: View {
     @State private var showingGoals = false
     @State private var showingTrends = false
     @State private var showingCoach = false
+    @State private var showingRecoveryAdvice = false
 
     private let ink = Color(red: 0.18, green: 0.18, blue: 0.17)
     private let muted = Color(red: 0.46, green: 0.45, blue: 0.43)
@@ -65,6 +66,11 @@ struct ATHLTHTrainProgressPremiumView: View {
         .sheet(isPresented: $showingCoach) {
             if let plan {
                 ATHLTHTrainProgressionCoachView(planID: plan.id)
+            }
+        }
+        .sheet(isPresented: $showingRecoveryAdvice) {
+            if let plan {
+                ATHLTHTrainRecoveryAdviceView(planID: plan.id)
             }
         }
     }
@@ -207,6 +213,30 @@ struct ATHLTHTrainProgressPremiumView: View {
                 .padding(15)
                 .freshProgressSurface(line: hairline)
             }
+
+            Button {
+                showingRecoveryAdvice = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "leaf")
+                        .font(.system(size: 19, weight: .light))
+                        .foregroundStyle(champagne)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Recovery suggestions", "Restitusjonsforslag"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(tr("Optional, local adjustments to upcoming strength training",
+                                "Valgfrie, lokale tilpasninger av kommende styrkeøkter"))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.right").font(.caption)
+                }
+                .foregroundStyle(ink)
+                .padding(15)
+                .freshProgressSurface(line: hairline)
+            }
+            .buttonStyle(.plain)
 
             Button {
                 showingCoach = true
