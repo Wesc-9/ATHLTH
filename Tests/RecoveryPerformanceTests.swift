@@ -102,6 +102,34 @@ final class RecoveryPerformanceTests:
         )
     }
 
+    @MainActor
+    func testCoachNeverAddsHealthMetricsWithoutPermission() throws {
+        let original = makeContext(
+            hrv: 75,
+            recoveryPercent: 8,
+            muscleStatus: "Fatigued"
+        )
+        let redacted = RecoveryAIContext.withoutHealthData
+
+        XCTAssertEqual(original.hrvMilliseconds, 75)
+        XCTAssertNil(redacted.recoveryScore)
+        XCTAssertNil(redacted.sleepSeconds)
+        XCTAssertNil(redacted.hrvMilliseconds)
+        XCTAssertNil(redacted.restingHeartRate)
+        XCTAssertNil(redacted.baselineSleepSeconds)
+        XCTAssertNil(redacted.baselineHRVMilliseconds)
+        XCTAssertNil(redacted.baselineRestingHeartRate)
+        XCTAssertNil(redacted.chronicWeeklyAverageMinutes)
+        XCTAssertTrue(redacted.muscles.isEmpty)
+        XCTAssertNil(redacted.checkIn.stress)
+        XCTAssertEqual(redacted.yesterdayTrainingMinutes, 0)
+        XCTAssertEqual(redacted.acuteTrainingMinutes, 0)
+        XCTAssertNotEqual(
+            try RecoveryAIService.cacheSignature(for: original),
+            try RecoveryAIService.cacheSignature(for: redacted)
+        )
+    }
+
     private func makeContext(
         hrv: Double,
         recoveryPercent: Int,
