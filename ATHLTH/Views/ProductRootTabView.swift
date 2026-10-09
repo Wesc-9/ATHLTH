@@ -10973,6 +10973,15 @@ struct ATHLTHRecoveryView: View {
                             recoveryScoreCard
                             todaysSignalsCard
 
+                            // Chat access must not depend on persistent AI
+                            // health permission. Coach asks for explicit
+                            // sharing approval in the conversation itself.
+                            if session.hasPaidAccess {
+                                RecoveryCoachEntryCard {
+                                    showingRecoveryCoach = true
+                                }
+                            }
+
                             RecoveryReadinessBreakdownCard(
                                 recovery: health.recovery,
                                 sleep: health.sleep,
@@ -10989,7 +10998,7 @@ struct ATHLTHRecoveryView: View {
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
 
                                     Text(
-                                        insightText("Enable health-data use in Settings → Privacy & Data only if you want Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way.", "Aktiver bruk av helsedata i Innstillinger → Personvern og data bare hvis du vil at Coach skal bruke søvn, HRV, puls og treningskontekst. Restitusjon beregnes lokalt uansett.")
+                                        insightText("Health-based automatic AI insights are off. You can still chat with Coach and explicitly approve sending health data for a single question.", "Automatiske AI-innsikter basert på helsedata er av. Du kan fortsatt chatte med Coach og godkjenne deling av helsedata for ett spørsmål om gangen.")
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -11170,22 +11179,10 @@ struct ATHLTHRecoveryView: View {
                 RecoveryGuidedToolView(tool: tool)
             }
             .sheet(isPresented: $showingRecoveryCoach) {
-                if session.aiHealthDataSharingEnabled {
-                    NavigationStack {
-                        RecoveryCoachView(
-                            context: recoveryAIContext,
-                            insight:
-                                recoveryAIInsight ??
-                                fallbackRecoveryAIInsight
-                        )
-                    }
-                } else {
-                    ContentUnavailableView(
-                        insightText("Coach health access is off", "Tilgang til helsedata for Coach er av"),
-                        systemImage: "lock.shield.fill",
-                        description: Text(
-                            insightText("Enable it in Settings → Privacy & Data before sharing recovery health context with ATHLTH Coach.", "Aktiver dette i Innstillinger → Personvern og data før restitusjonsdata deles med ATHLTH Coach.")
-                        )
+                NavigationStack {
+                    RecoveryCoachView(
+                        context: recoveryAIContext,
+                        insight: recoveryAIInsight ?? fallbackRecoveryAIInsight
                     )
                 }
             }
