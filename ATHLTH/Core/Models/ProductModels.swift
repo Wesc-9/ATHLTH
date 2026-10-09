@@ -1031,6 +1031,11 @@ struct PlannedSession: Identifiable, Codable, Hashable {
 
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
+    // A reversible athlete-approved recovery adjustment. Optional so
+    // workouts saved by previous versions continue decoding unchanged.
+    var recoveryOriginalExercises: [PlannedExercise]? = nil
+    var recoveryAdjustedAt: Date? = nil
+
 
     var resolvedRunningWorkouts: [RunningWorkoutTemplate] {
         if let runningWorkouts,
