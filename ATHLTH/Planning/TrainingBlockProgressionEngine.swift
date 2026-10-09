@@ -212,12 +212,23 @@ enum TrainingBlockProgressionEngine {
     }
 
     private static func displayPrescription(_ workout: PlannedSession) -> String {
-        let details = workout.exercises.prefix(2).map { item in
-            let load = item.targetWeightKilograms.map { "\($0.formatted()) kg" }
-            let reps = item.reps.map { "\($0) reps" }
-            return "\(item.embeddedExercise.displayName): \(item.sets) sett"
+        workout.exercises.map { exercise in
+            let prefix = "\(exercise.embeddedExercise.displayName): "
+            if let targets = exercise.setTargets, !targets.isEmpty {
+                let details = targets.map { target -> String in
+                    let reps = target.reps.map { "\($0) reps" }
+                    let load = target.weightKilograms.map { "\($0.formatted()) kg" }
+                    let warmup = target.isWarmUp == true || target.setType == .warmUp
+                        ? " (oppv.)" : ""
+                    return [reps, load].compactMap { $0 }.joined(separator: " × ")
+                        + warmup
+                }
+                return prefix + details.joined(separator: " / ")
+            }
+            let load = exercise.targetWeightKilograms.map { "\($0.formatted()) kg" }
+            let reps = exercise.reps.map { "\($0) reps" }
+            return prefix + "\(exercise.sets) sett"
                 + [reps, load].compactMap { $0 }.map { " · " + $0 }.joined()
-        }
-        return details.joined(separator: " | ")
+        }.joined(separator: " | ")
     }
 }
