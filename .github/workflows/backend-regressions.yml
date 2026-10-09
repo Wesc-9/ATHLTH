@@ -32,7 +32,7 @@ jobs:
           node supabase/functions/_shared/account-storage-cleanup.test.ts
           node supabase/functions/_shared/ai-request-budget.test.ts
       - name: Typecheck changed Edge Functions
-        run: deno check supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts scripts/harden_workout_media_cache.ts
+        run: deno check supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/recovery-sense-v2/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts scripts/harden_workout_media_cache.ts
       - name: Start disposable Supabase database
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - name: Replay migrations and verify privacy rules
