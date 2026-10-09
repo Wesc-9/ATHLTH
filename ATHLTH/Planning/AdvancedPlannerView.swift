@@ -4556,7 +4556,9 @@ struct SessionEditorView: View {
     @State private var scheduledTimeEnabled = false
     @State private var scheduledTime = Date()
 
-    @State private var editorMode: SessionEditorMode = .basic
+    @State private var editorMode: SessionEditorMode =
+        UserDefaults.standard.bool(forKey: "athlth.planWorkspace.advancedMode")
+            ? .advanced : .basic
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var gearSelectionTouched = false
     @State private var audioCoachOverride:
@@ -4827,6 +4829,10 @@ struct SessionEditorView: View {
                     index == 1
                         ? .advanced
                         : .basic
+                UserDefaults.standard.set(
+                    index == 1,
+                    forKey: "athlth.planWorkspace.advancedMode"
+                )
             }
         )
     }
