@@ -202,9 +202,8 @@ enum RecoveryInsightAIConsentPreferences {
         if let data = try? JSONEncoder().encode(record) {
             defaults.set(data, forKey: key(userID: userID))
         }
-        if !allowExternalHealthProcessing {
-            clearCachedInsight(userID: userID, defaults: defaults)
-        }
+        // A fresh decision must not retain a legacy, backed-up AI cache.
+        clearCachedInsight(userID: userID, defaults: defaults)
         return record
     }
 
@@ -212,11 +211,16 @@ enum RecoveryInsightAIConsentPreferences {
         userID: UUID,
         defaults: UserDefaults = .standard
     ) {
+        // Remove legacy defaults cache and encrypted, non-backed-up files.
         for language in ["nb", "en"] {
             defaults.removeObject(
                 forKey: "athlth.recoveryAIInsight.\(userID.uuidString).\(language)"
             )
+            UserDefaults.standard.removeObject(
+                forKey: "athlth.recoveryAIInsight.\(userID.uuidString).\(language)"
+            )
         }
+        RecoveryInsightProtectedCache.remove(userID: userID)
     }
 
     static func removeForDeletedAccount(
@@ -236,6 +240,70 @@ enum RecoveryInsightAIConsentError: LocalizedError {
             english: "Allow AI health insights before sharing health data with Groq.",
             norwegian: "Godkjenn AI-helseinnsikt før helsedata deles med Groq."
         )
+    }
+}
+
+// Derived AI health insights should never be stored in backed-up defaults.
+private enum RecoveryInsightProtectedCache {
+    private static func fileURL(
+        userID: UUID,
+        language: String
+    ) -> URL? {
+        guard let base = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            return nil
+        }
+        return base.appendingPathComponent(
+            "recovery-insight-\(userID.uuidString)-\(language).json"
+        )
+    }
+
+    static func load(userID: UUID, language: String) -> Data? {
+        guard let url = fileURL(
+            userID: userID,
+            language: language
+        ) else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    static func save(
+        _ data: Data,
+        userID: UUID,
+        language: String
+    ) {
+        guard let url = fileURL(
+            userID: userID,
+            language: language
+        ) else { return }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(
+                to: url,
+                options: [.atomic, .completeFileProtection]
+            )
+            var protectedURL = url
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try protectedURL.setResourceValues(values)
+        } catch {
+            // If protection or backup exclusion fails, keep no cache.
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    static func remove(userID: UUID) {
+        for language in ["nb", "en"] {
+            if let url = fileURL(
+                userID: userID, language: language
+            ) {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 }
 
@@ -523,19 +591,15 @@ final class RecoveryAIService {
             try Self.cacheSignature(
                 for: context
             )
-        let userScope =
-            client.auth.currentUser?.id.uuidString
-            ?? "signed-out"
         let language =
             ATHLTHLocalization.isNorwegian
                 ? "nb"
                 : "en"
-        let cacheKey =
-            "athlth.recoveryAIInsight.\(userScope).\(language)"
 
         if !bypassCache,
-           let data = UserDefaults.standard.data(
-               forKey: cacheKey
+           let data = RecoveryInsightProtectedCache.load(
+               userID: authorizedUserID,
+               language: language
            ),
            let cached = try? JSONDecoder().decode(
                RecoveryAIInsightCacheEntry.self,
@@ -588,9 +652,10 @@ final class RecoveryAIService {
                 insight: insight
             )
         ) {
-            UserDefaults.standard.set(
+            RecoveryInsightProtectedCache.save(
                 data,
-                forKey: cacheKey
+                userID: authorizedUserID,
+                language: language
             )
         }
 
