@@ -2819,6 +2819,103 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Athlete-confirmed recovery adjustment; recompute and check the
+    /// selected session again before saving. No automatic changes.
+    @discardableResult
+    func applyRecoveryAdjustment(
+        planID: UUID,
+        workoutID: UUID,
+        expectedVersion: Int,
+        energy: Int?,
+        readiness: RecoveryReadinessSummary?,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion else { return false }
+
+        let all = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let completed = Set(all.compactMap { workout -> UUID? in
+            isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: healthWorkouts,
+                strengthHistory: strengthHistory
+            ) ? workout.id : nil
+        })
+        let skipped = Set(all.compactMap { workout -> UUID? in
+            isPlanSessionSkipped(planID: planID, sessionID: workout.id)
+                ? workout.id : nil
+        })
+        guard let proposed = ATHLTHTrainRecoveryAdvisor.proposals(
+            plan: plan,
+            completedIDs: completed,
+            skippedIDs: skipped,
+            strengthHistory: strengthHistory,
+            selfReportedEnergy: energy,
+            readiness: readiness
+        ).first(where: { $0.workoutID == workoutID }) else { return false }
+
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                guard let workoutIndex = plan.weeks[weekIndex].days[dayIndex]
+                    .sessions.firstIndex(where: { $0.id == workoutID }) else { continue }
+                plan.weeks[weekIndex].days[dayIndex].sessions[workoutIndex] =
+                    proposed.proposedSession
+                plan.version += 1
+                plan.updatedAt = Date()
+                replaceTrainingPlan(plan)
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Revert exactly the automatically adjusted exercises, but never
+    /// overwrite later manual edits or completed training.
+    @discardableResult
+    func undoRecoveryAdjustment(
+        planID: UUID,
+        workoutID: UUID,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
+              !isPlanSessionCompleted(
+                planID: planID, sessionID: workoutID,
+                healthWorkouts: healthWorkouts,
+                strengthHistory: strengthHistory
+              ), let start = plan.startDate else { return false }
+        let today = Calendar.current.startOfDay(for: Date())
+        for weekIndex in plan.weeks.indices {
+            for dayIndex in plan.weeks[weekIndex].days.indices {
+                let day = plan.weeks[weekIndex].days[dayIndex]
+                guard let workoutIndex = day.sessions.firstIndex(where: {
+                    $0.id == workoutID
+                }), let scheduled = Calendar.current.date(
+                    byAdding: .day,
+                    value: weekIndex * 7 + day.dayIndex - 1,
+                    to: Calendar.current.startOfDay(for: start)
+                ), scheduled >= today else { continue }
+                var workout = day.sessions[workoutIndex]
+                guard let original = workout.recoveryOriginalExercises,
+                      let adjusted = workout.recoveryAdjustedExercises,
+                      workout.exercises == adjusted else { return false }
+                workout.exercises = original
+                workout.recoveryOriginalExercises = nil
+                workout.recoveryAdjustedExercises = nil
+                workout.recoveryAdjustedAt = nil
+                plan.weeks[weekIndex].days[dayIndex]
+                    .sessions[workoutIndex] = workout
+                plan.version += 1
+                plan.updatedAt = Date()
+                replaceTrainingPlan(plan)
+                return true
+            }
+        }
+        return false
+    }
+
     /// Commit a single athlete-approved suggestion against the latest plan.
     /// Rebuild evidence and completion state before the atomic write.
     @discardableResult
