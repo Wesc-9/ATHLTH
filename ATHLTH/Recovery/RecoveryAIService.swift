@@ -217,6 +217,69 @@ enum RecoveryCoachInboxPreferences {
     }
 }
 
+// Account-scoped, versioned record of the user's explicit Coach choices.
+// An existing Apple Health permission or a global insights preference never
+// counts as permission to disclose health data in this separate AI chat.
+struct RecoveryCoachConsentRecord: Codable, Equatable {
+    let version: Int
+    let aiApprovedAt: Date
+    let healthApprovedAt: Date?
+
+    var healthSharingAllowed: Bool {
+        healthApprovedAt != nil
+    }
+}
+
+enum RecoveryCoachConsentPreferences {
+    private static let version = 1
+
+    private static func key(userID: UUID) -> String {
+        "athlth.recoveryCoach.aiConsent.v1.\(userID.uuidString)"
+    }
+
+    static func load(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryCoachConsentRecord? {
+        guard let data = defaults.data(forKey: key(userID: userID)),
+              let value = try? JSONDecoder().decode(
+                  RecoveryCoachConsentRecord.self, from: data
+              ),
+              value.version == version
+        else {
+            return nil
+        }
+        return value
+    }
+
+    @discardableResult
+    static func approve(
+        userID: UUID,
+        healthSharingAllowed: Bool,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryCoachConsentRecord {
+        let previous = load(userID: userID, defaults: defaults)
+        let record = RecoveryCoachConsentRecord(
+            version: version,
+            aiApprovedAt: previous?.aiApprovedAt ?? Date(),
+            healthApprovedAt: healthSharingAllowed
+                ? (previous?.healthApprovedAt ?? Date())
+                : nil
+        )
+        if let data = try? JSONEncoder().encode(record) {
+            defaults.set(data, forKey: key(userID: userID))
+        }
+        return record
+    }
+
+    static func revoke(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: key(userID: userID))
+    }
+}
+
 enum RecoveryCoachConversationPersistence {
     private static let maxStoredMessages = 200
 
