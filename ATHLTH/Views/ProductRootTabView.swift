@@ -5337,10 +5337,7 @@ struct ATHLTHTrainView: View {
                 AllTrainingPlansView()
             }
             .sheet(isPresented: $showingTrainProgramCreation) {
-                ATHLTHTrainingPlanBuilderFlow(
-                    startsAtSourceChoice: false,
-                    initialAdvanced: false
-                )
+                ATHLTHTrainProgramComposerView()
             }
             .sheet(isPresented: $showingTrainPlanProgress) {
                 if let plan = session.activePlan {
