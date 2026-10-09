@@ -33,6 +33,7 @@ struct ATHLTHTrainWeekBuilderView: View {
         let id = UUID()
         let dayID: UUID
         let sessionID: UUID?
+        let expectedPlanVersion: Int
     }
     private struct TransferRequest: Identifiable {
         let id = UUID()
@@ -138,6 +139,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                 ATHLTHTrainWorkoutBuilderView(
                     planID: planID,
                     dayID: request.dayID,
+                    expectedPlanVersion: request.expectedPlanVersion,
                     existingWorkout: plan?.weeks.flatMap(\.days)
                         .flatMap(\.sessions)
                         .first(where: { $0.id == request.sessionID })
@@ -330,11 +332,13 @@ struct ATHLTHTrainWeekBuilderView: View {
                         Menu {
                             Button {
                                 editorRequest = .init(
-                                    dayID: day.id, sessionID: workout.id
+                                    dayID: day.id, sessionID: workout.id,
+                                    expectedPlanVersion: plan.version
                                 )
                             } label: {
                                 Label(tr("Edit", "Rediger"), systemImage: "pencil")
                             }
+                            .disabled(isCompleted(workout.id))
                             Button {
                                 transferRequest = .init(
                                     workoutID: workout.id,
@@ -399,7 +403,11 @@ struct ATHLTHTrainWeekBuilderView: View {
                     }
 
                     Button {
-                        editorRequest = .init(dayID: day.id, sessionID: workout.id)
+                        editorRequest = .init(
+                        dayID: day.id,
+                        sessionID: workout.id,
+                        expectedPlanVersion: plan.version
+                    )
                     } label: {
                         HStack {
                             Text(tr("Edit complete workout", "Rediger hele økten"))
@@ -411,6 +419,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                         .padding(.top, 7)
                     }
                     .buttonStyle(.plain)
+                    .disabled(isCompleted(workout.id))
                 }
                 .padding(16)
                 .background(.white, in: RoundedRectangle(cornerRadius: 16))
@@ -421,7 +430,11 @@ struct ATHLTHTrainWeekBuilderView: View {
             }
 
             Button {
-                editorRequest = .init(dayID: day.id, sessionID: nil)
+                editorRequest = .init(
+                    dayID: day.id,
+                    sessionID: nil,
+                    expectedPlanVersion: plan.version
+                )
             } label: {
                 HStack {
                     Image(systemName: "plus")
@@ -510,11 +523,14 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @AppStorage("athlth.planWorkspace.advancedMode") private var advanced = false
 
     let planID: UUID
     let dayID: UUID
     let existingWorkout: PlannedSession?
+    let expectedPlanVersion: Int
 
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
@@ -531,10 +547,16 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
     private let line = Color(red: 0.88, green: 0.86, blue: 0.83)
 
-    init(planID: UUID, dayID: UUID, existingWorkout: PlannedSession? = nil) {
+    init(
+        planID: UUID,
+        dayID: UUID,
+        expectedPlanVersion: Int,
+        existingWorkout: PlannedSession? = nil
+    ) {
         self.planID = planID
         self.dayID = dayID
         self.existingWorkout = existingWorkout
+        self.expectedPlanVersion = expectedPlanVersion
         _draft = State(initialValue: existingWorkout ?? PlannedSession(
             id: UUID(), title: "", kind: .strength,
             scheduledStart: nil, durationMinutes: 50,
@@ -1195,12 +1217,23 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             updated.scheduledStart = nil
         }
 
-        if existingWorkout != nil {
-            session.updateSession(updated, inPlan: planID)
+        let saved = session.savePlanStudioWorkout(
+            updated,
+            inPlan: planID,
+            dayID: dayID,
+            editingWorkoutID: existingWorkout?.id,
+            expectedPlanVersion: expectedPlanVersion,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        if saved {
+            dismiss()
         } else {
-            session.addSession(updated, toDay: dayID, inPlan: planID)
+            errorMessage = tr(
+                "The plan has changed, or this session is completed or in the past. Close and reopen the editor to use the latest version.",
+                "Planen er endret, eller økten er gjennomført eller ligger i fortiden. Lukk og åpne editoren igjen for å bruke siste versjon."
+            )
         }
-        dismiss()
     }
 
     private func sectionTitle(_ title: String) -> some View {
