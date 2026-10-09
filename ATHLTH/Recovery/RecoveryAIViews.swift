@@ -1059,6 +1059,11 @@ struct RecoveryCoachView: View {
     @State private var shareHealthForNextQuestion = false
     @State private var pendingHealthQuestion: String?
     @State private var showingHealthShareConfirmation = false
+    @State private var aiConsentApproved = false
+    @State private var healthConsentApproved = false
+    @State private var draftHealthPermission = false
+    @State private var showingCoachConsentSheet = false
+    @State private var pendingShareAfterConsent = false
 
     private let service = RecoveryAIService()
     private let bottomAnchorID =
@@ -1271,11 +1276,12 @@ struct RecoveryCoachView: View {
             coachPinned =
                 RecoveryCoachInboxPreferences
                     .isPinned(
-                        userID:
-                            session
-                                .profile
-                                .userID
+                        userID: session.profile.userID
                     )
+            loadCoachConsent()
+        }
+        .sheet(isPresented: $showingCoachConsentSheet) {
+            coachConsentSheet
         }
         .alert(
             recoveryAIText(
@@ -1394,6 +1400,20 @@ struct RecoveryCoachView: View {
                             coachPinned
                                 ? "pin.slash"
                                 : "pin.fill"
+                    )
+                }
+
+                Button {
+                    draftHealthPermission = healthConsentApproved
+                    pendingShareAfterConsent = false
+                    showingCoachConsentSheet = true
+                } label: {
+                    Label(
+                        recoveryAIText(
+                            "AI & privacy settings",
+                            "AI- og personvernvalg"
+                        ),
+                        systemImage: "hand.raised"
                     )
                 }
 
@@ -1880,7 +1900,17 @@ struct RecoveryCoachView: View {
             }
 
             Button {
-                shareHealthForNextQuestion.toggle()
+                if !aiConsentApproved {
+                    pendingShareAfterConsent = false
+                    draftHealthPermission = false
+                    showingCoachConsentSheet = true
+                } else if !healthConsentApproved {
+                    pendingShareAfterConsent = true
+                    draftHealthPermission = false
+                    showingCoachConsentSheet = true
+                } else {
+                    shareHealthForNextQuestion.toggle()
+                }
             } label: {
                 Label(
                     shareHealthForNextQuestion
@@ -2310,6 +2340,17 @@ struct RecoveryCoachView: View {
         let clean = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, !isAsking else { return }
 
+        guard aiConsentApproved,
+              RecoveryCoachConsentPreferences.load(
+                userID: session.profile.userID
+              ) != nil
+        else {
+            pendingShareAfterConsent = false
+            draftHealthPermission = false
+            showingCoachConsentSheet = true
+            return
+        }
+
         if shareHealthForNextQuestion {
             pendingHealthQuestion = clean
             showingHealthShareConfirmation = true
@@ -2333,7 +2374,12 @@ struct RecoveryCoachView: View {
                 )
 
         guard !clean.isEmpty,
-              !isAsking
+              !isAsking,
+              aiConsentApproved,
+              let currentConsent = RecoveryCoachConsentPreferences.load(
+                  userID: session.profile.userID
+              ),
+              !shareHealthData || currentConsent.healthSharingAllowed
         else {
             return
         }
