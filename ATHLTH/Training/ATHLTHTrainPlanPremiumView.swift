@@ -20,6 +20,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingAllPlans = false
     @State private var showingEditor = false
     @State private var showingProgress = false
+    @State private var showingGoals = false
     @State private var showingAIHelp = false
     @State private var editingDayID: UUID?
     @State private var openingWorkout: PlannedSession?
@@ -88,6 +89,11 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingProgress) {
             if let plan {
                 TrainingPlanProgressDetailView(planID: plan.id)
+            }
+        }
+        .sheet(isPresented: $showingGoals) {
+            if let plan {
+                ATHLTHTrainGoalHubView(planID: plan.id)
             }
         }
         .sheet(isPresented: $showingEditor) {
@@ -297,6 +303,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                         Label(tr("All plans", "Alle planer"), systemImage: "square.stack")
                     }
                     Button {
+                        showingGoals = true
+                    } label: {
+                        Label(tr("Goals and progress", "Mål og fremgang"), systemImage: "target")
+                    }
+                    Button {
                         showingProgress = true
                     } label: {
                         Label(tr("Analyze", "Analyser"), systemImage: "chart.xyaxis.line")
@@ -354,6 +365,23 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("View progress", "Se fremgang"))
             }
+            Button {
+                showingGoals = true
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "target")
+                        .foregroundStyle(warmGold)
+                    Text(tr("Goals and program progress", "Mål og programfremgang"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.caption)
+                }
+                .foregroundStyle(graphite)
+                .padding(13)
+                .background(soft, in: RoundedRectangle(cornerRadius: 11))
+            }
+            .buttonStyle(.plain)
         }
         .padding(17)
         .surface(line: line)
