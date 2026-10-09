@@ -1034,6 +1034,7 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // A reversible athlete-approved recovery adjustment. Optional so
     // workouts saved by previous versions continue decoding unchanged.
     var recoveryOriginalExercises: [PlannedExercise]? = nil
+    var recoveryAdjustedExercises: [PlannedExercise]? = nil
     var recoveryAdjustedAt: Date? = nil
 
 
