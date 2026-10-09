@@ -13386,6 +13386,14 @@ struct ATHLTHRecoveryView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
 
+                    Text(insightText(
+                        "Groq may process customer data in the United States. Depending on the provider's data settings, inputs or outputs may temporarily be retained for troubleshooting or abuse monitoring, normally up to 30 days. You can choose local Insights instead.",
+                        "Groq kan behandle kundedata i USA. Avhengig av leverandørens datainnstillinger kan spørsmål og svar lagres midlertidig for feilsøking eller kontroll av misbruk, normalt i inntil 30 dager. Du kan i stedet velge lokale Insights."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+
                     VStack(alignment: .leading, spacing: 11) {
                         Label(
                             insightText(
