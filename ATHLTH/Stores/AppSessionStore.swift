@@ -2819,6 +2819,78 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Commit a single athlete-approved suggestion against the latest plan.
+    /// Rebuild evidence and completion state before the atomic write.
+    @discardableResult
+    func applySuggestedTrainingLoad(
+        planID: UUID,
+        workoutID: UUID,
+        exerciseID: UUID,
+        expectedVersion: Int,
+        expectedBeforeLoad: Double,
+        approvedIncreaseKg: Double,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              approvedIncreaseKg.isFinite,
+              (0.5...5).contains(approvedIncreaseKg) else { return false }
+
+        let workouts = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let completedIDs = Set(workouts.compactMap { workout -> UUID? in
+            isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: healthWorkouts, strengthHistory: strengthHistory
+            ) ? workout.id : nil
+        })
+        let skippedIDs = Set(workouts.compactMap { workout -> UUID? in
+            isPlanSessionSkipped(planID: planID, sessionID: workout.id)
+                ? workout.id : nil
+        })
+        let suggestions = ATHLTHTrainProgressionCoach.suggestions(
+            plan: plan, strengthHistory: strengthHistory,
+            completedSessionIDs: completedIDs, skippedSessionIDs: skippedIDs,
+            increaseKg: approvedIncreaseKg
+        )
+        guard let suggestion = suggestions.first(where: {
+            $0.workoutID == workoutID && $0.exerciseID == exerciseID
+        }),
+              abs(suggestion.beforeLoad - expectedBeforeLoad) < 0.001,
+              let location = plan.weeks.indices.compactMap({
+                weekIndex -> (Int, Int, Int)? in
+                for dayIndex in plan.weeks[weekIndex].days.indices {
+                    let day = plan.weeks[weekIndex].days[dayIndex]
+                    if let workoutIndex = day.sessions.firstIndex(where: {
+                        $0.id == workoutID
+                    }) {
+                        return (weekIndex, dayIndex, workoutIndex)
+                    }
+                }
+                return nil
+              }).first
+        else { return false }
+
+        let (weekIndex, dayIndex, workoutIndex) = location
+        guard let exerciseIndex = plan.weeks[weekIndex].days[dayIndex]
+            .sessions[workoutIndex].exercises.firstIndex(where: {
+                $0.id == exerciseID
+            }) else { return false }
+
+        let original = plan.weeks[weekIndex].days[dayIndex]
+            .sessions[workoutIndex].exercises[exerciseIndex]
+        guard let adjusted = ATHLTHTrainProgressionCoach.adjustedExercise(
+            original, increaseKg: approvedIncreaseKg
+        ) else { return false }
+
+        plan.weeks[weekIndex].days[dayIndex]
+            .sessions[workoutIndex].exercises[exerciseIndex] = adjusted
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     /// Apply only the currently previewed version. Completion is recalculated
     /// at save time rather than relying on a stale UI snapshot.
     @discardableResult
