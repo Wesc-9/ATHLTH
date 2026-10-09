@@ -1405,7 +1405,9 @@ struct RecoveryCoachView: View {
                     quickQuestions =
                         contextAwareQuestions()
                     errorMessage = nil
-                    persistConversation()
+                    RecoveryCoachConversationPersistence.delete(
+                        userID: session.profile.userID
+                    )
                 } label: {
                     Label(
                         recoveryAIText(
@@ -1952,7 +1954,9 @@ struct RecoveryCoachView: View {
                         quickQuestions =
                             contextAwareQuestions()
                         errorMessage = nil
-                        persistConversation()
+                        RecoveryCoachConversationPersistence.delete(
+                        userID: session.profile.userID
+                    )
                     } label: {
                         Label(
                             recoveryAIText(
