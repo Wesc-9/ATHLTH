@@ -512,11 +512,10 @@ You are continuing an ATHLTH Coach conversation.
     await recordGroqQuota(response, "recovery-ask");
 
     if (!response.ok) {
-      const failure = await response.text();
+      // Provider error payloads may echo sensitive prompt content.
+      // Never persist them or generated health text in server logs.
       console.error("ATHLTH Coach ask failed", {
-        userID: access.userID,
         status: response.status,
-        body: failure.slice(0, 1500),
       });
       return json({ error: "ATHLTH Coach is temporarily unavailable." }, 502);
     }
@@ -547,12 +546,7 @@ You are continuing an ATHLTH Coach conversation.
       });
     } catch (error) {
       console.error("Unable to parse ATHLTH Coach chat reply", {
-        userID: access.userID,
-        output: outputText.slice(0, 1500),
-        message:
-          error instanceof Error
-            ? error.message
-            : String(error),
+        kind: "invalid_response_format",
       });
       return json({ error: "ATHLTH Coach returned an invalid answer." }, 502);
     }
@@ -593,11 +587,8 @@ Create today's Recovery insight.
   await recordGroqQuota(response, "recovery-insight");
 
   if (!response.ok) {
-    const failure = await response.text();
     console.error("ATHLTH Coach insight failed", {
-      userID: access.userID,
       status: response.status,
-      body: failure.slice(0, 1500),
     });
     return json({ error: "ATHLTH Coach is temporarily unavailable." }, 502);
   }
@@ -612,8 +603,7 @@ Create today's Recovery insight.
     return json(JSON.parse(outputText));
   } catch {
     console.error("Unable to parse ATHLTH Coach insight", {
-      userID: access.userID,
-      output: outputText.slice(0, 1500),
+      kind: "invalid_response_format",
     });
     return json({ error: "ATHLTH Coach returned an invalid insight." }, 502);
   }
