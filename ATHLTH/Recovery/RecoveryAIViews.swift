@@ -1912,6 +1912,17 @@ struct RecoveryCoachView: View {
                 )
             )
 
+            Text(
+                recoveryAIText(
+                    "Your message goes to Groq. Health metrics are added only after your confirmation.",
+                    "Meldingen din sendes til Groq. Helsedata legges bare ved etter din bekreftelse."
+                )
+            )
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .fixedSize(horizontal: false, vertical: true)
+
             HStack(spacing: 9) {
                 Menu {
                     Button {
