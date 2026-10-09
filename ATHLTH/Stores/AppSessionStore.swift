@@ -2819,6 +2819,46 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Apply only the currently previewed version. Completion is recalculated
+    /// at save time rather than relying on a stale UI snapshot.
+    @discardableResult
+    func applyTrainingBlockProgression(
+        planID: UUID,
+        blockID: UUID,
+        expectedVersion: Int,
+        rule: TrainingBlockProgressionRule,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> TrainingBlockProgressionEngine.Summary? {
+        guard let plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion else { return nil }
+        let workouts = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+        let protected = Set(workouts.compactMap { workout -> UUID? in
+            if isPlanSessionSkipped(planID: planID, sessionID: workout.id) ||
+               isPlanSessionCompleted(
+                   planID: planID,
+                   sessionID: workout.id,
+                   healthWorkouts: healthWorkouts,
+                   strengthHistory: strengthHistory
+               ) {
+                return workout.id
+            }
+            return nil
+        })
+        guard let result = TrainingBlockProgressionEngine.prepare(
+            plan: plan,
+            blockID: blockID,
+            rule: rule,
+            protectedSessionIDs: protected
+        ), result.summary.hasChanges else { return nil }
+
+        var updated = result.plan
+        updated.version += 1
+        updated.updatedAt = Date()
+        replaceTrainingPlan(updated)
+        return result.summary
+    }
+
     /// Adds or updates a named, non-overlapping training block. A block is
     /// descriptive metadata; it never rewrites scheduled or completed sessions.
     @discardableResult
