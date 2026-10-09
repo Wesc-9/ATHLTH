@@ -124,10 +124,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await catalog.refresh() }
         .sheet(isPresented: $showingCreatePlan) {
-            ATHLTHTrainingPlanBuilderFlow(
-                startsAtSourceChoice: false,
-                initialAdvanced: false
-            )
+            ATHLTHTrainProgramComposerView()
         }
         .sheet(item: $selectedTemplate) { plan in
             templatePreview(plan)
