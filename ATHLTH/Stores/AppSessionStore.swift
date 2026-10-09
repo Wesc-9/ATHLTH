@@ -2966,6 +2966,138 @@ final class AppSessionStore: ObservableObject {
             }
     }
 
+    /// Reuse an existing or saved workout without borrowing its completion ID.
+    /// All changes are atomic at the plan level, and the source is not mutated.
+    @discardableResult
+    func insertSavedWorkoutIntoPlan(
+        templateID: UUID,
+        planID: UUID,
+        dayID: UUID
+    ) -> Bool {
+        guard let template = savedWorkoutTemplates.first(where: { $0.id == templateID }) else {
+            return false
+        }
+        return insertPlanWorkoutCopy(
+            source: template,
+            planID: planID,
+            dayID: dayID
+        )
+    }
+
+    @discardableResult
+    func copyPlanWorkout(
+        planID: UUID,
+        workoutID: UUID,
+        dayID: UUID
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID),
+              let original = plan.weeks.flatMap(\.days)
+                .flatMap(\.sessions)
+                .first(where: { $0.id == workoutID })
+        else { return false }
+        return insertPlanWorkoutCopy(
+            source: original,
+            planID: planID,
+            dayID: dayID
+        )
+    }
+
+    private func insertPlanWorkoutCopy(
+        source: PlannedSession,
+        planID: UUID,
+        dayID: UUID
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              let start = plan.startDate,
+              let location = plan.weeks.enumerated().compactMap({
+                weekNumber, week -> (Int, Int)? in
+                guard let dayNumber = week.days.firstIndex(where: { $0.id == dayID }) else {
+                    return nil
+                }
+                return (weekNumber, dayNumber)
+              }).first
+        else { return false }
+
+        let (weekNumber, dayNumber) = location
+        let originalDay = plan.weeks[weekNumber].days[dayNumber]
+        let calendar = Calendar.current
+        let date = calendar.date(
+            byAdding: .day,
+            value: weekNumber * 7 + originalDay.dayIndex - 1,
+            to: calendar.startOfDay(for: start)
+        ) ?? start
+        let scheduled: Date? = source.scheduledStart.flatMap { original in
+            let time = calendar.dateComponents([.hour, .minute], from: original)
+            return calendar.date(
+                bySettingHour: time.hour ?? 18,
+                minute: time.minute ?? 0,
+                second: 0,
+                of: date
+            )
+        }
+        // A copied workout and its exercises are separate from the source.
+        // Re-map supersets, keeping their internal grouping intact.
+        var supersetIDs: [UUID: UUID] = [:]
+        let exercises: [PlannedExercise] = source.exercises.map { old in
+            var result = PlannedExercise(
+                id: UUID(),
+                exerciseID: old.exerciseID,
+                embeddedExercise: old.embeddedExercise,
+                sets: old.sets,
+                reps: old.reps,
+                targetWeightKilograms: old.targetWeightKilograms,
+                targetRPE: old.targetRPE,
+                restSeconds: old.restSeconds,
+                notes: old.notes
+            )
+            result.targetRIR = old.targetRIR
+            if let group = old.supersetGroupID {
+                if supersetIDs[group] == nil { supersetIDs[group] = UUID() }
+                result.supersetGroupID = supersetIDs[group]
+            }
+            result.progression = old.progression
+            result.targetKind = old.targetKind
+            result.targetDurationSeconds = old.targetDurationSeconds
+            result.loadKind = old.loadKind
+            result.targetResistanceLevel = old.targetResistanceLevel
+            result.setTargets = old.setTargets
+            return result
+        }
+        var copy = PlannedSession(
+            id: UUID(),
+            title: source.title,
+            kind: source.kind,
+            scheduledStart: scheduled,
+            durationMinutes: source.durationMinutes,
+            targetDistanceKilometers: source.targetDistanceKilometers,
+            targetPaceSecondsPerKilometer: source.targetPaceSecondsPerKilometer,
+            routeID: source.routeID,
+            exercises: exercises,
+            notes: source.notes,
+            runningWorkout: source.runningWorkout,
+            runningWorkouts: source.runningWorkouts,
+            gearIDs: source.gearIDs,
+            audioCoachConfiguration: source.audioCoachConfiguration,
+            autoPauseEnabled: source.autoPauseEnabled,
+            spotifyPlaylist: source.spotifyPlaylist,
+            spotifyAutoplayOnStart: source.spotifyAutoplayOnStart,
+            targetAlertConfiguration: source.targetAlertConfiguration,
+            routeAlertConfiguration: source.routeAlertConfiguration,
+            ghostTargetDurationSeconds: source.ghostTargetDurationSeconds,
+            ghostUpdates: source.ghostUpdates,
+            workoutTemplateID: source.workoutTemplateID,
+            workoutBlocks: source.workoutBlocks,
+            workoutCategory: source.workoutCategory
+        )
+        copy.sharedSourceOwnerID = source.sharedSourceOwnerID
+        copy.sharedSourceSessionID = source.sharedSourceSessionID
+        plan.weeks[weekNumber].days[dayNumber].sessions.append(copy)
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     func addSession(
         _ session: PlannedSession,
         toDay dayID: UUID
