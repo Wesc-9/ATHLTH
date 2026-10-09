@@ -173,7 +173,8 @@ struct ATHLTHApp: App {
     var body: some Scene {
         WindowGroup {
             if !appSession.signedIn &&
-                !appSession.previewModeEnabled {
+                !appSession.previewModeEnabled &&
+                UIDevice.current.userInterfaceIdiom != .pad {
                 // Render sign-in before constructing the full workout,
                 // social and background-services environment tree.
                 // Compact iPhone simulators can otherwise remain on an
@@ -228,7 +229,16 @@ struct ATHLTHApp: App {
                         )
                     }
             } else {
-                AppRootView()
+                // Keep the compatibility tab UI separate from the full
+                // production AppRootView. The smoke suite must render
+                // the real tab views, not the launch lifecycle graph.
+                Group {
+                    if appSession.previewModeEnabled {
+                        ATHLTHCompatibilityPreviewRootView()
+                    } else {
+                        AppRootView()
+                    }
+                }
                 .environmentObject(health)
                 .environmentObject(exerciseLibrary)
                 .environmentObject(runningWorkoutLibrary)
