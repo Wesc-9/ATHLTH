@@ -55,9 +55,10 @@ enum ATHLTHTrainProgressionCoach {
                 let working = entry.sets.filter {
                     $0.countsTowardTrainingLoad && $0.plannedSetType != .warmUp
                 }
-                guard working.count >= 2 else { continue }
                 var loads: [Double] = []
-                var allMet = true
+                // Insufficient or entirely missing working sets in the
+                // most recent session must suppress a recommendation.
+                var allMet = working.count >= 2
                 for set in working {
                     guard let plannedReps = set.plannedReps, plannedReps > 0,
                           let plannedLoad = set.plannedWeightKilograms,
