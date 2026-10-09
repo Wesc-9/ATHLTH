@@ -127,7 +127,7 @@ final class TrainingBlockProgressionEngineTests: XCTestCase {
 
     func testPastSessionsNeverChange() throws {
         let initial = plan()
-        let future = calendar.date(byAdding: .day, value: 15, to: start)!
+        let future = calendar.date(byAdding: .day, value: 21, to: start)!
         let result = try XCTUnwrap(TrainingBlockProgressionEngine.prepare(
             plan: initial, blockID: blockID,
             rule: rule(.weight), protectedSessionIDs: [],
