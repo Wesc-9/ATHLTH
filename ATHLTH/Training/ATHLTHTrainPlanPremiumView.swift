@@ -7,6 +7,10 @@ struct ATHLTHTrainPlanPremiumView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
+    // Optional deep link from "I dag" or the rebuilt library.
+    let highlightedPlanID: UUID? = nil
+    @State private var focusedPlanID: UUID?
+
     @AppStorage("athlth.planWorkspace.advancedMode")
     private var advanced = false
     @State private var selectedWeekIndex: Int?
@@ -29,7 +33,11 @@ struct ATHLTHTrainPlanPremiumView: View {
     private let soft = Color(red: 0.964, green: 0.951, blue: 0.929)
 
     private var plan: TrainingPlan? {
-        session.activePlan
+        if let id = focusedPlanID ?? highlightedPlanID,
+           let selected = session.trainingPlans.first(where: { $0.id == id }) {
+            return selected
+        }
+        return session.activePlan
     }
 
     private var selectedWeek: TrainingPlanWeek? {
@@ -59,8 +67,14 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: plan?.id) { _, _ in
             selectedWeekIndex = nil
         }
+        .onChange(of: highlightedPlanID) { _, next in
+            focusedPlanID = next
+        }
         .sheet(isPresented: $showingCreation) {
-            ATHLTHTrainProgramComposerView()
+            ATHLTHTrainProgramComposerView { planID in
+                focusedPlanID = planID
+                selectedWeekIndex = 0
+            }
         }
         .sheet(isPresented: $showingMyPlans) {
             MyTrainingPlansLibraryView()
@@ -122,6 +136,38 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
+    private var planChooser: some View {
+        Menu {
+            ForEach(session.trainingPlans) { item in
+                Button {
+                    focusedPlanID = item.id
+                    selectedWeekIndex = nil
+                } label: {
+                    Label(
+                        item.title,
+                        systemImage: item.id == plan?.id
+                            ? "checkmark.circle.fill" : "calendar"
+                    )
+                }
+            }
+            Button {
+                showingCreation = true
+            } label: {
+                Label(tr("New program", "Nytt program"), systemImage: "plus")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(tr("Choose program", "Velg program"))
+                Image(systemName: "chevron.down")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(graphite)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(soft, in: Capsule())
+        }
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
@@ -145,6 +191,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Create training plan", "Opprett treningsplan"))
+            }
+
+            if !session.trainingPlans.isEmpty {
+                planChooser
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack {
@@ -224,7 +275,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         return VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(tr("ACTIVE PROGRAM", "AKTIV PLAN"))
+                    Text(tr("TRAINING PROGRAM", "TRENINGSPROGRAM"))
                         .font(.system(size: 9, weight: .bold))
                         .tracking(1.7)
                         .foregroundStyle(warmGold)
