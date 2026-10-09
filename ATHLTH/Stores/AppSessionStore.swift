@@ -3448,6 +3448,115 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    /// Resolve an exact Plan Studio day and its calendar date.
+    private func planStudioDayLocation(
+        in plan: TrainingPlan,
+        dayID: UUID
+    ) -> (week: Int, day: Int, date: Date)? {
+        guard let start = plan.startDate else { return nil }
+        let calendar = Calendar.current
+        for week in plan.weeks.indices {
+            guard let day = plan.weeks[week].days.firstIndex(where: {
+                $0.id == dayID
+            }) else { continue }
+            let number = plan.weeks[week].days[day].dayIndex
+            guard let date = calendar.date(
+                byAdding: .day,
+                value: week * 7 + number - 1,
+                to: calendar.startOfDay(for: start)
+            ) else { return nil }
+            return (week, day, date)
+        }
+        return nil
+    }
+
+    /// A copy is a future session with new workout, exercise and set IDs.
+    @discardableResult
+    func copyPlanStudioWorkout(
+        planID: UUID,
+        sourceWorkoutID: UUID,
+        targetDayID: UUID,
+        expectedVersion: Int
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              plan.weeks.flatMap(\.days).flatMap(\.sessions).contains(where: {
+                  $0.id == sourceWorkoutID
+              }),
+              let target = planStudioDayLocation(in: plan, dayID: targetDayID),
+              target.date >= Calendar.current.startOfDay(for: Date())
+        else { return false }
+        return copyPlanWorkout(
+            planID: planID,
+            workoutID: sourceWorkoutID,
+            dayID: targetDayID
+        )
+    }
+
+    /// The older move API remains available to existing training flows.
+    /// Plan Studio adds completion, skipped-session and optimistic-version guards.
+    @discardableResult
+    func movePlanStudioWorkout(
+        planID: UUID,
+        workoutID: UUID,
+        targetDate: Date,
+        expectedVersion: Int,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let sourceDay = plan.weeks.flatMap(\.days).first(where: {
+                  $0.sessions.contains(where: { $0.id == workoutID })
+              }),
+              let source = planStudioDayLocation(in: plan, dayID: sourceDay.id),
+              source.date >= Calendar.current.startOfDay(for: Date()),
+              Calendar.current.startOfDay(for: targetDate) >=
+                  Calendar.current.startOfDay(for: Date()),
+              !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
+              !isPlanSessionCompleted(
+                  planID: planID, sessionID: workoutID,
+                  healthWorkouts: healthWorkouts,
+                  strengthHistory: strengthHistory
+              ) else { return false }
+        return movePlanSession(
+            planID: planID,
+            sessionID: workoutID,
+            to: targetDate
+        )
+    }
+
+    /// Only an uncompleted, unskipped, future planned workout can be
+    /// removed from Plan Studio; no recorded results are deleted.
+    @discardableResult
+    func removePlanStudioWorkout(
+        planID: UUID,
+        workoutID: UUID,
+        dayID: UUID,
+        expectedVersion: Int,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let location = planStudioDayLocation(in: plan, dayID: dayID),
+              location.date >= Calendar.current.startOfDay(for: Date()),
+              let workoutIndex = plan.weeks[location.week].days[location.day]
+                  .sessions.firstIndex(where: { $0.id == workoutID }),
+              !isPlanSessionSkipped(planID: planID, sessionID: workoutID),
+              !isPlanSessionCompleted(
+                  planID: planID, sessionID: workoutID,
+                  healthWorkouts: healthWorkouts,
+                  strengthHistory: strengthHistory
+              ) else { return false }
+        plan.weeks[location.week].days[location.day]
+            .sessions.remove(at: workoutIndex)
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return true
+    }
+
     /// Atomic Plan Studio save. Rejects stale editors, completed/skipped
     /// workouts and past dates; no existing execution or history is touched.
     @discardableResult
