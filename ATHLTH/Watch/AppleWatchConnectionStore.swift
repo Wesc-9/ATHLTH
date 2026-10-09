@@ -270,6 +270,14 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             .isActive == true
     }
 
+    // The iPhone is authoritative for locally recorded workouts. Both
+    // direct Watch launches and starts initiated from the iPhone must
+    // respect the same activity lock; otherwise a second HealthKit
+    // session can be created while an iPhone workout is running.
+    var hasActiveIPhoneWorkout: Bool {
+        localWorkoutActivityLock.snapshot().active
+    }
+
     var statusText: String {
         switch state {
         case .checking:
@@ -368,7 +376,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 .launchAlreadyInProgress
         }
 
-        guard !hasActiveWatchWorkout else {
+        guard !hasActiveWatchWorkout,
+              !hasActiveIPhoneWorkout
+        else {
             throw AppleWatchWorkoutLaunchError
                 .workoutAlreadyActive
         }
