@@ -307,7 +307,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 }
             }
 
-            let matches = exerciseLibrary.allExercises.filter { item in
+            let filteredExercises = exerciseLibrary.allExercises.filter { item in
                 let nameMatch = matches(item.name, item.canonicalName,
                                         item.bodyPart ?? "", item.category ?? "")
                 let muscleMatch = exerciseGroup.isEmpty
@@ -316,7 +316,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 return nameMatch && muscleMatch
             }
 
-            if matches.isEmpty {
+            if filteredExercises.isEmpty {
                 emptySection(
                     tr("No matching exercises", "Fant ingen øvelser"),
                     tr("Try a different name or muscle group.",
@@ -324,7 +324,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 )
             }
 
-            ForEach(matches.prefix(65)) { entry in
+            ForEach(filteredExercises.prefix(65)) { entry in
                 Button { selectedExercise = entry } label: {
                     HStack(spacing: 11) {
                         Image(systemName: "dumbbell")
@@ -354,7 +354,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 .buttonStyle(.plain)
             }
 
-            if matches.count > 65 {
+            if filteredExercises.count > 65 {
                 Text(tr("Use search to narrow down more exercises.",
                         "Bruk søk eller filter for å finne flere øvelser."))
                     .font(.caption)
