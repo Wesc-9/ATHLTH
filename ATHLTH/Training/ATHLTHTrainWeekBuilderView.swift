@@ -16,6 +16,7 @@ struct ATHLTHTrainWeekBuilderView: View {
     @State private var removeRequest: RemoveRequest?
     @State private var transferRequest: TransferRequest?
     @State private var showingSavedWorkouts = false
+    @State private var showingPeriodization = false
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -66,6 +67,33 @@ struct ATHLTHTrainWeekBuilderView: View {
                     if let plan, let week = currentWeek {
                         introduction(plan)
                         weekSelector(plan)
+                        Button {
+                            showingPeriodization = true
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: "chart.bar.xaxis")
+                                    .foregroundStyle(bronze)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(tr("Training periods", "Treningsperioder"))
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(tr("Weekly blocks, progression and recovery",
+                                            "Treningsblokker, progresjon og lettere uker"))
+                                        .font(.caption)
+                                        .foregroundStyle(muted)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(ink)
+                            .padding(14)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(line, lineWidth: 0.7)
+                            }
+                        }
+                        .buttonStyle(.plain)
                         daySelector(week)
                         if let day = currentDay {
                             detailForDay(day, plan: plan)
@@ -97,6 +125,15 @@ struct ATHLTHTrainWeekBuilderView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingPeriodization) {
+                ATHLTHTrainPeriodizationView(
+                    planID: planID,
+                    initialWeekIndex: weekIndex
+                ) { selectedIndex in
+                    weekIndex = selectedIndex
+                    selectedDayID = nil
+                }
+            }
             .sheet(item: $editorRequest) { request in
                 ATHLTHTrainWorkoutBuilderView(
                     planID: planID,
