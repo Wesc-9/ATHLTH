@@ -463,6 +463,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
     @State private var showRunningTemplates = false
+    @State private var showIntervalComposer = false
     @State private var scheduled = false
     @State private var clockTime = Date()
     @State private var errorMessage: String?
@@ -536,6 +537,17 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     draft.exercises.append(newExercise)
                     detailExerciseID = newExercise.id
                     showExerciseSearch = false
+                }
+            }
+            .sheet(isPresented: $showIntervalComposer) {
+                ATHLTHTrainIntervalComposerView(
+                    initial: draft.runningWorkout
+                ) { template in
+                    draft.runningWorkout = template
+                    draft.runningWorkouts = [template]
+                    if draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        draft.title = template.title
+                    }
                 }
             }
             .sheet(isPresented: $showRunningTemplates) {
@@ -950,6 +962,52 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .editorSurface(line: line)
 
             if draft.kind == .running {
+                Button { showIntervalComposer = true } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "repeat")
+                            .foregroundStyle(bronze)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(tr("Build your intervals", "Bygg løpeintervaller"))
+                                .font(.subheadline.weight(.semibold))
+                            Text(tr("Warm-up, intervals, pace and recovery",
+                                    "Oppvarming, drag, fart og pauser"))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .foregroundStyle(ink)
+                    .padding(14)
+                    .editorSurface(line: line)
+                }
+                .buttonStyle(.plain)
+
+                if let structured = draft.runningWorkout,
+                   !structured.blocks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(tr("CURRENT STRUCTURE", "VALGT ØKTSTRUKTUR"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.25)
+                            .foregroundStyle(bronze)
+                        ForEach(structured.blocks) { block in
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(block.title)
+                                    .font(.caption.weight(.medium))
+                                Spacer(minLength: 5)
+                                Text("\(block.repetitions) × "
+                                      + (block.work.measure == .distance
+                                        ? "\(Int(block.work.distanceMeters ?? 0)) m"
+                                        : "\(Int((block.work.durationSeconds ?? 0)/60)) min"))
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                            }
+                        }
+                    }
+                    .padding(13)
+                    .editorSurface(line: line)
+                }
+
                 Button { showRunningTemplates = true } label: {
                     HStack {
                         Image(systemName: "figure.run")
