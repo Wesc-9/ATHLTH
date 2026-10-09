@@ -57,6 +57,24 @@ final class WorkoutLaunchHardeningTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testWatchLaunchSeesActiveIPhoneWorkoutLock() {
+        let connection = AppleWatchConnectionStore()
+        XCTAssertFalse(connection.hasActiveIPhoneWorkout)
+
+        connection.updateLocalWorkoutActivity(
+            isActive: true,
+            title: "Local run"
+        )
+        XCTAssertTrue(connection.hasActiveIPhoneWorkout)
+
+        connection.updateLocalWorkoutActivity(
+            isActive: false,
+            title: nil
+        )
+        XCTAssertFalse(connection.hasActiveIPhoneWorkout)
+    }
+
     func testWorkoutKindMappingIsCentralized() {
         XCTAssertEqual(
             PlannedWorkoutWatchBuilder.watchKind(
