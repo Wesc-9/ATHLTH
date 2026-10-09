@@ -8,7 +8,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
     // Optional deep link from "I dag" or the rebuilt library.
-    let highlightedPlanID: UUID? = nil
+    var highlightedPlanID: UUID? = nil
     @State private var focusedPlanID: UUID?
 
     @AppStorage("athlth.planWorkspace.advancedMode")
