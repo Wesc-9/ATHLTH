@@ -1368,45 +1368,51 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var header: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 7) {
-                ATHLTHBrandMark(size: .compact)
-                    .scaleEffect(0.78)
-
-                Text("Settings")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+        HStack(spacing: 14) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(width: 43, height: 43)
+                    .background(
+                        Color.white.opacity(0.92),
+                        in: Circle()
+                    )
+                    .overlay {
+                        Circle().stroke(ATHLTHTheme.border, lineWidth: 0.8)
+                    }
             }
-            .padding(.top, 8)
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")
+            )
 
-            HStack(alignment: .top) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .frame(width: 48, height: 48)
-                        .background(Color.white.opacity(0.86), in: Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(ATHLTHTheme.border, lineWidth: 1)
-                        }
-                        .shadow(color: Color.black.opacity(0.035), radius: 14, x: 0, y: 8)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Settings",
+                        norwegian: "Innstillinger"
+                    )
+                )
+                .font(.system(size: 29, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
-                Spacer()
-
-                Text("A healthier\nyou, further")
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.70))
-                    .multilineTextAlignment(.trailing)
-                    .padding(.top, 10)
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Make ATHLTH yours.",
+                        norwegian: "Tilpass ATHLTH til deg."
+                    )
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
             }
+
+            Spacer(minLength: 0)
         }
         .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -1460,6 +1466,8 @@ if session.currentRole.canAccessControlCenter {
             return "Admin"
         case "Developer Tools":
             return "Utviklerverktøy"
+        case "Tools":
+            return "Verktøy"
         default:
             return title
         }
