@@ -88,7 +88,10 @@ enum ATHLTHTrainTrendEngine {
                 let key = normalize(trimmed)
                 guard !key.isEmpty else { continue }
 
-                let completedSets = entry.sets.filter(\.countsTowardTrainingLoad)
+                let completedSets = entry.sets.filter {
+                    $0.countsTowardTrainingLoad &&
+                    $0.plannedSetType != .warmUp
+                }
                 guard !completedSets.isEmpty else { continue }
 
                 names[key] = names[key] ?? trimmed
