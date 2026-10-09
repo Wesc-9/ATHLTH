@@ -436,7 +436,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Text(weekday(day.dayIndex))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(secondaryInk)
-                    Text(String(format: "%02d", day.dayIndex))
+                    Text(
+                        planDayDate(day.dayIndex, plan: plan)
+                            .formatted(.dateTime.day())
+                    )
                         .font(.system(size: 18, weight: .regular, design: .serif))
                         .foregroundStyle(graphite)
                 }
@@ -461,7 +464,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     HStack(spacing: 7) {
                                         Image(systemName: workout.kind.systemImage)
                                             .font(.caption)
-                                            .foregroundStyle(warmGold)
+                                            .foregroundStyle(kindTint(workout.kind))
+                                            .frame(width: 24, height: 24)
+                                            .background(
+                                                kindTint(workout.kind).opacity(0.12),
+                                                in: RoundedRectangle(cornerRadius: 7)
+                                            )
                                         Text(workout.title)
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(graphite)
@@ -647,6 +655,45 @@ struct ATHLTHTrainPlanPremiumView: View {
         let today = calendar.startOfDay(for: Date())
         let days = calendar.dateComponents([.day], from: first, to: today).day ?? 0
         return min(max(days / 7, 0), plan.weeks.count - 1)
+    }
+
+    private func planDayDate(
+        _ dayIndex: Int,
+        plan: TrainingPlan
+    ) -> Date {
+        let calendar = Calendar.current
+        let fallback = calendar.startOfDay(for: Date())
+        let first = calendar.startOfDay(for: plan.startDate ?? fallback)
+        var mondayCalendar = calendar
+        mondayCalendar.firstWeekday = 2
+        let monday = mondayCalendar.dateInterval(
+            of: .weekOfYear,
+            for: first
+        )?.start ?? first
+        let weekIndex = min(
+            max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
+            max(plan.weeks.count - 1, 0)
+        )
+        return calendar.date(
+            byAdding: .day,
+            value: weekIndex * 7 + min(max(dayIndex - 1, 0), 6),
+            to: monday
+        ) ?? first
+    }
+
+    private func kindTint(_ kind: WorkoutKind) -> Color {
+        switch kind {
+        case .strength:
+            return Color(red: 0.63, green: 0.45, blue: 0.34)
+        case .running:
+            return Color(red: 0.39, green: 0.49, blue: 0.62)
+        case .walking:
+            return Color(red: 0.43, green: 0.53, blue: 0.43)
+        case .recovery, .mobility:
+            return Color(red: 0.52, green: 0.46, blue: 0.63)
+        case .custom:
+            return warmGold
+        }
     }
 
     private func weekday(_ dayIndex: Int) -> String {
