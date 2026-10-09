@@ -10,6 +10,7 @@ struct ATHLTHApp: App {
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
     @StateObject private var appSession = AppSessionStore()
+    @State private var signedOutAuthError: String?
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
@@ -171,7 +172,63 @@ struct ATHLTHApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView()
+            if !appSession.signedIn &&
+                !appSession.previewModeEnabled {
+                // Render sign-in before constructing the full workout,
+                // social and background-services environment tree.
+                // Compact iPhone simulators can otherwise remain on an
+                // empty first frame even while the process is alive.
+                OnboardingFlowView()
+                    .environmentObject(appSession)
+                    .environmentObject(health)
+                    .environmentObject(settings)
+                    .environmentObject(watchConnection)
+                    .environmentObject(notifications)
+                    .environmentObject(accountService)
+                    .environment(
+                        \.locale,
+                        settings.interfaceLocale
+                    )
+                    .tint(ATHLTHTheme.accent)
+                    .onOpenURL { url in
+                        Task {
+                            do {
+                                if let bootstrap =
+                                    try await accountService
+                                        .handleAuthCallback(url) {
+                                    appSession.applyBackendBootstrap(
+                                        bootstrap,
+                                        method: .email
+                                    )
+                                }
+                            } catch {
+                                signedOutAuthError =
+                                    error.localizedDescription
+                            }
+                        }
+                    }
+                    .alert(
+                        "Authentication Error",
+                        isPresented: Binding(
+                            get: { signedOutAuthError != nil },
+                            set: { shown in
+                                if !shown {
+                                    signedOutAuthError = nil
+                                }
+                            }
+                        )
+                    ) {
+                        Button("OK", role: .cancel) {
+                            signedOutAuthError = nil
+                        }
+                    } message: {
+                        Text(
+                            signedOutAuthError ??
+                                "Authentication could not be completed."
+                        )
+                    }
+            } else {
+                AppRootView()
                 .environmentObject(health)
                 .environmentObject(exerciseLibrary)
                 .environmentObject(runningWorkoutLibrary)
@@ -213,6 +270,7 @@ struct ATHLTHApp: App {
                 )
                 .preferredColorScheme(.light)
                 .tint(ATHLTHTheme.accent)
+            }
         }
     }
 }
