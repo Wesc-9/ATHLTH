@@ -187,6 +187,75 @@ final class TrainingPlanHealthLinkTests: XCTestCase {
     }
 
     @MainActor
+    func testCanonicalCompletionKeepsPlanProgressAndSessionStateInSync() {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let today = Calendar.current.startOfDay(for: Date())
+        guard let plan = store.createTrainingPlan(
+            title: "Consistent progress", summary: "",
+            weekCount: 1, startDate: today
+        ) else {
+            return XCTFail("Expected plan")
+        }
+        let planned = addRun(
+            store: store, planID: plan.id,
+            dayID: plan.weeks[0].days[0].id, time: today
+        )
+        let healthRun = workout(activity: .running, startedAt: today)
+
+        func completion() -> Bool {
+            store.isPlanSessionCompleted(
+                planID: plan.id,
+                sessionID: planned.id,
+                healthWorkouts: [healthRun],
+                strengthHistory: []
+            )
+        }
+
+        func count() -> Int {
+            guard let updated = store.trainingPlan(withID: plan.id) else {
+                return -1
+            }
+            return store.trainingPlanProgress(
+                updated, healthWorkouts: [healthRun],
+                strengthHistory: [], referenceDate: today
+            ).completedSessions
+        }
+
+        XCTAssertFalse(completion())
+        XCTAssertEqual(count(), 0)
+        XCTAssertTrue(store.linkHealthWorkout(
+            healthRun, toPlan: plan.id, sessionID: planned.id
+        ))
+        XCTAssertTrue(completion())
+        XCTAssertEqual(count(), 1)
+
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: planned.id, skipped: true
+        )
+        XCTAssertFalse(completion())
+        XCTAssertEqual(count(), 0)
+
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: planned.id, skipped: false
+        )
+        XCTAssertTrue(completion())
+        XCTAssertEqual(count(), 1)
+
+        store.unlinkHealthWorkout(
+            planID: plan.id, sessionID: planned.id
+        )
+        XCTAssertFalse(completion())
+        XCTAssertEqual(count(), 0)
+
+        store.setPlanSessionManuallyCompleted(
+            planID: plan.id, sessionID: planned.id, completed: true
+        )
+        XCTAssertTrue(completion())
+        XCTAssertEqual(count(), 1)
+    }
+
+    @MainActor
     func testLinkedWorkoutRemovedFromHealthIsNotCounted() {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
