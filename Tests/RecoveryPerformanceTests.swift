@@ -177,6 +177,88 @@ final class RecoveryPerformanceTests:
         ))
     }
 
+    func testInsightsAIRequiresSeparateExplicitAccountConsent() {
+        let name = "ATHLTH.InsightsConsentTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: name) else {
+            return XCTFail("Unable to create isolated defaults")
+        }
+        defer { defaults.removePersistentDomain(forName: name) }
+
+        let first = UUID()
+        let second = UUID()
+
+        // Legacy general AI/HealthKit settings never migrate silently.
+        defaults.set(
+            true,
+            forKey: AccountLocalStorage.key(
+                "aiHealthDataConsent",
+                userID: first
+            )
+        )
+        XCTAssertNil(
+            RecoveryInsightAIConsentPreferences.load(
+                userID: first, defaults: defaults
+            )
+        )
+        XCTAssertFalse(
+            RecoveryInsightAIConsentPreferences.isAuthorized(
+                userID: first, defaults: defaults
+            )
+        )
+
+        // Declining is remembered and does not affect local insights.
+        let declined = RecoveryInsightAIConsentPreferences.decide(
+            userID: first,
+            allowExternalHealthProcessing: false,
+            defaults: defaults
+        )
+        XCTAssertFalse(declined.allowsExternalHealthProcessing)
+        XCTAssertFalse(
+            RecoveryInsightAIConsentPreferences.isAuthorized(
+                userID: first, defaults: defaults
+            )
+        )
+
+        let approved = RecoveryInsightAIConsentPreferences.decide(
+            userID: first,
+            allowExternalHealthProcessing: true,
+            defaults: defaults
+        )
+        XCTAssertTrue(approved.allowsExternalHealthProcessing)
+        XCTAssertFalse(
+            RecoveryInsightAIConsentPreferences.isAuthorized(
+                userID: second, defaults: defaults
+            )
+        )
+
+        // Withdrawal clears any cached AI health insight immediately.
+        defaults.set(
+            Data("Sensitive response".utf8),
+            forKey: "athlth.recoveryAIInsight.\(first.uuidString).nb"
+        )
+        let withdrawn = RecoveryInsightAIConsentPreferences.decide(
+            userID: first,
+            allowExternalHealthProcessing: false,
+            defaults: defaults
+        )
+        XCTAssertFalse(withdrawn.allowsExternalHealthProcessing)
+        XCTAssertNil(
+            defaults.data(
+                forKey: "athlth.recoveryAIInsight.\(first.uuidString).nb"
+            )
+        )
+
+        RecoveryInsightAIConsentPreferences.removeForDeletedAccount(
+            userID: first,
+            defaults: defaults
+        )
+        XCTAssertNil(
+            RecoveryInsightAIConsentPreferences.load(
+                userID: first, defaults: defaults
+            )
+        )
+    }
+
     private func makeContext(
         hrv: Double,
         recoveryPercent: Int,
