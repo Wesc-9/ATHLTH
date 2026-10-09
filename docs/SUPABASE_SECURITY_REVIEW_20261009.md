@@ -15,6 +15,21 @@ Scope: live Supabase project schema checks and the `release/v1.7.0` codebase. Th
 - The two RLS/no-policy lint findings, `private.ai_request_budgets` and `public.public_media_moderation_events`, are deliberately closed to direct ordinary-client table access. They are verified to have RLS enabled.
 - A new CI test at `supabase/tests/security_definer_rpc_access.sql` guards these access assumptions.
 
+## Fresh-install regression found and fixed in migration
+
+The new CI check initially failed after replaying all migrations: two
+`SECURITY DEFINER` functions were granted to `anon` on a fresh database,
+even though the live project had neither exposure:
+`public.community_event_set_lifecycle(uuid,text)` and
+`public.set_community_group_announcement_pin(uuid,uuid)`.
+
+Both functions have their own authorization checks, so this was unnecessary
+RPC exposure rather than a demonstrated account bypass. Migration
+`20261009194500_restrict_community_definer_rpcs.sql` revokes `PUBLIC` and
+`anon` execution but preserves `authenticated` and `service_role`.
+The live project already has the desired execution permissions; the
+migration is meant to keep new environments and future deployments aligned.
+
 ## Remaining work / release gates
 
 1. **Leaked-password protection**: Supabase Auth advises enabling its Have I Been Pwned check. This requires a Supabase Auth project-setting change (not provided by the connected API tools). Review production sign-in method compatibility and enable it in the dashboard; re-run security advisors.
