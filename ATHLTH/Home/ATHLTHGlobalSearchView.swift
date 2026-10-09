@@ -387,21 +387,158 @@ struct ATHLTHGlobalSearchView: View {
     }
 
     private var searchLanding: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if !recentSearches.isEmpty {
-                recentSearchesSection
-            }
+        VStack(alignment: .leading, spacing: 23) {
+            if scope == .all {
+                exploreShortcutGrid
+                if !recentSearches.isEmpty {
+                    recentSearchesSection
+                }
 
-            if !initialLoadFinished && landingContentEmpty {
-                landingSkeleton
-            } else if scope == .all {
-                discoverSection
-                routeDiscoverySection
+                if !initialLoadFinished && landingContentEmpty {
+                    landingSkeleton
+                } else {
+                    discoverSection
+                    routeDiscoverySection
+                }
             } else {
                 categoryLanding
             }
         }
-        .padding(.top, 2)
+        .padding(.top, 9)
+    }
+
+    // 2×2 exploration tiles keep the discovery start screen useful even
+    // before account and remote results have loaded.
+    private var exploreShortcutGrid: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            searchSectionTitle(
+                ATHLTHLocalization.format(
+                    english: "Explore",
+                    norwegian: "Utforsk"
+                )
+            )
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                explorationTile(
+                    .users,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Discover people",
+                        norwegian: "Finn nye folk"
+                    ),
+                    artwork: "CommunityHero",
+                    tint: searchSocialAccent
+                )
+                explorationTile(
+                    .routes,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Discover routes",
+                        norwegian: "Utforsk nye ruter"
+                    ),
+                    artwork: "GoalRunning",
+                    tint: searchRouteAccent
+                )
+                explorationTile(
+                    .groups,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "Find your crew",
+                        norwegian: "Finn din gjeng"
+                    ),
+                    artwork: "HomeHero",
+                    tint: Color(red: 0.78, green: 0.41, blue: 0.27)
+                )
+                explorationTile(
+                    .events,
+                    subtitle: ATHLTHLocalization.format(
+                        english: "What's happening",
+                        norwegian: "Se hva som skjer"
+                    ),
+                    artwork: "GoalEvent",
+                    tint: searchWarmAccent
+                )
+            }
+        }
+    }
+
+    private func explorationTile(
+        _ item: ATHLTHGlobalSearchScope,
+        subtitle: String,
+        artwork: String,
+        tint: Color
+    ) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                scope = item
+                searchFocused = false
+            }
+        } label: {
+            ZStack(alignment: .leading) {
+                GeometryReader { viewport in
+                    Image(artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: viewport.size.width,
+                            height: viewport.size.height
+                        )
+                        .clipped()
+                        .opacity(0.38)
+                }
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.94),
+                        Color.white.opacity(0.65),
+                        tint.opacity(0.15)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                HStack(spacing: 10) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(tint)
+                        .frame(width: 40, height: 40)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.localizedTitle)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(searchGraphite)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.83)
+
+                        Text(subtitle)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(searchGraphite.opacity(0.72))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 11)
+            }
+            .frame(height: 105)
+            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 21, style: .continuous)
+                    .stroke(.white.opacity(0.92), lineWidth: 1)
+            }
+            .shadow(color: searchGraphite.opacity(0.07), radius: 13, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(
+            ATHLTHLocalization.format(
+                english: "Show \(item.localizedTitle.lowercased())",
+                norwegian: "Vis \(item.localizedTitle.lowercased())"
+            )
+        )
     }
 
     private var recentSearchesSection: some View {
@@ -409,8 +546,8 @@ struct ATHLTHGlobalSearchView: View {
             HStack {
                 searchSectionTitle(
                     ATHLTHLocalization.format(
-                        english: "Recent",
-                        norwegian: "Nylig"
+                        english: "Recently searched",
+                        norwegian: "Nylig søkt"
                     )
                 )
 
@@ -474,17 +611,17 @@ struct ATHLTHGlobalSearchView: View {
         }
         .padding(.leading, 12)
         .padding(.trailing, 4)
-        .frame(height: 34)
+        .frame(height: 39)
         .background(
             Color.white
-                .opacity(0.86),
+                .opacity(0.69),
             in: Capsule()
         )
         .overlay {
             Capsule()
                 .stroke(
-                    Color.primary
-                        .opacity(0.050),
+                    Color.white
+                        .opacity(0.80),
                     lineWidth: 0.8
                 )
         }
@@ -492,8 +629,8 @@ struct ATHLTHGlobalSearchView: View {
             color:
                 Color.black
                     .opacity(0.018),
-            radius: 5,
-            y: 2
+            radius: 9,
+            y: 3
         )
     }
 
@@ -505,7 +642,7 @@ struct ATHLTHGlobalSearchView: View {
             !challenges.visibleChallenges.isEmpty
 
         if hasDiscovery {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 11) {
                 searchSectionTitle(
                     ATHLTHLocalization.format(
                         english: "For you",
@@ -521,7 +658,8 @@ struct ATHLTHGlobalSearchView: View {
                             icon: "person.3.fill",
                             tint: searchSocialAccent,
                             title: group.name,
-                            subtitle: groupSubtitle(group)
+                            subtitle: groupSubtitle(group),
+                            artwork: "CommunityHero"
                         )
                     }
                     .buttonStyle(.plain)
@@ -533,18 +671,18 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: event.event.activityType.systemImage,
-                            tint: searchCoolAccent,
+                            tint: searchWarmAccent,
                             title: event.event.title,
                             subtitle:
                                 ATHLTHLocalization.format(
                                     english: "Upcoming event",
                                     norwegian: "Kommende arrangement"
-                                ) +
-                                " · " +
+                                ) + " · " +
                                 event.event.startsAt.formatted(
                                     date: .abbreviated,
                                     time: .shortened
-                                )
+                                ),
+                            artwork: "GoalEvent"
                         )
                     }
                     .buttonStyle(.plain)
@@ -556,15 +694,14 @@ struct ATHLTHGlobalSearchView: View {
                     } label: {
                         discoveryRow(
                             icon: challenge.sport.systemImage,
-                            tint: searchWarmAccent,
+                            tint: searchCoolAccent,
                             title: challenge.title,
                             subtitle:
                                 ATHLTHLocalization.format(
                                     english: "Challenge",
                                     norwegian: "Utfordring"
-                                ) +
-                                " · " +
-                                challenge.sport.title
+                                ) + " · " + challenge.sport.title,
+                            artwork: "GoalRunning"
                         )
                     }
                     .buttonStyle(.plain)
@@ -576,19 +713,16 @@ struct ATHLTHGlobalSearchView: View {
     @ViewBuilder
     private var routeDiscoverySection: some View {
         let nearby = nearbyLocation.map {
-            routes.nearbyRoutes(
-                from: $0,
-                radiusKilometers: 35
-            )
+            routes.nearbyRoutes(from: $0, radiusKilometers: 35)
         } ?? []
 
         let useNearby = !nearby.isEmpty
         let visibleRoutes = useNearby
-            ? Array(nearby.prefix(3))
-            : Array(routes.routes.prefix(3))
+            ? Array(nearby.prefix(2))
+            : Array(routes.routes.prefix(2))
 
         if !visibleRoutes.isEmpty {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 11) {
                 HStack {
                     searchSectionTitle(
                         useNearby
@@ -604,30 +738,21 @@ struct ATHLTHGlobalSearchView: View {
 
                     Spacer()
 
-                    if routes.routes.count > 3 {
+                    if routes.routes.count > 2 {
                         Button {
-                            withAnimation(
-                                .easeInOut(
-                                    duration: 0.16
-                                )
-                            ) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
                                 scope = .routes
                             }
                         } label: {
-                            Text(
+                            Label(
                                 ATHLTHLocalization.format(
                                     english: "See all",
                                     norwegian: "Se alle"
-                                )
+                                ),
+                                systemImage: "chevron.right"
                             )
-                            .font(
-                                .caption.weight(
-                                    .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                searchCoolAccent
-                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(searchGraphite.opacity(0.72))
                         }
                         .buttonStyle(.plain)
                     }
@@ -637,10 +762,8 @@ struct ATHLTHGlobalSearchView: View {
                     NavigationLink {
                         ATHLTHGlobalRouteDetailView(route: route)
                     } label: {
-                        discoveryRow(
-                            icon: "map.fill",
-                            tint: searchRouteAccent,
-                            title: route.title,
+                        featuredRouteRow(
+                            route,
                             subtitle: routeDiscoverySubtitle(
                                 route,
                                 location: useNearby ? nearbyLocation : nil
@@ -651,6 +774,49 @@ struct ATHLTHGlobalSearchView: View {
                 }
             }
         }
+    }
+
+    private func featuredRouteRow(
+        _ route: CommunityRouteRecord,
+        subtitle: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            RouteMapSnapshotThumbnail(
+                route: route.trainingRoute,
+                height: 92
+            )
+            .frame(width: 104, height: 92)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(route.title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(searchGraphite)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                Text(subtitle)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(searchGraphite.opacity(0.75))
+                .frame(width: 29, height: 29)
+                .background(Color.white.opacity(0.54), in: Circle())
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .stroke(.white.opacity(0.86), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.055), radius: 13, y: 6)
     }
 
     @ViewBuilder
@@ -1715,61 +1881,65 @@ struct ATHLTHGlobalSearchView: View {
         icon: String,
         tint: Color,
         title: String,
-        subtitle: String
+        subtitle: String,
+        artwork: String
     ) -> some View {
-        searchRow(
-            icon: icon,
-            tint: tint,
-            title: title,
-            subtitle: subtitle
-        )
-        .background(
+        ZStack(alignment: .leading) {
+            GeometryReader { viewport in
+                Image(artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: viewport.size.width, height: viewport.size.height)
+                    .clipped()
+                    .opacity(0.49)
+            }
+
             LinearGradient(
                 colors: [
-                    Color.white
-                        .opacity(0.96),
-                    tint
-                        .opacity(0.045)
+                    Color.white.opacity(0.97),
+                    Color.white.opacity(0.88),
+                    Color.white.opacity(0.15)
                 ],
-                startPoint:
-                    .leading,
-                endPoint:
-                    .trailing
-            ),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style: .continuous
-                )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 19,
-                style: .continuous
+                startPoint: .leading,
+                endPoint: .trailing
             )
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.78),
-                        tint
-                            .opacity(0.10)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                ),
-                lineWidth: 0.8
-            )
+
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 51, height: 51)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(searchGraphite)
+                        .lineLimit(1)
+
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(searchGraphite.opacity(0.71))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 2)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(searchGraphite)
+                    .frame(width: 30, height: 30)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .padding(.horizontal, 15)
         }
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.026),
-            radius: 9,
-            y: 4
-        )
+        .frame(height: 91)
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .stroke(.white.opacity(0.90), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.065), radius: 15, y: 6)
     }
 
     private func groupSubtitle(
