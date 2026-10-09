@@ -19,7 +19,7 @@ APP = ROOT / "ATHLTH"
 REQUIRED = {
     "ATHLTH/Recovery/RecoveryAIViews.swift": (
         r"GeometryReader\s*\{\s*viewport\s+in",
-        r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*214\)",
+        r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*164\)",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
     "ATHLTH/Social/HomeActivityStrengthDetailView.swift": (
