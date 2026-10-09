@@ -1801,47 +1801,6 @@ struct OfficialWeeklyChallengeCard: View {
                 Spacer(minLength: 12)
 
                 HStack(alignment: .bottom, spacing: 12) {
-                    HStack(spacing: -7) {
-                        ForEach(
-                            visibleParticipantProfiles.prefix(4)
-                        ) { profile in
-                            OfficialChallengeAvatar(
-                                url: profile.avatarURL.flatMap(URL.init(string:)),
-                                fallback: profile.resolvedName,
-                                size: 31
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(.white, lineWidth: 1.5)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(ATHLTHLocalization.format(
-                                english: "%d participating",
-                                norwegian: "%d deltar",
-                                store.participantCount(for: challenge.id)
-                            ))
-
-                            if friendParticipantCount > 0 {
-                                Text(
-                                    friendParticipantCount == 1
-                                        ? "1 friend joined"
-                                        : "\(friendParticipantCount) friends joined"
-                                )
-                                .font(.caption2.weight(.semibold))
-                            }
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.leading, 14)
-                        .shadow(
-                            color: .black.opacity(0.42),
-                            radius: 4,
-                            y: 1
-                        )
-                    }
-
                     Spacer(minLength: 8)
 
                     NavigationLink {
@@ -2148,24 +2107,10 @@ struct OfficialWeeklyChallengeDetailView: View {
                             vertical: true
                         )
 
-                    HStack(spacing: 8) {
-                        Label(
-                            challenge.kind.targetText(
-                                challenge.targetValue
-                            ),
-                            systemImage: challenge.kind.icon
-                        )
-
-                        Text("•")
-
-                        Text(
-                            ATHLTHLocalization.format(
-                            english: "%d participating",
-                            norwegian: "%d deltar",
-                            store.participantCount(for: challenge.id)
-                        )
-                        )
-                    }
+                    Label(
+                        challenge.kind.targetText(challenge.targetValue),
+                        systemImage: challenge.kind.icon
+                    )
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.88))
                 }
@@ -2321,7 +2266,10 @@ struct OfficialWeeklyChallengeDetailView: View {
                             for: challenge
                         ),
                         detail:
-                            "\(store.participantCount(for: challenge.id)) participants"
+                            ATHLTHLocalization.choose(
+                                english: "Automatic participation",
+                                norwegian: "Automatisk deltakelse"
+                            )
                     )
                 }
 
