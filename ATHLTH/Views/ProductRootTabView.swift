@@ -10894,6 +10894,7 @@ struct ATHLTHRecoveryView: View {
     @State private var isLoadingRecoveryAI = false
     @State private var recoveryAIError: String?
     @State private var insightAIConsent: RecoveryInsightAIConsentRecord?
+    @State private var insightAIConsentAccountID: UUID?
     @State private var showingInsightAIConsentSheet = false
     @State private var showingSorenessLog = false
     @State private var showingRecoveryInfo = false
@@ -13311,8 +13312,15 @@ struct ATHLTHRecoveryView: View {
     private func reloadInsightAIConsent() {
         guard session.signedIn else {
             insightAIConsent = nil
+            insightAIConsentAccountID = nil
             recoveryAIInsight = nil
             return
+        }
+        if insightAIConsentAccountID != session.profile.userID {
+            // Never briefly display another account's health-based insight.
+            recoveryAIInsight = nil
+            recoveryAIError = nil
+            insightAIConsentAccountID = session.profile.userID
         }
         insightAIConsent = RecoveryInsightAIConsentPreferences.load(
             userID: session.profile.userID
