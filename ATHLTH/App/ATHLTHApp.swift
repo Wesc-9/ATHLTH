@@ -1704,7 +1704,19 @@ struct AppRootView: View {
         }
     }
 
+    @ViewBuilder
     var body: some View {
+        if appSession.previewModeEnabled {
+            // Keep compatibility previews isolated from the production
+            // lifecycle's sheets, tasks, observers and overlays. Those
+            // modifiers can starve the first tab frame on compact iPhones.
+            ATHLTHCompatibilityPreviewRootView()
+        } else {
+            productionRootContent
+        }
+    }
+
+    private var productionRootContent: some View {
         lifecycleContent
         .onOpenURL { url in
             if spotifyPlayback.handleOpenURL(url) {
