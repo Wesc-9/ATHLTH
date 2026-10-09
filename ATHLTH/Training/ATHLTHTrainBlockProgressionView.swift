@@ -294,7 +294,7 @@ struct ATHLTHTrainBlockProgressionView: View {
                 .font(.subheadline)
                 .foregroundStyle(muted)
             } else {
-                ForEach(summary.changes.prefix(15)) { change in
+                ForEach(summary.changes) { change in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text(change.workoutName)
@@ -324,14 +324,6 @@ struct ATHLTHTrainBlockProgressionView: View {
                     }
                     .padding(13)
                     .background(paper, in: RoundedRectangle(cornerRadius: 12))
-                }
-                if summary.changes.count > 15 {
-                    Text(tr(
-                        "\(summary.changes.count - 15) additional workouts are included.",
-                        "\(summary.changes.count - 15) øvrige økter blir også påvirket."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(muted)
                 }
             }
             if summary.alreadyApplied > 0 {
