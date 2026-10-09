@@ -35,6 +35,9 @@ struct TrainingPlanProgressDetailView: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         header(plan: plan)
                         overallCard(overall)
+                        if health.hasRequestedAuthorization {
+                            recoveryContextCard
+                        }
                         strengthCard(report)
                         exerciseCard(report)
                         if !guidance.isEmpty {
@@ -169,6 +172,68 @@ struct TrainingPlanProgressDetailView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
+        }
+    }
+
+
+    private var recoveryContextCard: some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Recovery & training plan",
+                        norwegian: "Restitusjon og treningsplan"
+                    ),
+                    systemImage: "heart.text.square"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(recoveryPlanGuidance)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Guidance only. Your plan is not changed automatically.",
+                        norwegian: "Kun veiledning. Planen endres ikke automatisk."
+                    ),
+                    systemImage: "hand.raised"
+                )
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+    }
+
+    private var recoveryPlanGuidance: String {
+        switch health.recovery.state {
+        case .ready:
+            return ATHLTHLocalization.choose(
+                english: "Your recovery signals are favorable. Follow your plan if you feel ready.",
+                norwegian: "Restitusjonssignalene er gode. Følg planen dersom du føler deg klar."
+            )
+        case .balanced:
+            return ATHLTHLocalization.choose(
+                english: "Recovery looks balanced. Keep your plan flexible and consider how you feel.",
+                norwegian: "Restitusjonen virker balansert. Behold fleksibiliteten i planen og kjenn etter hvordan du føler deg."
+            )
+        case .takeItEasy:
+            return ATHLTHLocalization.choose(
+                english: "Some signals are below your baseline. Consider less intensity or extra recovery before a demanding session.",
+                norwegian: "Noen signaler ligger under ditt nivå. Vurder lavere intensitet eller ekstra hvile før en krevende økt."
+            )
+        case .recover:
+            return ATHLTHLocalization.choose(
+                english: "Your signals are below baseline. Consider rest or low-intensity activity before the next demanding session.",
+                norwegian: "Signalene ligger under ditt nivå. Vurder hvile eller aktivitet med lav intensitet før neste krevende økt."
+            )
+        case .buildingBaseline:
+            return ATHLTHLocalization.choose(
+                english: "More recent sleep, HRV and resting heart-rate data are needed before comparing recovery with your plan.",
+                norwegian: "ATHLTH trenger flere opplysninger om søvn, HRV og hvilepuls før restitusjonen kan vurderes opp mot treningsplanen."
+            )
         }
     }
 
