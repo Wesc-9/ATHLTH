@@ -12,6 +12,8 @@ struct ATHLTHTrainWeekBuilderView: View {
     @State private var selectedDayID: UUID?
     @State private var editorRequest: EditorRequest?
     @State private var removeRequest: RemoveRequest?
+    @State private var transferRequest: TransferRequest?
+    @State private var showingSavedWorkouts = false
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
@@ -29,6 +31,12 @@ struct ATHLTHTrainWeekBuilderView: View {
         let dayID: UUID
         let sessionID: UUID?
     }
+    private struct TransferRequest: Identifiable {
+        let id = UUID()
+        let workoutID: UUID
+        let copyInsteadOfMove: Bool
+    }
+
     private struct RemoveRequest: Identifiable {
         let id = UUID()
         let dayID: UUID
@@ -95,6 +103,21 @@ struct ATHLTHTrainWeekBuilderView: View {
                         .flatMap(\.sessions)
                         .first(where: { $0.id == request.sessionID })
                 )
+            }
+            .sheet(item: $transferRequest) { request in
+                ATHLTHTrainSessionTransferView(
+                    planID: planID,
+                    sessionID: request.workoutID,
+                    copyInsteadOfMove: request.copyInsteadOfMove
+                )
+            }
+            .sheet(isPresented: $showingSavedWorkouts) {
+                if let dayID = currentDay?.id {
+                    ATHLTHTrainSavedWorkoutPickerView(
+                        planID: planID,
+                        dayID: dayID
+                    )
+                }
             }
             .alert(item: $removeRequest) { request in
                 Alert(
@@ -267,6 +290,24 @@ struct ATHLTHTrainWeekBuilderView: View {
                             } label: {
                                 Label(tr("Edit", "Rediger"), systemImage: "pencil")
                             }
+                            Button {
+                                transferRequest = .init(
+                                    workoutID: workout.id,
+                                    copyInsteadOfMove: true
+                                )
+                            } label: {
+                                Label(tr("Copy to a day", "Kopier til en dag"),
+                                      systemImage: "square.on.square")
+                            }
+                            Button {
+                                transferRequest = .init(
+                                    workoutID: workout.id,
+                                    copyInsteadOfMove: false
+                                )
+                            } label: {
+                                Label(tr("Move to a day", "Flytt til en dag"),
+                                      systemImage: "calendar.badge.clock")
+                            }
                             Button(role: .destructive) {
                                 removeRequest = .init(
                                     dayID: day.id,
@@ -345,6 +386,27 @@ struct ATHLTHTrainWeekBuilderView: View {
                 .foregroundStyle(.white)
                 .padding(16)
                 .background(ink, in: RoundedRectangle(cornerRadius: 13))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingSavedWorkouts = true
+            } label: {
+                HStack {
+                    Image(systemName: "books.vertical")
+                        .foregroundStyle(bronze)
+                    Text(tr("Use a saved workout", "Bruk en lagret økt"))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ink)
+                .padding(15)
+                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(line, lineWidth: 0.7)
+                }
             }
             .buttonStyle(.plain)
 
