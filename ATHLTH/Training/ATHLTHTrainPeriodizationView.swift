@@ -21,6 +21,8 @@ struct ATHLTHTrainPeriodizationView: View {
     @State private var awaitingConfirmation = false
     @State private var showResult = false
     @State private var resultMessage = ""
+    @State private var showingNewBlock = false
+    @State private var editingBlock: TrainingPlanBlock?
 
     private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
     private let muted = Color(red: 0.47, green: 0.45, blue: 0.43)
@@ -87,6 +89,7 @@ struct ATHLTHTrainPeriodizationView: View {
 
                     if let plan, let week {
                         timeline(plan)
+                        blockOverview(plan)
                         selectedWeekDetail(week)
                         if advanced {
                             phaseEditor(week)
@@ -112,6 +115,24 @@ struct ATHLTHTrainPeriodizationView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Close", "Lukk")) { dismiss() }
                         .foregroundStyle(ink)
+                }
+            }
+            .sheet(isPresented: $showingNewBlock) {
+                if let plan {
+                    ATHLTHTrainBlockEditorView(
+                        planID: planID,
+                        weekCount: plan.weeks.count,
+                        startingWeek: chosenWeekIndex + 1
+                    )
+                }
+            }
+            .sheet(item: $editingBlock) { block in
+                if let plan {
+                    ATHLTHTrainBlockEditorView(
+                        planID: planID,
+                        weekCount: plan.weeks.count,
+                        existingBlock: block
+                    )
                 }
             }
             .onAppear(perform: refreshEditor)
@@ -192,6 +213,9 @@ struct ATHLTHTrainPeriodizationView: View {
             ) {
                 ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { index, item in
                     let selected = index == chosenWeekIndex
+                    let parentBlock = plan.trainingBlocks?.first {
+                        $0.contains(week: index + 1)
+                    }
                     Button {
                         chosenWeekIndex = index
                     } label: {
@@ -207,7 +231,7 @@ struct ATHLTHTrainPeriodizationView: View {
                                 Image(systemName: item.strengthPhase == .deload
                                       ? "leaf" : "circle.fill")
                                     .font(.system(size: 8))
-                                Text(phaseShortLabel(item))
+                                Text(parentBlock?.purpose.title ?? phaseShortLabel(item))
                                     .font(.system(size: 9, weight: .medium))
                                     .lineLimit(1)
                             }
@@ -226,12 +250,107 @@ struct ATHLTHTrainPeriodizationView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(
-                        tr("Week \(index + 1), \(phaseShortLabel(item))",
-                           "Uke \(index + 1), \(phaseShortLabel(item))")
+                        tr("Week \(index + 1), \(parentBlock?.title ?? phaseShortLabel(item))",
+                           "Uke \(index + 1), \(parentBlock?.title ?? phaseShortLabel(item))")
                     )
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
+        }
+    }
+
+    private func blockOverview(_ plan: TrainingPlan) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("TRAINING BLOCKS", "TRENINGSSBLOKKER"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(bronze)
+                    Text(tr("The bigger picture", "Perioder med mening"))
+                        .font(.system(size: 22, weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                }
+                Spacer(minLength: 4)
+                Button {
+                    showingNewBlock = true
+                } label: {
+                    Label(tr("New block", "Ny blokk"), systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 12)
+                        .frame(height: 36)
+                        .background(paleGold, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            let blocks = (plan.trainingBlocks ?? []).sorted {
+                $0.startWeek < $1.startWeek
+            }
+            if blocks.isEmpty {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 23, weight: .ultraLight))
+                        .foregroundStyle(bronze)
+                    Text(tr(
+                        "Group several weeks into a foundation, progression or recovery block. Start with just a name and a goal.",
+                        "Samle flere uker i én periode for grunnlag, progresjon eller restitusjon. Start med et navn og et mål."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+                .periodSurface(border: border)
+            } else {
+                ForEach(blocks) { block in
+                    Button {
+                        editingBlock = block
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: block.purpose.systemImage)
+                                .font(.system(size: 21, weight: .light))
+                                .foregroundStyle(bronze)
+                                .frame(width: 34, height: 37)
+                                .background(paleGold, in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(block.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .multilineTextAlignment(.leading)
+                                Text(tr(
+                                    "Weeks \(block.startWeek)–\(block.endWeek) · \(block.purpose.title)",
+                                    "Uke \(block.startWeek)–\(block.endWeek) · \(block.purpose.title)"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                                if !block.goal.isEmpty {
+                                    Text(block.goal)
+                                        .font(.caption)
+                                        .foregroundStyle(muted)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundStyle(muted)
+                        }
+                        .padding(14)
+                        .periodSurface(border: border)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text(tr(
+                "Blocks are planning labels. Your actual workouts and completion history remain unchanged.",
+                "Blokkene beskriver planen. Økter og treningshistorikk endres ikke."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
         }
     }
 
