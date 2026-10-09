@@ -142,6 +142,103 @@ private struct RecoveryAIRequest: Encodable {
     let shareHealthData: Bool?
 }
 
+// Separate, versioned first-use consent for automatic Insights AI.
+// Legacy HealthKit/AI settings never authorize third-party processing.
+struct RecoveryInsightAIConsentRecord: Codable, Equatable {
+    let version: Int
+    let decidedAt: Date
+    let authorizedAt: Date?
+
+    var allowsExternalHealthProcessing: Bool {
+        authorizedAt != nil
+    }
+}
+
+enum RecoveryInsightAIConsentPreferences {
+    private static let version = 1
+
+    private static func key(userID: UUID) -> String {
+        "athlth.insights.externalAIHealthConsent.v1.\(userID.uuidString)"
+    }
+
+    static func load(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryInsightAIConsentRecord? {
+        guard let data = defaults.data(forKey: key(userID: userID)),
+              let record = try? JSONDecoder().decode(
+                  RecoveryInsightAIConsentRecord.self,
+                  from: data
+              ),
+              record.version == version
+        else {
+            return nil
+        }
+        return record
+    }
+
+    static func isAuthorized(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        load(userID: userID, defaults: defaults)?
+            .allowsExternalHealthProcessing == true
+    }
+
+    @discardableResult
+    static func decide(
+        userID: UUID,
+        allowExternalHealthProcessing: Bool,
+        defaults: UserDefaults = .standard
+    ) -> RecoveryInsightAIConsentRecord {
+        let prior = load(userID: userID, defaults: defaults)
+        let record = RecoveryInsightAIConsentRecord(
+            version: version,
+            decidedAt: Date(),
+            authorizedAt: allowExternalHealthProcessing
+                ? (prior?.authorizedAt ?? Date())
+                : nil
+        )
+        if let data = try? JSONEncoder().encode(record) {
+            defaults.set(data, forKey: key(userID: userID))
+        }
+        if !allowExternalHealthProcessing {
+            clearCachedInsight(userID: userID, defaults: defaults)
+        }
+        return record
+    }
+
+    static func clearCachedInsight(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        for language in ["nb", "en"] {
+            defaults.removeObject(
+                forKey: "athlth.recoveryAIInsight.\(userID.uuidString).\(language)"
+            )
+        }
+    }
+
+    static func removeForDeletedAccount(
+        userID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: key(userID: userID))
+        clearCachedInsight(userID: userID, defaults: defaults)
+    }
+}
+
+enum RecoveryInsightAIConsentError: LocalizedError {
+    case notAuthorized
+
+    var errorDescription: String? {
+        ATHLTHLocalization.choose(
+            english: "Allow AI health insights before sharing health data with Groq.",
+            norwegian: "Godkjenn AI-helseinnsikt før helsedata deles med Groq."
+        )
+    }
+}
+
 private struct RecoveryAIInsightCacheEntry: Codable {
     let signature: String
     let createdAt: Date
