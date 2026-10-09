@@ -817,20 +817,16 @@ struct ATHLTHTrainPlanPremiumView: View {
         let calendar = Calendar.current
         let fallback = calendar.startOfDay(for: Date())
         let first = calendar.startOfDay(for: plan.startDate ?? fallback)
-        var mondayCalendar = calendar
-        mondayCalendar.firstWeekday = 2
-        let monday = mondayCalendar.dateInterval(
-            of: .weekOfYear,
-            for: first
-        )?.start ?? first
         let weekIndex = min(
             max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
             max(plan.weeks.count - 1, 0)
         )
+        // Planned sessions are persisted relative to the program's actual
+        // start date, not the Monday of its calendar week.
         return calendar.date(
             byAdding: .day,
             value: weekIndex * 7 + min(max(dayIndex - 1, 0), 6),
-            to: monday
+            to: first
         ) ?? first
     }
 
