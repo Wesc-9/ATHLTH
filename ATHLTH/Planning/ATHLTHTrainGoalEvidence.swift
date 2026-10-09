@@ -79,11 +79,20 @@ enum ATHLTHTrainGoalEvidence {
                         .localizedCaseInsensitiveCompare(rawName) == .orderedSame
                 }
                 .flatMap(\.sets)
-                .filter { $0.isCompleted && $0.isWarmUp != true }
-                .compactMap { set -> Double? in
+                .filter {
+                    $0.isCompleted && $0.isWarmUp != true &&
+                    $0.plannedSetType != .warmUp
+                }
+                .flatMap { set -> [Double] in
+                    // Sets with multiple effort segments should use their
+                    // actual recorded loads instead of an empty aggregate.
+                    if let segments = set.effortSegments, !segments.isEmpty {
+                        return segments.compactMap(\.weightKilograms)
+                            .filter { $0.isFinite && $0 >= 0 }
+                    }
                     guard let weight = set.completedWeightKilograms,
-                          weight.isFinite, weight >= 0 else { return nil }
-                    return weight
+                          weight.isFinite, weight >= 0 else { return [] }
+                    return [weight]
                 }
             guard let best = weights.max() else {
                 return unavailable(
