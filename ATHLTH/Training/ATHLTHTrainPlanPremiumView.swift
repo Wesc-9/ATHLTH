@@ -142,6 +142,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
                     dayID: dayID,
+                    expectedPlanVersion: plan.version,
                     existingWorkout: workout
                 )
             }
@@ -158,7 +159,8 @@ struct ATHLTHTrainPlanPremiumView: View {
             if let plan, let dayID = editingDayID {
                 ATHLTHTrainWorkoutBuilderView(
                     planID: plan.id,
-                    dayID: dayID
+                    dayID: dayID,
+                    expectedPlanVersion: plan.version
                 )
             }
         }
