@@ -3169,17 +3169,12 @@ struct ATHLTHHomeView: View {
         planID: UUID,
         workout: PlannedSession
     ) -> Bool {
-        if session.isPlanSessionManuallyCompleted(
+        session.isPlanSessionCompleted(
             planID: planID,
-            sessionID: workout.id
-        ) {
-            return true
-        }
-
-        return strengthWorkout.workoutHistory.contains {
-            $0.isFinished &&
-            $0.plannedSessionID == workout.id
-        }
+            sessionID: workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
     }
 
     @ViewBuilder
@@ -5875,15 +5870,14 @@ struct ATHLTHTrainView: View {
     ) -> some View {
         let sessions = todaySessions(in: plan)
         let healthCompletedIDs =
-            healthCompletedTodaySessionIDs(sessions)
-        let manuallyCompletedIDs =
-            manuallyCompletedTodaySessionIDs(
+            healthCompletedTodaySessionIDs(
                 planID: plan.id,
                 sessions: sessions
             )
         let completedIDs =
-            healthCompletedIDs.union(
-                manuallyCompletedIDs
+            completedTodaySessionIDs(
+                planID: plan.id,
+                sessions: sessions
             )
         let primary =
             sessions.first(
@@ -7193,95 +7187,22 @@ struct ATHLTHTrainView: View {
         in plan: TrainingPlan,
         weekIndex: Int
     ) -> (completed: Int, total: Int) {
-        guard
-            plan.weeks.indices.contains(weekIndex)
-        else {
+        guard plan.weeks.indices.contains(weekIndex) else {
             return (0, 0)
         }
 
-        let week = plan.weeks[weekIndex]
-        let sessions =
-            week.days.flatMap(\.sessions)
-        let total = sessions.count
-
-        guard total > 0 else {
-            return (0, 0)
-        }
-
-        var completedIDs =
-            Set(
-                sessions
-                    .filter {
-                        session
-                            .isPlanSessionManuallyCompleted(
-                                planID: plan.id,
-                                sessionID: $0.id
-                            )
-                    }
-                    .map(\.id)
+        let sessions = plan.weeks[weekIndex]
+            .days.flatMap(\.sessions)
+        let completed = sessions.filter {
+            session.isPlanSessionCompleted(
+                planID: plan.id,
+                sessionID: $0.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
             )
-
-        guard let startDate = plan.startDate else {
-            return (completedIDs.count, total)
-        }
-
-        let calendar = Calendar.current
-        let planStart =
-            calendar.startOfDay(for: startDate)
-
-        for day in week.days {
-            guard
-                let date =
-                    calendar.date(
-                        byAdding: .day,
-                        value:
-                            weekIndex * 7 +
-                            max(day.dayIndex - 1, 0),
-                        to: planStart
-                    )
-            else {
-                continue
-            }
-
-            var available =
-                health.workouts
-                    .filter {
-                        calendar.isDate(
-                            $0.startDate,
-                            inSameDayAs: date
-                        )
-                    }
-                    .sorted {
-                        $0.startDate < $1.startDate
-                    }
-
-            for workout in day.sessions
-            where !completedIDs.contains(
-                workout.id
-            ) {
-                guard
-                    let matchIndex =
-                        available.firstIndex(
-                            where: {
-                                healthWorkout(
-                                    $0,
-                                    matches: workout
-                                )
-                            }
-                        )
-                else {
-                    continue
-                }
-
-                completedIDs.insert(workout.id)
-                available.remove(at: matchIndex)
-            }
-        }
-
-        return (
-            min(completedIDs.count, total),
-            total
-        )
+        }.count
+        // The same source of truth drives week, day and whole-plan progress.
+        return (completed, sessions.count)
     }
 
     private func trainUpcomingWorkouts(
@@ -8555,8 +8476,7 @@ struct ATHLTHTrainView: View {
         let completed =
             trainPlanSessionCompleted(
                 workout,
-                planID: plan.id,
-                date: date
+                planID: plan.id
             )
         let skipped =
             session.isPlanSessionSkipped(
@@ -8573,11 +8493,10 @@ struct ATHLTHTrainView: View {
                     workout: workout,
                     isHealthCompleted:
                         completed &&
-                        !session
-                            .isPlanSessionManuallyCompleted(
-                                planID: plan.id,
-                                sessionID: workout.id
-                            )
+                        session.linkedHealthWorkoutID(
+                            planID: plan.id,
+                            sessionID: workout.id
+                        ) != nil
                 )
         } label: {
             HStack(spacing: 10) {
@@ -9593,40 +9512,14 @@ struct ATHLTHTrainView: View {
 
     private func trainPlanSessionCompleted(
         _ workout: PlannedSession,
-        planID: UUID,
-        date: Date?
+        planID: UUID
     ) -> Bool {
-        if session.isPlanSessionManuallyCompleted(
+        session.isPlanSessionCompleted(
             planID: planID,
-            sessionID: workout.id
-        ) {
-            return true
-        }
-
-        if strengthWorkout.workoutHistory.contains(
-            where: {
-                $0.isFinished &&
-                $0.plannedSessionID ==
-                    workout.id
-            }
-        ) {
-            return true
-        }
-
-        guard let date else {
-            return false
-        }
-
-        return health.workouts.contains {
-            Calendar.current.isDate(
-                $0.startDate,
-                inSameDayAs: date
-            ) &&
-            healthWorkout(
-                $0,
-                matches: workout
-            )
-        }
+            sessionID: workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
     }
 
     private func trainWeekSnapshotCard(
@@ -10349,7 +10242,10 @@ struct ATHLTHTrainView: View {
     @ViewBuilder
     private func todaysPlanCard(_ plan: TrainingPlan) -> some View {
         let sessions = todaySessions(in: plan)
-        let healthCompletedIDs = healthCompletedTodaySessionIDs(sessions)
+        let healthCompletedIDs = healthCompletedTodaySessionIDs(
+            planID: plan.id,
+            sessions: sessions
+        )
         let manuallyCompletedIDs = manuallyCompletedTodaySessionIDs(
             planID: plan.id,
             sessions: sessions
@@ -10497,7 +10393,12 @@ struct ATHLTHTrainView: View {
         isFirst: Bool,
         isLast: Bool
     ) -> some View {
-        let isCompleted = isHealthCompleted || isManuallyCompleted
+        let isCompleted = session.isPlanSessionCompleted(
+            planID: planID,
+            sessionID: workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory
+        )
 
         Button {
             selectedPlanWorkout = PlannedWorkoutSelection(
@@ -10644,52 +10545,42 @@ struct ATHLTHTrainView: View {
         )
     }
 
-    private func healthCompletedTodaySessionIDs(
-        _ sessions: [PlannedSession]
+    private func completedTodaySessionIDs(
+        planID: UUID,
+        sessions: [PlannedSession]
     ) -> Set<UUID> {
-        let calendar = Calendar.current
-        var unusedWorkouts = health.workouts
-            .filter { calendar.isDateInToday($0.startDate) }
-            .sorted { $0.startDate < $1.startDate }
-
-        var result = Set<UUID>()
-
-        for session in sessions {
-            guard let matchIndex = unusedWorkouts.firstIndex(where: {
-                healthWorkout($0, matches: session)
-            }) else {
-                continue
-            }
-
-            result.insert(session.id)
-            unusedWorkouts.remove(at: matchIndex)
-        }
-
-        return result
+        Set(
+            sessions.filter {
+                session.isPlanSessionCompleted(
+                    planID: planID,
+                    sessionID: $0.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strengthWorkout.workoutHistory
+                )
+            }.map(\.id)
+        )
     }
 
-    private func healthWorkout(
-        _ workout: WorkoutSummary,
-        matches session: PlannedSession
-    ) -> Bool {
-        switch session.kind {
-        case .running:
-            return workout.activity == .running
-        case .walking:
-            return workout.activity == .walking || workout.activity == .hiking
-        case .strength:
-            return workout.activity == .strength
-        case .mobility:
-            return workout.activity == .yoga || workout.activity == .coreTraining
-        case .recovery:
-            return false
-        case .custom:
-            return workout.activity == .hiit ||
-                workout.activity == .rowing ||
-                workout.activity == .cycling ||
-                workout.activity == .stairClimbing ||
-                workout.activity == .other
-        }
+    private func healthCompletedTodaySessionIDs(
+        planID: UUID,
+        sessions: [PlannedSession]
+    ) -> Set<UUID> {
+        // Display the Health label only for a valid, explicitly linked workout.
+        // Never infer that today's unrelated run completed a scheduled one.
+        Set(
+            sessions.filter {
+                session.linkedHealthWorkoutID(
+                    planID: planID,
+                    sessionID: $0.id
+                ) != nil &&
+                session.isPlanSessionCompleted(
+                    planID: planID,
+                    sessionID: $0.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strengthWorkout.workoutHistory
+                )
+            }.map(\.id)
+        )
     }
 
     private func todaySessions(
@@ -10817,7 +10708,8 @@ struct ATHLTHTrainView: View {
                         workout: workout,
                         isHealthCompleted:
                             healthCompletedTodaySessionIDs(
-                                [workout]
+                                planID: planID,
+                                sessions: [workout]
                             )
                             .contains(workout.id)
                     )
