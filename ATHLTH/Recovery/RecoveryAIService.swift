@@ -33,6 +33,36 @@ struct RecoveryAIContext: Codable, Hashable {
     let checkIn: RecoveryAICheckIn
 }
 
+
+extension RecoveryAIContext {
+    // Deliberately empty health context for ordinary Coach questions.
+    // This is the default for every request unless the user explicitly
+    // confirms health-data sharing for that one message.
+    static var withoutHealthData: RecoveryAIContext {
+        RecoveryAIContext(
+            recoveryScore: nil,
+            recoveryState: "Not shared",
+            recoveryDetail: "Health data was not shared for this question.",
+            sleepSeconds: nil,
+            baselineSleepSeconds: nil,
+            hrvMilliseconds: nil,
+            baselineHRVMilliseconds: nil,
+            restingHeartRate: nil,
+            baselineRestingHeartRate: nil,
+            yesterdayTrainingMinutes: 0,
+            acuteTrainingMinutes: 0,
+            chronicWeeklyAverageMinutes: nil,
+            muscles: [],
+            checkIn: RecoveryAICheckIn(
+                energy: nil,
+                stress: nil,
+                overallSoreness: nil,
+                motivation: nil
+            )
+        )
+    }
+}
+
 struct RecoveryAIFactor: Codable, Hashable, Identifiable {
     var id: String { title + detail }
 
@@ -109,6 +139,7 @@ private struct RecoveryAIRequest: Encodable {
     let question: String?
     let language: String
     let history: [RecoveryAIChatTurn]?
+    let shareHealthData: Bool?
 }
 
 private struct RecoveryAIInsightCacheEntry: Codable {
@@ -287,7 +318,7 @@ enum RecoveryCoachConversationPersistence {
                 isDirectory: true
             )
             .appendingPathComponent(
-                "recovery-coach-(userID.uuidString)-(language).json",
+                "recovery-coach-\(userID.uuidString)-\(language).json",
                 isDirectory: false
             )
     }
@@ -354,7 +385,8 @@ final class RecoveryAIService {
                             ATHLTHLocalization.isNorwegian
                                 ? "nb"
                                 : "en",
-                        history: nil
+                        history: nil,
+                        shareHealthData: nil
                     )
                 )
             )
@@ -437,7 +469,8 @@ final class RecoveryAIService {
     func ask(
         _ question: String,
         context: RecoveryAIContext,
-        history: [RecoveryCoachMessage]
+        history: [RecoveryCoachMessage],
+        shareHealthData: Bool = false
     ) async throws -> RecoveryCoachReply {
         let requestHistory =
             history
@@ -460,16 +493,18 @@ final class RecoveryAIService {
                 options: FunctionInvokeOptions(
                     body: RecoveryAIRequest(
                         mode: "ask",
-                        context: context,
+                        context: shareHealthData
+                            ? context : .withoutHealthData,
                         question: question,
                         language:
                             ATHLTHLocalization.isNorwegian
                                 ? "nb"
                                 : "en",
                         history:
-                            requestHistory.isEmpty
-                                ? nil
-                                : requestHistory
+                            shareHealthData && !requestHistory.isEmpty
+                                ? requestHistory
+                                : nil,
+                        shareHealthData: shareHealthData
                     )
                 )
             )
