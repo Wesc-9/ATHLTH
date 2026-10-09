@@ -1422,59 +1422,34 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
     }
 
     var body: some View {
-        let appearance =
-            challenge.resolvedAppearance
-        let titleColor =
-            Color(
-                athlthHex:
-                    appearance
-                    .textColorHex
-            )
-        let secondaryColor =
-            Color(
-                athlthHex:
-                    appearance
-                    .secondaryTextColorHex
-            )
+        let appearance = challenge.resolvedAppearance
+        let titleColor = Color(athlthHex: appearance.textColorHex)
+        let secondaryColor = Color(athlthHex: appearance.secondaryTextColorHex)
 
         ZStack {
             OfficialWeeklyChallengeArtwork(
                 challenge: challenge,
-                preserveOriginalColors:
-                    appearance
-                    .preserveOriginalImageColors
+                preserveOriginalColors: appearance.preserveOriginalImageColors
             )
 
-            // Premium floating-text treatment. Instead of putting the whole
-            // copy inside a glass rectangle, contrast is created inside the
-            // artwork itself with soft local gradients.
-            HStack(spacing: 0) {
-                LinearGradient(
-                    colors: [
-                        Color.black
-                            .opacity(0.48),
-                        Color.black
-                            .opacity(0.24),
-                        Color.black
-                            .opacity(0.04),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(maxWidth: 430)
-
-                Spacer(minLength: 0)
-            }
+            // Protect text contrast within the photo, without floating text boxes.
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.47),
+                    Color.black.opacity(0.20),
+                    Color.black.opacity(0.02),
+                    Color.clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
             .allowsHitTesting(false)
 
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black
-                        .opacity(0.04),
-                    Color.black
-                        .opacity(0.31)
+                    Color.black.opacity(0.05),
+                    Color.black.opacity(0.33)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1482,393 +1457,105 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
             .allowsHitTesting(false)
 
             if appearance.showImageOverlay {
-                Color.black.opacity(
-                    appearance
-                        .resolvedImageOverlayOpacity
-                )
-                .allowsHitTesting(false)
+                Color.black.opacity(appearance.resolvedImageOverlayOpacity)
+                    .allowsHitTesting(false)
             }
 
-            VStack(
-                alignment: .leading,
-                spacing: 0
-            ) {
-                HStack(
-                    alignment: .center,
-                    spacing: 9
-                ) {
-                    if appearance.showBadge {
-                        HStack(spacing: 9) {
-                            Image(
-                                systemName:
-                                    "trophy.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 11,
-                                    weight: .bold
-                                )
-                            )
-                            .foregroundStyle(
-                                premiumGold
-                            )
+            VStack(alignment: .leading, spacing: 0) {
+                if appearance.showBadge {
+                    HStack(spacing: 10) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(premiumGold)
 
-                            Rectangle()
-                                .fill(
-                                    premiumGold
-                                        .opacity(0.64)
-                                )
-                                .frame(
-                                    width: 1,
-                                    height: 16
-                                )
+                        Rectangle()
+                            .fill(premiumGold.opacity(0.85))
+                            .frame(width: 1, height: 18)
 
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "WEEKLY CHALLENGE",
-                                    norwegian:
-                                        "UKENS CHALLENGE"
-                                )
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "WEEKLY CHALLENGE",
+                                norwegian: "UKENS CHALLENGE"
                             )
-                            .font(
-                                .system(
-                                    size: 10,
-                                    weight: .heavy,
-                                    design: .rounded
-                                )
-                            )
-                            .tracking(1.15)
-                            .foregroundStyle(
-                                Color.white
-                                    .opacity(0.96)
-                            )
-                        }
-                        .padding(
-                            .horizontal,
-                            13
                         )
-                        .frame(height: 34)
-                        .background(
-                            .ultraThinMaterial,
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white
-                                                .opacity(0.70),
-                                            premiumGold
-                                                .opacity(0.62),
-                                            Color.white
-                                                .opacity(0.18)
-                                        ],
-                                        startPoint:
-                                            .topLeading,
-                                        endPoint:
-                                            .bottomTrailing
-                                    ),
-                                    lineWidth: 0.9
-                                )
-                        }
-                        .shadow(
-                            color:
-                                premiumGold
-                                    .opacity(0.17),
-                            radius: 7,
-                            y: 2
-                        )
-                        .shadow(
-                            color:
-                                Color.black
-                                    .opacity(0.18),
-                            radius: 8,
-                            y: 3
-                        )
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .tracking(1.35)
+                        .foregroundStyle(Color.white.opacity(0.97))
                     }
-
-                    Spacer(minLength: 8)
-
-                    HStack(spacing: 6) {
-                        Image(
-                            systemName:
-                                challenge
-                                    .kind
-                                    .icon
-                        )
-
-                        Text(targetText)
-                    }
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .padding(
-                        .horizontal,
-                        12
-                    )
-                    .frame(height: 34)
-                    .background(
-                        .ultraThinMaterial,
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(
-                                Color.white
-                                    .opacity(0.36),
-                                lineWidth: 0.8
-                            )
-                    }
-                    .shadow(
-                        color:
-                            Color.black
-                                .opacity(0.18),
-                        radius: 7,
-                        y: 3
-                    )
+                    .shadow(color: Color.black.opacity(0.32), radius: 3, y: 1)
                 }
 
-                Spacer(minLength: 15)
+                Spacer(minLength: 16)
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(challenge.title)
-                        .font(
-                            .system(
-                                size: 24,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(
-                            titleColor
-                        )
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .foregroundStyle(titleColor)
                         .lineLimit(2)
-                        .minimumScaleFactor(
-                            0.80
-                        )
-                        .lineSpacing(1)
+                        .minimumScaleFactor(0.78)
                         .shadow(
-                            color:
-                                Color.black
-                                .opacity(
-                                    appearance
-                                        .showTextShadow
-                                        ? max(
-                                            appearance
-                                                .resolvedShadowOpacity,
-                                            0.46
-                                        )
-                                        : 0.24
-                                ),
-                            radius:
-                                appearance
-                                    .showTextShadow
-                                    ? 4
-                                    : 2,
+                            color: Color.black.opacity(
+                                appearance.showTextShadow
+                                    ? max(appearance.resolvedShadowOpacity, 0.46)
+                                    : 0.24
+                            ),
+                            radius: appearance.showTextShadow ? 4 : 2,
                             y: 1.5
                         )
 
                     if appearance.showSubtitle {
-                        Text(
-                            challenge.subtitle
-                        )
-                        .font(
-                            .system(
-                                size: 13,
-                                weight: .medium
-                            )
-                        )
-                        .foregroundStyle(
-                            secondaryColor
-                        )
-                        .lineLimit(2)
-                        .lineSpacing(1.5)
-                        .truncationMode(.tail)
-                        .shadow(
-                            color:
-                                Color.black
-                                    .opacity(0.34),
-                            radius: 3,
-                            y: 1
-                        )
+                        Text(challenge.subtitle)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(secondaryColor)
+                            .lineLimit(2)
+                            .lineSpacing(1.5)
+                            .truncationMode(.tail)
+                            .shadow(color: .black.opacity(0.38), radius: 3, y: 1)
                     }
                 }
-                .frame(
-                    maxWidth: 345,
-                    alignment: .leading
-                )
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 14)
 
-                HStack(
-                    alignment: .center,
-                    spacing: 10
-                ) {
+                HStack(alignment: .center, spacing: 10) {
                     if appearance.showMetadata {
-                        HStack(spacing: 10) {
-                            Label(
-                                ATHLTHLocalization
-                                    .format(
-                                        english:
-                                            "%d participating",
-                                        norwegian:
-                                            "%d deltar",
-                                        store
-                                            .participantCount(
-                                                for:
-                                                    challenge
-                                                    .id
-                                            )
-                                    ),
-                                systemImage:
-                                    "person.2.fill"
-                            )
-
-                            Rectangle()
-                                .fill(
-                                    Color.white
-                                        .opacity(0.34)
-                                )
-                                .frame(
-                                    width: 1,
-                                    height: 15
-                                )
-
-                            Label(
-                                ATHLTHLocalization
-                                    .format(
-                                        english:
-                                            "%d days left",
-                                        norwegian:
-                                            "%d dager igjen",
-                                        daysRemaining
-                                    ),
-                                systemImage:
-                                    "clock.fill"
-                            )
-                        }
-                        .font(
-                            .system(
-                                size: 10.5,
-                                weight: .bold,
-                                design: .rounded
-                            )
+                        Label(
+                            ATHLTHLocalization.format(
+                                english: "%d days left",
+                                norwegian: "%d dager igjen",
+                                daysRemaining
+                            ),
+                            systemImage: "clock.fill"
                         )
-                        .foregroundStyle(
-                            Color.white
-                                .opacity(0.96)
-                        )
-                        .padding(
-                            .horizontal,
-                            13
-                        )
-                        .frame(height: 36)
-                        .background(
-                            .ultraThinMaterial,
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white
-                                                .opacity(0.52),
-                                            premiumGold
-                                                .opacity(0.28),
-                                            Color.white
-                                                .opacity(0.20)
-                                        ],
-                                        startPoint:
-                                            .topLeading,
-                                        endPoint:
-                                            .bottomTrailing
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                        }
-                        .shadow(
-                            color:
-                                Color.black
-                                    .opacity(0.17),
-                            radius: 7,
-                            y: 3
-                        )
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.98))
+                        .shadow(color: .black.opacity(0.40), radius: 4, y: 1)
                     }
 
                     Spacer(minLength: 8)
 
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .bold
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(
+                            Color(red: 0.34, green: 0.25, blue: 0.08)
                         )
-                    )
-                    .foregroundStyle(
-                        Color(
-                            red: 0.34,
-                            green: 0.25,
-                            blue: 0.08
-                        )
-                    )
-                    .frame(
-                        width: 43,
-                        height: 43
-                    )
-                    .background(
-                        .ultraThinMaterial,
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
+                        .frame(width: 43, height: 43)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .overlay {
+                            Circle().stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color.white
-                                            .opacity(0.90),
-                                        premiumGold
-                                            .opacity(0.82),
-                                        Color.white
-                                            .opacity(0.32)
+                                        Color.white.opacity(0.92),
+                                        premiumGold.opacity(0.88),
+                                        Color.white.opacity(0.28)
                                     ],
-                                    startPoint:
-                                        .topLeading,
-                                    endPoint:
-                                        .bottomTrailing
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 1.15
+                                lineWidth: 1
                             )
-                    }
-                    .shadow(
-                        color:
-                            premiumGold
-                                .opacity(0.20),
-                        radius: 8,
-                        y: 2
-                    )
-                    .shadow(
-                        color:
-                            Color.black
-                                .opacity(0.18),
-                        radius: 7,
-                        y: 3
-                    )
+                        }
+                        .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
                 }
             }
             .padding(14)
@@ -1876,47 +1563,25 @@ private struct CommunityReferenceWeeklyChallengeCard: View {
         .frame(height: 184)
         .frame(maxWidth: .infinity)
         .clipShape(
-            RoundedRectangle(
-                cornerRadius: 27,
-                style: .continuous
-            )
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 27,
-                style: .continuous
-            )
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.76),
-                        premiumGold
-                            .opacity(0.52),
-                        Color.white
-                            .opacity(0.20)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
-            )
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.76),
+                            premiumGold.opacity(0.52),
+                            Color.white.opacity(0.20)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         }
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.12),
-            radius: 17,
-            y: 8
-        )
-        .shadow(
-            color:
-                premiumGold
-                    .opacity(0.08),
-            radius: 24,
-            y: 10
-        )
-
+        .shadow(color: .black.opacity(0.12), radius: 17, y: 8)
+        .shadow(color: premiumGold.opacity(0.08), radius: 24, y: 10)
     }
 }
 
