@@ -353,10 +353,9 @@ enum RecoveryCoachConversationPersistence {
                 options: [.atomic, .completeFileProtection]
             )
             var protectedURL = url
-            try protectedURL.setResourceValue(
-                true,
-                forKey: .isExcludedFromBackupKey
-            )
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            try protectedURL.setResourceValues(resourceValues)
         } catch {
             return
         }
