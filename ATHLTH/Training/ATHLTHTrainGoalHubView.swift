@@ -255,7 +255,11 @@ struct ATHLTHTrainGoalHubView: View {
     }
 
     private func blockReview(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let strengthReport = TrainingPlanStrengthReport.make(
+            plan: plan,
+            strengthHistory: strength.workoutHistory
+        )
+        return VStack(alignment: .leading, spacing: 12) {
             Text(tr("TRAINING BLOCKS", "TRENINGSPERIODER"))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.5)
@@ -284,6 +288,11 @@ struct ATHLTHTrainGoalHubView: View {
                 }.count
                 let fraction = sessions.isEmpty
                     ? 0.0 : Double(completed) / Double(sessions.count)
+                let includedWeeks = strengthReport.weeks.filter {
+                    block.contains(week: $0.number)
+                }
+                let plannedSets = includedWeeks.reduce(0) { $0 + $1.plannedWorkingSets }
+                let performedSets = includedWeeks.reduce(0) { $0 + $1.performedWorkingSets }
 
                 VStack(alignment: .leading, spacing: 9) {
                     HStack {
@@ -308,6 +317,20 @@ struct ATHLTHTrainGoalHubView: View {
                         }
                     }
                     .frame(height: 5)
+                    HStack {
+                        Text(tr("Planned work sets", "Planlagte arbeidssett"))
+                        Spacer()
+                        Text("\(plannedSets)")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    HStack {
+                        Text(tr("Recorded work sets", "Gjennomførte arbeidssett"))
+                        Spacer()
+                        Text("\(performedSets)")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(muted)
                     if !block.goal.isEmpty {
                         Text(block.goal)
                             .font(.caption)
