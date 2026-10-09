@@ -48,7 +48,7 @@ private struct RecoveryCoachLegacyConversationHero<
                     .scaledToFill()
                     // Cropping needs a finite width or this image expands
                     // the entire chat beyond the iPhone screen.
-                    .frame(width: viewport.size.width, height: 214)
+                    .frame(width: viewport.size.width, height: 164)
                     .clipped()
 
             LinearGradient(
@@ -141,7 +141,7 @@ private struct RecoveryCoachLegacyConversationHero<
             .padding(.horizontal, 14)
             .padding(.top, 14)
         }
-        .frame(width: viewport.size.width, height: 214)
+        .frame(width: viewport.size.width, height: 164)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: 30,
@@ -167,7 +167,7 @@ private struct RecoveryCoachLegacyConversationHero<
             y: 7
         )
         }
-        .frame(height: 214)
+        .frame(height: 164)
     }
 }
 
@@ -797,23 +797,6 @@ struct RecoveryCoachInboxDestinationView:
                             )
                         )
                 )
-            } else if !session
-                .aiHealthDataSharingEnabled {
-                ContentUnavailableView(
-                    recoveryAIText(
-                        "Coach health access is off",
-                        "Tilgang til helsedata for Coach er av"
-                    ),
-                    systemImage:
-                        "lock.shield.fill",
-                    description:
-                        Text(
-                            recoveryAIText(
-                                "Enable health-data use in Settings → Privacy & Data to use ATHLTH Coach.",
-                                "Aktiver bruk av helsedata i Innstillinger → Personvern og data for å bruke ATHLTH Coach."
-                            )
-                        )
-                )
             } else {
                 RecoveryCoachView(
                     context:
@@ -1021,10 +1004,7 @@ struct RecoveryCoachInboxDestinationView:
     @MainActor
     private func loadCoachContext()
         async {
-        guard session.hasPaidAccess,
-              session
-                .aiHealthDataSharingEnabled
-        else {
+        guard session.hasPaidAccess else {
             return
         }
 
@@ -1051,11 +1031,9 @@ struct RecoveryCoachInboxDestinationView:
                             .trainingLoad
                 )
 
-        insight =
-            try? await RecoveryAIService()
-                .generate(
-                    coachContext
-                )
+        // Build health context locally. Opening the chat never sends
+        // it to an AI provider; only confirmed messages may do that.
+        insight = nil
     }
 }
 
@@ -1078,6 +1056,9 @@ struct RecoveryCoachView: View {
     @State private var didLoadConversation =
         false
     @State private var coachPinned = true
+    @State private var shareHealthForNextQuestion = false
+    @State private var pendingHealthQuestion: String?
+    @State private var showingHealthShareConfirmation = false
 
     private let service = RecoveryAIService()
     private let bottomAnchorID =
@@ -1110,8 +1091,8 @@ struct RecoveryCoachView: View {
                             alignment: .leading,
                             spacing: 14
                         ) {
-                            coachInsightCard
-
+                            // The Coach conversation is a dedicated chat, not a
+                            // second Insights dashboard under a giant header.
                             if messages.isEmpty {
                                 Text(
                                     recoveryAIText(
@@ -1263,7 +1244,7 @@ struct RecoveryCoachView: View {
                 )
                 .padding(
                     .top,
-                    -24
+                    -14
                 )
                 .zIndex(1)
             }
@@ -1295,6 +1276,36 @@ struct RecoveryCoachView: View {
                                 .profile
                                 .userID
                     )
+        }
+        .alert(
+            recoveryAIText(
+                "Share health data with AI?",
+                "Dele helsedata med AI?"
+            ),
+            isPresented: $showingHealthShareConfirmation
+        ) {
+            Button(
+                recoveryAIText("Cancel", "Avbryt"),
+                role: .cancel
+            ) {
+                pendingHealthQuestion = nil
+                shareHealthForNextQuestion = false
+            }
+            Button(recoveryAIText("Share and send", "Del og send")) {
+                guard let pending = pendingHealthQuestion else { return }
+                pendingHealthQuestion = nil
+                shareHealthForNextQuestion = false
+                Task {
+                    await ask(pending, shareHealthData: true)
+                }
+            }
+        } message: {
+            Text(
+                recoveryAIText(
+                    "ATHLTH will send your question, up to 16 recent chat messages, and your current sleep, HRV, resting heart rate, activity load, muscle recovery and any check-in values to its external AI provider Groq. This approval applies to this question only. Cancel to keep health data on your device.",
+                    "ATHLTH sender spørsmålet ditt, inntil 16 tidligere chatmeldinger og opplysninger om søvn, HRV, hvilepuls, treningsbelastning, muskelrestitusjon og eventuell innsjekk til AI-leverandøren Groq. Du godkjenner bare denne sendingen. Velg Avbryt for å beholde helsedata på telefonen."
+                )
+            )
         }
     }
 
@@ -1773,11 +1784,7 @@ struct RecoveryCoachView: View {
                             ) {
                                 suggestion in
                                 Button {
-                                    Task {
-                                        await ask(
-                                            suggestion
-                                        )
-                                    }
+                                    requestAnswer(suggestion)
                                 } label: {
                                     VStack(
                                         alignment:
@@ -1870,6 +1877,41 @@ struct RecoveryCoachView: View {
                 }
             }
 
+            Button {
+                shareHealthForNextQuestion.toggle()
+            } label: {
+                Label(
+                    shareHealthForNextQuestion
+                        ? recoveryAIText(
+                            "Health data selected · confirm when sending",
+                            "Helsedata valgt · bekreft ved sending"
+                        )
+                        : recoveryAIText(
+                            "Share health data for next question",
+                            "Del helsedata i neste spørsmål"
+                        ),
+                    systemImage: shareHealthForNextQuestion
+                        ? "checkmark.shield.fill"
+                        : "lock.shield"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(
+                    shareHealthForNextQuestion
+                        ? ATHLTHTheme.vitality
+                        : ATHLTHTheme.mutedText
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                recoveryAIText(
+                    "Normal questions are sent to Groq without health data. Activate and confirm to include your health data for one question.",
+                    "Vanlige spørsmål sendes til Groq uten helsedata. Aktiver og bekreft for å inkludere helsedata i ett spørsmål."
+                )
+            )
+
             HStack(spacing: 9) {
                 Menu {
                     Button {
@@ -1955,11 +1997,7 @@ struct RecoveryCoachView: View {
                 .lineLimit(1...4)
                 .submitLabel(.send)
                 .onSubmit {
-                    Task {
-                        await ask(
-                            question
-                        )
-                    }
+                    requestAnswer(question)
                 }
                 .padding(
                     .horizontal,
@@ -1999,11 +2037,7 @@ struct RecoveryCoachView: View {
                 )
 
                 Button {
-                    Task {
-                        await ask(
-                            question
-                        )
-                    }
+                    requestAnswer(question)
                 } label: {
                     Image(
                         systemName:
@@ -2257,8 +2291,24 @@ struct RecoveryCoachView: View {
     }
 
     @MainActor
+    private func requestAnswer(_ rawQuestion: String) {
+        let clean = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, !isAsking else { return }
+
+        if shareHealthForNextQuestion {
+            pendingHealthQuestion = clean
+            showingHealthShareConfirmation = true
+        } else {
+            Task {
+                await ask(clean, shareHealthData: false)
+            }
+        }
+    }
+
+    @MainActor
     private func ask(
-        _ rawQuestion: String
+        _ rawQuestion: String,
+        shareHealthData: Bool
     ) async {
         let clean =
             rawQuestion
@@ -2295,8 +2345,8 @@ struct RecoveryCoachView: View {
                 try await service.ask(
                     clean,
                     context: context,
-                    history:
-                        priorHistory
+                    history: priorHistory,
+                    shareHealthData: shareHealthData
                 )
 
             messages.append(
