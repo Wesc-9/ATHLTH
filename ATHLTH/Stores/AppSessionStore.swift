@@ -542,6 +542,16 @@ final class AppSessionStore: ObservableObject {
 
     func clearAfterAccountDeletion() {
         let deletedID = localAccountID
+        if let deletedID {
+            // Coach history and generated insights can contain health data.
+            // Remove both separately from the regular training-data cleanup.
+            RecoveryCoachConversationPersistence.delete(userID: deletedID)
+            for language in ["nb", "en"] {
+                let key = "athlth.recoveryAIInsight.\(deletedID.uuidString).\(language)"
+                defaults.removeObject(forKey: key)
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
         if let deletedID { defaults.set(true, forKey: AccountLocalStorage.key("deleted", userID: deletedID)) }
         clearAfterSignOut()
         if let deletedID {
