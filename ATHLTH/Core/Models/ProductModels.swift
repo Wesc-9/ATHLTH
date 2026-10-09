@@ -1261,6 +1261,75 @@ struct TrainingPlanBuilderProfile: Codable, Hashable {
     var preferredWorkoutKindsByDay: [Int: WorkoutKind]? = nil
 }
 
+/// A named multi-week period inside a training program. This describes
+/// purpose and timing; it never stores completed-workout results.
+enum TrainingPlanBlockPurpose: String, Codable, Hashable, CaseIterable, Identifiable {
+    case foundation
+    case progression
+    case specialization
+    case recovery
+    case evaluation
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .foundation:
+            return ATHLTHLocalization.choose(
+                english: "Foundation", norwegian: "Grunnlag"
+            )
+        case .progression:
+            return ATHLTHLocalization.choose(
+                english: "Progression", norwegian: "Progresjon"
+            )
+        case .specialization:
+            return ATHLTHLocalization.choose(
+                english: "Specialization", norwegian: "Spesialisering"
+            )
+        case .recovery:
+            return ATHLTHLocalization.choose(
+                english: "Recovery", norwegian: "Restitusjon"
+            )
+        case .evaluation:
+            return ATHLTHLocalization.choose(
+                english: "Evaluation", norwegian: "Evaluering"
+            )
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english: "Custom", norwegian: "Egendefinert"
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .foundation: return "square.stack.3d.up"
+        case .progression: return "chart.line.uptrend.xyaxis"
+        case .specialization: return "scope"
+        case .recovery: return "leaf"
+        case .evaluation: return "checkmark.seal"
+        case .custom: return "slider.horizontal.3"
+        }
+    }
+}
+
+struct TrainingPlanBlock: Identifiable, Codable, Hashable {
+    let id: UUID
+    var title: String
+    var purpose: TrainingPlanBlockPurpose
+    /// 1-based week indices, inclusive.
+    var startWeek: Int
+    var endWeek: Int
+    var goal: String
+
+    var weekCount: Int { max(0, endWeek - startWeek + 1) }
+
+    func contains(week: Int) -> Bool {
+        startWeek <= week && week <= endWeek
+    }
+}
+
 struct TrainingPlan: Identifiable, Codable, Hashable {
     let id: UUID
     var ownerID: UUID
@@ -1280,6 +1349,8 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var sharedSourcePlanID: UUID? = nil
     var sharedSourceVersion: Int? = nil
     var builderProfile: TrainingPlanBuilderProfile? = nil
+    // Optional so plans saved before training blocks decode without migration.
+    var trainingBlocks: [TrainingPlanBlock]? = nil
 }
 
 struct RouteCoordinate: Codable, Hashable {
