@@ -266,7 +266,7 @@ struct ATHLTHGlobalSearchView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 45, height: 45)
-                    .background(.ultraThinMaterial.opacity(0.55), in: Circle())
+                    .background(.ultraThinMaterial, in: Circle())
                     .overlay {
                         Circle()
                             .stroke(.white.opacity(0.78), lineWidth: 1)
